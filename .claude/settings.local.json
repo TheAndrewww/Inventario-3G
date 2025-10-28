@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(brew install:*)",
+      "Bash(brew services start:*)",
+      "Bash(export PATH=\"/opt/homebrew/opt/postgresql@14/bin:$PATH\")",
+      "Bash(psql:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(node server.js:*)",
+      "Bash(lsof:*)",
+      "Bash(npm run seed:*)",
+      "Bash(python3:*)",
+      "Bash(tree:*)",
+      "Bash(xargs kill -9)",
+      "Bash(npm start)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkAzZy5jb20iLCJyb2wiOiJhZG1pbmlzdHJhZG9yIiwiaWF0IjoxNzYxNjcwODAxLCJleHAiOjE3NjIyNzU2MDF9.luXoH_pjktHbyOj7QeAmCPE7VG7nh592eRt4kdH--2I\")",
+      "Read(//private/tmp/**)",
+      "Bash(bash -c 'TOKEN=$(cat /tmp/token.txt) && curl -s -X POST http://localhost:5001/api/articulos -H \"\"Content-Type: application/json\"\" -H \"\"Authorization: Bearer $TOKEN\"\" -d \"\"{\\\"\"nombre\\\"\":\\\"\"Tornillo hexagonal\\\"\",\\\"\"descripcion\\\"\":\\\"\"Tornillo hexagonal de acero\\\"\",\\\"\"categoria_id\\\"\":1,\\\"\"ubicacion_id\\\"\":1,\\\"\"stock_actual\\\"\":100,\\\"\"stock_minimo\\\"\":20,\\\"\"unidad\\\"\":\\\"\"piezas\\\"\",\\\"\"costo_unitario\\\"\":2.5}\"\" | head -100')",
+      "Bash(bash -c 'TOKEN=$(cat /tmp/token2.txt) && curl -s -X POST http://localhost:5001/api/articulos -H \"\"Content-Type: application/json\"\" -H \"\"Authorization: Bearer $TOKEN\"\" -d \"\"{\\\"\"nombre\\\"\":\\\"\"Tornillo hexagonal 1/4\\\"\",\\\"\"descripcion\\\"\":\\\"\"Tornillo hexagonal de acero inoxidable\\\"\",\\\"\"categoria_id\\\"\":1,\\\"\"ubicacion_id\\\"\":1,\\\"\"stock_actual\\\"\":100,\\\"\"stock_minimo\\\"\":20,\\\"\"unidad\\\"\":\\\"\"piezas\\\"\",\\\"\"costo_unitario\\\"\":2.5}\"\"')",
+      "Bash(bash -c 'TOKEN=$(cat /tmp/token2.txt) && curl -s -X GET http://localhost:5001/api/articulos -H \"\"Authorization: Bearer $TOKEN\"\" | python3 -m json.tool | head -50')",
+      "Bash(bash -c 'TOKEN=$(cat /tmp/token2.txt) && curl -s -X POST http://localhost:5001/api/movimientos -H \"\"Content-Type: application/json\"\" -H \"\"Authorization: Bearer $TOKEN\"\" -d \"\"{\\\"\"tipo\\\"\":\\\"\"retiro\\\"\",\\\"\"articulos\\\"\":[{\\\"\"articulo_id\\\"\":1,\\\"\"cantidad\\\"\":10,\\\"\"observaciones\\\"\":\\\"\"Retiro para proyecto test\\\"\"}],\\\"\"observaciones\\\"\":\\\"\"Prueba de retiro desde API\\\"\"}\"\" | python3 -m json.tool')",
+      "Bash(bash -c 'TOKEN=$(cat /tmp/token2.txt) && curl -s -X GET http://localhost:5001/api/movimientos -H \"\"Authorization: Bearer $TOKEN\"\" | python3 -m json.tool | head -60')",
+      "Bash(bash -c 'TOKEN=$(cat /tmp/token2.txt) && curl -s -X GET \"\"http://localhost:5001/api/articulos/1\"\" -H \"\"Authorization: Bearer $TOKEN\"\" | python3 -m json.tool | grep -A2 \"\"stock_actual\"\"')",
+      "Bash(npm create vite@latest frontend -- --template react)",
+      "Bash(npx tailwindcss init -p)",
+      "Bash(npm uninstall:*)",
+      "Bash(bash -c 'TOKEN=$(cat /tmp/token2.txt) && curl -s -X GET \"\"http://localhost:5001/api/movimientos\"\" -H \"\"Authorization: Bearer $TOKEN\"\" | python3 -m json.tool | head -80')",
+      "Bash(bash -c 'TOKEN=$(cat /tmp/token2.txt) && curl -s -X DELETE \"\"http://localhost:5001/api/articulos/1\"\" -H \"\"Authorization: Bearer $TOKEN\"\" | python3 -m json.tool')",
+      "Bash(npm create:*)",
+      "Bash(npm run build:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
