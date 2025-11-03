@@ -15,7 +15,8 @@ import {
 import {
     verificarToken,
     esAdministrador,
-    esSupervisorOAdmin
+    esSupervisorOAdmin,
+    accesoInventario
 } from '../middleware/auth.middleware.js';
 import { uploadArticuloImagen as multerUpload } from '../config/multer.js';
 
@@ -67,16 +68,16 @@ router.get('/:id', verificarToken, getArticuloById);
 /**
  * @route   POST /api/articulos
  * @desc    Crear nuevo artículo (genera QR automáticamente)
- * @access  Private (Admin o Supervisor)
+ * @access  Private (Almacen, Supervisor, Admin)
  */
-router.post('/', verificarToken, esSupervisorOAdmin, createArticulo);
+router.post('/', verificarToken, accesoInventario, createArticulo);
 
 /**
  * @route   PUT /api/articulos/:id
  * @desc    Actualizar artículo existente
- * @access  Private (Admin o Supervisor)
+ * @access  Private (Almacen, Supervisor, Admin)
  */
-router.put('/:id', verificarToken, esSupervisorOAdmin, updateArticulo);
+router.put('/:id', verificarToken, accesoInventario, updateArticulo);
 
 /**
  * @route   DELETE /api/articulos/:id
@@ -88,9 +89,9 @@ router.delete('/:id', verificarToken, esSupervisorOAdmin, deleteArticulo);
 /**
  * @route   POST /api/articulos/:id/imagen
  * @desc    Subir imagen para un artículo
- * @access  Private (Admin o Supervisor)
+ * @access  Private (Almacen, Supervisor, Admin)
  */
-router.post('/:id/imagen', verificarToken, esSupervisorOAdmin, multerUpload.single('imagen'), uploadArticuloImagen);
+router.post('/:id/imagen', verificarToken, accesoInventario, multerUpload.single('imagen'), uploadArticuloImagen);
 
 /**
  * @route   DELETE /api/articulos/:id/imagen
