@@ -160,7 +160,7 @@ const startServer = async () => {
             }
 
             // Verificar/crear usuario administrador (siempre)
-            const bcrypt = await import('bcrypt');
+            const bcrypt = await import('bcryptjs');
             const { Usuario } = await import('./src/models/index.js');
 
             // FORZAR recreación del admin (eliminar si existe)
