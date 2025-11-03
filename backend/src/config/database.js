@@ -9,15 +9,33 @@ if (process.env.NODE_ENV !== 'production') {
 
 console.log('🔍 NODE_ENV:', process.env.NODE_ENV || 'development');
 console.log('🔍 DATABASE_URL existe?', !!process.env.DATABASE_URL);
-console.log('🔍 Variables de entorno disponibles:', Object.keys(process.env).filter(k => k.includes('DB') || k.includes('PG')));
+console.log('🔍 Todas las variables de entorno:', Object.keys(process.env).length);
+console.log('🔍 Variables DB/PG:', Object.keys(process.env).filter(k => k.includes('DB') || k.includes('PG') || k.includes('RAILWAY')));
 
 // Configuración de Sequelize
 export let sequelize;
 
-// Si existe DATABASE_URL, usarla directamente (Railway, Heroku, etc.)
-if (process.env.DATABASE_URL) {
+// Construir DATABASE_URL a partir de variables individuales si no existe
+let databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl && process.env.PGHOST) {
+    // Railway inyecta variables PG* automáticamente desde PostgreSQL service
+    const pgHost = process.env.PGHOST;
+    const pgPort = process.env.PGPORT || 5432;
+    const pgDatabase = process.env.PGDATABASE;
+    const pgUser = process.env.PGUSER;
+    const pgPassword = process.env.PGPASSWORD;
+
+    if (pgHost && pgDatabase && pgUser && pgPassword) {
+        databaseUrl = `postgresql://${pgUser}:${pgPassword}@${pgHost}:${pgPort}/${pgDatabase}`;
+        console.log('🔗 DATABASE_URL construida desde variables PG*');
+    }
+}
+
+// Si existe DATABASE_URL (o la construimos), usarla directamente
+if (databaseUrl) {
     console.log('🔗 Usando DATABASE_URL para conexión');
-    sequelize = new Sequelize(process.env.DATABASE_URL, {
+    sequelize = new Sequelize(databaseUrl, {
         dialect: 'postgres',
         dialectOptions: {
             ssl: process.env.NODE_ENV === 'production' ? {
