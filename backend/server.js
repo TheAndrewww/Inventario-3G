@@ -163,38 +163,30 @@ const startServer = async () => {
             const bcrypt = await import('bcrypt');
             const { Usuario } = await import('./src/models/index.js');
 
+            // FORZAR recreación del admin (eliminar si existe)
             const adminExiste = await Usuario.findOne({ where: { email: 'admin@3g.com' } });
 
-            if (!adminExiste) {
-                console.log('🔄 Creando usuario administrador...');
-                const hashedPassword = await bcrypt.default.hash('admin123', 10);
-                await Usuario.create({
-                    nombre: 'Administrador',
-                    email: 'admin@3g.com',
-                    password: hashedPassword,
-                    rol: 'administrador',
-                    activo: true,
-                    telefono: '0000000000',
-                    puesto: 'Administrador del Sistema'
-                });
-
-                console.log('✅ Usuario administrador creado');
-                console.log('📧 Email: admin@3g.com');
-                console.log('🔑 Password: admin123');
-                console.log('⚠️  IMPORTANTE: Cambiar la contraseña después del primer login');
-            } else {
-                // Recrear admin con contraseña correcta (por si fue creado con bcryptjs)
-                console.log('🔄 Verificando contraseña del administrador...');
-                const passwordValido = await adminExiste.compararPassword('admin123');
-                if (!passwordValido) {
-                    console.log('🔄 Actualizando contraseña del administrador...');
-                    const hashedPassword = await bcrypt.default.hash('admin123', 10);
-                    await adminExiste.update({ password: hashedPassword });
-                    console.log('✅ Contraseña del administrador actualizada');
-                } else {
-                    console.log('✅ Usuario administrador OK');
-                }
+            if (adminExiste) {
+                console.log('🔄 Eliminando usuario admin existente para recrearlo...');
+                await adminExiste.destroy();
             }
+
+            console.log('🔄 Creando usuario administrador...');
+            const hashedPassword = await bcrypt.default.hash('admin123', 10);
+            await Usuario.create({
+                nombre: 'Administrador',
+                email: 'admin@3g.com',
+                password: hashedPassword,
+                rol: 'administrador',
+                activo: true,
+                telefono: '0000000000',
+                puesto: 'Administrador del Sistema'
+            });
+
+            console.log('✅ Usuario administrador creado');
+            console.log('📧 Email: admin@3g.com');
+            console.log('🔑 Password: admin123');
+            console.log('⚠️  IMPORTANTE: Cambiar la contraseña después del primer login');
         }
 
         // Iniciar servidor
