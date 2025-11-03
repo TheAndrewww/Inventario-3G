@@ -1,5 +1,5 @@
 import { Usuario } from '../models/index.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 /**
  * Obtener todos los usuarios
