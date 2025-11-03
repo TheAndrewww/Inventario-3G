@@ -27,15 +27,22 @@ const allowedOrigins = [
 // Agregar URL de producción si existe
 if (process.env.FRONTEND_URL) {
     allowedOrigins.push(process.env.FRONTEND_URL);
+    // Agregar también la versión con https
+    allowedOrigins.push(process.env.FRONTEND_URL.replace('http://', 'https://'));
 }
+
+console.log('🔒 CORS - Orígenes permitidos:', allowedOrigins);
 
 app.use(cors({
     origin: function (origin, callback) {
+        console.log('🔍 CORS - Origen recibido:', origin);
         // Permite peticiones si el origen está en la lista,
         // o si no hay origen (ej. Postman)
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
+            console.log('❌ CORS - Origen rechazado:', origin);
+            console.log('❌ CORS - Lista permitida:', allowedOrigins);
             callback(new Error('CORS no permitido para este origen'));
         }
     },
