@@ -221,6 +221,7 @@ export const createArticulo = async (req, res) => {
     try {
         const {
             codigo_ean13,
+            codigo_tipo,
             nombre,
             descripcion,
             categoria_id,
@@ -243,22 +244,26 @@ export const createArticulo = async (req, res) => {
             });
         }
 
-        // Si se proporciona código EAN-13, validarlo
-        if (codigo_ean13) {
-            // Validar formato EAN-13
-            if (!/^[0-9]{13}$/.test(codigo_ean13)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El código EAN-13 debe contener exactamente 13 dígitos numéricos'
-                });
-            }
+        // Determinar tipo de código (por defecto EAN13)
+        const tipoFinal = codigo_tipo || 'EAN13';
 
-            // Verificar que el código EAN-13 no exista
+        // Validar tipo de código
+        const tiposValidos = ['EAN13', 'EAN8', 'UPCA', 'UPCE', 'CODE128', 'CODE39', 'QRCODE', 'DATAMATRIX'];
+        if (!tiposValidos.includes(tipoFinal)) {
+            return res.status(400).json({
+                success: false,
+                message: `Tipo de código inválido. Tipos válidos: ${tiposValidos.join(', ')}`
+            });
+        }
+
+        // Si se proporciona código, validarlo
+        if (codigo_ean13) {
+            // Verificar que el código no exista
             const articuloExistente = await Articulo.findOne({ where: { codigo_ean13 } });
             if (articuloExistente) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Ya existe un artículo con ese código EAN-13'
+                    message: `Ya existe un artículo con ese código ${tipoFinal}`
                 });
             }
         }
@@ -292,6 +297,7 @@ export const createArticulo = async (req, res) => {
         // Crear artículo
         const articulo = await Articulo.create({
             codigo_ean13: codigoFinal,
+            codigo_tipo: tipoFinal,
             nombre,
             descripcion,
             categoria_id,
@@ -307,8 +313,8 @@ export const createArticulo = async (req, res) => {
             es_herramienta: es_herramienta || false
         });
 
-        // Si se generó automáticamente, actualizar con código basado en ID
-        if (!codigo_ean13) {
+        // Si se generó automáticamente y es EAN13, actualizar con código basado en ID
+        if (!codigo_ean13 && tipoFinal === 'EAN13') {
             const codigoBasadoEnId = generarCodigoEAN13(articulo.id);
             await articulo.update({ codigo_ean13: codigoBasadoEnId });
             articulo.codigo_ean13 = codigoBasadoEnId;
@@ -363,6 +369,7 @@ export const updateArticulo = async (req, res) => {
         const { id } = req.params;
         const {
             codigo_ean13,
+            codigo_tipo,
             nombre,
             descripcion,
             categoria_id,
@@ -410,17 +417,20 @@ export const updateArticulo = async (req, res) => {
             }
         }
 
-        // Si se proporciona código EAN-13, validarlo
-        if (codigo_ean13) {
-            // Validar formato EAN-13
-            if (!/^[0-9]{13}$/.test(codigo_ean13)) {
+        // Validar tipo de código si se proporciona
+        if (codigo_tipo) {
+            const tiposValidos = ['EAN13', 'EAN8', 'UPCA', 'UPCE', 'CODE128', 'CODE39', 'QRCODE', 'DATAMATRIX'];
+            if (!tiposValidos.includes(codigo_tipo)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'El código EAN-13 debe contener exactamente 13 dígitos numéricos'
+                    message: `Tipo de código inválido. Tipos válidos: ${tiposValidos.join(', ')}`
                 });
             }
+        }
 
-            // Verificar que el código EAN-13 no exista en otro artículo
+        // Si se proporciona código, validarlo
+        if (codigo_ean13) {
+            // Verificar que el código no exista en otro artículo
             const articuloExistente = await Articulo.findOne({
                 where: {
                     codigo_ean13,
@@ -430,7 +440,7 @@ export const updateArticulo = async (req, res) => {
             if (articuloExistente) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Ya existe otro artículo con ese código EAN-13'
+                    message: 'Ya existe otro artículo con ese código'
                 });
             }
         }
@@ -438,6 +448,7 @@ export const updateArticulo = async (req, res) => {
         // Actualizar artículo
         await articulo.update({
             ...(codigo_ean13 && { codigo_ean13 }),
+            ...(codigo_tipo && { codigo_tipo }),
             ...(nombre && { nombre }),
             ...(descripcion !== undefined && { descripcion }),
             ...(categoria_id && { categoria_id }),
@@ -544,8 +555,9 @@ export const getArticuloBarcode = async (req, res) => {
             });
         }
 
-        // Generar imagen del código de barras
-        const imagenBuffer = await generarImagenCodigoBarras(articulo.codigo_ean13);
+        // Generar imagen del código de barras usando el tipo especificado
+        const tipoCodigo = articulo.codigo_tipo || 'EAN13';
+        const imagenBuffer = await generarImagenCodigoBarras(articulo.codigo_ean13, tipoCodigo);
 
         // Configurar headers para imagen PNG
         res.setHeader('Content-Type', 'image/png');
@@ -580,8 +592,9 @@ export const getArticuloBarcodeSVG = async (req, res) => {
             });
         }
 
-        // Generar SVG del código de barras
-        const svg = await generarSVGCodigoBarras(articulo.codigo_ean13);
+        // Generar SVG del código de barras usando el tipo especificado
+        const tipoCodigo = articulo.codigo_tipo || 'EAN13';
+        const svg = await generarSVGCodigoBarras(articulo.codigo_ean13, tipoCodigo);
 
         // Configurar headers para SVG
         res.setHeader('Content-Type', 'image/svg+xml');
@@ -629,8 +642,9 @@ export const getArticuloEtiqueta = async (req, res) => {
             });
         }
 
-        // Generar imagen del código de barras
-        const imagenBuffer = await generarImagenCodigoBarras(articulo.codigo_ean13, {
+        // Generar imagen del código de barras usando el tipo especificado
+        const tipoCodigo = articulo.codigo_tipo || 'EAN13';
+        const imagenBuffer = await generarImagenCodigoBarras(articulo.codigo_ean13, tipoCodigo, {
             scale: 4,
             height: 12
         });

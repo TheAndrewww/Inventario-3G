@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Camera, X, Loader2, Barcode, AlertCircle, SwitchCamera } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import toast from 'react-hot-toast';
+import { detectBarcodeType, getBarcodeTypeName } from '../../utils/barcodeTypeDetector';
 
-const EAN13InputScanner = ({ value, onChange, disabled = false }) => {
+const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [lastScanned, setLastScanned] = useState(null);
@@ -12,15 +13,17 @@ const EAN13InputScanner = ({ value, onChange, disabled = false }) => {
   const html5QrCodeRef = useRef(null);
   const scannerInitialized = useRef(false);
 
-  // Validar formato EAN-13
-  const validateEAN13 = (code) => {
-    return /^[0-9]{13}$/.test(code);
+  // Validar que el código tenga contenido válido
+  const validateCode = (code) => {
+    // Aceptar cualquier código que tenga contenido válido
+    return code && code.length > 0 && code.length <= 4296; // Máximo para QR Code
   };
 
   // Manejar cambio manual del input
   const handleInputChange = (e) => {
-    const newValue = e.target.value.replace(/[^0-9]/g, ''); // Solo números
-    if (newValue.length <= 13) {
+    const newValue = e.target.value;
+    // Permitir cualquier carácter alfanumérico y algunos especiales
+    if (newValue.length <= 50) { // Límite del campo en BD
       onChange(newValue);
     }
   };
@@ -29,9 +32,9 @@ const EAN13InputScanner = ({ value, onChange, disabled = false }) => {
   const handleScan = (decodedText) => {
     console.log('Código escaneado:', decodedText);
 
-    // Validar que sea EAN-13
-    if (!validateEAN13(decodedText)) {
-      toast.error('Código inválido. Debe ser EAN-13 (13 dígitos)');
+    // Validar que tenga contenido
+    if (!validateCode(decodedText)) {
+      toast.error('Código inválido o demasiado largo');
       return;
     }
 
@@ -41,9 +44,20 @@ const EAN13InputScanner = ({ value, onChange, disabled = false }) => {
     }
     setLastScanned(decodedText);
 
+    // Detectar automáticamente el tipo de código
+    const detectedType = detectBarcodeType(decodedText);
+    const typeName = getBarcodeTypeName(detectedType);
+
+    console.log('Tipo detectado:', detectedType, '-', typeName);
+
+    // Notificar al componente padre sobre el tipo detectado
+    if (onTypeDetected) {
+      onTypeDetected(detectedType);
+    }
+
     // Actualizar valor
     onChange(decodedText);
-    toast.success('Código escaneado correctamente');
+    toast.success(`✓ ${typeName} escaneado correctamente`);
 
     // Detener escaneo automáticamente
     stopScanning();
@@ -131,7 +145,7 @@ const EAN13InputScanner = ({ value, onChange, disabled = false }) => {
 
       setIsScanning(true);
       console.log('✅ Scanner iniciado correctamente');
-      toast.success('Cámara activada. Coloca el código EAN-13');
+      toast.success('Cámara activada. Coloca el código de barras o QR');
     } catch (err) {
       console.error('❌ Error al iniciar scanner:', err);
       toast.error(`No se pudo activar la cámara: ${err.message || 'Error desconocido'}`);

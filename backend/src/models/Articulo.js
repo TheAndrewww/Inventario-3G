@@ -8,13 +8,19 @@ const Articulo = sequelize.define('Articulo', {
         autoIncrement: true
     },
     codigo_ean13: {
-        type: DataTypes.STRING(13),
+        type: DataTypes.STRING(50),
         allowNull: false,
         unique: true,
-        comment: 'Código de barras EAN-13 del artículo (13 dígitos)',
+        comment: 'Código de barras del artículo (soporta múltiples formatos)',
+        field: 'codigo_ean13' // Mantiene compatibilidad con BD existente
+    },
+    codigo_tipo: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'EAN13',
+        comment: 'Tipo de código: EAN13, EAN8, UPCA, UPCE, CODE128, CODE39, QRCODE, DATAMATRIX',
         validate: {
-            is: /^[0-9]{13}$/,
-            len: [13, 13]
+            isIn: [['EAN13', 'EAN8', 'UPCA', 'UPCE', 'CODE128', 'CODE39', 'QRCODE', 'DATAMATRIX']]
         }
     },
     nombre: {

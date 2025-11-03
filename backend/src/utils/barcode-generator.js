@@ -1,33 +1,100 @@
 /**
- * Generador de imágenes de códigos de barras EAN-13
+ * Generador de imágenes de códigos de barras y QR
+ * Soporta múltiples formatos: EAN-13, EAN-8, UPC-A, UPC-E, Code 128, Code 39, QR Code, DataMatrix
  * Usa la librería bwip-js para generar códigos de barras en formato PNG
  */
 
 import bwipjs from 'bwip-js';
 
 /**
- * Genera una imagen PNG de código de barras EAN-13
- * @param {string} ean13 - Código EAN-13 (13 dígitos)
- * @param {Object} options - Opciones de generación
+ * Mapeo de tipos de código a formato bwip-js
+ */
+const TIPO_A_BCID = {
+    'EAN13': 'ean13',
+    'EAN8': 'ean8',
+    'UPCA': 'upca',
+    'UPCE': 'upce',
+    'CODE128': 'code128',
+    'CODE39': 'code39',
+    'QRCODE': 'qrcode',
+    'DATAMATRIX': 'datamatrix'
+};
+
+/**
+ * Valida un código según su tipo
+ * @param {string} codigo - Código a validar
+ * @param {string} tipo - Tipo de código (EAN13, EAN8, etc.)
+ * @returns {boolean} - true si es válido
+ */
+const validarCodigoPorTipo = (codigo, tipo) => {
+    const validaciones = {
+        'EAN13': /^[0-9]{13}$/,
+        'EAN8': /^[0-9]{8}$/,
+        'UPCA': /^[0-9]{12}$/,
+        'UPCE': /^[0-9]{6,8}$/,
+        'CODE128': /^[\x20-\x7E]+$/, // Caracteres ASCII imprimibles
+        'CODE39': /^[0-9A-Z\-. $/+%]+$/,
+        'QRCODE': () => codigo.length > 0 && codigo.length <= 4296, // QR Code puede contener hasta 4296 caracteres
+        'DATAMATRIX': () => codigo.length > 0 && codigo.length <= 2335 // DataMatrix límite
+    };
+
+    const validacion = validaciones[tipo];
+    if (typeof validacion === 'function') {
+        return validacion();
+    }
+    return validacion ? validacion.test(codigo) : true;
+};
+
+/**
+ * Genera una imagen PNG de código de barras de cualquier tipo soportado
+ * @param {string} codigo - Código a generar
+ * @param {string} tipo - Tipo de código (EAN13, EAN8, UPCA, etc.)
+ * @param {Object} options - Opciones de generación adicionales
  * @returns {Promise<Buffer>} - Buffer con la imagen PNG
  */
-export const generarImagenCodigoBarras = async (ean13, options = {}) => {
+export const generarImagenCodigoBarras = async (codigo, tipo = 'EAN13', options = {}) => {
     try {
-        // Validar que sea EAN-13
-        if (!/^[0-9]{13}$/.test(ean13)) {
-            throw new Error('El código debe tener exactamente 13 dígitos numéricos');
+        // Validar tipo
+        if (!TIPO_A_BCID[tipo]) {
+            throw new Error(`Tipo de código no soportado: ${tipo}`);
         }
 
-        // Opciones por defecto
-        const defaultOptions = {
-            bcid: 'ean13',           // Tipo de código de barras
-            text: ean13,             // El código a codificar
-            scale: 3,                // Factor de escala (3x)
-            height: 10,              // Altura de las barras en mm
-            includetext: true,       // Incluir texto debajo del código
-            textxalign: 'center',    // Alinear texto al centro
-            textsize: 13,            // Tamaño del texto
+        // Validar código según tipo
+        if (!validarCodigoPorTipo(codigo, tipo)) {
+            throw new Error(`Código inválido para tipo ${tipo}`);
+        }
+
+        // Obtener bcid de bwip-js
+        const bcid = TIPO_A_BCID[tipo];
+
+        // Opciones por defecto según tipo
+        let defaultOptions = {
+            bcid: bcid,
+            text: codigo,
+            scale: 3,
+            includetext: true,
+            textxalign: 'center',
         };
+
+        // Ajustes específicos por tipo
+        if (tipo === 'QRCODE') {
+            defaultOptions = {
+                ...defaultOptions,
+                eclevel: 'M', // Error correction level: L, M, Q, H
+                scale: 4,
+                includetext: false
+            };
+        } else if (tipo === 'DATAMATRIX') {
+            defaultOptions = {
+                ...defaultOptions,
+                scale: 4,
+                includetext: false
+            };
+        } else {
+            // Para códigos de barras lineales
+            defaultOptions.height = 10;
+            defaultOptions.textsize = 13;
+        }
 
         // Combinar opciones
         const finalOptions = { ...defaultOptions, ...options };
@@ -45,28 +112,15 @@ export const generarImagenCodigoBarras = async (ean13, options = {}) => {
 /**
  * Genera una imagen de código de barras con información adicional del artículo
  * Incluye nombre y otros datos en la etiqueta
- * @param {string} ean13 - Código EAN-13
+ * @param {string} codigo - Código del artículo
+ * @param {string} tipo - Tipo de código
  * @param {Object} articuloInfo - Información del artículo
  * @returns {Promise<Buffer>} - Buffer con la imagen PNG
  */
-export const generarEtiquetaArticulo = async (ean13, articuloInfo = {}) => {
+export const generarEtiquetaArticulo = async (codigo, tipo = 'EAN13', articuloInfo = {}) => {
     try {
-        const options = {
-            bcid: 'ean13',
-            text: ean13,
-            scale: 3,
-            height: 10,
-            includetext: true,
-            textxalign: 'center',
-            textsize: 13,
-        };
-
-        // Si hay información adicional, podemos agregarla
-        // Por ahora, solo generamos el código de barras básico
-        // En el futuro, se podría usar canvas para agregar más info
-
-        const png = await bwipjs.toBuffer(options);
-        return png;
+        // Reutilizar la función principal
+        return await generarImagenCodigoBarras(codigo, tipo);
     } catch (error) {
         console.error('Error generando etiqueta:', error);
         throw new Error(`No se pudo generar la etiqueta: ${error.message}`);
@@ -75,23 +129,43 @@ export const generarEtiquetaArticulo = async (ean13, articuloInfo = {}) => {
 
 /**
  * Genera imagen de código de barras en formato SVG
- * @param {string} ean13 - Código EAN-13
+ * @param {string} codigo - Código a generar
+ * @param {string} tipo - Tipo de código
  * @returns {Promise<string>} - String con SVG
  */
-export const generarSVGCodigoBarras = async (ean13) => {
+export const generarSVGCodigoBarras = async (codigo, tipo = 'EAN13') => {
     try {
-        if (!/^[0-9]{13}$/.test(ean13)) {
-            throw new Error('El código debe tener exactamente 13 dígitos numéricos');
+        // Validar tipo
+        if (!TIPO_A_BCID[tipo]) {
+            throw new Error(`Tipo de código no soportado: ${tipo}`);
         }
 
-        const svg = bwipjs.toSVG({
-            bcid: 'ean13',
-            text: ean13,
+        // Validar código según tipo
+        if (!validarCodigoPorTipo(codigo, tipo)) {
+            throw new Error(`Código inválido para tipo ${tipo}`);
+        }
+
+        const bcid = TIPO_A_BCID[tipo];
+
+        let options = {
+            bcid: bcid,
+            text: codigo,
             scale: 3,
-            height: 10,
             includetext: true,
             textxalign: 'center',
-        });
+        };
+
+        if (tipo === 'QRCODE' || tipo === 'DATAMATRIX') {
+            options.includetext = false;
+            options.scale = 4;
+            if (tipo === 'QRCODE') {
+                options.eclevel = 'M';
+            }
+        } else {
+            options.height = 10;
+        }
+
+        const svg = bwipjs.toSVG(options);
 
         return svg;
     } catch (error) {

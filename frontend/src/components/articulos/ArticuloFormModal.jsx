@@ -28,6 +28,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
   const [creandoCategoria, setCreandoCategoria] = useState(false);
   const [formData, setFormData] = useState({
     codigo_ean13: '',
+    codigo_tipo: 'EAN13',
     nombre: '',
     descripcion: '',
     categoria_id: '',
@@ -40,6 +41,18 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
     costo_unitario: '',
     es_herramienta: false
   });
+
+  // Tipos de código soportados
+  const tiposCodigo = [
+    { value: 'EAN13', label: 'EAN-13 (13 dígitos)' },
+    { value: 'EAN8', label: 'EAN-8 (8 dígitos)' },
+    { value: 'UPCA', label: 'UPC-A (12 dígitos)' },
+    { value: 'UPCE', label: 'UPC-E (6-8 dígitos)' },
+    { value: 'CODE128', label: 'Code 128 (alfanumérico)' },
+    { value: 'CODE39', label: 'Code 39 (alfanumérico)' },
+    { value: 'QRCODE', label: 'QR Code' },
+    { value: 'DATAMATRIX', label: 'DataMatrix' }
+  ];
 
   const isEdit = !!articulo;
 
@@ -54,6 +67,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       if (articulo) {
         setFormData({
           codigo_ean13: articulo.codigo_ean13 || '',
+          codigo_tipo: articulo.codigo_tipo || 'EAN13',
           nombre: articulo.nombre || '',
           descripcion: articulo.descripcion || '',
           categoria_id: articulo.categoria_id || '',
@@ -78,6 +92,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
         // Limpiar formulario para nuevo artículo
         setFormData({
           codigo_ean13: '',
+          codigo_tipo: 'EAN13',
           nombre: '',
           descripcion: '',
           categoria_id: '',
@@ -292,6 +307,16 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
     }));
   };
 
+  // Manejar detección automática del tipo de código
+  const handleTypeDetected = (detectedType) => {
+    console.log('Tipo detectado en formulario:', detectedType);
+    setFormData(prev => ({
+      ...prev,
+      codigo_tipo: detectedType
+    }));
+    toast.success(`Tipo detectado: ${detectedType}`, { duration: 2000 });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -372,14 +397,10 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
         es_herramienta: formData.es_herramienta
       };
 
-      // Agregar código EAN-13 solo si se proporcionó
+      // Agregar código y tipo solo si se proporcionó un código
       if (formData.codigo_ean13 && formData.codigo_ean13.trim()) {
-        // Validar que tenga 13 dígitos
-        if (!/^[0-9]{13}$/.test(formData.codigo_ean13)) {
-          toast.error('El código EAN-13 debe tener exactamente 13 dígitos');
-          return;
-        }
         dataToSend.codigo_ean13 = formData.codigo_ean13.trim();
+        dataToSend.codigo_tipo = formData.codigo_tipo;
       }
 
       let articuloId;
@@ -411,6 +432,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       // Limpiar formulario
       setFormData({
         codigo_ean13: '',
+        codigo_tipo: 'EAN13',
         nombre: '',
         descripcion: '',
         categoria_id: '',
@@ -449,6 +471,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
     if (!loading) {
       setFormData({
         codigo_ean13: '',
+        codigo_tipo: 'EAN13',
         nombre: '',
         descripcion: '',
         categoria_id: '',
@@ -474,18 +497,51 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       title={isEdit ? 'Editar Artículo' : 'Nuevo Artículo'}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Código EAN-13 (solo en creación) */}
+        {/* Tipo de Código y Código de Barras (solo en creación) */}
         {!isEdit && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Código de Barras EAN-13 (Opcional)
-            </label>
-            <EAN13InputScanner
-              value={formData.codigo_ean13}
-              onChange={handleEAN13Change}
-              disabled={loading}
-            />
-          </div>
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tipo de Código <span className="text-red-600">*</span>
+              </label>
+              <select
+                name="codigo_tipo"
+                value={formData.codigo_tipo}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                disabled={loading}
+                required
+              >
+                {tiposCodigo.map(tipo => (
+                  <option key={tipo.value} value={tipo.value}>
+                    {tipo.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Selecciona el tipo de código que vas a usar para este artículo
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Código de Barras (Opcional)
+              </label>
+              <EAN13InputScanner
+                value={formData.codigo_ean13}
+                onChange={handleEAN13Change}
+                onTypeDetected={handleTypeDetected}
+                disabled={loading}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Tipo seleccionado: <span className="font-semibold">{tiposCodigo.find(t => t.value === formData.codigo_tipo)?.label}</span>.
+                {formData.codigo_tipo === 'EAN13' && ' Si no ingresas uno, se generará automáticamente.'}
+              </p>
+              <p className="mt-1 text-xs text-blue-600">
+                💡 El tipo se detecta automáticamente al escanear
+              </p>
+            </div>
+          </>
         )}
 
         {/* Nombre */}
