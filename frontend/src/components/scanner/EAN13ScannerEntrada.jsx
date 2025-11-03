@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, X, AlertCircle } from 'lucide-react';
+import { Camera, X, AlertCircle, SwitchCamera } from 'lucide-react';
 import toast from 'react-hot-toast';
 import articulosService from '../../services/articulos.service';
 
@@ -112,6 +112,62 @@ const EAN13ScannerEntrada = ({ onClose, onScan }) => {
     }
   };
 
+  // Cambiar de cámara
+  const switchCamera = async () => {
+    if (cameras.length <= 1) {
+      toast.error('No hay otra cámara disponible');
+      return;
+    }
+
+    const currentIndex = cameras.findIndex(cam => cam.id === selectedCamera);
+    const nextIndex = (currentIndex + 1) % cameras.length;
+    const nextCamera = cameras[nextIndex];
+
+    // Detener escaneo actual
+    await stopScanning();
+
+    // Cambiar a la nueva cámara
+    setSelectedCamera(nextCamera.id);
+    toast.success(`Cambiado a: ${nextCamera.label || 'Cámara ' + (nextIndex + 1)}`);
+
+    // Reiniciar escaneo con la nueva cámara después de un breve delay
+    setTimeout(() => {
+      if (nextCamera.id) {
+        startScanningWithCamera(nextCamera.id);
+      }
+    }, 500);
+  };
+
+  // Iniciar escaneo con una cámara específica
+  const startScanningWithCamera = async (cameraId) => {
+    if (!cameraId) {
+      toast.error('No se encontró ninguna cámara');
+      return;
+    }
+
+    try {
+      html5QrCodeRef.current = new Html5Qrcode('ean13-scanner-entrada');
+
+      await html5QrCodeRef.current.start(
+        cameraId,
+        {
+          fps: 10,
+          qrbox: { width: 350, height: 150 },
+          aspectRatio: 1.777778,
+        },
+        handleScan,
+        (errorMessage) => {
+          // Ignorar errores de escaneo continuo
+        }
+      );
+
+      setIsScanning(true);
+    } catch (err) {
+      console.error('Error al iniciar scanner:', err);
+      toast.error('No se pudo iniciar la cámara');
+    }
+  };
+
   // Limpiar al desmontar
   useEffect(() => {
     return () => {
@@ -124,6 +180,17 @@ const EAN13ScannerEntrada = ({ onClose, onScan }) => {
       {/* Área de escaneo */}
       <div className="relative bg-gray-900 rounded-lg overflow-hidden">
         <div id="ean13-scanner-entrada" className="w-full aspect-video" />
+
+        {/* Botón flotante para cambiar de cámara */}
+        {isScanning && cameras.length > 1 && (
+          <button
+            onClick={switchCamera}
+            className="absolute top-4 right-4 p-3 bg-white/90 hover:bg-white text-gray-900 rounded-full shadow-lg hover:shadow-xl transition-all z-10"
+            title="Cambiar cámara"
+          >
+            <SwitchCamera size={24} />
+          </button>
+        )}
 
         {!isScanning && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-90">
