@@ -133,10 +133,45 @@ const startServer = async () => {
         await sequelize.authenticate();
         console.log('✅ Conexión a base de datos establecida correctamente');
 
-        // Sincronizar modelos (solo en desarrollo)
+        // Sincronizar modelos
         if (process.env.NODE_ENV === 'development') {
             await sequelize.sync({ alter: false });
             console.log('✅ Modelos sincronizados con la base de datos');
+        } else {
+            // En producción, ejecutar setup automático si no hay tablas
+            const [results] = await sequelize.query(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'usuarios'"
+            );
+
+            const tablaExiste = parseInt(results[0].count) > 0;
+
+            if (!tablaExiste) {
+                console.log('🔄 Primera ejecución detectada. Ejecutando setup automático...');
+                await sequelize.sync({ force: false, alter: true });
+                console.log('✅ Tablas creadas');
+
+                // Crear usuario administrador
+                const bcrypt = await import('bcryptjs');
+                const { Usuario } = await import('./src/models/index.js');
+
+                const hashedPassword = await bcrypt.default.hash('admin123', 10);
+                await Usuario.create({
+                    nombre: 'Administrador',
+                    email: 'admin@3g.com',
+                    password: hashedPassword,
+                    rol: 'administrador',
+                    activo: true,
+                    telefono: '0000000000',
+                    puesto: 'Administrador del Sistema'
+                });
+
+                console.log('✅ Usuario administrador creado');
+                console.log('📧 Email: admin@3g.com');
+                console.log('🔑 Password: admin123');
+                console.log('⚠️  IMPORTANTE: Cambiar la contraseña después del primer login');
+            } else {
+                console.log('✅ Base de datos ya inicializada');
+            }
         }
 
         // Iniciar servidor
