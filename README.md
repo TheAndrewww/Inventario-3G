@@ -21,7 +21,47 @@ Sistema completo de gestión de inventario con control de artículos, pedidos, �
 - PostgreSQL 14+
 - Git
 
-## 🛠️ Instalación Local
+## 🛠️ Instalación y Desarrollo Local
+
+### 🚀 Inicio Rápido (Recomendado)
+
+Si quieres empezar a desarrollar rápidamente, usa el script de inicio automático:
+
+```bash
+# 1. Asegúrate de estar en la raíz del proyecto
+cd /Users/andrewww/Documents/Inventario-3G
+
+# 2. Ejecuta el script de inicio
+./start-local.sh
+```
+
+Este script automáticamente:
+- ✅ Verifica PostgreSQL
+- ✅ Crea la base de datos si no existe
+- ✅ Instala dependencias
+- ✅ Inicia backend y frontend
+- ✅ Abre el navegador
+
+### 🧪 Verificar Ambiente Local
+
+Para verificar que todo esté configurado correctamente:
+
+```bash
+./test-local.sh
+```
+
+### 📖 Guía Completa de Desarrollo
+
+Para una guía detallada con todos los pasos manuales, consulta:
+
+**[📘 DESARROLLO_LOCAL.md](./DESARROLLO_LOCAL.md)**
+
+Esta guía incluye:
+- Instalación paso a paso de PostgreSQL
+- Configuración de variables de entorno
+- Resolución de problemas comunes
+- Comandos útiles para desarrollo
+- Checklist antes de hacer commits
 
 ### 1. Clonar el repositorio
 
