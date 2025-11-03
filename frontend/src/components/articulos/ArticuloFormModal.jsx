@@ -98,7 +98,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
 
   const fetchCatalogos = async () => {
     try {
-      const [categoriasData, ubicacionesData, proveedoresData] = await Promise.all([
+      const [categoriasData, ubicacionesData, proveedoresResponse] = await Promise.all([
         categoriasService.getAll(),
         ubicacionesService.getAll(),
         proveedoresService.listar({ activo: true })
@@ -106,7 +106,11 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
 
       setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       setUbicaciones(Array.isArray(ubicacionesData) ? ubicacionesData : []);
-      setProveedores(proveedoresData.data?.proveedores || []);
+
+      // El servicio devuelve { data: { proveedores: [...] } }
+      const proveedoresList = proveedoresResponse?.data?.proveedores || [];
+      setProveedores(proveedoresList);
+      console.log('Proveedores cargados:', proveedoresList);
     } catch (error) {
       console.error('Error al cargar catálogos:', error);
       toast.error('Error al cargar catálogos');

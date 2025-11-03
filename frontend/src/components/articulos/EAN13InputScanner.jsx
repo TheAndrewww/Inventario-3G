@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, X, Loader2, Barcode, AlertCircle } from 'lucide-react';
+import { Camera, X, Loader2, Barcode, AlertCircle, SwitchCamera } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import toast from 'react-hot-toast';
 
@@ -7,6 +7,8 @@ const EAN13InputScanner = ({ value, onChange, disabled = false }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [lastScanned, setLastScanned] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCamera, setSelectedCamera] = useState(null);
   const html5QrCodeRef = useRef(null);
   const scannerInitialized = useRef(false);
 
@@ -79,12 +81,16 @@ const EAN13InputScanner = ({ value, onChange, disabled = false }) => {
         return;
       }
 
+      // Guardar lista de cámaras
+      setCameras(devices);
+
       // Preferir cámara trasera
       const backCamera = devices.find(
         (device) => device.label.toLowerCase().includes('back') ||
                    device.label.toLowerCase().includes('rear')
       );
       const cameraId = backCamera ? backCamera.id : devices[0].id;
+      setSelectedCamera(cameraId);
       console.log('Cámara seleccionada:', cameraId);
 
       // Limpiar instancia anterior si existe
@@ -172,6 +178,99 @@ const EAN13InputScanner = ({ value, onChange, disabled = false }) => {
     setShowScanner(false);
   };
 
+  // Cambiar de cámara
+  const switchCamera = async () => {
+    if (cameras.length <= 1) {
+      toast.error('No hay otra cámara disponible');
+      return;
+    }
+
+    const currentIndex = cameras.findIndex(cam => cam.id === selectedCamera);
+    const nextIndex = (currentIndex + 1) % cameras.length;
+    const nextCamera = cameras[nextIndex];
+
+    // Detener escaneo actual
+    await stopScanning();
+
+    // Cambiar a la nueva cámara
+    setSelectedCamera(nextCamera.id);
+    toast.success(`Cambiado a: ${nextCamera.label || 'Cámara ' + (nextIndex + 1)}`);
+
+    // Reiniciar escaneo con la nueva cámara después de un breve delay
+    setTimeout(() => {
+      if (nextCamera.id) {
+        startScanningWithCamera(nextCamera.id);
+      }
+    }, 500);
+  };
+
+  // Iniciar escaneo con una cámara específica
+  const startScanningWithCamera = async (cameraId) => {
+    try {
+      console.log('Iniciando scanner con cámara específica:', cameraId);
+
+      // Mostrar área de scanner
+      setShowScanner(true);
+
+      // Esperar a que el DOM se actualice
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Verificar que el elemento existe
+      const element = document.getElementById('ean13-input-scanner');
+      if (!element) {
+        console.error('Elemento del scanner no encontrado');
+        toast.error('Error al inicializar el área de escaneo');
+        setShowScanner(false);
+        return;
+      }
+
+      // Limpiar instancia anterior si existe
+      if (html5QrCodeRef.current && scannerInitialized.current) {
+        try {
+          await html5QrCodeRef.current.clear();
+        } catch (e) {
+          console.log('Error limpiando scanner anterior:', e);
+        }
+      }
+
+      // Inicializar scanner
+      html5QrCodeRef.current = new Html5Qrcode('ean13-input-scanner');
+      scannerInitialized.current = true;
+
+      // Configuración
+      const config = {
+        fps: 10,
+        qrbox: 250,
+        aspectRatio: 1.0,
+        disableFlip: false
+      };
+
+      await html5QrCodeRef.current.start(
+        cameraId,
+        config,
+        (decodedText) => {
+          console.log('✅ Código detectado:', decodedText);
+          handleScan(decodedText);
+        },
+        (errorMessage) => {
+          // Ignorar errores de escaneo continuo
+        }
+      );
+
+      setIsScanning(true);
+      console.log('✅ Scanner iniciado correctamente con nueva cámara');
+    } catch (err) {
+      console.error('❌ Error al iniciar scanner:', err);
+      toast.error(`No se pudo activar la cámara: ${err.message || 'Error desconocido'}`);
+      setIsScanning(false);
+      setShowScanner(false);
+      if (html5QrCodeRef.current) {
+        html5QrCodeRef.current = null;
+      }
+      scannerInitialized.current = false;
+    }
+  };
+
   // Limpiar al desmontar
   useEffect(() => {
     return () => {
@@ -257,6 +356,18 @@ const EAN13InputScanner = ({ value, onChange, disabled = false }) => {
               display: 'block'
             }}
           />
+
+          {/* Botón flotante para cambiar de cámara */}
+          {isScanning && cameras.length > 1 && (
+            <button
+              onClick={switchCamera}
+              className="absolute top-4 left-4 p-3 bg-white/90 hover:bg-white text-gray-900 rounded-full shadow-lg hover:shadow-xl transition-all z-10"
+              title="Cambiar cámara"
+            >
+              <SwitchCamera size={24} />
+            </button>
+          )}
+
           {isScanning && (
             <div className="absolute top-2 right-2 z-10">
               <span className="inline-flex items-center gap-1 px-3 py-2 bg-red-600 text-white text-sm font-medium rounded shadow-lg">
