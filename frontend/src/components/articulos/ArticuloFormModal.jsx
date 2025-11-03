@@ -21,6 +21,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
   const [showNuevaUbicacion, setShowNuevaUbicacion] = useState(false);
   const [nuevaUbicacionData, setNuevaUbicacionData] = useState({ codigo: '', descripcion: '' });
   const [creandoUbicacion, setCreandoUbicacion] = useState(false);
+  const [showNuevaCategoria, setShowNuevaCategoria] = useState(false);
+  const [nuevaCategoriaData, setNuevaCategoriaData] = useState({ nombre: '', descripcion: '' });
+  const [creandoCategoria, setCreandoCategoria] = useState(false);
   const [formData, setFormData] = useState({
     codigo_ean13: '',
     nombre: '',
@@ -122,6 +125,13 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       return;
     }
 
+    // Si el usuario selecciona "nueva_categoria" en el select
+    if (name === 'categoria_id' && value === 'nueva_categoria') {
+      setShowNuevaCategoria(true);
+      setNuevaCategoriaData({ nombre: '', descripcion: '' });
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -219,6 +229,52 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
     }));
   };
 
+  const handleCrearCategoriaRapido = async () => {
+    if (!nuevaCategoriaData.nombre.trim() || !nuevaCategoriaData.descripcion.trim()) {
+      toast.error('Ingresa el nombre y descripción de la categoría');
+      return;
+    }
+
+    try {
+      setCreandoCategoria(true);
+      const response = await categoriasService.create({
+        nombre: nuevaCategoriaData.nombre.trim(),
+        descripcion: nuevaCategoriaData.descripcion.trim()
+      });
+
+      const nuevaCategoria = response;
+
+      // Agregar la nueva categoría a la lista
+      setCategorias(prev => [...prev, nuevaCategoria]);
+
+      // Seleccionar la nueva categoría
+      setFormData(prev => ({
+        ...prev,
+        categoria_id: nuevaCategoria.id
+      }));
+
+      // Limpiar y ocultar el input
+      setShowNuevaCategoria(false);
+      setNuevaCategoriaData({ nombre: '', descripcion: '' });
+
+      toast.success(`Categoría "${nuevaCategoria.nombre}" creada exitosamente`);
+    } catch (error) {
+      console.error('Error al crear categoría:', error);
+      toast.error(error.response?.data?.message || 'Error al crear categoría');
+    } finally {
+      setCreandoCategoria(false);
+    }
+  };
+
+  const handleCancelarNuevaCategoria = () => {
+    setShowNuevaCategoria(false);
+    setNuevaCategoriaData({ nombre: '', descripcion: '' });
+    setFormData(prev => ({
+      ...prev,
+      categoria_id: ''
+    }));
+  };
+
   const handleEAN13Change = (value) => {
     setFormData(prev => ({
       ...prev,
@@ -238,6 +294,12 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
     // Advertencia si hay una ubicación sin confirmar
     if (showNuevaUbicacion && (nuevaUbicacionData.codigo.trim() || nuevaUbicacionData.descripcion.trim())) {
       toast.error('Tienes una ubicación sin confirmar. Presiona el botón verde para guardarlo o X para cancelar.');
+      return;
+    }
+
+    // Advertencia si hay una categoría sin confirmar
+    if (showNuevaCategoria && (nuevaCategoriaData.nombre.trim() || nuevaCategoriaData.descripcion.trim())) {
+      toast.error('Tienes una categoría sin confirmar. Presiona el botón verde para guardarlo o X para cancelar.');
       return;
     }
 
@@ -460,17 +522,20 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
           />
         </div>
 
-        {/* Categoría y Ubicación */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Categoría <span className="text-red-600">*</span>
-            </label>
+        {/* Categoría */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Categoría <span className="text-red-600">*</span>
+          </label>
+
+          {!showNuevaCategoria ? (
             <select
+              key={`categoria-select-${categorias.length}`}
               name="categoria_id"
               value={formData.categoria_id}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+              disabled={loading}
               required
             >
               <option value="">Seleccionar...</option>
@@ -479,15 +544,93 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                   {cat.nombre}
                 </option>
               ))}
+              <option value="nueva_categoria" className="text-red-700 font-medium">
+                + Crear nueva categoría
+              </option>
             </select>
-          </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={nuevaCategoriaData.nombre}
+                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, nombre: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (nuevaCategoriaData.nombre.trim() && nuevaCategoriaData.descripcion.trim()) {
+                        handleCrearCategoriaRapido();
+                      }
+                    }
+                    if (e.key === 'Escape') {
+                      handleCancelarNuevaCategoria();
+                    }
+                  }}
+                  placeholder="Nombre (ej: Tornillería)"
+                  className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                  autoFocus
+                  disabled={creandoCategoria}
+                />
+                <input
+                  type="text"
+                  value={nuevaCategoriaData.descripcion}
+                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, descripcion: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (nuevaCategoriaData.nombre.trim() && nuevaCategoriaData.descripcion.trim()) {
+                        handleCrearCategoriaRapido();
+                      }
+                    }
+                    if (e.key === 'Escape') {
+                      handleCancelarNuevaCategoria();
+                    }
+                  }}
+                  placeholder="Descripción (ej: Tornillos y accesorios)"
+                  className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                  disabled={creandoCategoria}
+                />
+                <button
+                  type="button"
+                  onClick={handleCrearCategoriaRapido}
+                  disabled={creandoCategoria}
+                  className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                  title="Guardar categoría"
+                >
+                  {creandoCategoria ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <Check size={18} />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelarNuevaCategoria}
+                  disabled={creandoCategoria}
+                  className="px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                  title="Cancelar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              {showNuevaCategoria && (
+                <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-xs text-yellow-800">
+                    ⚠️ <strong>Categoría pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ubicación <span className="text-red-600">*</span>
-            </label>
+        {/* Ubicación */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Ubicación <span className="text-red-600">*</span>
+          </label>
 
-            {!showNuevaUbicacion ? (
+          {!showNuevaUbicacion ? (
               <select
                 key={`ubicacion-select-${ubicaciones.length}`}
                 name="ubicacion_id"
@@ -581,7 +724,6 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                 )}
               </div>
             )}
-          </div>
         </div>
 
         {/* Proveedor */}
