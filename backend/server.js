@@ -15,12 +15,16 @@ const PORT = process.env.PORT || 5000;
 
 // Lista de orígenes permitidos
 const allowedOrigins = [
-    'http://localhost:5173', // Tu frontend viejo
-    'http://localhost:5174', // Tu frontend nuevo
-    'http://localhost:5175', // Puerto actual del frontend
+    'http://localhost:5173', // Desarrollo local
+    'http://localhost:5174',
+    'http://localhost:5175',
     'http://192.168.100.26:5173', // Acceso desde red local (móviles)
-    // Puedes agregar más aquí (ej. la URL de producción)
 ];
+
+// Agregar URL de producción si existe
+if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+}
 
 app.use(cors({
     origin: function (origin, callback) {
