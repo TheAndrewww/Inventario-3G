@@ -419,14 +419,7 @@ const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected }
       {/* Ayuda */}
       {!isScanning && (
         <p className="text-xs text-gray-500">
-          Puedes digitar manualmente o escanear un código EAN-13 existente. Si lo dejas vacío, se generará uno automáticamente.
-        </p>
-      )}
-
-      {/* Validación */}
-      {value && !validateEAN13(value) && (
-        <p className="text-xs text-orange-600">
-          ⚠️ El código debe tener exactamente 13 dígitos
+          Puedes digitar manualmente o escanear cualquier tipo de código de barras o QR. Si lo dejas vacío, se generará uno automáticamente.
         </p>
       )}
     </div>
