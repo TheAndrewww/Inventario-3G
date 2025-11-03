@@ -159,34 +159,31 @@ const startServer = async () => {
                 console.log('✅ Base de datos ya inicializada');
             }
 
-            // Verificar/crear usuario administrador (siempre)
-            const bcrypt = await import('bcryptjs');
+            // Verificar/crear usuario administrador (solo si no existe)
             const { Usuario } = await import('./src/models/index.js');
 
-            // FORZAR recreación del admin (eliminar si existe)
             const adminExiste = await Usuario.findOne({ where: { email: 'admin@3g.com' } });
 
-            if (adminExiste) {
-                console.log('🔄 Eliminando usuario admin existente para recrearlo...');
-                await adminExiste.destroy();
+            if (!adminExiste) {
+                console.log('🔄 Creando usuario administrador...');
+                // NO hashear aquí, el hook beforeSave del modelo lo hará
+                await Usuario.create({
+                    nombre: 'Administrador',
+                    email: 'admin@3g.com',
+                    password: 'admin123', // Password en texto plano, el modelo lo hasheará
+                    rol: 'administrador',
+                    activo: true,
+                    telefono: '0000000000',
+                    puesto: 'Administrador del Sistema'
+                });
+
+                console.log('✅ Usuario administrador creado');
+                console.log('📧 Email: admin@3g.com');
+                console.log('🔑 Password: admin123');
+                console.log('⚠️  IMPORTANTE: Cambiar la contraseña después del primer login');
+            } else {
+                console.log('✅ Usuario administrador ya existe');
             }
-
-            console.log('🔄 Creando usuario administrador...');
-            // NO hashear aquí, el hook beforeSave del modelo lo hará
-            await Usuario.create({
-                nombre: 'Administrador',
-                email: 'admin@3g.com',
-                password: 'admin123', // Password en texto plano, el modelo lo hasheará
-                rol: 'administrador',
-                activo: true,
-                telefono: '0000000000',
-                puesto: 'Administrador del Sistema'
-            });
-
-            console.log('✅ Usuario administrador creado');
-            console.log('📧 Email: admin@3g.com');
-            console.log('🔑 Password: admin123');
-            console.log('⚠️  IMPORTANTE: Cambiar la contraseña después del primer login');
         }
 
         // Iniciar servidor
