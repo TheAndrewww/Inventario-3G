@@ -18,6 +18,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
   const [showNuevoProveedor, setShowNuevoProveedor] = useState(false);
   const [nuevoProveedorNombre, setNuevoProveedorNombre] = useState('');
   const [creandoProveedor, setCreandoProveedor] = useState(false);
+  const [showNuevaUbicacion, setShowNuevaUbicacion] = useState(false);
+  const [nuevaUbicacionData, setNuevaUbicacionData] = useState({ codigo: '', descripcion: '' });
+  const [creandoUbicacion, setCreandoUbicacion] = useState(false);
   const [formData, setFormData] = useState({
     codigo_ean13: '',
     nombre: '',
@@ -112,6 +115,13 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       return;
     }
 
+    // Si el usuario selecciona "nueva_ubicacion" en el select
+    if (name === 'ubicacion_id' && value === 'nueva_ubicacion') {
+      setShowNuevaUbicacion(true);
+      setNuevaUbicacionData({ codigo: '', descripcion: '' });
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -163,6 +173,52 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
     }));
   };
 
+  const handleCrearUbicacionRapido = async () => {
+    if (!nuevaUbicacionData.codigo.trim() || !nuevaUbicacionData.descripcion.trim()) {
+      toast.error('Ingresa el código y descripción de la ubicación');
+      return;
+    }
+
+    try {
+      setCreandoUbicacion(true);
+      const response = await ubicacionesService.create({
+        codigo: nuevaUbicacionData.codigo.trim(),
+        descripcion: nuevaUbicacionData.descripcion.trim()
+      });
+
+      const nuevaUbicacion = response;
+
+      // Agregar la nueva ubicación a la lista
+      setUbicaciones(prev => [...prev, nuevaUbicacion]);
+
+      // Seleccionar la nueva ubicación
+      setFormData(prev => ({
+        ...prev,
+        ubicacion_id: nuevaUbicacion.id
+      }));
+
+      // Limpiar y ocultar el input
+      setShowNuevaUbicacion(false);
+      setNuevaUbicacionData({ codigo: '', descripcion: '' });
+
+      toast.success(`Ubicación "${nuevaUbicacion.codigo}" creada exitosamente`);
+    } catch (error) {
+      console.error('Error al crear ubicación:', error);
+      toast.error(error.response?.data?.message || 'Error al crear ubicación');
+    } finally {
+      setCreandoUbicacion(false);
+    }
+  };
+
+  const handleCancelarNuevaUbicacion = () => {
+    setShowNuevaUbicacion(false);
+    setNuevaUbicacionData({ codigo: '', descripcion: '' });
+    setFormData(prev => ({
+      ...prev,
+      ubicacion_id: ''
+    }));
+  };
+
   const handleEAN13Change = (value) => {
     setFormData(prev => ({
       ...prev,
@@ -176,6 +232,12 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
     // Advertencia si hay un proveedor sin confirmar
     if (showNuevoProveedor && nuevoProveedorNombre.trim()) {
       toast.error('Tienes un proveedor sin confirmar. Presiona el botón verde para guardarlo o X para cancelar.');
+      return;
+    }
+
+    // Advertencia si hay una ubicación sin confirmar
+    if (showNuevaUbicacion && (nuevaUbicacionData.codigo.trim() || nuevaUbicacionData.descripcion.trim())) {
+      toast.error('Tienes una ubicación sin confirmar. Presiona el botón verde para guardarlo o X para cancelar.');
       return;
     }
 
@@ -424,20 +486,101 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Ubicación <span className="text-red-600">*</span>
             </label>
-            <select
-              name="ubicacion_id"
-              value={formData.ubicacion_id}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              required
-            >
-              <option value="">Seleccionar...</option>
-              {ubicaciones.map(ub => (
-                <option key={ub.id} value={ub.id}>
-                  {ub.codigo} - {ub.descripcion}
+
+            {!showNuevaUbicacion ? (
+              <select
+                key={`ubicacion-select-${ubicaciones.length}`}
+                name="ubicacion_id"
+                value={formData.ubicacion_id}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                disabled={loading}
+                required
+              >
+                <option value="">Seleccionar...</option>
+                {ubicaciones.map(ub => (
+                  <option key={ub.id} value={ub.id}>
+                    {ub.codigo} - {ub.descripcion}
+                  </option>
+                ))}
+                <option value="nueva_ubicacion" className="text-red-700 font-medium">
+                  + Crear nueva ubicación
                 </option>
-              ))}
-            </select>
+              </select>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={nuevaUbicacionData.codigo}
+                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, codigo: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (nuevaUbicacionData.codigo.trim() && nuevaUbicacionData.descripcion.trim()) {
+                          handleCrearUbicacionRapido();
+                        }
+                      }
+                      if (e.key === 'Escape') {
+                        handleCancelarNuevaUbicacion();
+                      }
+                    }}
+                    placeholder="Código (ej: A-01)"
+                    className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                    autoFocus
+                    disabled={creandoUbicacion}
+                  />
+                  <input
+                    type="text"
+                    value={nuevaUbicacionData.descripcion}
+                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, descripcion: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (nuevaUbicacionData.codigo.trim() && nuevaUbicacionData.descripcion.trim()) {
+                          handleCrearUbicacionRapido();
+                        }
+                      }
+                      if (e.key === 'Escape') {
+                        handleCancelarNuevaUbicacion();
+                      }
+                    }}
+                    placeholder="Descripción (ej: Estante A)"
+                    className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                    disabled={creandoUbicacion}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCrearUbicacionRapido}
+                    disabled={creandoUbicacion}
+                    className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                    title="Guardar ubicación"
+                  >
+                    {creandoUbicacion ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <Check size={18} />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelarNuevaUbicacion}
+                    disabled={creandoUbicacion}
+                    className="px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                    title="Cancelar"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                {showNuevaUbicacion && (
+                  <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-xs text-yellow-800">
+                      ⚠️ <strong>Ubicación pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
