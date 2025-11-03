@@ -309,12 +309,12 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
 
   // Manejar detección automática del tipo de código
   const handleTypeDetected = (detectedType) => {
-    console.log('Tipo detectado en formulario:', detectedType);
+    console.log('✓ Tipo detectado automáticamente:', detectedType);
     setFormData(prev => ({
       ...prev,
       codigo_tipo: detectedType
     }));
-    toast.success(`Tipo detectado: ${detectedType}`, { duration: 2000 });
+    // El toast ya se muestra en el scanner con el nombre del tipo
   };
 
   const handleSubmit = async (e) => {
@@ -497,51 +497,28 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       title={isEdit ? 'Editar Artículo' : 'Nuevo Artículo'}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Tipo de Código y Código de Barras (solo en creación) */}
+        {/* Código de Barras (solo en creación) */}
         {!isEdit && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tipo de Código <span className="text-red-600">*</span>
-              </label>
-              <select
-                name="codigo_tipo"
-                value={formData.codigo_tipo}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                disabled={loading}
-                required
-              >
-                {tiposCodigo.map(tipo => (
-                  <option key={tipo.value} value={tipo.value}>
-                    {tipo.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
-                Selecciona el tipo de código que vas a usar para este artículo
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Código de Barras / QR (Opcional)
+            </label>
+            <EAN13InputScanner
+              value={formData.codigo_ean13}
+              onChange={handleEAN13Change}
+              onTypeDetected={handleTypeDetected}
+              disabled={loading}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Escanea cualquier código de barras, QR o ingresa manualmente.
+              {formData.codigo_tipo === 'EAN13' && ' Si no ingresas uno, se generará automáticamente.'}
+            </p>
+            {formData.codigo_ean13 && formData.codigo_tipo && (
+              <p className="mt-1 text-xs text-green-600 font-medium">
+                ✓ Tipo detectado: {tiposCodigo.find(t => t.value === formData.codigo_tipo)?.label}
               </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Código de Barras (Opcional)
-              </label>
-              <EAN13InputScanner
-                value={formData.codigo_ean13}
-                onChange={handleEAN13Change}
-                onTypeDetected={handleTypeDetected}
-                disabled={loading}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Tipo seleccionado: <span className="font-semibold">{tiposCodigo.find(t => t.value === formData.codigo_tipo)?.label}</span>.
-                {formData.codigo_tipo === 'EAN13' && ' Si no ingresas uno, se generará automáticamente.'}
-              </p>
-              <p className="mt-1 text-xs text-blue-600">
-                💡 El tipo se detecta automáticamente al escanear
-              </p>
-            </div>
-          </>
+            )}
+          </div>
         )}
 
         {/* Nombre */}
