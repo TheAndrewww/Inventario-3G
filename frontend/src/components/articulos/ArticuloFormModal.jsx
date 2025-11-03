@@ -194,8 +194,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
   };
 
   const handleCrearUbicacionRapido = async () => {
-    if (!nuevaUbicacionData.codigo.trim() || !nuevaUbicacionData.descripcion.trim()) {
-      toast.error('Ingresa el código y descripción de la ubicación');
+    if (!nuevaUbicacionData.codigo.trim()) {
+      toast.error('Ingresa el código de la ubicación');
       return;
     }
 
@@ -203,7 +203,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       setCreandoUbicacion(true);
       const response = await ubicacionesService.create({
         codigo: nuevaUbicacionData.codigo.trim(),
-        descripcion: nuevaUbicacionData.descripcion.trim()
+        descripcion: nuevaUbicacionData.descripcion.trim() || 'Sin descripción'
       });
 
       const nuevaUbicacion = response;
@@ -240,8 +240,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
   };
 
   const handleCrearCategoriaRapido = async () => {
-    if (!nuevaCategoriaData.nombre.trim() || !nuevaCategoriaData.descripcion.trim()) {
-      toast.error('Ingresa el nombre y descripción de la categoría');
+    if (!nuevaCategoriaData.nombre.trim()) {
+      toast.error('Ingresa el nombre de la categoría');
       return;
     }
 
@@ -249,7 +249,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       setCreandoCategoria(true);
       const response = await categoriasService.create({
         nombre: nuevaCategoriaData.nombre.trim(),
-        descripcion: nuevaCategoriaData.descripcion.trim()
+        descripcion: nuevaCategoriaData.descripcion.trim() || 'Sin descripción'
       });
 
       const nuevaCategoria = response;
@@ -588,7 +588,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      if (nuevaCategoriaData.nombre.trim() && nuevaCategoriaData.descripcion.trim()) {
+                      if (nuevaCategoriaData.nombre.trim()) {
                         handleCrearCategoriaRapido();
                       }
                     }
@@ -596,7 +596,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                       handleCancelarNuevaCategoria();
                     }
                   }}
-                  placeholder="Descripción (ej: Tornillos y accesorios)"
+                  placeholder="Descripción (opcional)"
                   className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
                   disabled={creandoCategoria}
                 />
@@ -690,7 +690,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        if (nuevaUbicacionData.codigo.trim() && nuevaUbicacionData.descripcion.trim()) {
+                        if (nuevaUbicacionData.codigo.trim()) {
                           handleCrearUbicacionRapido();
                         }
                       }
@@ -698,7 +698,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                         handleCancelarNuevaUbicacion();
                       }
                     }}
-                    placeholder="Descripción (ej: Estante A)"
+                    placeholder="Descripción (opcional)"
                     className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
                     disabled={creandoUbicacion}
                   />
