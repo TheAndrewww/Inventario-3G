@@ -111,15 +111,21 @@ export const login = async (req, res) => {
         // Buscar usuario por email
         const usuario = await Usuario.findOne({ where: { email } });
 
+        console.log('🔍 Login - Usuario encontrado:', !!usuario);
+
         if (!usuario) {
+            console.log('❌ Login - Usuario no existe:', email);
             return res.status(401).json({
                 success: false,
                 message: 'Credenciales inválidas'
             });
         }
 
+        console.log('🔍 Login - Usuario activo:', usuario.activo);
+
         // Verificar si el usuario está activo
         if (!usuario.activo) {
+            console.log('❌ Login - Usuario inactivo:', email);
             return res.status(401).json({
                 success: false,
                 message: 'Usuario inactivo. Contacte al administrador.'
@@ -127,14 +133,19 @@ export const login = async (req, res) => {
         }
 
         // Verificar password (usa el método del modelo)
+        console.log('🔍 Login - Verificando password...');
         const passwordValido = await usuario.compararPassword(password);
+        console.log('🔍 Login - Password válido:', passwordValido);
 
         if (!passwordValido) {
+            console.log('❌ Login - Password incorrecto para:', email);
             return res.status(401).json({
                 success: false,
                 message: 'Credenciales inválidas'
             });
         }
+
+        console.log('✅ Login exitoso para:', email);
 
         // Actualizar última conexión
         await usuario.update({ ultima_conexion: new Date() });
