@@ -30,40 +30,49 @@ const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected }
 
   // Procesar código escaneado
   const handleScan = (decodedText) => {
-    console.log('Código escaneado:', decodedText);
+    try {
+      console.log('Código escaneado:', decodedText);
 
-    // Validar que tenga contenido
-    if (!validateCode(decodedText)) {
-      toast.error('Código inválido o demasiado largo');
-      return;
+      // Validar que tenga contenido
+      if (!validateCode(decodedText)) {
+        toast.error('Código inválido o demasiado largo');
+        return;
+      }
+
+      // Evitar escaneos duplicados
+      if (lastScanned === decodedText) {
+        return;
+      }
+      setLastScanned(decodedText);
+
+      // Detectar automáticamente el tipo de código
+      const detectedType = detectBarcodeType(decodedText);
+      const typeName = getBarcodeTypeName(detectedType);
+
+      console.log('Tipo detectado:', detectedType, '-', typeName);
+
+      // Actualizar valor primero
+      onChange(decodedText);
+
+      // Notificar al componente padre sobre el tipo detectado
+      if (onTypeDetected) {
+        onTypeDetected(detectedType);
+      }
+
+      // Mostrar mensaje de éxito
+      toast.success(`✓ ${typeName} escaneado correctamente`);
+
+      // Detener escaneo automáticamente
+      stopScanning().catch(err => {
+        console.error('Error al detener scanner:', err);
+      });
+
+      // Limpiar después de 2 segundos
+      setTimeout(() => setLastScanned(null), 2000);
+    } catch (error) {
+      console.error('Error en handleScan:', error);
+      toast.error('Error al procesar el código escaneado');
     }
-
-    // Evitar escaneos duplicados
-    if (lastScanned === decodedText) {
-      return;
-    }
-    setLastScanned(decodedText);
-
-    // Detectar automáticamente el tipo de código
-    const detectedType = detectBarcodeType(decodedText);
-    const typeName = getBarcodeTypeName(detectedType);
-
-    console.log('Tipo detectado:', detectedType, '-', typeName);
-
-    // Notificar al componente padre sobre el tipo detectado
-    if (onTypeDetected) {
-      onTypeDetected(detectedType);
-    }
-
-    // Actualizar valor
-    onChange(decodedText);
-    toast.success(`✓ ${typeName} escaneado correctamente`);
-
-    // Detener escaneo automáticamente
-    stopScanning();
-
-    // Limpiar después de 2 segundos
-    setTimeout(() => setLastScanned(null), 2000);
   };
 
   // Iniciar escaneo
@@ -166,30 +175,39 @@ const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected }
   const stopScanning = async () => {
     console.log('Deteniendo scanner...', { current: html5QrCodeRef.current, isScanning });
 
-    if (html5QrCodeRef.current) {
-      try {
-        const state = await html5QrCodeRef.current.getState();
-        console.log('Estado del scanner:', state);
+    try {
+      if (html5QrCodeRef.current && scannerInitialized.current) {
+        try {
+          const state = await html5QrCodeRef.current.getState();
+          console.log('Estado del scanner:', state);
 
-        // Solo detener si está realmente corriendo
-        if (state === 2) { // Html5QrcodeScannerState.SCANNING
-          await html5QrCodeRef.current.stop();
-          console.log('Scanner detenido');
+          // Solo detener si está realmente corriendo
+          if (state === 2) { // Html5QrcodeScannerState.SCANNING
+            await html5QrCodeRef.current.stop();
+            console.log('Scanner detenido');
+          }
+
+          // Intentar limpiar
+          try {
+            await html5QrCodeRef.current.clear();
+          } catch (clearErr) {
+            console.log('Error al limpiar, ignorando:', clearErr);
+          }
+        } catch (err) {
+          console.error('Error al detener scanner:', err);
         }
 
-        html5QrCodeRef.current.clear();
-        html5QrCodeRef.current = null;
-        scannerInitialized.current = false;
-      } catch (err) {
-        console.error('Error al detener scanner:', err);
-        // Forzar limpieza incluso si hay error
+        // Siempre limpiar referencias
         html5QrCodeRef.current = null;
         scannerInitialized.current = false;
       }
+    } catch (err) {
+      console.error('Error general al detener scanner:', err);
+    } finally {
+      // Siempre actualizar estados
+      setIsScanning(false);
+      setShowScanner(false);
     }
-
-    setIsScanning(false);
-    setShowScanner(false);
   };
 
   // Cambiar de cámara
