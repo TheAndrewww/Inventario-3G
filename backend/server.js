@@ -36,11 +36,17 @@ console.log('🔒 CORS - Orígenes permitidos:', allowedOrigins);
 app.use(cors({
     origin: function (origin, callback) {
         console.log('🔍 CORS - Origen recibido:', origin);
-        // Permite peticiones si el origen está en la lista,
-        // o si no hay origen (ej. Postman)
+
+        // Permite peticiones si el origen está en la lista
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
-        } else {
+        }
+        // Permite cualquier URL de Vercel (*.vercel.app)
+        else if (origin && origin.includes('.vercel.app')) {
+            console.log('✅ CORS - Origen de Vercel permitido:', origin);
+            callback(null, true);
+        }
+        else {
             console.log('❌ CORS - Origen rechazado:', origin);
             console.log('❌ CORS - Lista permitida:', allowedOrigins);
             callback(new Error('CORS no permitido para este origen'));
