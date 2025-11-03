@@ -7,8 +7,10 @@ import ubicacionesService from '../../services/ubicaciones.service';
 import proveedoresService from '../../services/proveedores.service';
 import articulosService from '../../services/articulos.service';
 import EAN13InputScanner from './EAN13InputScanner';
+import { useAuth } from '../../context/AuthContext';
 
 const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
@@ -40,6 +42,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
   });
 
   const isEdit = !!articulo;
+
+  // Verificar permisos para crear proveedores (solo admin y supervisor)
+  const puedeCrearProveedores = ['administrador', 'supervisor'].includes(user?.rol);
 
   // Cargar catálogos y datos del artículo si es edición
   useEffect(() => {
@@ -747,9 +752,11 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                   {prov.nombre}
                 </option>
               ))}
-              <option value="nuevo_proveedor" className="text-red-700 font-medium">
-                + Crear nuevo proveedor
-              </option>
+              {puedeCrearProveedores && (
+                <option value="nuevo_proveedor" className="text-red-700 font-medium">
+                  + Crear nuevo proveedor
+                </option>
+              )}
             </select>
           ) : (
             <div className="flex gap-2">
