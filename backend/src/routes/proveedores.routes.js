@@ -14,11 +14,11 @@ const router = express.Router();
 // Todas las rutas requieren autenticación
 router.use(verificarToken);
 
-// Listar proveedores (compras, almacen, supervisor, admin)
-router.get('/', accesoCompras, listarProveedores);
+// Listar proveedores (almacen, compras, supervisor, admin) - Solo lectura para almacen
+router.get('/', accesoInventario, listarProveedores);
 
-// Obtener proveedor por ID
-router.get('/:id', accesoCompras, obtenerProveedor);
+// Obtener proveedor por ID (almacen, compras, supervisor, admin) - Solo lectura para almacen
+router.get('/:id', accesoInventario, obtenerProveedor);
 
 // Crear proveedor (solo compras, supervisor, admin)
 router.post('/', accesoCompras, crearProveedor);
