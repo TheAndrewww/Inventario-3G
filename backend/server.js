@@ -155,11 +155,18 @@ const startServer = async () => {
                 console.log('🔄 Primera ejecución detectada. Ejecutando setup automático...');
                 await sequelize.sync({ force: false, alter: true });
                 console.log('✅ Tablas creadas');
+            } else {
+                console.log('✅ Base de datos ya inicializada');
+            }
 
-                // Crear usuario administrador
-                const bcrypt = await import('bcryptjs');
-                const { Usuario } = await import('./src/models/index.js');
+            // Verificar/crear usuario administrador (siempre)
+            const bcrypt = await import('bcrypt');
+            const { Usuario } = await import('./src/models/index.js');
 
+            const adminExiste = await Usuario.findOne({ where: { email: 'admin@3g.com' } });
+
+            if (!adminExiste) {
+                console.log('🔄 Creando usuario administrador...');
                 const hashedPassword = await bcrypt.default.hash('admin123', 10);
                 await Usuario.create({
                     nombre: 'Administrador',
@@ -176,7 +183,17 @@ const startServer = async () => {
                 console.log('🔑 Password: admin123');
                 console.log('⚠️  IMPORTANTE: Cambiar la contraseña después del primer login');
             } else {
-                console.log('✅ Base de datos ya inicializada');
+                // Recrear admin con contraseña correcta (por si fue creado con bcryptjs)
+                console.log('🔄 Verificando contraseña del administrador...');
+                const passwordValido = await adminExiste.compararPassword('admin123');
+                if (!passwordValido) {
+                    console.log('🔄 Actualizando contraseña del administrador...');
+                    const hashedPassword = await bcrypt.default.hash('admin123', 10);
+                    await adminExiste.update({ password: hashedPassword });
+                    console.log('✅ Contraseña del administrador actualizada');
+                } else {
+                    console.log('✅ Usuario administrador OK');
+                }
             }
         }
 
