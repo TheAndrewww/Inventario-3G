@@ -343,8 +343,8 @@ const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected }
           />
           {value && (
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <span className={`text-xs ${validateEAN13(value) ? 'text-green-600' : 'text-orange-600'}`}>
-                {value.length}/13
+              <span className={`text-xs ${validateCode(value) ? 'text-green-600' : 'text-orange-600'}`}>
+                {value.length}
               </span>
             </div>
           )}
