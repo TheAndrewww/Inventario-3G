@@ -172,11 +172,11 @@ const startServer = async () => {
             }
 
             console.log('🔄 Creando usuario administrador...');
-            const hashedPassword = await bcrypt.default.hash('admin123', 10);
+            // NO hashear aquí, el hook beforeSave del modelo lo hará
             await Usuario.create({
                 nombre: 'Administrador',
                 email: 'admin@3g.com',
-                password: hashedPassword,
+                password: 'admin123', // Password en texto plano, el modelo lo hasheará
                 rol: 'administrador',
                 activo: true,
                 telefono: '0000000000',
