@@ -1,131 +1,61 @@
 import api from './api';
 
 const authService = {
-  /**
-   * Iniciar sesión
-   * @param {string} email
-   * @param {string} password
-   * @returns {Promise} Datos del usuario y token
-   */
-  login: async (email, password) => {
+  // Login
+  async login(email, password) {
     try {
       const response = await api.post('/auth/login', { email, password });
 
-      if (response.data.success) {
-        const { token, usuario } = response.data.data;
+      // El backend devuelve: { success, data: { usuario, token } }
+      const { data } = response.data;
 
-        // Guardar en localStorage
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(usuario));
+      if (data && data.token) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.usuario));
 
-        return response.data.data;
+        return {
+          token: data.token,
+          usuario: data.usuario
+        };
       }
 
-      throw new Error(response.data.message || 'Error al iniciar sesión');
+      throw new Error('No se recibió token del servidor');
     } catch (error) {
-      throw error.response?.data || error;
+      throw error.response?.data || { message: 'Error al iniciar sesión' };
     }
   },
 
-  /**
-   * Cerrar sesión
-   */
-  logout: () => {
+  // Logout
+  logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
   },
 
-  /**
-   * Verificar si el token es válido
-   * @returns {Promise} Datos del usuario
-   */
-  verify: async () => {
+  // Verificar token
+  async verifyToken() {
     try {
       const response = await api.get('/auth/verify');
-
-      if (response.data.success) {
-        return response.data.data.usuario;
-      }
-
-      throw new Error('Token inválido');
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  },
-
-  /**
-   * Obtener usuario actual
-   * @returns {Promise} Datos del usuario
-   */
-  getMe: async () => {
-    try {
-      const response = await api.get('/auth/me');
-
-      if (response.data.success) {
-        return response.data.data.usuario;
-      }
-
-      throw new Error('Error al obtener usuario');
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  },
-
-  /**
-   * Cambiar contraseña
-   * @param {string} passwordActual
-   * @param {string} passwordNuevo
-   * @returns {Promise}
-   */
-  cambiarPassword: async (passwordActual, passwordNuevo) => {
-    try {
-      const response = await api.put('/auth/cambiar-password', {
-        passwordActual,
-        passwordNuevo,
-      });
-
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error.response?.data || { message: 'Token inválido' };
     }
   },
 
-  /**
-   * Registrar nuevo usuario (solo admin)
-   * @param {Object} userData
-   * @returns {Promise}
-   */
-  register: async (userData) => {
-    try {
-      const response = await api.post('/auth/register', userData);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
+  // Obtener usuario actual
+  getCurrentUser() {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch (error) {
+        return null;
+      }
     }
+    return null;
   },
 
-  /**
-   * Obtener token del localStorage
-   * @returns {string|null}
-   */
-  getToken: () => {
-    return localStorage.getItem('token');
-  },
-
-  /**
-   * Obtener usuario del localStorage
-   * @returns {Object|null}
-   */
-  getUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
-  },
-
-  /**
-   * Verificar si el usuario está autenticado
-   * @returns {boolean}
-   */
-  isAuthenticated: () => {
+  // Verificar si está autenticado
+  isAuthenticated() {
     return !!localStorage.getItem('token');
   },
 };

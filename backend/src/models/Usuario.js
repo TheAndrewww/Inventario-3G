@@ -25,9 +25,10 @@ const Usuario = sequelize.define('Usuario', {
         allowNull: false
     },
     rol: {
-        type: DataTypes.ENUM('empleado', 'supervisor', 'administrador'),
-        defaultValue: 'empleado',
-        allowNull: false
+        type: DataTypes.ENUM('administrador', 'diseñador', 'compras', 'almacen', 'supervisor'),
+        defaultValue: 'almacen',
+        allowNull: false,
+        comment: 'Roles: administrador (acceso total), diseñador (diseño de productos), compras (gestión de compras), almacen (gestión de inventario), supervisor (supervisión general)'
     },
     activo: {
         type: DataTypes.BOOLEAN,

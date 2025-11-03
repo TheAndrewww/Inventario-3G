@@ -1,0 +1,79 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Production builds
+backend/dist/
+frontend/dist/
+frontend/build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Uploads y archivos generados
+uploads/
+backend/uploads/
+barcodes/
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+# Backups
+backups/
+backend/backups/
+*.backup
+*.bak
+*.old
+
+# Testing
+coverage/
+.nyc_output/
+*.test.js.snap
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation (temporal)
+CHANGELOG.md
+TODO.md
+NOTES.md
+
+# Archivos de prueba
+test-*.html
+*-backup.*
+*-old.*
+
+# Railway y Vercel
+.vercel
+.railway
+
+# Claude Code
+.claude/settings.local.json

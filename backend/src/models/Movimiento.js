@@ -14,9 +14,9 @@ const Movimiento = sequelize.define('Movimiento', {
         comment: 'ID único del ticket (formato: DDMMYY-HHMM-NN)'
     },
     tipo: {
-        type: DataTypes.ENUM('retiro', 'devolucion', 'ajuste_entrada', 'ajuste_salida', 'transferencia'),
+        type: DataTypes.ENUM('retiro', 'devolucion', 'ajuste_entrada', 'ajuste_salida', 'transferencia', 'pedido'),
         allowNull: false,
-        comment: 'Tipo de movimiento'
+        comment: 'Tipo de movimiento. pedido = solicitud de materiales por diseñador'
     },
     fecha_hora: {
         type: DataTypes.DATE,
@@ -46,10 +46,67 @@ const Movimiento = sequelize.define('Movimiento', {
         allowNull: true,
         comment: 'Nombre del proyecto/obra (si aplica)'
     },
+    tipo_pedido: {
+        type: DataTypes.ENUM('proyecto', 'equipo'),
+        allowNull: true,
+        comment: 'Tipo de pedido: proyecto (diseñador) o equipo (almacenista)'
+    },
+    equipo_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'equipos',
+            key: 'id'
+        },
+        comment: 'ID del equipo para pedidos de tipo equipo'
+    },
+    ubicacion_destino_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'ubicaciones',
+            key: 'id'
+        },
+        comment: 'ID de la ubicación destino para pedidos (ej: camionetas, almacenes específicos)'
+    },
     estado: {
-        type: DataTypes.ENUM('pendiente', 'aprobado', 'completado', 'cancelado'),
+        type: DataTypes.ENUM('pendiente', 'pendiente_aprobacion', 'aprobado', 'rechazado', 'listo_para_entrega', 'entregado', 'completado', 'cancelado'),
         defaultValue: 'completado',
-        allowNull: false
+        allowNull: false,
+        comment: 'pendiente = dispersión en proceso, pendiente_aprobacion = requiere aprobación supervisor, aprobado = aprobado para dispersar, listo_para_entrega = 100% dispersado esperando recepción, entregado = recibido y validado por supervisor'
+    },
+    aprobado_por_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'usuarios',
+            key: 'id'
+        },
+        comment: 'Usuario (supervisor) que aprobó el pedido'
+    },
+    fecha_aprobacion: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Fecha y hora de aprobación del pedido'
+    },
+    motivo_rechazo: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: 'Motivo si el pedido fue rechazado'
+    },
+    recibido_por_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'usuarios',
+            key: 'id'
+        },
+        comment: 'Supervisor que recibió y validó el pedido'
+    },
+    fecha_recepcion: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Fecha y hora de recepción del pedido por el supervisor'
     },
     observaciones: {
         type: DataTypes.TEXT,

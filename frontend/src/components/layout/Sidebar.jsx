@@ -1,164 +1,170 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React from 'react';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackagePlus } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { usePedido } from '../../context/PedidoContext';
-import {
-  Package,
-  ShoppingCart,
-  History,
-  BarChart3,
-  User,
-  Menu,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 
-const Sidebar = () => {
-  const [isOpen, setIsOpen] = useState(true);
-  const navigate = useNavigate();
+const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
   const location = useLocation();
   const { user } = useAuth();
-  const { getTotalArticulos } = usePedido();
 
-  const menuItems = [
+  // Definir todas las opciones del menú con sus roles permitidos
+  const allMenuItems = [
     {
-      id: 'inventario',
-      label: 'Inventario',
-      icon: Package,
       path: '/inventario',
+      icon: Package,
+      label: 'Inventario',
+      roles: ['administrador', 'diseñador', 'almacen', 'ventas']
     },
     {
-      id: 'pedido',
-      label: 'Pedido Actual',
-      icon: ShoppingCart,
+      path: '/entrada-inventario',
+      icon: PackagePlus,
+      label: 'Entrada Inventario',
+      roles: ['administrador', 'almacen', 'ventas']
+    },
+    {
       path: '/pedido',
-      badge: getTotalArticulos(),
+      icon: ShoppingCart,
+      label: 'Pedido Actual',
+      roles: ['administrador', 'diseñador', 'almacen']
     },
     {
-      id: 'historial',
-      label: 'Historial',
-      icon: History,
+      path: '/pedidos-pendientes',
+      icon: ClipboardList,
+      label: 'Pedidos Pendientes',
+      roles: ['administrador', 'almacen']
+    },
+    {
+      path: '/recibir-pedidos',
+      icon: CheckSquare,
+      label: 'Recibir Pedidos',
+      roles: ['administrador', 'supervisor']
+    },
+    {
+      path: '/equipos',
+      icon: Users,
+      label: 'Equipos',
+      roles: ['administrador', 'supervisor']
+    },
+    {
+      path: '/usuarios',
+      icon: UserCog,
+      label: 'Usuarios',
+      roles: ['administrador']
+    },
+    {
+      path: '/ordenes-compra',
+      icon: FileText,
+      label: 'Órdenes de Compra',
+      roles: ['administrador', 'diseñador', 'ventas', 'compras']
+    },
+    {
+      path: '/renta-herramientas',
+      icon: Wrench,
+      label: 'Renta Herramientas',
+      roles: ['administrador', 'supervisor']
+    },
+    {
       path: '/historial',
+      icon: History,
+      label: 'Historial',
+      roles: ['administrador', 'diseñador']
     },
     {
-      id: 'reportes',
-      label: 'Reportes',
-      icon: BarChart3,
+      path: '/proveedores',
+      icon: Truck,
+      label: 'Proveedores',
+      roles: ['administrador', 'compras', 'supervisor']
+    },
+    {
       path: '/reportes',
-      disabled: true,
+      icon: BarChart3,
+      label: 'Reportes',
+      roles: ['administrador', 'supervisor']
     },
   ];
 
-  const isActive = (path) => {
-    return location.pathname === path;
-  };
+  // Filtrar los items del menú según el rol del usuario
+  const menuItems = allMenuItems.filter(item =>
+    item.roles.includes(user?.rol)
+  );
 
   return (
-    <motion.div
-      initial={false}
-      animate={{ width: isOpen ? 256 : 80 }}
-      transition={{ duration: 0.3, ease: 'easeInOut' }}
-      className="bg-white border-r border-gray-200 flex flex-col h-full"
+    <div
+      className={`
+        ${isMobile ? 'fixed inset-y-0 left-0 z-50' : 'relative'}
+        ${isOpen ? 'w-64' : isMobile ? '-translate-x-full' : 'w-20'}
+        bg-white border-r border-gray-200 transition-all duration-300 flex flex-col
+        ${isMobile ? 'transform' : ''}
+      `}
     >
-      {/* Logo y Toggle */}
+      {/* Header del Sidebar */}
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="flex items-center gap-2"
-            >
-              <div className="w-10 h-10 bg-red-700 rounded-lg flex items-center justify-center text-white font-bold">
-                3G
-              </div>
-              <div>
-                <h1 className="font-bold text-gray-900">ERP 3G</h1>
-                <p className="text-xs text-gray-500">Inventario v1.0</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <Menu size={20} />
-        </button>
+        {isOpen && (
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 bg-red-700 rounded-lg flex items-center justify-center text-white font-bold">
+              3G
+            </div>
+            <div>
+              <h1 className="font-bold text-gray-900">ERP 3G</h1>
+              <p className="text-xs text-gray-500">Inventario v1.0</p>
+            </div>
+          </div>
+        )}
+        {!isMobile && (
+          <button
+            onClick={toggleSidebar}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <Menu size={20} />
+          </button>
+        )}
       </div>
 
-      {/* Navegación */}
-      <nav className="flex-1 p-4 space-y-2">
+      {/* Navigation */}
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const active = isActive(item.path);
+          const isActive = location.pathname === item.path;
 
           return (
-            <button
-              key={item.id}
-              onClick={() => !item.disabled && navigate(item.path)}
-              disabled={item.disabled}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors relative ${
-                active
+            <Link
+              key={item.path}
+              to={item.path}
+              onClick={onNavigate}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                isActive
                   ? 'bg-red-50 text-red-700'
-                  : item.disabled
-                  ? 'text-gray-400 cursor-not-allowed'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
               <Icon size={20} />
-              <AnimatePresence>
-                {isOpen && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="font-medium"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-              {item.badge > 0 && (
-                <span className="absolute top-2 left-8 bg-red-700 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                  {item.badge}
-                </span>
-              )}
-            </button>
+              {isOpen && <span className="font-medium">{item.label}</span>}
+            </Link>
           );
         })}
       </nav>
 
-      {/* Perfil de Usuario */}
+      {/* User Section */}
       <div className="p-4 border-t border-gray-200">
-        <button
-          onClick={() => navigate('/perfil')}
+        <Link
+          to="/perfil"
+          onClick={onNavigate}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-            isActive('/perfil')
+            location.pathname === '/perfil'
               ? 'bg-red-50 text-red-700'
               : 'text-gray-700 hover:bg-gray-100'
           }`}
         >
           <User size={20} />
-          <AnimatePresence>
-            {isOpen && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex-1 text-left"
-              >
-                <p className="font-medium text-sm">{user?.nombre || 'Usuario'}</p>
-                <p className="text-xs text-gray-500 capitalize">{user?.rol || 'Rol'}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </button>
+          {isOpen && (
+            <div className="flex-1 text-left">
+              <p className="font-medium text-sm">Usuario</p>
+              <p className="text-xs text-gray-500">Ver perfil</p>
+            </div>
+          )}
+        </Link>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

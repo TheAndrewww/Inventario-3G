@@ -7,11 +7,15 @@ const Articulo = sequelize.define('Articulo', {
         primaryKey: true,
         autoIncrement: true
     },
-    codigo_qr: {
-        type: DataTypes.STRING(255),
+    codigo_ean13: {
+        type: DataTypes.STRING(13),
         allowNull: false,
         unique: true,
-        comment: 'Código QR único del artículo'
+        comment: 'Código de barras EAN-13 del artículo (13 dígitos)',
+        validate: {
+            is: /^[0-9]{13}$/,
+            len: [13, 13]
+        }
     },
     nombre: {
         type: DataTypes.STRING(200),
@@ -41,9 +45,7 @@ const Articulo = sequelize.define('Articulo', {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0,
-        validate: {
-            min: 0
-        }
+        comment: 'Stock actual del artículo (puede ser negativo si hay faltante)'
     },
     stock_minimo: {
         type: DataTypes.DECIMAL(10, 2),
@@ -53,11 +55,28 @@ const Articulo = sequelize.define('Articulo', {
             min: 0
         }
     },
+    stock_maximo: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+        comment: 'Stock máximo recomendado para el artículo',
+        validate: {
+            min: 0
+        }
+    },
     unidad: {
         type: DataTypes.STRING(50),
         allowNull: false,
         defaultValue: 'piezas',
         comment: 'Unidad de medida: piezas, kg, metros, litros, cajas, etc.'
+    },
+    proveedor_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'proveedores',
+            key: 'id'
+        },
+        comment: 'Proveedor del artículo'
     },
     costo_unitario: {
         type: DataTypes.DECIMAL(10, 2),
@@ -81,13 +100,18 @@ const Articulo = sequelize.define('Articulo', {
         allowNull: true,
         unique: true,
         comment: 'SKU del proveedor (opcional)'
+    },
+    es_herramienta: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        comment: 'Indica si el artículo es una herramienta que se renta/presta'
     }
 }, {
     tableName: 'articulos',
     timestamps: true,
     indexes: [
         {
-            fields: ['codigo_qr']
+            fields: ['codigo_ean13']
         },
         {
             fields: ['nombre']

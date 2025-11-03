@@ -2,17 +2,22 @@ import express from 'express';
 import {
     getArticulos,
     getArticuloById,
-    getArticuloByQR,
+    getArticuloByEAN13,
     createArticulo,
     updateArticulo,
     deleteArticulo,
-    regenerarQR
+    getArticuloBarcode,
+    getArticuloBarcodeSVG,
+    getArticuloEtiqueta,
+    uploadArticuloImagen,
+    deleteArticuloImagen
 } from '../controllers/articulos.controller.js';
 import {
     verificarToken,
     esAdministrador,
     esSupervisorOAdmin
 } from '../middleware/auth.middleware.js';
+import { uploadArticuloImagen as multerUpload } from '../config/multer.js';
 
 const router = express.Router();
 
@@ -25,11 +30,32 @@ const router = express.Router();
 router.get('/', verificarToken, getArticulos);
 
 /**
- * @route   GET /api/articulos/qr/:codigoQR
- * @desc    Buscar artículo por código QR
+ * @route   GET /api/articulos/ean13/:codigoEAN13
+ * @desc    Buscar artículo por código de barras EAN-13
  * @access  Private
  */
-router.get('/qr/:codigoQR', verificarToken, getArticuloByQR);
+router.get('/ean13/:codigoEAN13', verificarToken, getArticuloByEAN13);
+
+/**
+ * @route   GET /api/articulos/:id/barcode
+ * @desc    Generar código de barras PNG del artículo
+ * @access  Private
+ */
+router.get('/:id/barcode', verificarToken, getArticuloBarcode);
+
+/**
+ * @route   GET /api/articulos/:id/barcode-svg
+ * @desc    Generar código de barras SVG del artículo
+ * @access  Private
+ */
+router.get('/:id/barcode-svg', verificarToken, getArticuloBarcodeSVG);
+
+/**
+ * @route   GET /api/articulos/:id/etiqueta
+ * @desc    Generar etiqueta para imprimir con código de barras
+ * @access  Private
+ */
+router.get('/:id/etiqueta', verificarToken, getArticuloEtiqueta);
 
 /**
  * @route   GET /api/articulos/:id
@@ -41,29 +67,36 @@ router.get('/:id', verificarToken, getArticuloById);
 /**
  * @route   POST /api/articulos
  * @desc    Crear nuevo artículo (genera QR automáticamente)
- * @access  Private (Admin)
+ * @access  Private (Admin o Supervisor)
  */
-router.post('/', verificarToken, esAdministrador, createArticulo);
+router.post('/', verificarToken, esSupervisorOAdmin, createArticulo);
 
 /**
  * @route   PUT /api/articulos/:id
  * @desc    Actualizar artículo existente
- * @access  Private (Admin)
+ * @access  Private (Admin o Supervisor)
  */
-router.put('/:id', verificarToken, esAdministrador, updateArticulo);
+router.put('/:id', verificarToken, esSupervisorOAdmin, updateArticulo);
 
 /**
  * @route   DELETE /api/articulos/:id
  * @desc    Eliminar (desactivar) artículo
- * @access  Private (Admin)
+ * @access  Private (Admin o Supervisor)
  */
-router.delete('/:id', verificarToken, esAdministrador, deleteArticulo);
+router.delete('/:id', verificarToken, esSupervisorOAdmin, deleteArticulo);
 
 /**
- * @route   POST /api/articulos/:id/regenerar-qr
- * @desc    Regenerar código QR de un artículo
- * @access  Private (Admin)
+ * @route   POST /api/articulos/:id/imagen
+ * @desc    Subir imagen para un artículo
+ * @access  Private (Admin o Supervisor)
  */
-router.post('/:id/regenerar-qr', verificarToken, esAdministrador, regenerarQR);
+router.post('/:id/imagen', verificarToken, esSupervisorOAdmin, multerUpload.single('imagen'), uploadArticuloImagen);
+
+/**
+ * @route   DELETE /api/articulos/:id/imagen
+ * @desc    Eliminar imagen de un artículo
+ * @access  Private (Admin o Supervisor)
+ */
+router.delete('/:id/imagen', verificarToken, esSupervisorOAdmin, deleteArticuloImagen);
 
 export default router;

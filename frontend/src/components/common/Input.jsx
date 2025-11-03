@@ -1,69 +1,55 @@
 import React from 'react';
 
-const Input = React.forwardRef(({
+const Input = ({
   label,
-  id,
   type = 'text',
+  name,
+  value,
+  onChange,
   placeholder,
   error,
-  helperText,
   required = false,
   disabled = false,
-  icon,
-  className = '',
-  ...props
-}, ref) => {
-  const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
-
+  icon: Icon,
+  className = ''
+}) => {
   return (
     <div className={`w-full ${className}`}>
       {label && (
-        <label
-          htmlFor={inputId}
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
+        <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-2">
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-red-600 ml-1">*</span>}
         </label>
       )}
-
       <div className="relative">
-        {icon && (
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            {icon}
+        {Icon && (
+          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+            <Icon size={20} />
           </div>
         )}
-
         <input
-          ref={ref}
-          id={inputId}
+          id={name}
+          name={name}
           type={type}
+          value={value}
+          onChange={onChange}
           placeholder={placeholder}
+          required={required}
           disabled={disabled}
           className={`
-            block w-full rounded-lg border
-            ${icon ? 'pl-10' : 'pl-3'} pr-3 py-2
-            ${error ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'}
-            ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}
-            text-gray-900 placeholder-gray-400
-            focus:outline-none focus:ring-2 focus:ring-offset-0
-            transition-colors duration-200
+            w-full px-4 py-3 border rounded-lg
+            focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-transparent
+            disabled:bg-gray-100 disabled:cursor-not-allowed
+            ${Icon ? 'pl-10' : ''}
+            ${error ? 'border-red-500' : 'border-gray-300'}
           `}
-          {...props}
         />
       </div>
-
       {error && (
         <p className="mt-1 text-sm text-red-600">{error}</p>
       )}
-
-      {helperText && !error && (
-        <p className="mt-1 text-sm text-gray-500">{helperText}</p>
-      )}
     </div>
   );
-});
-
-Input.displayName = 'Input';
+};
 
 export default Input;

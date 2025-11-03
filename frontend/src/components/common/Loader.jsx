@@ -1,34 +1,29 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
 
-const Loader = ({ size = 'md', text, fullScreen = false }) => {
+const Loader = ({ size = 'md', fullScreen = false }) => {
   const sizes = {
-    sm: 'w-4 h-4',
-    md: 'w-8 h-8',
-    lg: 'w-12 h-12',
-    xl: 'w-16 h-16',
+    sm: 'w-6 h-6 border-2',
+    md: 'w-10 h-10 border-3',
+    lg: 'w-16 h-16 border-4'
   };
 
-  const sizeClass = sizes[size] || sizes.md;
-
-  const LoaderContent = () => (
-    <div className="flex flex-col items-center justify-center">
-      <Loader2 className={`${sizeClass} animate-spin text-blue-600`} />
-      {text && (
-        <p className="mt-4 text-gray-600 text-sm">{text}</p>
-      )}
-    </div>
+  const spinner = (
+    <div className={`${sizes[size]} border-gray-200 border-t-red-700 rounded-full animate-spin`}></div>
   );
 
   if (fullScreen) {
     return (
       <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
-        <LoaderContent />
+        {spinner}
       </div>
     );
   }
 
-  return <LoaderContent />;
+  return (
+    <div className="flex items-center justify-center py-8">
+      {spinner}
+    </div>
+  );
 };
 
 export default Loader;

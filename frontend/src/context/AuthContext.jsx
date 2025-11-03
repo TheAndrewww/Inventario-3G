@@ -1,12 +1,12 @@
-import { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/auth.service';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth debe ser usado dentro de AuthProvider');
+    throw new Error('useAuth debe ser usado dentro de un AuthProvider');
   }
   return context;
 };
@@ -16,34 +16,28 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Verificar autenticación al cargar la app
+  // Verificar si hay un usuario logueado al cargar la app
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = authService.getToken();
-        const storedUser = authService.getUser();
+    const initAuth = () => {
+      const token = localStorage.getItem('token');
+      const savedUser = localStorage.getItem('user');
 
-        if (token && storedUser) {
-          // Verificar que el token sea válido
-          const usuario = await authService.verify();
-          setUser(usuario);
+      if (token && savedUser) {
+        try {
+          const currentUser = JSON.parse(savedUser);
+          setUser(currentUser);
           setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
+        } catch (error) {
+          console.error('Error al cargar usuario:', error);
+          authService.logout();
           setUser(null);
+          setIsAuthenticated(false);
         }
-      } catch (error) {
-        console.error('Error al verificar autenticación:', error);
-        // Si el token es inválido, limpiar localStorage
-        authService.logout();
-        setIsAuthenticated(false);
-        setUser(null);
-      } finally {
-        setLoading(false);
       }
+      setLoading(false);
     };
 
-    checkAuth();
+    initAuth();
   }, []);
 
   const login = async (email, password) => {
@@ -53,7 +47,6 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       return data;
     } catch (error) {
-      console.error('Error en login:', error);
       throw error;
     }
   };
@@ -64,18 +57,12 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
   };
 
-  const updateUser = (userData) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-  };
-
   const value = {
     user,
     loading,
     isAuthenticated,
     login,
     logout,
-    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

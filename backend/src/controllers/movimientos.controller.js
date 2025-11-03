@@ -205,7 +205,7 @@ export const createMovimiento = async (req, res) => {
         }
 
         // Validar tipo de movimiento
-        const tiposPermitidos = ['retiro', 'devolucion', 'ajuste', 'entrada'];
+        const tiposPermitidos = ['retiro', 'devolucion', 'ajuste_entrada', 'ajuste_salida', 'transferencia'];
         if (!tiposPermitidos.includes(tipo)) {
             await transaction.rollback();
             return res.status(400).json({
@@ -272,16 +272,16 @@ export const createMovimiento = async (req, res) => {
 
             // Actualizar stock solo si el estado es 'completado'
             if (movimiento.estado === 'completado') {
-                let nuevoStock = articulo.stock_actual;
+                let nuevoStock = parseFloat(articulo.stock_actual);
 
                 switch (tipo) {
                     case 'retiro':
-                    case 'ajuste':
-                        nuevoStock -= cantidad;
+                    case 'ajuste_salida':
+                        nuevoStock -= parseFloat(cantidad);
                         break;
                     case 'devolucion':
-                    case 'entrada':
-                        nuevoStock += cantidad;
+                    case 'ajuste_entrada':
+                        nuevoStock += parseFloat(cantidad);
                         break;
                 }
 

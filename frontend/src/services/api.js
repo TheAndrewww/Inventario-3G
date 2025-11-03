@@ -1,14 +1,19 @@
 import axios from 'axios';
 
-// Configuración base de Axios
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+
+// Crear instancia de axios
 const api = axios.create({
-  baseURL: '/api', // Usa el proxy configurado en vite.config.js
+  baseURL: API_URL,
   headers: {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json; charset=utf-8',
+    'Accept': 'application/json; charset=utf-8',
   },
+  responseType: 'json',
+  responseEncoding: 'utf8',
 });
 
-// Interceptor para agregar el token JWT a todas las peticiones
+// Interceptor para agregar el token a cada petición
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -22,17 +27,20 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor para manejar respuestas y errores
+// Interceptor para manejar errores de respuesta y decodificación UTF-8
 api.interceptors.response.use(
   (response) => {
+    // Asegurar que la respuesta se interprete correctamente como UTF-8
+    if (response.data && typeof response.data === 'object') {
+      response.data = JSON.parse(JSON.stringify(response.data));
+    }
     return response;
   },
   (error) => {
-    // Si el token ha expirado o es inválido, redirigir al login
+    // Solo registrar el error, no redirigir automáticamente
+    // React Router y el AuthContext manejarán la navegación
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      console.log('Error 401: Token inválido o expirado');
     }
     return Promise.reject(error);
   }

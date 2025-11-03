@@ -1,6 +1,7 @@
 import { Op } from 'sequelize';
-import { Articulo, Categoria, Ubicacion } from '../models/index.js';
-import { generarQRArticulo } from '../utils/qr-generator.js';
+import { Articulo, Categoria, Ubicacion, Proveedor } from '../models/index.js';
+import { generarCodigoEAN13, generarCodigoEAN13Temporal, validarCodigoEAN13 } from '../utils/ean13-generator.js';
+import { generarImagenCodigoBarras, generarSVGCodigoBarras } from '../utils/barcode-generator.js';
 
 /**
  * GET /api/articulos
@@ -59,6 +60,12 @@ export const getArticulos = async (req, res) => {
                     model: Ubicacion,
                     as: 'ubicacion',
                     attributes: ['id', 'codigo', 'almacen', 'descripcion']
+                },
+                {
+                    model: Proveedor,
+                    as: 'proveedor',
+                    attributes: ['id', 'nombre', 'contacto', 'telefono'],
+                    required: false
                 }
             ],
             order: [[order_by, order_dir.toUpperCase()]],
@@ -114,6 +121,12 @@ export const getArticuloById = async (req, res) => {
                     model: Ubicacion,
                     as: 'ubicacion',
                     attributes: ['id', 'codigo', 'almacen', 'pasillo', 'estante', 'nivel', 'descripcion']
+                },
+                {
+                    model: Proveedor,
+                    as: 'proveedor',
+                    attributes: ['id', 'nombre', 'contacto', 'telefono', 'email'],
+                    required: false
                 }
             ]
         });
@@ -141,26 +154,23 @@ export const getArticuloById = async (req, res) => {
 };
 
 /**
- * GET /api/articulos/qr/:codigoQR
- * Buscar artículo por código QR
+ * GET /api/articulos/ean13/:codigoEAN13
+ * Buscar artículo por código de barras EAN-13
  */
-export const getArticuloByQR = async (req, res) => {
+export const getArticuloByEAN13 = async (req, res) => {
     try {
-        const { codigoQR } = req.params;
+        const { codigoEAN13 } = req.params;
 
-        // Decodificar el QR (viene como JSON string)
-        let qrData;
-        try {
-            qrData = JSON.parse(decodeURIComponent(codigoQR));
-        } catch (error) {
+        // Validar formato EAN-13 (13 dígitos numéricos)
+        if (!/^[0-9]{13}$/.test(codigoEAN13)) {
             return res.status(400).json({
                 success: false,
-                message: 'Código QR inválido'
+                message: 'Código EAN-13 inválido. Debe contener exactamente 13 dígitos numéricos.'
             });
         }
 
         const articulo = await Articulo.findOne({
-            where: { id: qrData.id },
+            where: { codigo_ean13: codigoEAN13 },
             include: [
                 {
                     model: Categoria,
@@ -171,6 +181,12 @@ export const getArticuloByQR = async (req, res) => {
                     model: Ubicacion,
                     as: 'ubicacion',
                     attributes: ['id', 'codigo', 'almacen', 'descripcion']
+                },
+                {
+                    model: Proveedor,
+                    as: 'proveedor',
+                    attributes: ['id', 'nombre', 'contacto', 'telefono'],
+                    required: false
                 }
             ]
         });
@@ -178,7 +194,7 @@ export const getArticuloByQR = async (req, res) => {
         if (!articulo) {
             return res.status(404).json({
                 success: false,
-                message: 'Artículo no encontrado'
+                message: 'Artículo no encontrado con ese código EAN-13'
             });
         }
 
@@ -188,10 +204,10 @@ export const getArticuloByQR = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error en getArticuloByQR:', error);
+        console.error('Error en getArticuloByEAN13:', error);
         res.status(500).json({
             success: false,
-            message: 'Error al buscar artículo por QR',
+            message: 'Error al buscar artículo por código de barras',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
@@ -199,28 +215,52 @@ export const getArticuloByQR = async (req, res) => {
 
 /**
  * POST /api/articulos
- * Crear un nuevo artículo con QR automático
+ * Crear un nuevo artículo con código EAN-13 (opcional - se genera automáticamente si no se proporciona)
  */
 export const createArticulo = async (req, res) => {
     try {
         const {
+            codigo_ean13,
             nombre,
             descripcion,
             categoria_id,
             ubicacion_id,
+            proveedor_id,
             stock_actual,
             stock_minimo,
+            stock_maximo,
             unidad,
             costo_unitario,
-            imagen
+            imagen,
+            es_herramienta
         } = req.body;
 
-        // Validar campos requeridos
+        // Validar campos requeridos (codigo_ean13 ahora es OPCIONAL)
         if (!nombre || !categoria_id || !ubicacion_id || stock_actual === undefined || stock_minimo === undefined) {
             return res.status(400).json({
                 success: false,
                 message: 'Campos requeridos: nombre, categoria_id, ubicacion_id, stock_actual, stock_minimo'
             });
+        }
+
+        // Si se proporciona código EAN-13, validarlo
+        if (codigo_ean13) {
+            // Validar formato EAN-13
+            if (!/^[0-9]{13}$/.test(codigo_ean13)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El código EAN-13 debe contener exactamente 13 dígitos numéricos'
+                });
+            }
+
+            // Verificar que el código EAN-13 no exista
+            const articuloExistente = await Articulo.findOne({ where: { codigo_ean13 } });
+            if (articuloExistente) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ya existe un artículo con ese código EAN-13'
+                });
+            }
         }
 
         // Verificar que la categoría existe
@@ -241,40 +281,38 @@ export const createArticulo = async (req, res) => {
             });
         }
 
-        // Generar un ID temporal para el QR (antes de crear el artículo)
-        // Vamos a generar el código QR con un placeholder y luego actualizar
-        const tempId = Date.now().toString();
-        const tempQRData = JSON.stringify({
-            id: tempId,
-            type: 'articulo',
-            timestamp: new Date().toISOString()
-        });
+        // Determinar el código EAN-13 a usar
+        let codigoFinal = codigo_ean13;
 
-        // Crear artículo con QR temporal
+        // Si no se proporcionó código, generar uno temporal
+        if (!codigoFinal) {
+            codigoFinal = generarCodigoEAN13Temporal();
+        }
+
+        // Crear artículo
         const articulo = await Articulo.create({
+            codigo_ean13: codigoFinal,
             nombre,
             descripcion,
             categoria_id,
             ubicacion_id,
+            proveedor_id: proveedor_id || null,
             stock_actual,
             stock_minimo,
+            stock_maximo: stock_maximo || null,
             unidad: unidad || 'piezas',
             costo_unitario: costo_unitario || 0,
             imagen_url: imagen,
             activo: true,
-            codigo_qr: tempQRData // QR temporal para cumplir con NOT NULL
+            es_herramienta: es_herramienta || false
         });
 
-        // Ahora generar el código QR real con el ID correcto
-        const qrResult = await generarQRArticulo({
-            id: articulo.id,
-            nombre: articulo.nombre
-        });
-
-        // Actualizar artículo con el código QR real
-        await articulo.update({
-            codigo_qr: qrResult.qrData
-        });
+        // Si se generó automáticamente, actualizar con código basado en ID
+        if (!codigo_ean13) {
+            const codigoBasadoEnId = generarCodigoEAN13(articulo.id);
+            await articulo.update({ codigo_ean13: codigoBasadoEnId });
+            articulo.codigo_ean13 = codigoBasadoEnId;
+        }
 
         // Obtener artículo completo con relaciones
         const articuloCompleto = await Articulo.findByPk(articulo.id, {
@@ -288,6 +326,12 @@ export const createArticulo = async (req, res) => {
                     model: Ubicacion,
                     as: 'ubicacion',
                     attributes: ['id', 'codigo', 'almacen', 'descripcion']
+                },
+                {
+                    model: Proveedor,
+                    as: 'proveedor',
+                    attributes: ['id', 'nombre', 'contacto', 'telefono'],
+                    required: false
                 }
             ]
         });
@@ -296,11 +340,7 @@ export const createArticulo = async (req, res) => {
             success: true,
             message: 'Artículo creado exitosamente',
             data: {
-                articulo: articuloCompleto,
-                qr: {
-                    dataURL: qrResult.qrDataURL,
-                    filePath: qrResult.qrFilePath
-                }
+                articulo: articuloCompleto
             }
         });
 
@@ -322,16 +362,20 @@ export const updateArticulo = async (req, res) => {
     try {
         const { id } = req.params;
         const {
+            codigo_ean13,
             nombre,
             descripcion,
             categoria_id,
             ubicacion_id,
+            proveedor_id,
             stock_actual,
             stock_minimo,
+            stock_maximo,
             unidad,
             costo_unitario,
             imagen,
-            activo
+            activo,
+            es_herramienta
         } = req.body;
 
         // Buscar artículo
@@ -366,18 +410,47 @@ export const updateArticulo = async (req, res) => {
             }
         }
 
+        // Si se proporciona código EAN-13, validarlo
+        if (codigo_ean13) {
+            // Validar formato EAN-13
+            if (!/^[0-9]{13}$/.test(codigo_ean13)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El código EAN-13 debe contener exactamente 13 dígitos numéricos'
+                });
+            }
+
+            // Verificar que el código EAN-13 no exista en otro artículo
+            const articuloExistente = await Articulo.findOne({
+                where: {
+                    codigo_ean13,
+                    id: { [Op.ne]: id }  // Excluir el artículo actual
+                }
+            });
+            if (articuloExistente) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ya existe otro artículo con ese código EAN-13'
+                });
+            }
+        }
+
         // Actualizar artículo
         await articulo.update({
+            ...(codigo_ean13 && { codigo_ean13 }),
             ...(nombre && { nombre }),
             ...(descripcion !== undefined && { descripcion }),
             ...(categoria_id && { categoria_id }),
             ...(ubicacion_id && { ubicacion_id }),
+            ...(proveedor_id !== undefined && { proveedor_id }),
             ...(stock_actual !== undefined && { stock_actual }),
             ...(stock_minimo !== undefined && { stock_minimo }),
+            ...(stock_maximo !== undefined && { stock_maximo }),
             ...(unidad && { unidad }),
             ...(costo_unitario !== undefined && { costo_unitario }),
             ...(imagen !== undefined && { imagen }),
-            ...(activo !== undefined && { activo })
+            ...(activo !== undefined && { activo }),
+            ...(es_herramienta !== undefined && { es_herramienta })
         });
 
         // Obtener artículo actualizado con relaciones
@@ -392,6 +465,12 @@ export const updateArticulo = async (req, res) => {
                     model: Ubicacion,
                     as: 'ubicacion',
                     attributes: ['id', 'codigo', 'almacen', 'descripcion']
+                },
+                {
+                    model: Proveedor,
+                    as: 'proveedor',
+                    attributes: ['id', 'nombre', 'contacto', 'telefono'],
+                    required: false
                 }
             ]
         });
@@ -448,13 +527,14 @@ export const deleteArticulo = async (req, res) => {
 };
 
 /**
- * POST /api/articulos/:id/regenerar-qr
- * Regenerar código QR de un artículo
+ * GET /api/articulos/:id/barcode
+ * Generar código de barras EAN-13 como imagen PNG
  */
-export const regenerarQR = async (req, res) => {
+export const getArticuloBarcode = async (req, res) => {
     try {
         const { id } = req.params;
 
+        // Buscar artículo
         const articulo = await Articulo.findByPk(id);
 
         if (!articulo) {
@@ -464,34 +544,211 @@ export const regenerarQR = async (req, res) => {
             });
         }
 
-        // Generar nuevo código QR
-        const qrResult = await generarQRArticulo({
-            id: articulo.id,
-            nombre: articulo.nombre
+        // Generar imagen del código de barras
+        const imagenBuffer = await generarImagenCodigoBarras(articulo.codigo_ean13);
+
+        // Configurar headers para imagen PNG
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Content-Disposition', `inline; filename="barcode-${articulo.codigo_ean13}.png"`);
+        res.send(imagenBuffer);
+
+    } catch (error) {
+        console.error('Error en getArticuloBarcode:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al generar código de barras',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * GET /api/articulos/:id/barcode-svg
+ * Generar código de barras EAN-13 como SVG
+ */
+export const getArticuloBarcodeSVG = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Buscar artículo
+        const articulo = await Articulo.findByPk(id);
+
+        if (!articulo) {
+            return res.status(404).json({
+                success: false,
+                message: 'Artículo no encontrado'
+            });
+        }
+
+        // Generar SVG del código de barras
+        const svg = await generarSVGCodigoBarras(articulo.codigo_ean13);
+
+        // Configurar headers para SVG
+        res.setHeader('Content-Type', 'image/svg+xml');
+        res.setHeader('Content-Disposition', `inline; filename="barcode-${articulo.codigo_ean13}.svg"`);
+        res.send(svg);
+
+    } catch (error) {
+        console.error('Error en getArticuloBarcodeSVG:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al generar código de barras SVG',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * GET /api/articulos/:id/etiqueta
+ * Generar etiqueta completa para imprimir con código de barras y datos del artículo
+ */
+export const getArticuloEtiqueta = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Buscar artículo con todas sus relaciones
+        const articulo = await Articulo.findByPk(id, {
+            include: [
+                {
+                    model: Categoria,
+                    as: 'categoria',
+                    attributes: ['nombre']
+                },
+                {
+                    model: Ubicacion,
+                    as: 'ubicacion',
+                    attributes: ['codigo', 'almacen']
+                }
+            ]
         });
 
-        // Actualizar artículo con el nuevo código QR
-        await articulo.update({
-            codigo_qr: qrResult.qrData,
-            qr_image_url: qrResult.qrFilePath
+        if (!articulo) {
+            return res.status(404).json({
+                success: false,
+                message: 'Artículo no encontrado'
+            });
+        }
+
+        // Generar imagen del código de barras
+        const imagenBuffer = await generarImagenCodigoBarras(articulo.codigo_ean13, {
+            scale: 4,
+            height: 12
         });
+
+        // Por ahora solo devolvemos el código de barras
+        // En el futuro se puede generar una etiqueta completa con más datos
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Content-Disposition', `attachment; filename="etiqueta-${articulo.nombre.replace(/\s+/g, '-')}.png"`);
+        res.send(imagenBuffer);
+
+    } catch (error) {
+        console.error('Error en getArticuloEtiqueta:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al generar etiqueta',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * POST /api/articulos/:id/imagen
+ * Subir imagen para un artículo
+ */
+export const uploadArticuloImagen = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Verificar que el artículo existe
+        const articulo = await Articulo.findByPk(id);
+
+        if (!articulo) {
+            return res.status(404).json({
+                success: false,
+                message: 'Artículo no encontrado'
+            });
+        }
+
+        // Verificar que se subió un archivo
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No se proporcionó ninguna imagen'
+            });
+        }
+
+        // Eliminar imagen anterior si existe
+        if (articulo.imagen_url) {
+            const { eliminarImagen } = await import('../config/multer.js');
+            eliminarImagen(articulo.imagen_url);
+        }
+
+        // Construir URL de la imagen
+        const imageUrl = `/uploads/articulos/${req.file.filename}`;
+
+        // Actualizar artículo con nueva imagen
+        await articulo.update({ imagen_url: imageUrl });
 
         res.status(200).json({
             success: true,
-            message: 'Código QR regenerado exitosamente',
+            message: 'Imagen subida exitosamente',
             data: {
-                qr: {
-                    dataURL: qrResult.qrDataURL,
-                    filePath: qrResult.qrFilePath
-                }
+                imagen_url: imageUrl
             }
         });
 
     } catch (error) {
-        console.error('Error en regenerarQR:', error);
+        console.error('Error en uploadArticuloImagen:', error);
         res.status(500).json({
             success: false,
-            message: 'Error al regenerar código QR',
+            message: 'Error al subir imagen',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * DELETE /api/articulos/:id/imagen
+ * Eliminar imagen de un artículo
+ */
+export const deleteArticuloImagen = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Verificar que el artículo existe
+        const articulo = await Articulo.findByPk(id);
+
+        if (!articulo) {
+            return res.status(404).json({
+                success: false,
+                message: 'Artículo no encontrado'
+            });
+        }
+
+        if (!articulo.imagen_url) {
+            return res.status(404).json({
+                success: false,
+                message: 'El artículo no tiene imagen'
+            });
+        }
+
+        // Eliminar imagen del sistema de archivos
+        const { eliminarImagen } = await import('../config/multer.js');
+        eliminarImagen(articulo.imagen_url);
+
+        // Actualizar artículo
+        await articulo.update({ imagen_url: null });
+
+        res.status(200).json({
+            success: true,
+            message: 'Imagen eliminada exitosamente'
+        });
+
+    } catch (error) {
+        console.error('Error en deleteArticuloImagen:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al eliminar imagen',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
@@ -500,9 +757,13 @@ export const regenerarQR = async (req, res) => {
 export default {
     getArticulos,
     getArticuloById,
-    getArticuloByQR,
+    getArticuloByEAN13,
     createArticulo,
     updateArticulo,
     deleteArticulo,
-    regenerarQR
+    getArticuloBarcode,
+    getArticuloBarcodeSVG,
+    getArticuloEtiqueta,
+    uploadArticuloImagen,
+    deleteArticuloImagen
 };

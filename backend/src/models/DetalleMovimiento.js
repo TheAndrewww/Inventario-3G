@@ -38,6 +38,26 @@ const DetalleMovimiento = sequelize.define('DetalleMovimiento', {
     observaciones: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    dispersado: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Indica si el artículo fue dispersado/entregado'
+    },
+    fecha_dispersado: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Fecha y hora en que se dispersó el artículo'
+    },
+    dispersado_por_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'usuarios',
+            key: 'id'
+        },
+        comment: 'Usuario que dispersó el artículo'
     }
 }, {
     tableName: 'detalle_movimientos',

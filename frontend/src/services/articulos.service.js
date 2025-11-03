@@ -1,128 +1,114 @@
 import api from './api';
 
 const articulosService = {
-  /**
-   * Obtener todos los artículos con filtros opcionales
-   * @param {Object} params - Parámetros de búsqueda
-   * @returns {Promise}
-   */
-  getAll: async (params = {}) => {
+  // Obtener todos los artículos
+  async getAll() {
     try {
-      const response = await api.get('/articulos', { params });
-      return response.data;
+      const response = await api.get('/articulos');
+      // El backend devuelve: { success, data: { articulos, total, ... } }
+      return response.data.data?.articulos || response.data.data || [];
     } catch (error) {
-      throw error.response?.data || error;
+      throw error.response?.data || { message: 'Error al obtener artículos' };
     }
   },
 
-  /**
-   * Obtener un artículo por ID
-   * @param {number} id
-   * @returns {Promise}
-   */
-  getById: async (id) => {
+  // Obtener un artículo por ID
+  async getById(id) {
     try {
       const response = await api.get(`/articulos/${id}`);
-      return response.data;
+      return response.data.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error.response?.data || { message: 'Error al obtener artículo' };
     }
   },
 
-  /**
-   * Buscar artículo por código QR
-   * @param {string} codigoQR
-   * @returns {Promise}
-   */
-  getByQR: async (codigoQR) => {
+  // Buscar artículo por código EAN-13
+  async getByEAN13(codigoEAN13) {
     try {
-      const response = await api.get(`/articulos/qr/${encodeURIComponent(codigoQR)}`);
-      return response.data;
+      const response = await api.get(`/articulos/ean13/${codigoEAN13}`);
+      // El backend devuelve: { success, data: { articulo: {...} } }
+      return response.data.data?.articulo || response.data.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error.response?.data || { message: 'Error al buscar por código EAN-13' };
     }
   },
 
-  /**
-   * Crear nuevo artículo (genera QR automáticamente)
-   * @param {Object} articuloData
-   * @returns {Promise}
-   */
-  create: async (articuloData) => {
+  // Crear artículo
+  async create(data) {
     try {
-      const response = await api.post('/articulos', articuloData);
-      return response.data;
+      const response = await api.post('/articulos', data);
+      return response.data.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error.response?.data || { message: 'Error al crear artículo' };
     }
   },
 
-  /**
-   * Actualizar artículo existente
-   * @param {number} id
-   * @param {Object} articuloData
-   * @returns {Promise}
-   */
-  update: async (id, articuloData) => {
+  // Actualizar artículo
+  async update(id, data) {
     try {
-      const response = await api.put(`/articulos/${id}`, articuloData);
-      return response.data;
+      const response = await api.put(`/articulos/${id}`, data);
+      return response.data.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error.response?.data || { message: 'Error al actualizar artículo' };
     }
   },
 
-  /**
-   * Eliminar (desactivar) artículo
-   * @param {number} id
-   * @returns {Promise}
-   */
-  delete: async (id) => {
+  // Eliminar artículo
+  async delete(id) {
     try {
       const response = await api.delete(`/articulos/${id}`);
-      return response.data;
+      return response.data.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error.response?.data || { message: 'Error al eliminar artículo' };
     }
   },
 
-  /**
-   * Regenerar código QR de un artículo
-   * @param {number} id
-   * @returns {Promise}
-   */
-  regenerarQR: async (id) => {
+  // Buscar artículos
+  async search(query) {
     try {
-      const response = await api.post(`/articulos/${id}/regenerar-qr`);
-      return response.data;
+      const response = await api.get('/articulos/search', { params: { q: query } });
+      return response.data.data?.articulos || response.data.data || [];
     } catch (error) {
-      throw error.response?.data || error;
+      throw error.response?.data || { message: 'Error al buscar artículos' };
     }
   },
 
-  /**
-   * Buscar artículos con filtros
-   * @param {Object} filtros
-   * @returns {Promise}
-   */
-  search: async (filtros) => {
+  // Subir imagen de artículo
+  async uploadImagen(id, file) {
     try {
-      const params = {};
+      const formData = new FormData();
+      formData.append('imagen', file);
 
-      if (filtros.search) params.search = filtros.search;
-      if (filtros.categoria_id) params.categoria_id = filtros.categoria_id;
-      if (filtros.ubicacion_id) params.ubicacion_id = filtros.ubicacion_id;
-      if (filtros.stock_bajo) params.stock_bajo = filtros.stock_bajo;
-      if (filtros.activo !== undefined) params.activo = filtros.activo;
-      if (filtros.page) params.page = filtros.page;
-      if (filtros.limit) params.limit = filtros.limit;
+      const response = await api.post(`/articulos/${id}/imagen`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al subir imagen' };
+    }
+  },
 
+  // Eliminar imagen de artículo
+  async deleteImagen(id) {
+    try {
+      const response = await api.delete(`/articulos/${id}/imagen`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al eliminar imagen' };
+    }
+  },
+
+  // Buscar artículos con filtros
+  async buscar(params = {}) {
+    try {
       const response = await api.get('/articulos', { params });
-      return response.data;
+      return response.data.data?.articulos || response.data.data || [];
     } catch (error) {
-      throw error.response?.data || error;
+      throw error.response?.data || { message: 'Error al buscar artículos' };
     }
-  },
+  }
 };
 
 export default articulosService;

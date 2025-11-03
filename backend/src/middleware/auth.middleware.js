@@ -125,6 +125,54 @@ export const esSupervisorOAdmin = (req, res, next) => {
 };
 
 /**
+ * Middleware para verificar que el usuario tenga acceso a gestión de inventario
+ * (Almacen, Supervisor, Administrador)
+ */
+export const accesoInventario = (req, res, next) => {
+    return verificarRol('almacen', 'supervisor', 'administrador')(req, res, next);
+};
+
+/**
+ * Middleware para verificar que el usuario tenga acceso a compras
+ * (Compras, Supervisor, Administrador)
+ */
+export const accesoCompras = (req, res, next) => {
+    return verificarRol('compras', 'supervisor', 'administrador')(req, res, next);
+};
+
+/**
+ * Middleware para verificar que el usuario sea diseñador
+ * (Diseñador, Supervisor, Administrador)
+ */
+export const accesoDiseño = (req, res, next) => {
+    return verificarRol('diseñador', 'supervisor', 'administrador')(req, res, next);
+};
+
+/**
+ * Middleware para verificar que el usuario tenga permisos de gestión
+ * (Supervisor, Administrador)
+ */
+export const accesoGestion = (req, res, next) => {
+    return verificarRol('supervisor', 'administrador')(req, res, next);
+};
+
+/**
+ * Middleware para verificar que el usuario pueda crear pedidos
+ * (Diseñador, Administrador)
+ */
+export const puedeCrearPedidos = (req, res, next) => {
+    return verificarRol('diseñador', 'administrador')(req, res, next);
+};
+
+/**
+ * Middleware para verificar que el usuario sea de almacén
+ * (Almacen, Supervisor, Administrador)
+ */
+export const esAlmacen = (req, res, next) => {
+    return verificarRol('almacen', 'supervisor', 'administrador')(req, res, next);
+};
+
+/**
  * Middleware para verificar que el usuario esté autenticado (cualquier rol)
  */
 export const estaAutenticado = verificarToken;
@@ -169,6 +217,12 @@ export default {
     verificarRol,
     esAdministrador,
     esSupervisorOAdmin,
+    accesoInventario,
+    accesoCompras,
+    accesoDiseño,
+    accesoGestion,
+    puedeCrearPedidos,
+    esAlmacen,
     estaAutenticado,
     verificarTokenOpcional
 };
