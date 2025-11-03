@@ -7,26 +7,6 @@ if (process.env.NODE_ENV !== 'production') {
     dotenv.config();
 }
 
-console.log('🔍 NODE_ENV:', process.env.NODE_ENV || 'development');
-console.log('🔍 DATABASE_URL existe?', !!process.env.DATABASE_URL);
-console.log('🔍 DATABASE_URL value:', process.env.DATABASE_URL ? 'SET (hidden)' : 'NOT SET');
-console.log('🔍 Todas las variables de entorno:', Object.keys(process.env).length);
-console.log('🔍 TODAS las variables (primeras 20):', Object.keys(process.env).slice(0, 20));
-console.log('🔍 Variables que contienen "DB" o "PG":', Object.keys(process.env).filter(k =>
-    k.toUpperCase().includes('DB') ||
-    k.toUpperCase().includes('PG') ||
-    k.toUpperCase().includes('POSTGRES')
-));
-
-// Imprimir TODAS las variables para debug (solo en el primer deploy)
-if (process.env.RAILWAY_DEPLOYMENT_ID) {
-    console.log('🔍 LISTADO COMPLETO DE VARIABLES:');
-    Object.keys(process.env).sort().forEach(key => {
-        // No mostrar valores sensibles, solo las claves
-        console.log(`   - ${key}: ${key.includes('PASSWORD') || key.includes('SECRET') || key.includes('TOKEN') ? '***' : 'SET'}`);
-    });
-}
-
 // Configuración de Sequelize
 export let sequelize;
 
