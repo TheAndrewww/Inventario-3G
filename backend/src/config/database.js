@@ -2,7 +2,14 @@ import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
 
 // Cargar .env solo si existe (desarrollo local)
-dotenv.config();
+// En producción (Railway, Heroku), las variables están en process.env directamente
+if (process.env.NODE_ENV !== 'production') {
+    dotenv.config();
+}
+
+console.log('🔍 NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('🔍 DATABASE_URL existe?', !!process.env.DATABASE_URL);
+console.log('🔍 Variables de entorno disponibles:', Object.keys(process.env).filter(k => k.includes('DB') || k.includes('PG')));
 
 // Configuración de Sequelize
 export let sequelize;

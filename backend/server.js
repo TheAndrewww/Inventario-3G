@@ -5,8 +5,11 @@ import { sequelize } from './src/config/database.js';
 import './src/models/index.js'; // Importar modelos y relaciones
 import { iniciarCronJobs } from './src/utils/cronJobs.js';
 
-// Cargar variables de entorno
-dotenv.config();
+// Cargar variables de entorno solo en desarrollo
+// En producción (Railway, Heroku), las variables están en process.env directamente
+if (process.env.NODE_ENV !== 'production') {
+    dotenv.config();
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
