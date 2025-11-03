@@ -107,8 +107,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       setUbicaciones(Array.isArray(ubicacionesData) ? ubicacionesData : []);
 
-      // El servicio devuelve response.data directamente, que contiene { proveedores: [...] }
-      const proveedoresList = proveedoresResponse?.proveedores || [];
+      // El servicio devuelve response.data que es { data: { proveedores: [...] } }
+      console.log('Respuesta completa de proveedores:', proveedoresResponse);
+      const proveedoresList = proveedoresResponse?.data?.proveedores || [];
       setProveedores(proveedoresList);
       console.log('Proveedores cargados:', proveedoresList);
     } catch (error) {
