@@ -185,8 +185,17 @@ const PedidoPage = () => {
 
     try {
       setBuscando(true);
-      const response = await articulosService.getAll({ busqueda: termino, activo: true });
-      setResultadosBusqueda(response.articulos || []);
+      const articulos = await articulosService.getAll();
+
+      // Filtrar artículos localmente por nombre o código
+      const resultados = articulos.filter(art => {
+        const nombreMatch = art.nombre?.toLowerCase().includes(termino.toLowerCase());
+        const codigoMatch = art.codigo_ean13?.includes(termino);
+        const activoMatch = art.activo !== false;
+        return (nombreMatch || codigoMatch) && activoMatch;
+      });
+
+      setResultadosBusqueda(resultados);
     } catch (error) {
       console.error('Error al buscar artículos:', error);
       toast.error('Error al buscar artículos');
@@ -207,12 +216,13 @@ const PedidoPage = () => {
   // Buscar por código de barras
   const buscarPorCodigo = async (codigo) => {
     try {
-      const response = await articulosService.buscarPorEAN13(codigo);
+      const response = await articulosService.getByEAN13(codigo);
       if (response && response.id) {
         agregarArticulo(response);
         toast.success(`✓ ${response.nombre} agregado`);
         setBusqueda('');
         setResultadosBusqueda([]);
+        setShowScanner(false);
       }
     } catch (error) {
       console.error('Error al buscar por código:', error);
