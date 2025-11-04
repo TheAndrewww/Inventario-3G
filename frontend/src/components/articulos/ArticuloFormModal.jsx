@@ -8,6 +8,7 @@ import proveedoresService from '../../services/proveedores.service';
 import articulosService from '../../services/articulos.service';
 import EAN13InputScanner from './EAN13InputScanner';
 import { useAuth } from '../../context/AuthContext';
+import { getImageUrl } from '../../utils/imageUtils';
 
 const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
   const { user } = useAuth();
@@ -83,7 +84,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
 
         // Cargar imagen actual si existe
         if (articulo.imagen_url) {
-          setCurrentImageUrl(`${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${articulo.imagen_url}`);
+          setCurrentImageUrl(getImageUrl(articulo.imagen_url));
         } else {
           setCurrentImageUrl(null);
         }

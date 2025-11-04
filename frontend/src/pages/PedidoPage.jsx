@@ -10,6 +10,7 @@ import ubicacionesService from '../services/ubicaciones.service';
 import articulosService from '../services/articulos.service';
 import EAN13Scanner from '../components/scanner/EAN13Scanner';
 import toast from 'react-hot-toast';
+import { getImageUrl } from '../utils/imageUtils';
 
 const PedidoPage = () => {
   const navigate = useNavigate();
@@ -299,7 +300,7 @@ const PedidoPage = () => {
                     <div className="divide-y divide-gray-200">
                       {resultadosBusqueda.slice(0, 5).map((articulo) => {
                         const imagenUrl = articulo.imagen_url
-                          ? `${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${articulo.imagen_url}`
+                          ? getImageUrl(articulo.imagen_url)
                           : null;
 
                         return (
@@ -379,7 +380,7 @@ const PedidoPage = () => {
               <div className="space-y-3">
                 {items.map((item) => {
                   const imagenUrl = item.imagen_url
-                    ? `${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${item.imagen_url}`
+                    ? getImageUrl(item.imagen_url)
                     : null;
 
                   return (

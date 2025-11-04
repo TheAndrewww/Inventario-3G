@@ -2,15 +2,14 @@ import React from 'react';
 import { X, Package, MapPin, DollarSign, Hash, Box, Edit } from 'lucide-react';
 import { Modal } from '../common';
 import BarcodeDisplay from './BarcodeDisplay';
+import { getImageUrl } from '../../utils/imageUtils';
 
 const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = false }) => {
   if (!articulo) return null;
 
   const stockBajo = parseFloat(articulo.stock_actual) <= parseFloat(articulo.stock_minimo);
 
-  const imagenUrl = articulo.imagen_url
-    ? `${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${articulo.imagen_url}`
-    : null;
+  const imagenUrl = getImageUrl(articulo.imagen_url);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Detalles del Artículo">

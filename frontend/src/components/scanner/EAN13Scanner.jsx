@@ -5,6 +5,7 @@ import { Camera, X, CheckCircle, AlertCircle, Plus, Minus, Trash2, ShoppingCart,
 import toast from 'react-hot-toast';
 import articulosService from '../../services/articulos.service';
 import { usePedido } from '../../context/PedidoContext';
+import { getImageUrl } from '../../utils/imageUtils';
 
 const EAN13Scanner = ({ onClose }) => {
   const [isScanning, setIsScanning] = useState(false);
@@ -330,7 +331,7 @@ const EAN13Scanner = ({ onClose }) => {
               <div className="flex-shrink-0">
                 {item.articulo.imagen_url ? (
                   <img
-                    src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${item.articulo.imagen_url}`}
+                    src={getImageUrl(item.articulo.imagen_url)}
                     alt={item.articulo.nombre}
                     className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg border border-gray-200"
                     onError={(e) => {

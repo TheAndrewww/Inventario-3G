@@ -10,6 +10,7 @@ import EAN13Scanner from '../components/scanner/EAN13Scanner';
 import toast from 'react-hot-toast';
 import { usePedido } from '../context/PedidoContext';
 import { useAuth } from '../context/AuthContext';
+import { getImageUrl } from '../utils/imageUtils';
 
 const InventarioPage = () => {
   const [articulos, setArticulos] = useState([]);
@@ -314,7 +315,7 @@ const InventarioPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredArticulos.filter(item => item.es_herramienta).map((item) => {
                   const imagenUrl = item.imagen_url
-                    ? `${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${item.imagen_url}`
+                    ? getImageUrl(item.imagen_url)
                     : null;
 
                   return (
@@ -424,7 +425,7 @@ const InventarioPage = () => {
           <div className="md:hidden divide-y divide-gray-200 max-h-96 overflow-y-auto">
             {filteredArticulos.filter(item => item.es_herramienta).map((item) => {
               const imagenUrl = item.imagen_url
-                ? `${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${item.imagen_url}`
+                ? getImageUrl(item.imagen_url)
                 : null;
 
               return (
@@ -556,7 +557,7 @@ const InventarioPage = () => {
               ) : (
                 filteredArticulos.filter(item => !item.es_herramienta).map((item) => {
                   const imagenUrl = item.imagen_url
-                    ? `${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${item.imagen_url}`
+                    ? getImageUrl(item.imagen_url)
                     : null;
 
                   return (
@@ -672,7 +673,7 @@ const InventarioPage = () => {
           ) : (
             filteredArticulos.filter(item => !item.es_herramienta).map((item) => {
               const imagenUrl = item.imagen_url
-                ? `${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${item.imagen_url}`
+                ? getImageUrl(item.imagen_url)
                 : null;
 
               return (

@@ -5,6 +5,7 @@ import movimientosService from '../services/movimientos.service';
 import toast from 'react-hot-toast';
 import Modal from '../components/common/Modal';
 import EAN13ScannerEntrada from '../components/scanner/EAN13ScannerEntrada';
+import { getImageUrl } from '../utils/imageUtils';
 
 const EntradaInventarioPage = () => {
   const [articulosSeleccionados, setArticulosSeleccionados] = useState([]);
@@ -228,7 +229,7 @@ const EntradaInventarioPage = () => {
                       <div className="flex items-center gap-3 flex-1">
                         {articulo.imagen_url ? (
                           <img
-                            src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${articulo.imagen_url}`}
+                            src={getImageUrl(articulo.imagen_url)}
                             alt={articulo.nombre}
                             className="w-12 h-12 object-cover rounded-lg"
                           />
@@ -299,7 +300,7 @@ const EntradaInventarioPage = () => {
                     <div className="flex items-start gap-3">
                       {articulo.imagen_url ? (
                         <img
-                          src={`${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${articulo.imagen_url}`}
+                          src={getImageUrl(articulo.imagen_url)}
                           alt={articulo.nombre}
                           className="w-16 h-16 object-cover rounded-lg"
                         />
