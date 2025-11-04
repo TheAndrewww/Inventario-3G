@@ -101,9 +101,11 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
         {isOpen && (
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-red-700 rounded-lg flex items-center justify-center text-white font-bold">
-              3G
-            </div>
+            <img
+              src="https://res.cloudinary.com/dd93jrilg/image/upload/v1762289946/logo-page_qhpoey.png"
+              alt="Logo 3G"
+              className="w-10 h-10 object-contain rounded-lg"
+            />
             <div>
               <h1 className="font-bold text-gray-900">ERP 3G</h1>
               <p className="text-xs text-gray-500">Inventario v1.0</p>

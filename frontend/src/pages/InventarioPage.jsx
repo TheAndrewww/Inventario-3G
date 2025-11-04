@@ -286,260 +286,24 @@ const InventarioPage = () => {
         )}
       </div>
 
-      {/* Sección de Herramientas */}
-      {filteredArticulos.some(item => item.es_herramienta) && (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-4 md:mb-6">
-          <div className="bg-orange-50 border-b border-orange-200 px-4 md:px-6 py-3">
-            <h2 className="text-base md:text-lg font-semibold text-orange-900 flex items-center gap-2">
-              🔧 Herramientas
-              <span className="text-xs md:text-sm font-normal text-orange-700">
-                ({filteredArticulos.filter(item => item.es_herramienta).length})
-              </span>
-            </h2>
-          </div>
-
-          {/* Vista Desktop: Tabla */}
-          <div className="hidden md:block overflow-x-auto max-h-96 overflow-y-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Artículo</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código EAN-13</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo Unit.</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredArticulos.filter(item => item.es_herramienta).map((item) => {
-                  const imagenUrl = item.imagen_url
-                    ? getImageUrl(item.imagen_url)
-                    : null;
-
-                  return (
-                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          {imagenUrl ? (
-                            <img
-                              src={imagenUrl}
-                              alt={item.nombre}
-                              className="w-10 h-10 object-cover rounded-lg"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
-                              🔧
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-medium text-gray-900">{item.nombre}</div>
-                            <div className="text-sm text-gray-500">{item.descripcion}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                        {item.codigo_ean13}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {item.categoria?.nombre || 'Sin categoría'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                            {parseFloat(item.stock_actual).toFixed(0)} {item.unidad}
-                          </span>
-                          {parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) && (
-                            <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">Bajo</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${parseFloat(item.costo_unitario || 0).toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleVerDetalle(item)}
-                            className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200"
-                            title="Ver detalles y código de barras"
-                          >
-                            <Barcode size={16} />
-                            Ver
-                          </button>
-                          {puedeGestionarInventario && (
-                            <button
-                              onClick={() => handleAbrirEntrada(item)}
-                              className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                              title="Registrar entrada de inventario"
-                            >
-                              <PackagePlus size={16} />
-                              Entrada
-                            </button>
-                          )}
-                          {puedeAgregarAlPedido && (
-                            <button
-                              onClick={() => handleAgregarAlPedido(item)}
-                              className="inline-flex items-center gap-1 px-3 py-2 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800"
-                            >
-                              <Plus size={16} />
-                              Agregar
-                            </button>
-                          )}
-                          {puedeCrearArticulos && (
-                            mostrarDesactivados ? (
-                              <button
-                                onClick={() => handleReactivar(item)}
-                                className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                                title="Reactivar artículo"
-                              >
-                                <Plus size={16} />
-                                Reactivar
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleEliminar(item)}
-                                className="inline-flex items-center gap-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                                title="Desactivar artículo"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            )
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Vista Móvil: Cards */}
-          <div className="md:hidden divide-y divide-gray-200 max-h-96 overflow-y-auto">
-            {filteredArticulos.filter(item => item.es_herramienta).map((item) => {
-              const imagenUrl = item.imagen_url
-                ? getImageUrl(item.imagen_url)
-                : null;
-
-              return (
-                <div key={item.id} className="p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex gap-3">
-                    {/* Imagen */}
-                    {imagenUrl ? (
-                      <img
-                        src={imagenUrl}
-                        alt={item.nombre}
-                        className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
-                        🔧
-                      </div>
-                    )}
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900 truncate">{item.nombre}</h3>
-                      <p className="text-xs text-gray-500 truncate mb-2">{item.descripcion}</p>
-
-                      <div className="flex flex-wrap gap-2 text-xs mb-2">
-                        <span className="inline-flex px-2 py-1 rounded-full bg-blue-100 text-blue-800 font-medium">
-                          {item.categoria?.nombre || 'Sin categoría'}
-                        </span>
-                        <span className={`inline-flex px-2 py-1 rounded font-medium ${
-                          parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo)
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          {parseFloat(item.stock_actual).toFixed(0)} {item.unidad}
-                        </span>
-                      </div>
-
-                      <div className="text-xs text-gray-600 space-y-1">
-                        <div className="font-mono">{item.codigo_ean13}</div>
-                        <div>${parseFloat(item.costo_unitario || 0).toFixed(2)}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Botones de acción */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => handleVerDetalle(item)}
-                      className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 text-xs rounded-lg hover:bg-gray-200"
-                    >
-                      <Barcode size={14} />
-                      Ver
-                    </button>
-                    {puedeGestionarInventario && (
-                      <button
-                        onClick={() => handleAbrirEntrada(item)}
-                        className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
-                      >
-                        <PackagePlus size={14} />
-                        Entrada
-                      </button>
-                    )}
-                    {puedeAgregarAlPedido && (
-                      <button
-                        onClick={() => handleAgregarAlPedido(item)}
-                        className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-700 text-white text-xs rounded-lg hover:bg-red-800"
-                      >
-                        <Plus size={14} />
-                        Agregar
-                      </button>
-                    )}
-                    {puedeCrearArticulos && (
-                      mostrarDesactivados ? (
-                        <button
-                          onClick={() => handleReactivar(item)}
-                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
-                        >
-                          <Plus size={14} />
-                          Reactivar
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleEliminar(item)}
-                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Sección de Consumibles */}
+      {/* Sección Unificada: Artículos (Consumibles + Herramientas) */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="bg-blue-50 border-b border-blue-200 px-4 md:px-6 py-3">
-          <h2 className="text-base md:text-lg font-semibold text-blue-900 flex items-center gap-2">
-            📦 Consumibles
-            <span className="text-xs md:text-sm font-normal text-blue-700">
-              ({filteredArticulos.filter(item => !item.es_herramienta).length})
+        <div className="bg-gradient-to-r from-blue-50 to-orange-50 border-b border-gray-200 px-4 md:px-6 py-3">
+          <h2 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
+            📦 Inventario
+            <span className="text-xs md:text-sm font-normal text-gray-700">
+              ({filteredArticulos.length} artículos total)
             </span>
           </h2>
         </div>
 
         {/* Vista Desktop: Tabla */}
-        <div className="hidden md:block overflow-x-auto max-h-96 overflow-y-auto">
+        <div className="hidden md:block overflow-x-auto max-h-[calc(100vh-300px)] overflow-y-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Artículo</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código EAN-13</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
@@ -548,20 +312,30 @@ const InventarioPage = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredArticulos.filter(item => !item.es_herramienta).length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
-                    No se encontraron artículos
-                  </td>
-                </tr>
-              ) : (
-                filteredArticulos.filter(item => !item.es_herramienta).map((item) => {
+              {/* Sección: Consumibles */}
+              {filteredArticulos.filter(item => !item.es_herramienta).length > 0 && (
+                <>
+                  <tr className="bg-blue-50 sticky top-[49px] z-20 border-b border-blue-200 shadow-sm">
+                    <td colSpan="7" className="px-6 py-3">
+                      <div className="flex items-center gap-2 font-semibold text-blue-900">
+                        📦 Consumibles
+                        <span className="text-xs font-normal text-blue-700">
+                          ({filteredArticulos.filter(item => !item.es_herramienta).length})
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                  {filteredArticulos.filter(item => !item.es_herramienta).map((item) => {
                   const imagenUrl = item.imagen_url
                     ? getImageUrl(item.imagen_url)
                     : null;
 
                   return (
-                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                    <tr
+                      key={item.id}
+                      onClick={() => handleVerDetalle(item)}
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           {imagenUrl ? (
@@ -606,15 +380,7 @@ const InventarioPage = () => {
                         ${parseFloat(item.costo_unitario || 0).toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleVerDetalle(item)}
-                            className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200"
-                            title="Ver detalles y código de barras"
-                          >
-                            <Barcode size={16} />
-                            Ver
-                          </button>
+                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                           {puedeGestionarInventario && (
                             <button
                               onClick={() => handleAbrirEntrada(item)}
@@ -658,123 +424,358 @@ const InventarioPage = () => {
                       </td>
                     </tr>
                   );
-                })
+                })}
+                </>
+              )}
+
+              {/* Sección: Herramientas */}
+              {filteredArticulos.filter(item => item.es_herramienta).length > 0 && (
+                <>
+                  <tr className="bg-orange-50 sticky top-[49px] z-20 border-b border-orange-200 shadow-sm">
+                    <td colSpan="7" className="px-6 py-3">
+                      <div className="flex items-center gap-2 font-semibold text-orange-900">
+                        🔧 Herramientas
+                        <span className="text-xs font-normal text-orange-700">
+                          ({filteredArticulos.filter(item => item.es_herramienta).length})
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                  {filteredArticulos.filter(item => item.es_herramienta).map((item) => {
+                    const imagenUrl = item.imagen_url
+                      ? getImageUrl(item.imagen_url)
+                      : null;
+
+                    return (
+                      <tr
+                        key={item.id}
+                        onClick={() => handleVerDetalle(item)}
+                        className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            {imagenUrl ? (
+                              <img
+                                src={imagenUrl}
+                                alt={item.nombre}
+                                className="w-10 h-10 object-cover rounded-lg"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
+                                🔧
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-medium text-gray-900">{item.nombre}</div>
+                              <div className="text-sm text-gray-500">{item.descripcion}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                          {item.codigo_ean13}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            {item.categoria?.nombre || 'Sin categoría'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                              {parseFloat(item.stock_actual).toFixed(0)} {item.unidad}
+                            </span>
+                            {parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) && (
+                              <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">Bajo</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          ${parseFloat(item.costo_unitario || 0).toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                            {puedeGestionarInventario && (
+                              <button
+                                onClick={() => handleAbrirEntrada(item)}
+                                className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                                title="Registrar entrada de inventario"
+                              >
+                                <PackagePlus size={16} />
+                                Entrada
+                              </button>
+                            )}
+                            {puedeAgregarAlPedido && (
+                              <button
+                                onClick={() => handleAgregarAlPedido(item)}
+                                className="inline-flex items-center gap-1 px-3 py-2 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800"
+                              >
+                                <Plus size={16} />
+                                Agregar
+                              </button>
+                            )}
+                            {puedeCrearArticulos && (
+                              mostrarDesactivados ? (
+                                <button
+                                  onClick={() => handleReactivar(item)}
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                                  title="Reactivar artículo"
+                                >
+                                  <Plus size={16} />
+                                  Reactivar
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleEliminar(item)}
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                                  title="Desactivar artículo"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Mensaje si no hay artículos */}
+              {filteredArticulos.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                    No se encontraron artículos
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Vista Móvil: Cards */}
-        <div className="md:hidden space-y-3 max-h-[70vh] overflow-y-auto px-1">
-          {filteredArticulos.filter(item => !item.es_herramienta).length === 0 ? (
-            <div className="px-4 py-8 text-center text-gray-500 text-sm">
+        {/* Vista Móvil: Cards unificadas */}
+        <div className="md:hidden divide-y divide-gray-200 max-h-[calc(100vh-300px)] overflow-y-auto">
+          {/* Sección: Consumibles */}
+          {filteredArticulos.filter(item => !item.es_herramienta).length > 0 && (
+            <>
+              <div className="bg-blue-50 px-4 py-3 sticky top-0 z-20 border-b border-blue-200 shadow-sm">
+                <div className="flex items-center gap-2 font-semibold text-blue-900">
+                  📦 Consumibles
+                  <span className="text-xs font-normal text-blue-700">
+                    ({filteredArticulos.filter(item => !item.es_herramienta).length})
+                  </span>
+                </div>
+              </div>
+              {filteredArticulos.filter(item => !item.es_herramienta).map((item) => {
+                const imagenUrl = item.imagen_url
+                  ? getImageUrl(item.imagen_url)
+                  : null;
+
+                return (
+                  <div
+                    key={`consumible-${item.id}`}
+                    onClick={() => handleVerDetalle(item)}
+                    className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex gap-3">
+                      {/* Imagen */}
+                      {imagenUrl ? (
+                        <img
+                          src={imagenUrl}
+                          alt={item.nombre}
+                          className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+                          📦
+                        </div>
+                      )}
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 truncate">{item.nombre}</h3>
+                        <p className="text-xs text-gray-500 truncate mb-2">{item.descripcion}</p>
+
+                        <div className="flex flex-wrap gap-2 text-xs mb-2">
+                          <span className="inline-flex px-2 py-1 rounded-full bg-blue-100 text-blue-800 font-medium">
+                            {item.categoria?.nombre || 'Sin categoría'}
+                          </span>
+                          <span className={`inline-flex px-2 py-1 rounded font-medium ${
+                            parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo)
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {parseFloat(item.stock_actual).toFixed(0)} {item.unidad}
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-gray-600 space-y-1">
+                          <div className="font-mono">{item.codigo_ean13}</div>
+                          <div>${parseFloat(item.costo_unitario || 0).toFixed(2)}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Botones de acción */}
+                    <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                      {puedeGestionarInventario && (
+                        <button
+                          onClick={() => handleAbrirEntrada(item)}
+                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
+                        >
+                          <PackagePlus size={14} />
+                          Entrada
+                        </button>
+                      )}
+                      {puedeAgregarAlPedido && (
+                        <button
+                          onClick={() => handleAgregarAlPedido(item)}
+                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-700 text-white text-xs rounded-lg hover:bg-red-800"
+                        >
+                          <Plus size={14} />
+                          Agregar
+                        </button>
+                      )}
+                      {puedeCrearArticulos && (
+                        mostrarDesactivados ? (
+                          <button
+                            onClick={() => handleReactivar(item)}
+                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
+                          >
+                            <Plus size={14} />
+                            Reactivar
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleEliminar(item)}
+                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {/* Sección: Herramientas */}
+          {filteredArticulos.filter(item => item.es_herramienta).length > 0 && (
+            <>
+              <div className="bg-orange-50 px-4 py-3 sticky top-0 z-20 border-b border-orange-200 shadow-sm">
+                <div className="flex items-center gap-2 font-semibold text-orange-900">
+                  🔧 Herramientas
+                  <span className="text-xs font-normal text-orange-700">
+                    ({filteredArticulos.filter(item => item.es_herramienta).length})
+                  </span>
+                </div>
+              </div>
+
+              {filteredArticulos.filter(item => item.es_herramienta).map((item) => {
+                const imagenUrl = item.imagen_url
+                  ? getImageUrl(item.imagen_url)
+                  : null;
+
+                return (
+                  <div
+                    key={`herramienta-${item.id}`}
+                    onClick={() => handleVerDetalle(item)}
+                    className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex gap-3">
+                      {/* Imagen */}
+                      {imagenUrl ? (
+                        <img
+                          src={imagenUrl}
+                          alt={item.nombre}
+                          className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+                          🔧
+                        </div>
+                      )}
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 truncate">{item.nombre}</h3>
+                        <p className="text-xs text-gray-500 truncate mb-2">{item.descripcion}</p>
+
+                        <div className="flex flex-wrap gap-2 text-xs mb-2">
+                          <span className="inline-flex px-2 py-1 rounded-full bg-blue-100 text-blue-800 font-medium">
+                            {item.categoria?.nombre || 'Sin categoría'}
+                          </span>
+                          <span className={`inline-flex px-2 py-1 rounded font-medium ${
+                            parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo)
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {parseFloat(item.stock_actual).toFixed(0)} {item.unidad}
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-gray-600 space-y-1">
+                          <div className="font-mono">{item.codigo_ean13}</div>
+                          <div>${parseFloat(item.costo_unitario || 0).toFixed(2)}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Botones de acción */}
+                    <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                      {puedeGestionarInventario && (
+                        <button
+                          onClick={() => handleAbrirEntrada(item)}
+                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
+                        >
+                          <PackagePlus size={14} />
+                          Entrada
+                        </button>
+                      )}
+                      {puedeAgregarAlPedido && (
+                        <button
+                          onClick={() => handleAgregarAlPedido(item)}
+                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-700 text-white text-xs rounded-lg hover:bg-red-800"
+                        >
+                          <Plus size={14} />
+                          Agregar
+                        </button>
+                      )}
+                      {puedeCrearArticulos && (
+                        mostrarDesactivados ? (
+                          <button
+                            onClick={() => handleReactivar(item)}
+                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
+                          >
+                            <Plus size={14} />
+                            Reactivar
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleEliminar(item)}
+                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {/* Mensaje si no hay artículos */}
+          {filteredArticulos.length === 0 && (
+            <div className="px-4 py-8 text-center text-gray-500">
               No se encontraron artículos
             </div>
-          ) : (
-            filteredArticulos.filter(item => !item.es_herramienta).map((item) => {
-              const imagenUrl = item.imagen_url
-                ? getImageUrl(item.imagen_url)
-                : null;
-
-              return (
-                <div key={item.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 hover:shadow-md transition-shadow">
-                  <div className="flex gap-3 mb-3">
-                    {/* Imagen */}
-                    {imagenUrl ? (
-                      <img
-                        src={imagenUrl}
-                        alt={item.nombre}
-                        className="w-20 h-20 object-cover rounded-lg flex-shrink-0 border border-gray-200"
-                      />
-                    ) : (
-                      <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-3xl flex-shrink-0 border border-gray-200">
-                        📦
-                      </div>
-                    )}
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-2 leading-tight">
-                        {item.nombre}
-                      </h3>
-                      <p className="text-xs text-gray-500 line-clamp-2 mb-2 leading-relaxed">
-                        {item.descripcion}
-                      </p>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        <span className="inline-flex px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium text-xs">
-                          {item.categoria?.nombre || 'Sin categoría'}
-                        </span>
-                        <span className={`inline-flex px-2 py-0.5 rounded-full font-medium text-xs ${
-                          parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo)
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-green-100 text-green-700'
-                        }`}>
-                          Stock: {parseFloat(item.stock_actual).toFixed(0)} {item.unidad}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Detalles adicionales */}
-                  <div className="flex items-center justify-between text-xs text-gray-600 mb-3 pb-3 border-b border-gray-100">
-                    <div className="font-mono bg-gray-50 px-2 py-1 rounded">
-                      {item.codigo_ean13}
-                    </div>
-                    <div className="font-semibold text-gray-900">
-                      ${parseFloat(item.costo_unitario || 0).toFixed(2)}
-                    </div>
-                  </div>
-
-                  {/* Botones de acción */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleVerDetalle(item)}
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 active:bg-gray-300 transition-colors"
-                    >
-                      <Barcode size={16} />
-                      Ver
-                    </button>
-                    {puedeGestionarInventario && (
-                      <button
-                        onClick={() => handleAbrirEntrada(item)}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 active:bg-green-800 transition-colors"
-                      >
-                        <PackagePlus size={16} />
-                        Entrada
-                      </button>
-                    )}
-                    {puedeAgregarAlPedido && (
-                      <button
-                        onClick={() => handleAgregarAlPedido(item)}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-red-700 text-white text-sm font-medium rounded-lg hover:bg-red-800 active:bg-red-900 transition-colors"
-                      >
-                        <Plus size={16} />
-                        Agregar
-                      </button>
-                    )}
-                    {puedeCrearArticulos && (
-                      mostrarDesactivados ? (
-                        <button
-                          onClick={() => handleReactivar(item)}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 active:bg-green-800 transition-colors"
-                        >
-                          <Plus size={16} />
-                          Reactivar
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleEliminar(item)}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 active:bg-red-800 transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
-              );
-            })
           )}
         </div>
       </div>

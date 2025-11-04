@@ -53,8 +53,12 @@ const LoginPage = () => {
       <div className="w-full max-w-md">
         {/* Logo y Título */}
         <div className="text-center mb-8">
-          <div className="inline-block bg-red-700 w-20 h-20 rounded-2xl flex items-center justify-center mb-4">
-            <span className="text-white text-4xl font-bold">3G</span>
+          <div className="flex justify-center mb-4">
+            <img
+              src="https://res.cloudinary.com/dd93jrilg/image/upload/v1762292854/logo_completo_web_eknzcb.png"
+              alt="Logo 3G Textil"
+              className="h-32 object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">ERP 3G Inventario</h1>
           <p className="text-gray-600">Ingresa a tu cuenta para continuar</p>
