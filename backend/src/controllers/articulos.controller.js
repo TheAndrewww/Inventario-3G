@@ -691,14 +691,19 @@ export const uploadArticuloImagen = async (req, res) => {
             });
         }
 
-        // Eliminar imagen anterior si existe
+        // Eliminar imagen anterior de Cloudinary si existe
         if (articulo.imagen_url) {
-            const { eliminarImagen } = await import('../config/multer.js');
-            eliminarImagen(articulo.imagen_url);
+            try {
+                const { eliminarImagen } = await import('../config/cloudinary.js');
+                await eliminarImagen(articulo.imagen_url);
+            } catch (error) {
+                console.log('Error al eliminar imagen anterior:', error.message);
+                // Continuar aunque falle la eliminación
+            }
         }
 
-        // Construir URL de la imagen
-        const imageUrl = `/uploads/articulos/${req.file.filename}`;
+        // Cloudinary ya provee la URL completa en req.file.path
+        const imageUrl = req.file.path;
 
         // Actualizar artículo con nueva imagen
         await articulo.update({ imagen_url: imageUrl });
@@ -746,9 +751,9 @@ export const deleteArticuloImagen = async (req, res) => {
             });
         }
 
-        // Eliminar imagen del sistema de archivos
-        const { eliminarImagen } = await import('../config/multer.js');
-        eliminarImagen(articulo.imagen_url);
+        // Eliminar imagen de Cloudinary
+        const { eliminarImagen } = await import('../config/cloudinary.js');
+        await eliminarImagen(articulo.imagen_url);
 
         // Actualizar artículo
         await articulo.update({ imagen_url: null });

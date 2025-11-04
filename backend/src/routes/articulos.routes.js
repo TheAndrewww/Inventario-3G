@@ -18,7 +18,7 @@ import {
     esSupervisorOAdmin,
     accesoInventario
 } from '../middleware/auth.middleware.js';
-import { uploadArticuloImagen as multerUpload } from '../config/multer.js';
+import { uploadArticuloImagen as multerUpload } from '../config/cloudinary.js';
 
 const router = express.Router();
 

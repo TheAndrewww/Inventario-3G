@@ -25,11 +25,13 @@
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "bwip-js": "^4.7.0",
+    "cloudinary": "^1.41.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "multer-storage-cloudinary": "^4.0.0",
     "node-cron": "^4.2.1",
     "pdfkit": "^0.17.2",
     "pg": "^8.16.3",
