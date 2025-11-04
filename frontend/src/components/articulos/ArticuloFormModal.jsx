@@ -134,7 +134,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
 
     // Si el usuario selecciona "nuevo_proveedor" en el select
     if (name === 'proveedor_id' && value === 'nuevo_proveedor') {
@@ -157,9 +157,15 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       return;
     }
 
+    // Convertir a mayúsculas si es un input de texto (excepto números y emails)
+    const camposDeTexto = ['nombre', 'descripcion', 'unidad'];
+    const finalValue = (type === 'text' && camposDeTexto.includes(name))
+      ? value.toUpperCase()
+      : value;
+
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: finalValue
     }));
   };
 
@@ -532,7 +538,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
             value={formData.nombre}
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            placeholder="Ej: Tornillo hexagonal 1/4"
+            placeholder="Ej: TORNILLO HEXAGONAL 1/4"
+            style={{ textTransform: 'uppercase' }}
             required
           />
         </div>
@@ -548,7 +555,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
             onChange={handleChange}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            placeholder="Descripción del artículo..."
+            placeholder="DESCRIPCIÓN DEL ARTÍCULO..."
+            style={{ textTransform: 'uppercase' }}
           />
         </div>
 
@@ -597,7 +605,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                 <input
                   type="text"
                   value={nuevaCategoriaData.nombre}
-                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, nombre: e.target.value }))}
+                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, nombre: e.target.value.toUpperCase() }))}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -609,15 +617,16 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                       handleCancelarNuevaCategoria();
                     }
                   }}
-                  placeholder="Nombre (ej: Tornillería)"
+                  placeholder="NOMBRE (EJ: TORNILLERÍA)"
                   className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                  style={{ textTransform: 'uppercase' }}
                   autoFocus
                   disabled={creandoCategoria}
                 />
                 <input
                   type="text"
                   value={nuevaCategoriaData.descripcion}
-                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, descripcion: e.target.value }))}
+                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, descripcion: e.target.value.toUpperCase() }))}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -629,8 +638,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                       handleCancelarNuevaCategoria();
                     }
                   }}
-                  placeholder="Descripción (opcional)"
+                  placeholder="DESCRIPCIÓN (OPCIONAL)"
                   className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                  style={{ textTransform: 'uppercase' }}
                   disabled={creandoCategoria}
                 />
                 <button
@@ -699,7 +709,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                   <input
                     type="text"
                     value={nuevaUbicacionData.codigo}
-                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, codigo: e.target.value }))}
+                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, codigo: e.target.value.toUpperCase() }))}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -711,15 +721,16 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                         handleCancelarNuevaUbicacion();
                       }
                     }}
-                    placeholder="Código (ej: A-01)"
+                    placeholder="CÓDIGO (EJ: A-01)"
                     className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                    style={{ textTransform: 'uppercase' }}
                     autoFocus
                     disabled={creandoUbicacion}
                   />
                   <input
                     type="text"
                     value={nuevaUbicacionData.descripcion}
-                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, descripcion: e.target.value }))}
+                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, descripcion: e.target.value.toUpperCase() }))}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -731,8 +742,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                         handleCancelarNuevaUbicacion();
                       }
                     }}
-                    placeholder="Descripción (opcional)"
+                    placeholder="DESCRIPCIÓN (OPCIONAL)"
                     className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                    style={{ textTransform: 'uppercase' }}
                     disabled={creandoUbicacion}
                   />
                   <button
@@ -801,7 +813,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
               <input
                 type="text"
                 value={nuevoProveedorNombre}
-                onChange={(e) => setNuevoProveedorNombre(e.target.value)}
+                onChange={(e) => setNuevoProveedorNombre(e.target.value.toUpperCase())}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -811,8 +823,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                     handleCancelarNuevoProveedor();
                   }
                 }}
-                placeholder="Nombre del nuevo proveedor"
+                placeholder="NOMBRE DEL NUEVO PROVEEDOR"
                 className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                style={{ textTransform: 'uppercase' }}
                 autoFocus
                 disabled={creandoProveedor}
               />

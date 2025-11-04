@@ -11,8 +11,34 @@ const Input = ({
   required = false,
   disabled = false,
   icon: Icon,
-  className = ''
+  className = '',
+  uppercase = true // Por defecto convertir a mayúsculas
 }) => {
+  // Tipos de input que NO deben convertirse a mayúsculas
+  const noUppercaseTypes = ['email', 'password', 'number', 'tel', 'url', 'date', 'time', 'datetime-local'];
+
+  // Determinar si debe aplicar mayúsculas
+  const shouldUppercase = uppercase && type === 'text' && !noUppercaseTypes.includes(type);
+
+  // Manejar el cambio con conversión a mayúsculas si aplica
+  const handleChange = (e) => {
+    if (shouldUppercase) {
+      const upperValue = e.target.value.toUpperCase();
+      // Crear nuevo evento con el valor en mayúsculas
+      const newEvent = {
+        ...e,
+        target: {
+          ...e.target,
+          value: upperValue,
+          name: e.target.name
+        }
+      };
+      onChange(newEvent);
+    } else {
+      onChange(e);
+    }
+  };
+
   return (
     <div className={`w-full ${className}`}>
       {label && (
@@ -32,10 +58,11 @@ const Input = ({
           name={name}
           type={type}
           value={value}
-          onChange={onChange}
+          onChange={handleChange}
           placeholder={placeholder}
           required={required}
           disabled={disabled}
+          style={shouldUppercase ? { textTransform: 'uppercase' } : {}}
           className={`
             w-full px-4 py-3 border rounded-lg
             focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-transparent
