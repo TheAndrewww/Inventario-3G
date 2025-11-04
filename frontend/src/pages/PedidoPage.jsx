@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Minus, Trash2, Package, Users, Truck } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, Package, Users, Truck, Search, Barcode } from 'lucide-react';
 import { usePedido } from '../context/PedidoContext';
 import { Button } from '../components/common';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +7,8 @@ import { useAuth } from '../context/AuthContext';
 import pedidosService from '../services/pedidos.service';
 import equiposService from '../services/equipos.service';
 import ubicacionesService from '../services/ubicaciones.service';
+import articulosService from '../services/articulos.service';
+import EAN13Scanner from '../components/scanner/EAN13Scanner';
 import toast from 'react-hot-toast';
 
 const PedidoPage = () => {
@@ -31,6 +33,13 @@ const PedidoPage = () => {
   const [ubicaciones, setUbicaciones] = useState([]);
   const [ubicacionDestino, setUbicacionDestino] = useState('');
   const [cargandoUbicaciones, setCargandoUbicaciones] = useState(false);
+
+  // Estados para búsqueda rápida
+  const [busqueda, setBusqueda] = useState('');
+  const [resultadosBusqueda, setResultadosBusqueda] = useState([]);
+  const [buscando, setBuscando] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const { agregarArticulo } = usePedido();
 
   // Cargar equipos si el usuario es almacenista
   useEffect(() => {
@@ -167,11 +176,180 @@ const PedidoPage = () => {
     }
   };
 
+  // Buscar artículos por nombre o código
+  const buscarArticulos = async (termino) => {
+    if (!termino || termino.length < 2) {
+      setResultadosBusqueda([]);
+      return;
+    }
+
+    try {
+      setBuscando(true);
+      const response = await articulosService.getAll({ busqueda: termino, activo: true });
+      setResultadosBusqueda(response.articulos || []);
+    } catch (error) {
+      console.error('Error al buscar artículos:', error);
+      toast.error('Error al buscar artículos');
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  // Debounce para la búsqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      buscarArticulos(busqueda);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [busqueda]);
+
+  // Buscar por código de barras
+  const buscarPorCodigo = async (codigo) => {
+    try {
+      const response = await articulosService.buscarPorEAN13(codigo);
+      if (response && response.id) {
+        agregarArticulo(response);
+        toast.success(`✓ ${response.nombre} agregado`);
+        setBusqueda('');
+        setResultadosBusqueda([]);
+      }
+    } catch (error) {
+      console.error('Error al buscar por código:', error);
+      toast.error('Artículo no encontrado');
+    }
+  };
+
+  // Agregar artículo desde búsqueda
+  const handleAgregarArticulo = (articulo) => {
+    agregarArticulo(articulo);
+    toast.success(`✓ ${articulo.nombre} agregado`);
+    setBusqueda('');
+    setResultadosBusqueda([]);
+  };
+
   return (
     <div className="p-4 md:p-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Lista de artículos */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-4">
+          {/* Panel de Búsqueda Rápida */}
+          <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
+            <h3 className="text-base md:text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Search size={20} />
+              Buscar y Agregar Artículos
+            </h3>
+
+            {/* Barra de búsqueda con scanner */}
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="text"
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value.toUpperCase())}
+                    placeholder="BUSCAR POR NOMBRE O CÓDIGO..."
+                    className="w-full pl-10 pr-3 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm md:text-base"
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+                <button
+                  onClick={() => setShowScanner(!showScanner)}
+                  className={`px-4 py-3 rounded-lg border-2 transition-colors ${
+                    showScanner
+                      ? 'bg-red-700 text-white border-red-700'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                  title="Escanear código de barras"
+                >
+                  <Barcode size={20} />
+                </button>
+              </div>
+
+              {/* Scanner */}
+              {showScanner && (
+                <div className="border-2 border-red-700 rounded-lg p-3 bg-gray-50">
+                  <EAN13Scanner
+                    onScan={buscarPorCodigo}
+                    onClose={() => setShowScanner(false)}
+                  />
+                </div>
+              )}
+
+              {/* Resultados de búsqueda */}
+              {busqueda.length >= 2 && (
+                <div className="border border-gray-200 rounded-lg max-h-80 overflow-y-auto">
+                  {buscando ? (
+                    <div className="p-4 text-center text-gray-500">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-700 mx-auto"></div>
+                      <p className="mt-2 text-sm">Buscando...</p>
+                    </div>
+                  ) : resultadosBusqueda.length > 0 ? (
+                    <div className="divide-y divide-gray-200">
+                      {resultadosBusqueda.slice(0, 5).map((articulo) => {
+                        const imagenUrl = articulo.imagen_url
+                          ? `${import.meta.env.VITE_BASE_URL || 'http://localhost:5001'}${articulo.imagen_url}`
+                          : null;
+
+                        return (
+                          <div
+                            key={articulo.id}
+                            className="p-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                            onClick={() => handleAgregarArticulo(articulo)}
+                          >
+                            <div className="flex items-center gap-3">
+                              {imagenUrl ? (
+                                <img
+                                  src={imagenUrl}
+                                  alt={articulo.nombre}
+                                  className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
+                                  📦
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-gray-900 text-sm truncate">
+                                  {articulo.nombre}
+                                </h4>
+                                <p className="text-xs text-gray-500 truncate">
+                                  {articulo.codigo_ean13} • Stock: {articulo.stock_actual}
+                                </p>
+                              </div>
+                              <button
+                                className="px-3 py-1.5 bg-red-700 text-white rounded-lg hover:bg-red-800 text-sm flex items-center gap-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAgregarArticulo(articulo);
+                                }}
+                              >
+                                <Plus size={14} />
+                                Agregar
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-gray-500 text-sm">
+                      No se encontraron artículos
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!busqueda && !showScanner && (
+                <p className="text-xs text-gray-500 text-center">
+                  Escribe el nombre o código del artículo, o escanea su código de barras
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Lista de artículos en el pedido */}
           <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
             <h3 className="text-base md:text-lg font-bold text-gray-900 mb-4">Artículos en el Pedido</h3>
 
