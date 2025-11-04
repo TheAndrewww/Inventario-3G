@@ -702,8 +702,17 @@ export const uploadArticuloImagen = async (req, res) => {
             }
         }
 
-        // Cloudinary ya provee la URL completa en req.file.path
-        const imageUrl = req.file.path;
+        // Cloudinary provee la URL en req.file.path
+        // Asegurarse de que la URL tenga el formato correcto (https://)
+        let imageUrl = req.file.path;
+
+        // Corregir si la URL está malformada (https// en lugar de https://)
+        if (imageUrl && imageUrl.includes('https//')) {
+            imageUrl = imageUrl.replace('https//', 'https://');
+        }
+        if (imageUrl && imageUrl.includes('http//')) {
+            imageUrl = imageUrl.replace('http//', 'http://');
+        }
 
         // Actualizar artículo con nueva imagen
         await articulo.update({ imagen_url: imageUrl });
