@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus } from 'lucide-react';
+import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown } from 'lucide-react';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
 import categoriasService from '../services/categorias.service';
@@ -20,6 +20,7 @@ const InventarioPage = () => {
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [mostrarCategorias, setMostrarCategorias] = useState(false);
   const [mostrarDesactivados, setMostrarDesactivados] = useState(false);
+  const [ordenamiento, setOrdenamiento] = useState('nombre-asc');
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
   const [articuloAEditar, setArticuloAEditar] = useState(null);
   const [modalDetalleOpen, setModalDetalleOpen] = useState(false);
@@ -73,20 +74,50 @@ const InventarioPage = () => {
     }
   };
 
-  const filteredArticulos = articulos.filter((item) => {
-    // Filtrar por estado activo/desactivado
-    const isActive = item.activo !== false;
-    const matchesActiveFilter = mostrarDesactivados ? !isActive : isActive;
+  const filteredArticulos = articulos
+    .filter((item) => {
+      // Filtrar por estado activo/desactivado
+      const isActive = item.activo !== false;
+      const matchesActiveFilter = mostrarDesactivados ? !isActive : isActive;
 
-    const matchesSearch =
-      item.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.codigo_ean13?.includes(searchTerm) ||
-      item.categoria?.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch =
+        item.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.codigo_ean13?.includes(searchTerm) ||
+        item.categoria?.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
+      const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
 
-    return matchesActiveFilter && matchesSearch && matchesCategoria;
-  });
+      return matchesActiveFilter && matchesSearch && matchesCategoria;
+    })
+    .sort((a, b) => {
+      // Ordenar según la opción seleccionada
+      switch (ordenamiento) {
+        case 'nombre-asc':
+          return a.nombre.localeCompare(b.nombre);
+        case 'nombre-desc':
+          return b.nombre.localeCompare(a.nombre);
+        case 'stock-bajo':
+          // Calcular si está bajo stock (stock_actual <= stock_minimo)
+          const aBajoStock = parseFloat(a.stock_actual) <= parseFloat(a.stock_minimo);
+          const bBajoStock = parseFloat(b.stock_actual) <= parseFloat(b.stock_minimo);
+          if (aBajoStock && !bBajoStock) return -1;
+          if (!aBajoStock && bBajoStock) return 1;
+          // Si ambos están bajos o ambos están bien, ordenar por cantidad de stock (menor primero)
+          return parseFloat(a.stock_actual) - parseFloat(b.stock_actual);
+        case 'stock-asc':
+          return parseFloat(a.stock_actual) - parseFloat(b.stock_actual);
+        case 'stock-desc':
+          return parseFloat(b.stock_actual) - parseFloat(a.stock_actual);
+        case 'costo-asc':
+          return parseFloat(a.costo_unitario) - parseFloat(b.costo_unitario);
+        case 'costo-desc':
+          return parseFloat(b.costo_unitario) - parseFloat(a.costo_unitario);
+        case 'categoria':
+          return a.categoria?.nombre.localeCompare(b.categoria?.nombre);
+        default:
+          return 0;
+      }
+    });
 
   const handleAgregarAlPedido = (articulo) => {
     agregarArticulo(articulo, 1);
@@ -269,6 +300,25 @@ const InventarioPage = () => {
 
         {/* Botones de acción - wrapeables en móvil */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Desplegable de ordenamiento */}
+          <div className="relative">
+            <select
+              value={ordenamiento}
+              onChange={(e) => setOrdenamiento(e.target.value)}
+              className="appearance-none pl-3 pr-8 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-700 cursor-pointer bg-white"
+            >
+              <option value="nombre-asc">Nombre (A-Z)</option>
+              <option value="nombre-desc">Nombre (Z-A)</option>
+              <option value="stock-bajo">⚠️ Stock Bajo Primero</option>
+              <option value="stock-asc">Stock (Menor a Mayor)</option>
+              <option value="stock-desc">Stock (Mayor a Menor)</option>
+              <option value="costo-asc">Precio (Menor a Mayor)</option>
+              <option value="costo-desc">Precio (Mayor a Menor)</option>
+              <option value="categoria">Por Categoría</option>
+            </select>
+            <ArrowUpDown size={16} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+
           <button
             onClick={() => setMostrarCategorias(!mostrarCategorias)}
             className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg hover:bg-gray-50"
