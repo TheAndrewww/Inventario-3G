@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 
 const EquiposPage = () => {
   const [equipos, setEquipos] = useState([]);
-  const [supervisores, setSupervisores] = useState([]);
+  const [encargados, setEncargados] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [equipoEditando, setEquipoEditando] = useState(null);
@@ -22,7 +22,7 @@ const EquiposPage = () => {
   }, []);
 
   const cargarDatos = async () => {
-    await Promise.all([cargarEquipos(), cargarSupervisores()]);
+    await Promise.all([cargarEquipos(), cargarEncargados()]);
   };
 
   const cargarEquipos = async () => {
@@ -38,13 +38,13 @@ const EquiposPage = () => {
     }
   };
 
-  const cargarSupervisores = async () => {
+  const cargarEncargados = async () => {
     try {
-      const response = await usuariosService.obtenerSupervisores();
-      setSupervisores(response.data.supervisores || []);
+      const response = await usuariosService.obtenerEncargados();
+      setEncargados(response.data.encargados || []);
     } catch (error) {
-      console.error('Error al cargar supervisores:', error);
-      toast.error('Error al cargar supervisores');
+      console.error('Error al cargar encargados:', error);
+      toast.error('Error al cargar encargados');
     }
   };
 
@@ -87,7 +87,7 @@ const EquiposPage = () => {
     }
 
     if (!formData.supervisor_id) {
-      toast.error('Debes seleccionar un supervisor');
+      toast.error('Debes seleccionar un encargado');
       return;
     }
 
@@ -194,7 +194,7 @@ const EquiposPage = () => {
               )}
 
               <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500 mb-1">Supervisor</p>
+                <p className="text-xs text-gray-500 mb-1">Encargado</p>
                 <p className="font-medium text-gray-900">
                   {equipo.supervisor?.nombre || 'Sin asignar'}
                 </p>
@@ -268,7 +268,7 @@ const EquiposPage = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Supervisor *
+                  Encargado *
                 </label>
                 <select
                   value={formData.supervisor_id}
@@ -276,16 +276,16 @@ const EquiposPage = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
                   required
                 >
-                  <option value="">Selecciona un supervisor</option>
-                  {supervisores.map((supervisor) => (
-                    <option key={supervisor.id} value={supervisor.id}>
-                      {supervisor.nombre} ({supervisor.email})
+                  <option value="">Selecciona un encargado</option>
+                  {encargados.map((encargado) => (
+                    <option key={encargado.id} value={encargado.id}>
+                      {encargado.nombre} ({encargado.email})
                     </option>
                   ))}
                 </select>
-                {supervisores.length === 0 && (
+                {encargados.length === 0 && (
                   <p className="text-xs text-red-600 mt-1">
-                    No hay supervisores disponibles. Crea un usuario con rol supervisor primero.
+                    No hay encargados disponibles. Crea un usuario con rol encargado primero.
                   </p>
                 )}
               </div>
