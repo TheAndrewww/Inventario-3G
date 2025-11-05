@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus } from 'lucide-react';
+import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus } from 'lucide-react';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
 import categoriasService from '../services/categorias.service';
@@ -30,6 +30,11 @@ const InventarioPage = () => {
   const [cantidadEntrada, setCantidadEntrada] = useState('');
   const [observacionesEntrada, setObservacionesEntrada] = useState('');
   const [loadingEntrada, setLoadingEntrada] = useState(false);
+  const [modalSalidaOpen, setModalSalidaOpen] = useState(false);
+  const [articuloParaSalida, setArticuloParaSalida] = useState(null);
+  const [cantidadSalida, setCantidadSalida] = useState('');
+  const [observacionesSalida, setObservacionesSalida] = useState('');
+  const [loadingSalida, setLoadingSalida] = useState(false);
   const { agregarArticulo } = usePedido();
   const { user } = useAuth();
 
@@ -37,6 +42,7 @@ const InventarioPage = () => {
   const puedeCrearArticulos = ['administrador', 'supervisor', 'almacen'].includes(user?.rol);
   const puedeAgregarAlPedido = ['administrador', 'diseñador'].includes(user?.rol);
   const puedeGestionarInventario = ['administrador', 'supervisor', 'almacen'].includes(user?.rol);
+  const esAdministrador = user?.rol === 'administrador';
 
   useEffect(() => {
     fetchArticulos();
@@ -184,6 +190,51 @@ const InventarioPage = () => {
       toast.error(error.message || 'Error al registrar entrada');
     } finally {
       setLoadingEntrada(false);
+    }
+  };
+
+  const handleAbrirSalida = (articulo) => {
+    setArticuloParaSalida(articulo);
+    setCantidadSalida('');
+    setObservacionesSalida('');
+    setModalSalidaOpen(true);
+  };
+
+  const handleCerrarSalida = () => {
+    setModalSalidaOpen(false);
+    setArticuloParaSalida(null);
+    setCantidadSalida('');
+    setObservacionesSalida('');
+  };
+
+  const handleGuardarSalida = async () => {
+    if (!cantidadSalida || parseFloat(cantidadSalida) <= 0) {
+      toast.error('La cantidad debe ser mayor a 0');
+      return;
+    }
+
+    try {
+      setLoadingSalida(true);
+      await movimientosService.create({
+        tipo: 'ajuste_salida',
+        articulos: [
+          {
+            articulo_id: articuloParaSalida.id,
+            cantidad: parseFloat(cantidadSalida),
+            observaciones: observacionesSalida || null
+          }
+        ],
+        observaciones: `Salida de inventario: ${articuloParaSalida.nombre}`
+      });
+
+      toast.success('Salida registrada exitosamente');
+      handleCerrarSalida();
+      fetchArticulos();
+    } catch (error) {
+      console.error('Error al registrar salida:', error);
+      toast.error(error.message || 'Error al registrar salida');
+    } finally {
+      setLoadingSalida(false);
     }
   };
 
@@ -391,6 +442,16 @@ const InventarioPage = () => {
                               Entrada
                             </button>
                           )}
+                          {esAdministrador && (
+                            <button
+                              onClick={() => handleAbrirSalida(item)}
+                              className="inline-flex items-center gap-1 px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700"
+                              title="Registrar salida de inventario"
+                            >
+                              <PackageMinus size={16} />
+                              Salida
+                            </button>
+                          )}
                           {puedeAgregarAlPedido && (
                             <button
                               onClick={() => handleAgregarAlPedido(item)}
@@ -505,6 +566,16 @@ const InventarioPage = () => {
                               >
                                 <PackagePlus size={16} />
                                 Entrada
+                              </button>
+                            )}
+                            {esAdministrador && (
+                              <button
+                                onClick={() => handleAbrirSalida(item)}
+                                className="inline-flex items-center gap-1 px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700"
+                                title="Registrar salida de inventario"
+                              >
+                                <PackageMinus size={16} />
+                                Salida
                               </button>
                             )}
                             {puedeAgregarAlPedido && (
@@ -630,6 +701,15 @@ const InventarioPage = () => {
                           Entrada
                         </button>
                       )}
+                      {esAdministrador && (
+                        <button
+                          onClick={() => handleAbrirSalida(item)}
+                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-700"
+                        >
+                          <PackageMinus size={14} />
+                          Salida
+                        </button>
+                      )}
                       {puedeAgregarAlPedido && (
                         <button
                           onClick={() => handleAgregarAlPedido(item)}
@@ -735,6 +815,15 @@ const InventarioPage = () => {
                         >
                           <PackagePlus size={14} />
                           Entrada
+                        </button>
+                      )}
+                      {esAdministrador && (
+                        <button
+                          onClick={() => handleAbrirSalida(item)}
+                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-700"
+                        >
+                          <PackageMinus size={14} />
+                          Salida
                         </button>
                       )}
                       {puedeAgregarAlPedido && (
@@ -895,6 +984,101 @@ const InventarioPage = () => {
                 <>
                   <PackagePlus size={18} />
                   Registrar Entrada
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de Salida de Inventario */}
+      <Modal
+        isOpen={modalSalidaOpen}
+        onClose={handleCerrarSalida}
+        title={`Salida de Inventario: ${articuloParaSalida?.nombre || ''}`}
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Stock actual:</span>
+                <span className="ml-2 font-semibold text-gray-900">
+                  {articuloParaSalida ? parseFloat(articuloParaSalida.stock_actual).toFixed(0) : '0'} {articuloParaSalida?.unidad}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-600">Ubicación:</span>
+                <span className="ml-2 font-semibold text-gray-900">
+                  {articuloParaSalida?.ubicacion?.codigo || 'N/A'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Cantidad a retirar <span className="text-red-600">*</span>
+            </label>
+            <input
+              type="number"
+              value={cantidadSalida}
+              onChange={(e) => setCantidadSalida(e.target.value)}
+              min="0"
+              step="0.01"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
+              placeholder="Ej: 50"
+              disabled={loadingSalida}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Observaciones
+            </label>
+            <textarea
+              value={observacionesSalida}
+              onChange={(e) => setObservacionesSalida(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
+              placeholder="Motivo de la salida..."
+              disabled={loadingSalida}
+            />
+          </div>
+
+          {cantidadSalida && parseFloat(cantidadSalida) > 0 && articuloParaSalida && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+              <p className="text-sm text-orange-800">
+                Nuevo stock: <span className="font-semibold">
+                  {(parseFloat(articuloParaSalida.stock_actual) - parseFloat(cantidadSalida)).toFixed(0)} {articuloParaSalida.unidad}
+                </span>
+              </p>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={handleCerrarSalida}
+              disabled={loadingSalida}
+              className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleGuardarSalida}
+              disabled={loadingSalida || !cantidadSalida || parseFloat(cantidadSalida) <= 0}
+              className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loadingSalida ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Registrando...
+                </>
+              ) : (
+                <>
+                  <PackageMinus size={18} />
+                  Registrar Salida
                 </>
               )}
             </button>
