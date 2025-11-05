@@ -135,7 +135,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
   };
 
   const handleChange = (e) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
 
     // Si el usuario selecciona "nuevo_proveedor" en el select
     if (name === 'proveedor_id' && value === 'nuevo_proveedor') {
@@ -158,15 +158,11 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       return;
     }
 
-    // Convertir a mayúsculas si es un input de texto (excepto números y emails)
-    const camposDeTexto = ['nombre', 'descripcion', 'unidad'];
-    const finalValue = (type === 'text' && camposDeTexto.includes(name))
-      ? value.toUpperCase()
-      : value;
-
+    // Guardar el valor tal como viene, sin transformaciones
+    // La conversión a mayúsculas se hace visualmente con CSS
     setFormData(prev => ({
       ...prev,
-      [name]: finalValue
+      [name]: value
     }));
   };
 
@@ -179,7 +175,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
     try {
       setCreandoProveedor(true);
       const response = await proveedoresService.crear({
-        nombre: nuevoProveedorNombre.trim()
+        nombre: nuevoProveedorNombre.trim().toUpperCase()
       });
 
       const nuevoProveedor = response.data;
@@ -224,8 +220,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
     try {
       setCreandoUbicacion(true);
       const response = await ubicacionesService.create({
-        codigo: nuevaUbicacionData.codigo.trim(),
-        descripcion: nuevaUbicacionData.descripcion.trim() || 'Sin descripción'
+        codigo: nuevaUbicacionData.codigo.trim().toUpperCase(),
+        descripcion: nuevaUbicacionData.descripcion.trim().toUpperCase() || 'Sin descripción'
       });
 
       const nuevaUbicacion = response;
@@ -270,8 +266,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
     try {
       setCreandoCategoria(true);
       const response = await categoriasService.create({
-        nombre: nuevaCategoriaData.nombre.trim(),
-        descripcion: nuevaCategoriaData.descripcion.trim() || 'Sin descripción'
+        nombre: nuevaCategoriaData.nombre.trim().toUpperCase(),
+        descripcion: nuevaCategoriaData.descripcion.trim().toUpperCase() || 'Sin descripción'
       });
 
       const nuevaCategoria = response;
@@ -391,15 +387,15 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       setLoading(true);
 
       const dataToSend = {
-        nombre: formData.nombre.trim(),
-        descripcion: formData.descripcion.trim(),
+        nombre: formData.nombre.trim().toUpperCase(),
+        descripcion: formData.descripcion.trim().toUpperCase(),
         categoria_id: parseInt(formData.categoria_id),
         ubicacion_id: parseInt(formData.ubicacion_id),
         proveedor_id: formData.proveedor_id ? parseInt(formData.proveedor_id) : null,
         stock_actual: parseFloat(formData.stock_actual),
         stock_minimo: parseFloat(formData.stock_minimo),
         stock_maximo: formData.stock_maximo ? parseFloat(formData.stock_maximo) : null,
-        unidad: formData.unidad,
+        unidad: formData.unidad.toUpperCase(),
         costo_unitario: parseFloat(formData.costo_unitario) || 0,
         es_herramienta: formData.es_herramienta
       };
@@ -606,7 +602,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                 <input
                   type="text"
                   value={nuevaCategoriaData.nombre}
-                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, nombre: e.target.value.toUpperCase() }))}
+                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, nombre: e.target.value }))}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -627,7 +623,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                 <input
                   type="text"
                   value={nuevaCategoriaData.descripcion}
-                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, descripcion: e.target.value.toUpperCase() }))}
+                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, descripcion: e.target.value }))}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -710,7 +706,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                   <input
                     type="text"
                     value={nuevaUbicacionData.codigo}
-                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, codigo: e.target.value.toUpperCase() }))}
+                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, codigo: e.target.value }))}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -731,7 +727,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
                   <input
                     type="text"
                     value={nuevaUbicacionData.descripcion}
-                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, descripcion: e.target.value.toUpperCase() }))}
+                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, descripcion: e.target.value }))}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -814,7 +810,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
               <input
                 type="text"
                 value={nuevoProveedorNombre}
-                onChange={(e) => setNuevoProveedorNombre(e.target.value.toUpperCase())}
+                onChange={(e) => setNuevoProveedorNombre(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
