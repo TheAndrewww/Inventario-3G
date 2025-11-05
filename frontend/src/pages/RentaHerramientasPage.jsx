@@ -17,7 +17,7 @@ const RentaHerramientasPage = () => {
   const { user } = useAuth();
 
   // Solo supervisores y administradores pueden acceder
-  const puedeGestionar = ['administrador', 'supervisor'].includes(user?.rol);
+  const puedeGestionar = ['administrador', 'encargado'].includes(user?.rol);
 
   useEffect(() => {
     if (puedeGestionar) {

@@ -80,7 +80,7 @@ const pedidosService = {
   },
 
   /**
-   * Listar pedidos pendientes de aprobación (para supervisores)
+   * Listar pedidos pendientes de aprobación (para encargados)
    */
   listarPendientesAprobacion: async () => {
     const response = await api.get('/pedidos/aprobacion/pendientes');
@@ -104,15 +104,15 @@ const pedidosService = {
   },
 
   /**
-   * Marcar pedido como listo para entrega y asignar supervisor
+   * Marcar pedido como listo para entrega y asignar encargado
    */
-  marcarListo: async (pedidoId, supervisorId) => {
-    const response = await api.put(`/pedidos/${pedidoId}/marcar-listo`, { supervisor_id: supervisorId });
+  marcarListo: async (pedidoId, encargadoId) => {
+    const response = await api.put(`/pedidos/${pedidoId}/marcar-listo`, { encargado_id: encargadoId });
     return response.data;
   },
 
   /**
-   * Listar pedidos listos para recibir (supervisores)
+   * Listar pedidos listos para recibir (encargados)
    */
   listarPendientesRecepcion: async () => {
     const response = await api.get('/pedidos/recepcion/pendientes');
@@ -136,10 +136,10 @@ const pedidosService = {
   },
 
   /**
-   * Listar supervisores disponibles
+   * Listar encargados disponibles
    */
   listarSupervisores: async () => {
-    const response = await api.get('/pedidos/supervisores');
+    const response = await api.get('/pedidos/encargados');
     return response.data;
   }
 };

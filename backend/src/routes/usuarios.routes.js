@@ -2,7 +2,7 @@ import express from 'express';
 import {
   obtenerUsuarios,
   obtenerUsuarioPorId,
-  obtenerSupervisores,
+  obtenerEncargados,
   crearUsuario,
   actualizarUsuario,
   eliminarUsuario
@@ -24,15 +24,15 @@ router.get(
 );
 
 /**
- * @route   GET /api/usuarios/supervisores
- * @desc    Obtener solo supervisores activos
- * @access  Administrador, Supervisor
+ * @route   GET /api/usuarios/encargados
+ * @desc    Obtener solo encargados activos
+ * @access  Administrador, Encargado
  */
 router.get(
-  '/supervisores',
+  '/encargados',
   verificarToken,
-  verificarRol('administrador', 'supervisor'),
-  obtenerSupervisores
+  verificarRol('administrador', 'encargado'),
+  obtenerEncargados
 );
 
 /**

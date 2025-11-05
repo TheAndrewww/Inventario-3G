@@ -37,13 +37,13 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/recibir-pedidos',
       icon: CheckSquare,
       label: 'Recibir Pedidos',
-      roles: ['administrador', 'supervisor']
+      roles: ['administrador', 'encargado']
     },
     {
       path: '/equipos',
       icon: Users,
       label: 'Equipos',
-      roles: ['administrador', 'supervisor']
+      roles: ['administrador', 'encargado']
     },
     {
       path: '/usuarios',
@@ -61,7 +61,7 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/renta-herramientas',
       icon: Wrench,
       label: 'Renta Herramientas',
-      roles: ['administrador', 'supervisor']
+      roles: ['administrador', 'encargado']
     },
     {
       path: '/historial',
@@ -73,13 +73,13 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/proveedores',
       icon: Truck,
       label: 'Proveedores',
-      roles: ['administrador', 'compras', 'supervisor']
+      roles: ['administrador', 'compras', 'encargado']
     },
     {
       path: '/reportes',
       icon: BarChart3,
       label: 'Reportes',
-      roles: ['administrador', 'supervisor']
+      roles: ['administrador', 'encargado']
     },
   ];
 

@@ -40,9 +40,9 @@ const InventarioPage = () => {
   const { user } = useAuth();
 
   // Verificar permisos según el rol
-  const puedeCrearArticulos = ['administrador', 'supervisor', 'almacen'].includes(user?.rol);
+  const puedeCrearArticulos = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
   const puedeAgregarAlPedido = ['administrador', 'diseñador'].includes(user?.rol);
-  const puedeGestionarInventario = ['administrador', 'supervisor', 'almacen'].includes(user?.rol);
+  const puedeGestionarInventario = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
   const esAdministrador = user?.rol === 'administrador';
 
   useEffect(() => {

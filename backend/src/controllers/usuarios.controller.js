@@ -56,13 +56,13 @@ export const obtenerUsuarioPorId = async (req, res) => {
 };
 
 /**
- * Obtener solo supervisores
+ * Obtener solo encargados
  */
-export const obtenerSupervisores = async (req, res) => {
+export const obtenerEncargados = async (req, res) => {
   try {
-    const supervisores = await Usuario.findAll({
+    const encargados = await Usuario.findAll({
       where: {
-        rol: 'supervisor',
+        rol: 'encargado',
         activo: true
       },
       attributes: { exclude: ['password'] },
@@ -71,13 +71,13 @@ export const obtenerSupervisores = async (req, res) => {
 
     res.json({
       success: true,
-      data: { supervisores }
+      data: { encargados }
     });
   } catch (error) {
-    console.error('Error al obtener supervisores:', error);
+    console.error('Error al obtener encargados:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener supervisores'
+      message: 'Error al obtener encargados'
     });
   }
 };
@@ -98,7 +98,7 @@ export const crearUsuario = async (req, res) => {
     }
 
     // Validar que el rol sea válido
-    const rolesValidos = ['administrador', 'diseñador', 'almacen', 'supervisor', 'compras'];
+    const rolesValidos = ['administrador', 'diseñador', 'almacen', 'encargado', 'compras'];
     if (!rolesValidos.includes(rol)) {
       return res.status(400).json({
         success: false,
@@ -162,7 +162,7 @@ export const actualizarUsuario = async (req, res) => {
 
     // Validar rol si se está actualizando
     if (rol) {
-      const rolesValidos = ['administrador', 'diseñador', 'almacen', 'supervisor', 'compras'];
+      const rolesValidos = ['administrador', 'diseñador', 'almacen', 'encargado', 'compras'];
       if (!rolesValidos.includes(rol)) {
         return res.status(400).json({
           success: false,

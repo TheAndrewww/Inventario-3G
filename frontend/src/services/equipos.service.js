@@ -13,9 +13,9 @@ const equiposService = {
     return response.data;
   },
 
-  // Obtener equipos por supervisor
-  obtenerPorSupervisor: async (supervisorId) => {
-    const response = await api.get(`/equipos/supervisor/${supervisorId}`);
+  // Obtener equipos por encargado
+  obtenerPorSupervisor: async (encargadoId) => {
+    const response = await api.get(`/equipos/encargado/${encargadoId}`);
     return response.data;
   },
 

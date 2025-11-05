@@ -143,7 +143,7 @@ const UsuariosPage = () => {
     switch (rol) {
       case 'administrador':
         return 'bg-purple-100 text-purple-800';
-      case 'supervisor':
+      case 'encargado':
         return 'bg-blue-100 text-blue-800';
       case 'diseñador':
         return 'bg-green-100 text-green-800';
@@ -160,7 +160,7 @@ const UsuariosPage = () => {
     switch (rol) {
       case 'administrador':
         return <Shield size={16} />;
-      case 'supervisor':
+      case 'encargado':
       case 'diseñador':
       case 'almacen':
         return <UserCheck size={16} />;
@@ -226,7 +226,7 @@ const UsuariosPage = () => {
           >
             <option value="">Todos los roles</option>
             <option value="administrador">Administrador</option>
-            <option value="supervisor">Supervisor</option>
+            <option value="encargado">Encargado</option>
             <option value="diseñador">Diseñador</option>
             <option value="almacen">Almacén</option>
             <option value="compras">Compras</option>
@@ -410,7 +410,7 @@ const UsuariosPage = () => {
                   >
                     <option value="">Selecciona un rol</option>
                     <option value="administrador">Administrador</option>
-                    <option value="supervisor">Supervisor</option>
+                    <option value="encargado">Encargado</option>
                     <option value="diseñador">Diseñador</option>
                     <option value="almacen">Almacén</option>
                     <option value="compras">Compras</option>

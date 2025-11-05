@@ -13,9 +13,9 @@ const usuariosService = {
     return response.data;
   },
 
-  // Obtener solo supervisores
+  // Obtener solo encargados
   obtenerSupervisores: async () => {
-    const response = await api.get('/usuarios/supervisores');
+    const response = await api.get('/usuarios/encargados');
     return response.data;
   },
 

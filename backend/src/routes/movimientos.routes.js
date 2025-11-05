@@ -8,7 +8,7 @@ import {
 } from '../controllers/movimientos.controller.js';
 import {
     verificarToken,
-    esSupervisorOAdmin
+    esEncargadoOAdmin
 } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
@@ -47,6 +47,6 @@ router.post('/', verificarToken, createMovimiento);
  * @desc    Actualizar estado de movimiento (aprobar/rechazar)
  * @access  Private (Supervisor o Admin)
  */
-router.put('/:id', verificarToken, esSupervisorOAdmin, updateMovimiento);
+router.put('/:id', verificarToken, esEncargadoOAdmin, updateMovimiento);
 
 export default router;

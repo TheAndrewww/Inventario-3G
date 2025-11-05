@@ -15,7 +15,7 @@ import {
 import {
     verificarToken,
     esAdministrador,
-    esSupervisorOAdmin,
+    esEncargadoOAdmin,
     accesoInventario
 } from '../middleware/auth.middleware.js';
 import { uploadArticuloImagen as multerUpload } from '../config/cloudinary.js';
@@ -84,7 +84,7 @@ router.put('/:id', verificarToken, accesoInventario, updateArticulo);
  * @desc    Eliminar (desactivar) artículo
  * @access  Private (Admin o Supervisor)
  */
-router.delete('/:id', verificarToken, esSupervisorOAdmin, deleteArticulo);
+router.delete('/:id', verificarToken, esEncargadoOAdmin, deleteArticulo);
 
 /**
  * @route   POST /api/articulos/:id/imagen
@@ -98,6 +98,6 @@ router.post('/:id/imagen', verificarToken, accesoInventario, multerUpload.single
  * @desc    Eliminar imagen de un artículo
  * @access  Private (Admin o Supervisor)
  */
-router.delete('/:id/imagen', verificarToken, esSupervisorOAdmin, deleteArticuloImagen);
+router.delete('/:id/imagen', verificarToken, esEncargadoOAdmin, deleteArticuloImagen);
 
 export default router;

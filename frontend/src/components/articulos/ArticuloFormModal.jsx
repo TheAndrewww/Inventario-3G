@@ -58,7 +58,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
   const isEdit = !!articulo;
 
   // Verificar permisos para crear proveedores (solo admin y supervisor)
-  const puedeCrearProveedores = ['administrador', 'supervisor'].includes(user?.rol);
+  const puedeCrearProveedores = ['administrador', 'encargado'].includes(user?.rol);
 
   // Cargar catálogos y datos del artículo si es edición
   useEffect(() => {
