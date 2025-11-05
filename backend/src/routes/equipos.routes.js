@@ -24,12 +24,12 @@ router.get('/supervisor/:supervisorId', obtenerEquiposPorSupervisor);
 router.get('/:id', obtenerEquipoPorId);
 
 // POST /api/equipos - Crear un nuevo equipo (solo admin y encargado)
-router.post('/', verificarRol(['administrador', 'encargado']), crearEquipo);
+router.post('/', verificarRol('administrador', 'encargado'), crearEquipo);
 
 // PUT /api/equipos/:id - Actualizar un equipo (solo admin y encargado)
-router.put('/:id', verificarRol(['administrador', 'encargado']), actualizarEquipo);
+router.put('/:id', verificarRol('administrador', 'encargado'), actualizarEquipo);
 
 // DELETE /api/equipos/:id - Eliminar (desactivar) un equipo (solo admin)
-router.delete('/:id', verificarRol(['administrador']), eliminarEquipo);
+router.delete('/:id', verificarRol('administrador'), eliminarEquipo);
 
 export default router;

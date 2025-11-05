@@ -189,7 +189,8 @@
       "Bash(for file in /Users/andrewww/Documents/Inventario-3G/frontend/src/services/usuarios.service.js /Users/andrewww/Documents/Inventario-3G/frontend/src/services/pedidos.service.js /Users/andrewww/Documents/Inventario-3G/frontend/src/services/equipos.service.js)",
       "Bash(do sed -i '' \"s/supervisores/encargados/g\" \"$file\")",
       "Bash(railway run:*)",
-      "Bash(railway link:*)"
+      "Bash(railway link:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkAzZy5jb20iLCJyb2wiOiJhZG1pbmlzdHJhZG9yIiwiaWF0IjoxNzYyMzcyNzQ5LCJleHAiOjE3NjI5Nzc1NDl9.XKDEUklHkzzEPyXjSiNFs5z2zamlc7KK6RYfsaqzmqs\")"
     ],
     "deny": [],
     "ask": []
