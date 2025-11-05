@@ -75,19 +75,19 @@ export const crearEquipo = async (req, res) => {
             });
         }
 
-        // Verificar que el supervisor existe y tiene rol de supervisor
-        const supervisor = await Usuario.findByPk(supervisor_id);
-        if (!supervisor) {
+        // Verificar que el encargado existe y tiene rol de encargado
+        const encargado = await Usuario.findByPk(supervisor_id);
+        if (!encargado) {
             return res.status(404).json({
                 success: false,
-                message: 'Supervisor no encontrado'
+                message: 'Encargado no encontrado'
             });
         }
 
-        if (supervisor.rol !== 'supervisor' && supervisor.rol !== 'administrador') {
+        if (encargado.rol !== 'encargado' && encargado.rol !== 'administrador') {
             return res.status(400).json({
                 success: false,
-                message: 'El usuario debe tener rol de supervisor o administrador'
+                message: 'El usuario debe tener rol de encargado o administrador'
             });
         }
 
@@ -135,20 +135,20 @@ export const actualizarEquipo = async (req, res) => {
             });
         }
 
-        // Si se va a cambiar el supervisor, validar
+        // Si se va a cambiar el encargado, validar
         if (supervisor_id && supervisor_id !== equipo.supervisor_id) {
-            const supervisor = await Usuario.findByPk(supervisor_id);
-            if (!supervisor) {
+            const encargado = await Usuario.findByPk(supervisor_id);
+            if (!encargado) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Supervisor no encontrado'
+                    message: 'Encargado no encontrado'
                 });
             }
 
-            if (supervisor.rol !== 'supervisor' && supervisor.rol !== 'administrador') {
+            if (encargado.rol !== 'encargado' && encargado.rol !== 'administrador') {
                 return res.status(400).json({
                     success: false,
-                    message: 'El usuario debe tener rol de supervisor o administrador'
+                    message: 'El usuario debe tener rol de encargado o administrador'
                 });
             }
         }
