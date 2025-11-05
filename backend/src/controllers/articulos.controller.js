@@ -16,7 +16,7 @@ export const getArticulos = async (req, res) => {
             stock_bajo,
             activo,
             page = 1,
-            limit = 50,
+            limit = 1000,
             order_by = 'nombre',
             order_dir = 'ASC'
         } = req.query;
