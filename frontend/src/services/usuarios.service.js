@@ -14,6 +14,12 @@ const usuariosService = {
   },
 
   // Obtener solo encargados
+  obtenerEncargados: async () => {
+    const response = await api.get('/usuarios/encargados');
+    return response.data;
+  },
+
+  // Mantener compatibilidad (deprecado)
   obtenerSupervisores: async () => {
     const response = await api.get('/usuarios/encargados');
     return response.data;
