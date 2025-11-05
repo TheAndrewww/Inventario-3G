@@ -91,6 +91,21 @@ export const crearEquipo = async (req, res) => {
             });
         }
 
+        // Verificar que el encargado no esté ya asignado a otro equipo activo
+        const equipoExistente = await Equipo.findOne({
+            where: {
+                supervisor_id,
+                activo: true
+            }
+        });
+
+        if (equipoExistente) {
+            return res.status(400).json({
+                success: false,
+                message: `Este encargado ya está asignado al equipo "${equipoExistente.nombre}"`
+            });
+        }
+
         const equipo = await Equipo.create({
             nombre,
             descripcion,
@@ -149,6 +164,21 @@ export const actualizarEquipo = async (req, res) => {
                 return res.status(400).json({
                     success: false,
                     message: 'El usuario debe tener rol de encargado o administrador'
+                });
+            }
+
+            // Verificar que el encargado no esté ya asignado a otro equipo activo
+            const equipoExistente = await Equipo.findOne({
+                where: {
+                    supervisor_id,
+                    activo: true
+                }
+            });
+
+            if (equipoExistente && equipoExistente.id !== parseInt(id)) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Este encargado ya está asignado al equipo "${equipoExistente.nombre}"`
                 });
             }
         }
