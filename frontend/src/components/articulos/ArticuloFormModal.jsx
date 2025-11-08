@@ -10,7 +10,7 @@ import EAN13InputScanner from './EAN13InputScanner';
 import { useAuth } from '../../context/AuthContext';
 import { getImageUrl } from '../../utils/imageUtils';
 
-const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
+const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigoInicial = null, nombreInicial = null }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState([]);
@@ -66,6 +66,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       fetchCatalogos();
 
       if (articulo) {
+        // Modo edición: cargar datos del artículo existente
         setFormData({
           codigo_ean13: articulo.codigo_ean13 || '',
           codigo_tipo: articulo.codigo_tipo || 'EAN13',
@@ -90,11 +91,11 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
         }
         setSelectedImage(null);
       } else {
-        // Limpiar formulario para nuevo artículo
+        // Modo creación: limpiar formulario y pre-llenar código o nombre si vienen de búsqueda
         setFormData({
-          codigo_ean13: '',
+          codigo_ean13: codigoInicial || '', // Pre-llenar con código si viene de búsqueda por código
           codigo_tipo: 'EAN13',
-          nombre: '',
+          nombre: nombreInicial || '', // Pre-llenar con nombre si viene de búsqueda por nombre
           descripcion: '',
           categoria_id: '',
           ubicacion_id: '',
@@ -110,7 +111,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
         setSelectedImage(null);
       }
     }
-  }, [isOpen, articulo]);
+  }, [isOpen, articulo, codigoInicial, nombreInicial]);
 
   const fetchCatalogos = async () => {
     try {
@@ -407,6 +408,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       }
 
       let articuloId;
+      let articuloCreado = null;
 
       if (isEdit) {
         await articulosService.update(articulo.id, dataToSend);
@@ -415,6 +417,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       } else {
         const response = await articulosService.create(dataToSend);
         articuloId = response.articulo.id;
+        articuloCreado = response.articulo;
         const mensaje = dataToSend.codigo_ean13
           ? 'Artículo creado exitosamente con el código proporcionado'
           : 'Artículo creado exitosamente con código EAN-13 automático';
@@ -451,7 +454,12 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null }) => {
       setSelectedImage(null);
       setCurrentImageUrl(null);
 
-      if (onSuccess) onSuccess();
+      // Pasar el artículo creado al callback
+      if (onSuccess && articuloCreado) {
+        onSuccess(articuloCreado);
+      } else if (onSuccess) {
+        onSuccess();
+      }
       onClose();
     } catch (error) {
       console.error('Error al guardar artículo:', error);

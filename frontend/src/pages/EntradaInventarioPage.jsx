@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { PackagePlus, Search, Trash2, Save, X, Plus, ScanLine } from 'lucide-react';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
@@ -6,6 +6,8 @@ import toast from 'react-hot-toast';
 import Modal from '../components/common/Modal';
 import EAN13ScannerEntrada from '../components/scanner/EAN13ScannerEntrada';
 import { getImageUrl } from '../utils/imageUtils';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import BarcodeScannerIndicator from '../components/scanner/BarcodeScannerIndicator';
 
 const EntradaInventarioPage = () => {
   const [articulosSeleccionados, setArticulosSeleccionados] = useState([]);
@@ -74,6 +76,67 @@ const EntradaInventarioPage = () => {
     // Agregar el artículo escaneado a la lista
     agregarArticulo(articulo);
   };
+
+  // Función para manejar escaneo desde pistola automática en Entrada de Inventario
+  const handleBarcodeScanEntrada = useCallback(async (codigo) => {
+    try {
+      let articuloEncontrado = null;
+
+      // Estrategia 1: Intentar buscar por código EAN-13 si tiene 13 dígitos
+      if (codigo.length === 13 && /^\d+$/.test(codigo)) {
+        try {
+          const response = await articulosService.getByEAN13(codigo);
+          if (response && response.id && response.activo) {
+            articuloEncontrado = response;
+          }
+        } catch (error) {
+          // No encontrado como EAN-13, continuar con búsqueda general
+        }
+      }
+
+      // Estrategia 2: Si no se encontró, buscar en todos los artículos por código
+      if (!articuloEncontrado) {
+        const todosLosArticulos = await articulosService.getAll();
+
+        // Buscar por código_ean13 exacto (cualquier longitud)
+        articuloEncontrado = todosLosArticulos.find(art =>
+          art.codigo_ean13 === codigo && art.activo
+        );
+
+        // Si aún no se encuentra, buscar por código que contenga el escaneado
+        if (!articuloEncontrado) {
+          articuloEncontrado = todosLosArticulos.find(art =>
+            art.codigo_ean13?.includes(codigo) && art.activo
+          );
+        }
+      }
+
+      if (articuloEncontrado && articuloEncontrado.id) {
+        // Agregar el artículo a la lista de entrada
+        agregarArticulo(articuloEncontrado);
+
+        toast.success(`✓ ${articuloEncontrado.nombre} agregado`, {
+          icon: '📦',
+          duration: 2000,
+        });
+      } else {
+        toast.error(`❌ Artículo no encontrado: ${codigo}`, {
+          duration: 4000,
+        });
+      }
+    } catch (error) {
+      toast.error(`❌ Error al buscar artículo`, {
+        duration: 3000,
+      });
+    }
+  }, []);
+
+  // Activar detección automática de pistola de códigos
+  const { isScanning } = useBarcodeScanner(handleBarcodeScanEntrada, {
+    enabled: true,
+    minLength: 6,
+    timeout: 200,
+  });
 
   const handleCantidadChange = (id, nuevaCantidad) => {
     if (nuevaCantidad <= 0) {
@@ -152,6 +215,9 @@ const EntradaInventarioPage = () => {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Indicador de escaneo activo */}
+      <BarcodeScannerIndicator isScanning={isScanning} />
+
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-200 bg-white">
         <div className="flex items-center justify-between">

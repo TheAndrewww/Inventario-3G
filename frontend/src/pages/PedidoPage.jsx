@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Minus, Trash2, Package, Users, Truck, Search, Barcode } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, Package, Users, Truck, Search, Barcode, PlusCircle } from 'lucide-react';
 import { usePedido } from '../context/PedidoContext';
 import { Button } from '../components/common';
 import { useNavigate } from 'react-router-dom';
@@ -9,8 +9,12 @@ import equiposService from '../services/equipos.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import articulosService from '../services/articulos.service';
 import EAN13Scanner from '../components/scanner/EAN13Scanner';
+import ArticuloFormModal from '../components/articulos/ArticuloFormModal';
 import toast from 'react-hot-toast';
 import { getImageUrl } from '../utils/imageUtils';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import BarcodeScannerIndicator from '../components/scanner/BarcodeScannerIndicator';
+import ScanSuccessNotification from '../components/scanner/ScanSuccessNotification';
 
 const PedidoPage = () => {
   const navigate = useNavigate();
@@ -41,6 +45,14 @@ const PedidoPage = () => {
   const [buscando, setBuscando] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const { agregarArticulo } = usePedido();
+
+  // Estados para pistola de códigos automática
+  const [lastScannedArticle, setLastScannedArticle] = useState(null);
+  const [showScanSuccess, setShowScanSuccess] = useState(false);
+
+  // Estados para modal de nuevo artículo
+  const [modalNuevoArticulo, setModalNuevoArticulo] = useState(false);
+  const [nombreNuevoArticulo, setNombreNuevoArticulo] = useState(null);
 
   // Cargar equipos si el usuario es almacenista
   useEffect(() => {
@@ -231,6 +243,72 @@ const PedidoPage = () => {
     }
   };
 
+  // Función para manejar escaneo desde pistola automática
+  const handleBarcodeScan = async (codigo) => {
+    try {
+      let articuloEncontrado = null;
+
+      // Estrategia 1: Intentar buscar por código EAN-13 si tiene 13 dígitos
+      if (codigo.length === 13 && /^\d+$/.test(codigo)) {
+        try {
+          const response = await articulosService.getByEAN13(codigo);
+          if (response && response.id) {
+            articuloEncontrado = response;
+          }
+        } catch (error) {
+          // No encontrado como EAN-13, continuar con búsqueda general
+        }
+      }
+
+      // Estrategia 2: Si no se encontró, buscar en todos los artículos por código
+      if (!articuloEncontrado) {
+        const todosLosArticulos = await articulosService.getAll();
+
+        // Buscar por código_ean13 exacto (cualquier longitud)
+        articuloEncontrado = todosLosArticulos.find(art =>
+          art.codigo_ean13 === codigo && art.activo !== false
+        );
+
+        // Si aún no se encuentra, buscar por código que contenga el escaneado
+        if (!articuloEncontrado) {
+          articuloEncontrado = todosLosArticulos.find(art =>
+            art.codigo_ean13?.includes(codigo) && art.activo !== false
+          );
+        }
+      }
+
+      if (articuloEncontrado && articuloEncontrado.id) {
+        // Agregar al pedido
+        agregarArticulo(articuloEncontrado);
+
+        // Mostrar notificación visual personalizada
+        setLastScannedArticle(articuloEncontrado);
+        setShowScanSuccess(true);
+
+        // También mostrar toast para confirmación
+        toast.success(`✓ ${articuloEncontrado.nombre} agregado`, {
+          icon: '📦',
+          duration: 2000,
+        });
+      } else {
+        toast.error(`❌ Artículo no encontrado: ${codigo}`, {
+          duration: 4000,
+        });
+      }
+    } catch (error) {
+      toast.error(`❌ Error al buscar artículo`, {
+        duration: 3000,
+      });
+    }
+  };
+
+  // Activar detección automática de pistola de códigos
+  const { isScanning } = useBarcodeScanner(handleBarcodeScan, {
+    enabled: true, // Siempre activa en la página de pedidos
+    minLength: 6, // Códigos mínimos de 6 caracteres
+    timeout: 200, // 200ms entre caracteres para capturar todos
+  });
+
   // Agregar artículo desde búsqueda
   const handleAgregarArticulo = (articulo) => {
     agregarArticulo(articulo);
@@ -239,8 +317,35 @@ const PedidoPage = () => {
     setResultadosBusqueda([]);
   };
 
+  // Handler para cuando se crea un nuevo artículo exitosamente
+  const handleNuevoArticuloCreado = (nuevoArticulo) => {
+    toast.success(`✓ Artículo "${nuevoArticulo.nombre}" creado exitosamente`);
+    // Agregar el nuevo artículo al pedido
+    agregarArticulo(nuevoArticulo);
+    // Limpiar búsqueda
+    setBusqueda('');
+    setResultadosBusqueda([]);
+    // Cerrar modal
+    setModalNuevoArticulo(false);
+    setNombreNuevoArticulo(null);
+  };
+
   return (
     <div className="p-4 md:p-6">
+      {/* Indicador de escaneo activo */}
+      <BarcodeScannerIndicator isScanning={isScanning} />
+
+      {/* Notificación de artículo escaneado exitosamente */}
+      {showScanSuccess && lastScannedArticle && (
+        <ScanSuccessNotification
+          articulo={lastScannedArticle}
+          onClose={() => {
+            setShowScanSuccess(false);
+            setLastScannedArticle(null);
+          }}
+        />
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Lista de artículos */}
         <div className="lg:col-span-2 space-y-4">
@@ -345,8 +450,20 @@ const PedidoPage = () => {
                       })}
                     </div>
                   ) : (
-                    <div className="p-4 text-center text-gray-500 text-sm">
-                      No se encontraron artículos
+                    <div className="p-4 text-center">
+                      <p className="text-gray-600 mb-3 text-sm">
+                        No se encontraron artículos con "{busqueda}"
+                      </p>
+                      <button
+                        onClick={() => {
+                          setNombreNuevoArticulo(busqueda);
+                          setModalNuevoArticulo(true);
+                        }}
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors mx-auto text-sm"
+                      >
+                        <PlusCircle size={18} />
+                        Crear nuevo artículo
+                      </button>
                     </div>
                   )}
                 </div>
@@ -601,6 +718,18 @@ const PedidoPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal para crear nuevo artículo */}
+      <ArticuloFormModal
+        isOpen={modalNuevoArticulo}
+        onClose={() => {
+          setModalNuevoArticulo(false);
+          setNombreNuevoArticulo(null);
+        }}
+        onSuccess={handleNuevoArticuloCreado}
+        articulo={null}
+        nombreInicial={nombreNuevoArticulo}
+      />
     </div>
   );
 };

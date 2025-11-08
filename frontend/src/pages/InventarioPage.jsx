@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown } from 'lucide-react';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
@@ -11,6 +11,8 @@ import toast from 'react-hot-toast';
 import { usePedido } from '../context/PedidoContext';
 import { useAuth } from '../context/AuthContext';
 import { getImageUrl } from '../utils/imageUtils';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import BarcodeScannerIndicator from '../components/scanner/BarcodeScannerIndicator';
 
 const InventarioPage = () => {
   const [articulos, setArticulos] = useState([]);
@@ -23,6 +25,7 @@ const InventarioPage = () => {
   const [ordenamiento, setOrdenamiento] = useState('nombre-asc');
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
   const [articuloAEditar, setArticuloAEditar] = useState(null);
+  const [codigoEscaneado, setCodigoEscaneado] = useState(null);
   const [modalDetalleOpen, setModalDetalleOpen] = useState(false);
   const [modalFormOpen, setModalFormOpen] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -129,24 +132,99 @@ const InventarioPage = () => {
     setModalDetalleOpen(true);
   };
 
+  // Función para manejar escaneo desde pistola automática en Inventario
+  // Usar useCallback para evitar que se recree en cada render
+  const handleBarcodeScanInventario = useCallback(async (codigo) => {
+    try {
+      let articuloEncontrado = null;
+
+      // Estrategia 1: Intentar buscar por código EAN-13 si tiene 13 dígitos
+      if (codigo.length === 13 && /^\d+$/.test(codigo)) {
+        try {
+          const response = await articulosService.getByEAN13(codigo);
+          if (response && response.id) {
+            articuloEncontrado = response;
+          }
+        } catch (error) {
+          // No encontrado como EAN-13, continuar con búsqueda general
+        }
+      }
+
+      // Estrategia 2: Si no se encontró, buscar en todos los artículos por código
+      if (!articuloEncontrado) {
+        const todosLosArticulos = await articulosService.getAll();
+
+        // Buscar por código_ean13 exacto (cualquier longitud)
+        articuloEncontrado = todosLosArticulos.find(art =>
+          art.codigo_ean13 === codigo
+        );
+
+        // Si aún no se encuentra, buscar por código que contenga el escaneado
+        if (!articuloEncontrado) {
+          articuloEncontrado = todosLosArticulos.find(art =>
+            art.codigo_ean13?.includes(codigo)
+          );
+        }
+      }
+
+      if (articuloEncontrado && articuloEncontrado.id) {
+        // Abrir modal de detalle del artículo
+        setArticuloSeleccionado(articuloEncontrado);
+        setModalDetalleOpen(true);
+
+        // Mostrar toast de confirmación
+        toast.success(`✓ ${articuloEncontrado.nombre}`, {
+          icon: '🔍',
+          duration: 2000,
+        });
+      } else {
+        // Si no existe, abrir modal de nuevo artículo con el código pre-llenado
+        setArticuloAEditar(null); // NO es edición, es creación
+        setCodigoEscaneado(codigo); // Guardar código escaneado
+        setModalFormOpen(true);
+
+        // Mostrar toast informativo
+        toast.success(`📦 Nuevo artículo - Código: ${codigo}`, {
+          icon: '✨',
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      toast.error(`❌ Error al buscar artículo`, {
+        duration: 3000,
+      });
+    }
+  }, []); // Array vacío porque no depende de ningún estado
+
+  // Activar detección automática de pistola de códigos en Inventario
+  const { isScanning } = useBarcodeScanner(handleBarcodeScanInventario, {
+    enabled: true, // Siempre activa en la página de inventario
+    minLength: 6, // Códigos mínimos de 6 caracteres
+    timeout: 200, // 200ms entre caracteres para capturar todos
+  });
+
   const handleNuevoArticulo = () => {
     setArticuloAEditar(null); // Limpiar artículo a editar
+    setCodigoEscaneado(null); // Limpiar código escaneado
     setModalFormOpen(true);
   };
 
   const handleEditar = (articulo) => {
     setArticuloAEditar(articulo);
+    setCodigoEscaneado(null); // Limpiar código escaneado cuando es edición
     setModalFormOpen(true);
   };
 
   const handleFormSuccess = () => {
     fetchArticulos(); // Recargar la lista
     setArticuloAEditar(null); // Limpiar artículo a editar
+    setCodigoEscaneado(null); // Limpiar código escaneado
   };
 
   const handleCloseForm = () => {
     setModalFormOpen(false);
     setArticuloAEditar(null); // Limpiar artículo a editar
+    setCodigoEscaneado(null); // Limpiar código escaneado
   };
 
   const handleEliminar = async (articulo) => {
@@ -275,6 +353,9 @@ const InventarioPage = () => {
 
   return (
     <div className="p-4 md:p-6">
+      {/* Indicador de escaneo activo */}
+      <BarcodeScannerIndicator isScanning={isScanning} />
+
       {/* Barra de búsqueda y acciones */}
       <div className="mb-4 md:mb-6 space-y-3 md:space-y-4">
         {/* Búsqueda y botón escanear */}
@@ -934,6 +1015,7 @@ const InventarioPage = () => {
         onClose={handleCloseForm}
         onSuccess={handleFormSuccess}
         articulo={articuloAEditar}
+        codigoInicial={codigoEscaneado}
       />
 
       {/* Modal del Scanner de Códigos de Barras */}
