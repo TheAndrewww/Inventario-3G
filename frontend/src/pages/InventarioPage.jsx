@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown } from 'lucide-react';
+import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X } from 'lucide-react';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
 import categoriasService from '../services/categorias.service';
+import ubicacionesService from '../services/ubicaciones.service';
 import { Loader, Modal } from '../components/common';
 import ArticuloDetalleModal from '../components/articulos/ArticuloDetalleModal';
 import ArticuloFormModal from '../components/articulos/ArticuloFormModal';
@@ -17,10 +18,13 @@ import BarcodeScannerIndicator from '../components/scanner/BarcodeScannerIndicat
 const InventarioPage = () => {
   const [articulos, setArticulos] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [ubicaciones, setUbicaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
+  const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState(null);
   const [mostrarCategorias, setMostrarCategorias] = useState(false);
+  const [mostrarUbicaciones, setMostrarUbicaciones] = useState(false);
   const [mostrarDesactivados, setMostrarDesactivados] = useState(false);
   const [ordenamiento, setOrdenamiento] = useState('nombre-asc');
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
@@ -39,6 +43,24 @@ const InventarioPage = () => {
   const [cantidadSalida, setCantidadSalida] = useState('');
   const [observacionesSalida, setObservacionesSalida] = useState('');
   const [loadingSalida, setLoadingSalida] = useState(false);
+
+  // Estados para gestión de categorías
+  const [modalCategoriaOpen, setModalCategoriaOpen] = useState(false);
+  const [categoriaEditando, setCategoriaEditando] = useState(null);
+  const [nombreCategoria, setNombreCategoria] = useState('');
+  const [loadingCategoria, setLoadingCategoria] = useState(false);
+
+  // Estados para gestión de ubicaciones
+  const [modalUbicacionOpen, setModalUbicacionOpen] = useState(false);
+  const [ubicacionEditando, setUbicacionEditando] = useState(null);
+  const [codigoUbicacion, setCodigoUbicacion] = useState('');
+  const [almacenUbicacion, setAlmacenUbicacion] = useState('');
+  const [pasilloUbicacion, setPasilloUbicacion] = useState('');
+  const [estanteUbicacion, setEstanteUbicacion] = useState('');
+  const [nivelUbicacion, setNivelUbicacion] = useState('');
+  const [descripcionUbicacion, setDescripcionUbicacion] = useState('');
+  const [loadingUbicacion, setLoadingUbicacion] = useState(false);
+
   const { agregarArticulo } = usePedido();
   const { user } = useAuth();
 
@@ -51,6 +73,7 @@ const InventarioPage = () => {
   useEffect(() => {
     fetchArticulos();
     fetchCategorias();
+    fetchUbicaciones();
   }, []);
 
   const fetchArticulos = async () => {
@@ -77,6 +100,15 @@ const InventarioPage = () => {
     }
   };
 
+  const fetchUbicaciones = async () => {
+    try {
+      const data = await ubicacionesService.getAll();
+      setUbicaciones(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error al cargar ubicaciones:', error);
+    }
+  };
+
   const filteredArticulos = articulos
     .filter((item) => {
       // Filtrar por estado activo/desactivado
@@ -89,8 +121,9 @@ const InventarioPage = () => {
         item.categoria?.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
+      const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
 
-      return matchesActiveFilter && matchesSearch && matchesCategoria;
+      return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion;
     })
     .sort((a, b) => {
       // Ordenar según la opción seleccionada
@@ -347,6 +380,200 @@ const InventarioPage = () => {
     }
   };
 
+  // ============ GESTIÓN DE CATEGORÍAS ============
+  const handleAbrirModalCategoria = (categoria = null) => {
+    if (categoria) {
+      setCategoriaEditando(categoria);
+      setNombreCategoria(categoria.nombre);
+    } else {
+      setCategoriaEditando(null);
+      setNombreCategoria('');
+    }
+    setModalCategoriaOpen(true);
+  };
+
+  const handleCerrarModalCategoria = () => {
+    setModalCategoriaOpen(false);
+    setCategoriaEditando(null);
+    setNombreCategoria('');
+  };
+
+  const handleGuardarCategoria = async () => {
+    if (!nombreCategoria.trim()) {
+      toast.error('El nombre de la categoría es requerido');
+      return;
+    }
+
+    try {
+      setLoadingCategoria(true);
+      if (categoriaEditando) {
+        await categoriasService.update(categoriaEditando.id, { nombre: nombreCategoria.trim() });
+        toast.success('Categoría actualizada exitosamente');
+      } else {
+        await categoriasService.create({ nombre: nombreCategoria.trim() });
+        toast.success('Categoría creada exitosamente');
+      }
+      handleCerrarModalCategoria();
+      fetchCategorias();
+    } catch (error) {
+      console.error('Error al guardar categoría:', error);
+      toast.error(error.message || 'Error al guardar categoría');
+    } finally {
+      setLoadingCategoria(false);
+    }
+  };
+
+  const handleEliminarCategoria = async (categoria) => {
+    try {
+      // Primer intento: verificar si hay artículos asociados
+      await categoriasService.delete(categoria.id, false);
+
+      // Si no hay artículos, se elimina directamente
+      toast.success('Categoría eliminada exitosamente');
+      fetchCategorias();
+      if (categoriaSeleccionada === categoria.id) {
+        setCategoriaSeleccionada(null);
+      }
+    } catch (error) {
+      console.error('Error al eliminar categoría:', error);
+
+      // Si requiere confirmación (hay artículos asociados)
+      if (error.requiresConfirmation) {
+        const confirmar = window.confirm(
+          `⚠️ ADVERTENCIA\n\n${error.message}\n\n¿Deseas continuar? Los artículos se moverán a la categoría "Sin Categoría".`
+        );
+
+        if (confirmar) {
+          try {
+            // Segundo intento: forzar eliminación
+            await categoriasService.delete(categoria.id, true);
+            toast.success('Categoría eliminada exitosamente');
+            fetchCategorias();
+            fetchArticulos(); // Recargar artículos para reflejar el cambio
+            if (categoriaSeleccionada === categoria.id) {
+              setCategoriaSeleccionada(null);
+            }
+          } catch (error2) {
+            console.error('Error al forzar eliminación:', error2);
+            toast.error(error2.message || 'Error al eliminar categoría');
+          }
+        }
+      } else {
+        // Error diferente
+        toast.error(error.message || 'Error al eliminar categoría');
+      }
+    }
+  };
+
+  // ============ GESTIÓN DE UBICACIONES ============
+  const handleAbrirModalUbicacion = (ubicacion = null) => {
+    if (ubicacion) {
+      setUbicacionEditando(ubicacion);
+      setCodigoUbicacion(ubicacion.codigo || '');
+      setAlmacenUbicacion(ubicacion.almacen || '');
+      setPasilloUbicacion(ubicacion.pasillo || '');
+      setEstanteUbicacion(ubicacion.estante || '');
+      setNivelUbicacion(ubicacion.nivel || '');
+      setDescripcionUbicacion(ubicacion.descripcion || '');
+    } else {
+      setUbicacionEditando(null);
+      setCodigoUbicacion('');
+      setAlmacenUbicacion('');
+      setPasilloUbicacion('');
+      setEstanteUbicacion('');
+      setNivelUbicacion('');
+      setDescripcionUbicacion('');
+    }
+    setModalUbicacionOpen(true);
+  };
+
+  const handleCerrarModalUbicacion = () => {
+    setModalUbicacionOpen(false);
+    setUbicacionEditando(null);
+    setCodigoUbicacion('');
+    setAlmacenUbicacion('');
+    setPasilloUbicacion('');
+    setEstanteUbicacion('');
+    setNivelUbicacion('');
+    setDescripcionUbicacion('');
+  };
+
+  const handleGuardarUbicacion = async () => {
+    if (!codigoUbicacion.trim()) {
+      toast.error('El código de ubicación es requerido');
+      return;
+    }
+
+    try {
+      setLoadingUbicacion(true);
+      const ubicacionData = {
+        codigo: codigoUbicacion.trim(),
+        almacen: almacenUbicacion.trim() || null,
+        pasillo: pasilloUbicacion.trim() || null,
+        estante: estanteUbicacion.trim() || null,
+        nivel: nivelUbicacion ? parseInt(nivelUbicacion) : null,
+        descripcion: descripcionUbicacion.trim() || null
+      };
+
+      if (ubicacionEditando) {
+        await ubicacionesService.update(ubicacionEditando.id, ubicacionData);
+        toast.success('Ubicación actualizada exitosamente');
+      } else {
+        await ubicacionesService.create(ubicacionData);
+        toast.success('Ubicación creada exitosamente');
+      }
+      handleCerrarModalUbicacion();
+      fetchUbicaciones();
+    } catch (error) {
+      console.error('Error al guardar ubicación:', error);
+      toast.error(error.message || 'Error al guardar ubicación');
+    } finally {
+      setLoadingUbicacion(false);
+    }
+  };
+
+  const handleEliminarUbicacion = async (ubicacion) => {
+    try {
+      // Primer intento: verificar si hay artículos asociados
+      await ubicacionesService.delete(ubicacion.id, false);
+
+      // Si no hay artículos, se elimina directamente
+      toast.success('Ubicación eliminada exitosamente');
+      fetchUbicaciones();
+      if (ubicacionSeleccionada === ubicacion.id) {
+        setUbicacionSeleccionada(null);
+      }
+    } catch (error) {
+      console.error('Error al eliminar ubicación:', error);
+
+      // Si requiere confirmación (hay artículos asociados)
+      if (error.requiresConfirmation) {
+        const confirmar = window.confirm(
+          `⚠️ ADVERTENCIA\n\n${error.message}\n\n¿Deseas continuar? Los artículos se moverán a la ubicación "Sin Asignar".`
+        );
+
+        if (confirmar) {
+          try {
+            // Segundo intento: forzar eliminación
+            await ubicacionesService.delete(ubicacion.id, true);
+            toast.success('Ubicación eliminada exitosamente');
+            fetchUbicaciones();
+            fetchArticulos(); // Recargar artículos para reflejar el cambio
+            if (ubicacionSeleccionada === ubicacion.id) {
+              setUbicacionSeleccionada(null);
+            }
+          } catch (error2) {
+            console.error('Error al forzar eliminación:', error2);
+            toast.error(error2.message || 'Error al eliminar ubicación');
+          }
+        }
+      } else {
+        // Error diferente
+        toast.error(error.message || 'Error al eliminar ubicación');
+      }
+    }
+  };
+
   if (loading) {
     return <Loader fullScreen />;
   }
@@ -402,10 +629,25 @@ const InventarioPage = () => {
 
           <button
             onClick={() => setMostrarCategorias(!mostrarCategorias)}
-            className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg hover:bg-gray-50"
+            className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border rounded-lg transition-colors ${
+              mostrarCategorias
+                ? 'bg-red-700 text-white border-red-700 hover:bg-red-800'
+                : 'border-gray-300 hover:bg-gray-50'
+            }`}
           >
             <Package size={18} />
             <span className="hidden sm:inline">Categorías</span>
+          </button>
+          <button
+            onClick={() => setMostrarUbicaciones(!mostrarUbicaciones)}
+            className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border rounded-lg transition-colors ${
+              mostrarUbicaciones
+                ? 'bg-red-700 text-white border-red-700 hover:bg-red-800'
+                : 'border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <MapPin size={18} />
+            <span className="hidden sm:inline">Ubicaciones</span>
           </button>
           {puedeCrearArticulos && (
             <>
@@ -435,9 +677,20 @@ const InventarioPage = () => {
         {/* Filtros de categorías */}
         {mostrarCategorias && (
           <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Package size={18} className="text-gray-600" />
-              <h3 className="font-medium text-gray-900">Filtrar por categoría</h3>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Package size={18} className="text-gray-600" />
+                <h3 className="font-medium text-gray-900">Filtrar por categoría</h3>
+              </div>
+              {puedeCrearArticulos && (
+                <button
+                  onClick={() => handleAbrirModalCategoria()}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors"
+                >
+                  <Plus size={16} />
+                  Nueva
+                </button>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -451,17 +704,113 @@ const InventarioPage = () => {
                 Todas
               </button>
               {categorias.map((categoria) => (
+                <div key={categoria.id} className="relative group">
+                  <button
+                    onClick={() => setCategoriaSeleccionada(categoria.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      categoriaSeleccionada === categoria.id
+                        ? 'bg-red-700 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    } ${puedeCrearArticulos ? 'pr-8' : ''}`}
+                  >
+                    {categoria.nombre}
+                  </button>
+                  {puedeCrearArticulos && (
+                    <div className="absolute top-0 right-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAbrirModalCategoria(categoria);
+                        }}
+                        className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        title="Editar"
+                      >
+                        <Edit2 size={10} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEliminarCategoria(categoria);
+                        }}
+                        className="p-1.5 bg-red-600 text-white rounded hover:bg-red-700"
+                        title="Eliminar"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Filtros de ubicaciones */}
+        {mostrarUbicaciones && (
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <MapPin size={18} className="text-gray-600" />
+                <h3 className="font-medium text-gray-900">Filtrar por ubicación</h3>
+              </div>
+              {puedeCrearArticulos && (
                 <button
-                  key={categoria.id}
-                  onClick={() => setCategoriaSeleccionada(categoria.id)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    categoriaSeleccionada === categoria.id
-                      ? 'bg-red-700 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  onClick={() => handleAbrirModalUbicacion()}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors"
                 >
-                  {categoria.nombre}
+                  <Plus size={16} />
+                  Nueva
                 </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setUbicacionSeleccionada(null)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  ubicacionSeleccionada === null
+                    ? 'bg-red-700 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Todas
+              </button>
+              {ubicaciones.map((ubicacion) => (
+                <div key={ubicacion.id} className="relative group">
+                  <button
+                    onClick={() => setUbicacionSeleccionada(ubicacion.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      ubicacionSeleccionada === ubicacion.id
+                        ? 'bg-red-700 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    } ${puedeCrearArticulos ? 'pr-8' : ''}`}
+                  >
+                    {ubicacion.codigo || ubicacion.nombre}
+                  </button>
+                  {puedeCrearArticulos && (
+                    <div className="absolute top-0 right-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAbrirModalUbicacion(ubicacion);
+                        }}
+                        className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        title="Editar"
+                      >
+                        <Edit2 size={10} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEliminarUbicacion(ubicacion);
+                        }}
+                        className="p-1.5 bg-red-600 text-white rounded hover:bg-red-700"
+                        title="Eliminar"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -1211,6 +1560,184 @@ const InventarioPage = () => {
                 <>
                   <PackageMinus size={18} />
                   Registrar Salida
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de Categoría */}
+      <Modal
+        isOpen={modalCategoriaOpen}
+        onClose={handleCerrarModalCategoria}
+        title={categoriaEditando ? 'Editar Categoría' : 'Nueva Categoría'}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nombre de la categoría <span className="text-red-600">*</span>
+            </label>
+            <input
+              type="text"
+              value={nombreCategoria}
+              onChange={(e) => setNombreCategoria(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+              placeholder="Ej: Tornillos, Tuercas, etc."
+              disabled={loadingCategoria}
+              autoFocus
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={handleCerrarModalCategoria}
+              disabled={loadingCategoria}
+              className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleGuardarCategoria}
+              disabled={loadingCategoria || !nombreCategoria.trim()}
+              className="flex-1 px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loadingCategoria ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  {categoriaEditando ? 'Actualizar' : 'Crear'} Categoría
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de Ubicación */}
+      <Modal
+        isOpen={modalUbicacionOpen}
+        onClose={handleCerrarModalUbicacion}
+        title={ubicacionEditando ? 'Editar Ubicación' : 'Nueva Ubicación'}
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Código <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={codigoUbicacion}
+                onChange={(e) => setCodigoUbicacion(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                placeholder="Ej: A-01, B-02, etc."
+                disabled={loadingUbicacion}
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Almacén
+              </label>
+              <input
+                type="text"
+                value={almacenUbicacion}
+                onChange={(e) => setAlmacenUbicacion(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                placeholder="Ej: Principal, Secundario"
+                disabled={loadingUbicacion}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Pasillo
+              </label>
+              <input
+                type="text"
+                value={pasilloUbicacion}
+                onChange={(e) => setPasilloUbicacion(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                placeholder="Ej: A, B, C"
+                disabled={loadingUbicacion}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Estante
+              </label>
+              <input
+                type="text"
+                value={estanteUbicacion}
+                onChange={(e) => setEstanteUbicacion(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                placeholder="Ej: 01, 02, 03"
+                disabled={loadingUbicacion}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nivel
+              </label>
+              <input
+                type="number"
+                value={nivelUbicacion}
+                onChange={(e) => setNivelUbicacion(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                placeholder="Ej: 1, 2, 3"
+                min="1"
+                disabled={loadingUbicacion}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Descripción
+              </label>
+              <textarea
+                value={descripcionUbicacion}
+                onChange={(e) => setDescripcionUbicacion(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                placeholder="Descripción adicional de la ubicación..."
+                disabled={loadingUbicacion}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={handleCerrarModalUbicacion}
+              disabled={loadingUbicacion}
+              className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleGuardarUbicacion}
+              disabled={loadingUbicacion || !codigoUbicacion.trim()}
+              className="flex-1 px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loadingUbicacion ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  {ubicacionEditando ? 'Actualizar' : 'Crear'} Ubicación
                 </>
               )}
             </button>

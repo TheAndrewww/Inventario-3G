@@ -6,6 +6,7 @@ import categoriasService from '../../services/categorias.service';
 import ubicacionesService from '../../services/ubicaciones.service';
 import proveedoresService from '../../services/proveedores.service';
 import articulosService from '../../services/articulos.service';
+import movimientosService from '../../services/movimientos.service';
 import EAN13InputScanner from './EAN13InputScanner';
 import { useAuth } from '../../context/AuthContext';
 import { getImageUrl } from '../../utils/imageUtils';
@@ -27,6 +28,15 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
   const [showNuevaCategoria, setShowNuevaCategoria] = useState(false);
   const [nuevaCategoriaData, setNuevaCategoriaData] = useState({ nombre: '', descripcion: '' });
   const [creandoCategoria, setCreandoCategoria] = useState(false);
+
+  // Estados para autocomplete y modo ingreso
+  const [todosArticulos, setTodosArticulos] = useState([]);
+  const [articulosFiltrados, setArticulosFiltrados] = useState([]);
+  const [mostrarAutocomplete, setMostrarAutocomplete] = useState(false);
+  const [modoIngreso, setModoIngreso] = useState(false);
+  const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
+  const [cantidadIngreso, setCantidadIngreso] = useState('');
+  const [observacionesIngreso, setObservacionesIngreso] = useState('');
   const [formData, setFormData] = useState({
     codigo_ean13: '',
     codigo_tipo: 'EAN13',
@@ -90,6 +100,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
           setCurrentImageUrl(null);
         }
         setSelectedImage(null);
+        setModoIngreso(false);
+        setArticuloSeleccionado(null);
       } else {
         // Modo creación: limpiar formulario y pre-llenar código o nombre si vienen de búsqueda
         setFormData({
@@ -109,9 +121,30 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         });
         setCurrentImageUrl(null);
         setSelectedImage(null);
+        setModoIngreso(false);
+        setArticuloSeleccionado(null);
+        setCantidadIngreso('');
+        setObservacionesIngreso('');
+
+        // Cargar todos los artículos para el autocomplete
+        fetchTodosArticulos();
       }
     }
   }, [isOpen, articulo, codigoInicial, nombreInicial]);
+
+  // Cargar todos los artículos para el autocomplete
+  const fetchTodosArticulos = async () => {
+    try {
+      const articulos = await articulosService.getAll();
+      // Filtrar solo artículos activos
+      const articulosActivos = Array.isArray(articulos)
+        ? articulos.filter(art => art.activo)
+        : [];
+      setTodosArticulos(articulosActivos);
+    } catch (error) {
+      console.error('Error al cargar artículos para autocomplete:', error);
+    }
+  };
 
   const fetchCatalogos = async () => {
     try {
@@ -157,6 +190,22 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       setShowNuevaCategoria(true);
       setNuevaCategoriaData({ nombre: '', descripcion: '' });
       return;
+    }
+
+    // Si es el campo nombre en modo creación, filtrar artículos para autocomplete
+    if (name === 'nombre' && !isEdit && !modoIngreso) {
+      const valorBusqueda = value.toUpperCase();
+
+      if (valorBusqueda.trim().length >= 2) {
+        const filtered = todosArticulos.filter(art =>
+          art.nombre.toUpperCase().includes(valorBusqueda)
+        );
+        setArticulosFiltrados(filtered);
+        setMostrarAutocomplete(filtered.length > 0);
+      } else {
+        setArticulosFiltrados([]);
+        setMostrarAutocomplete(false);
+      }
     }
 
     // Guardar el valor tal como viene, sin transformaciones
@@ -302,6 +351,77 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       ...prev,
       categoria_id: ''
     }));
+  };
+
+  // Manejar selección de artículo existente desde autocomplete
+  const handleSeleccionarArticulo = (articulo) => {
+    setArticuloSeleccionado(articulo);
+    setModoIngreso(true);
+    setMostrarAutocomplete(false);
+    setFormData(prev => ({
+      ...prev,
+      nombre: articulo.nombre
+    }));
+    setCantidadIngreso('');
+    setObservacionesIngreso('');
+  };
+
+  // Cancelar modo ingreso y volver a modo creación normal
+  const handleCancelarModoIngreso = () => {
+    setModoIngreso(false);
+    setArticuloSeleccionado(null);
+    setCantidadIngreso('');
+    setObservacionesIngreso('');
+    setFormData(prev => ({
+      ...prev,
+      nombre: ''
+    }));
+  };
+
+  // Manejar ingreso de inventario
+  const handleIngresoInventario = async (e) => {
+    e.preventDefault();
+
+    // Validaciones
+    if (!cantidadIngreso || parseFloat(cantidadIngreso) <= 0) {
+      toast.error('La cantidad debe ser mayor a 0');
+      return;
+    }
+
+    // Validar que si la unidad es "piezas", la cantidad sea número entero
+    if (articuloSeleccionado.unidad === 'piezas' && !Number.isInteger(parseFloat(cantidadIngreso))) {
+      toast.error('La cantidad debe ser un número entero para piezas');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Crear movimiento de tipo "ajuste_entrada" o "entrada"
+      await movimientosService.create({
+        tipo: 'ajuste_entrada',
+        articulos: [{
+          articulo_id: articuloSeleccionado.id,
+          cantidad: parseFloat(cantidadIngreso),
+          observaciones: observacionesIngreso.trim().toUpperCase() || 'Ingreso manual'
+        }],
+        observaciones: `Ingreso de inventario: ${articuloSeleccionado.nombre}`
+      });
+
+      toast.success(`✅ Ingreso exitoso de ${cantidadIngreso} ${articuloSeleccionado.unidad} de ${articuloSeleccionado.nombre}`);
+
+      // Limpiar y cerrar
+      handleCancelarModoIngreso();
+      if (onSuccess) {
+        onSuccess();
+      }
+      onClose();
+    } catch (error) {
+      console.error('Error al registrar ingreso:', error);
+      toast.error(error.message || 'Error al registrar ingreso de inventario');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEAN13Change = (value) => {
@@ -505,9 +625,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={isEdit ? 'Editar Artículo' : 'Nuevo Artículo'}
+      title={isEdit ? 'Editar Artículo' : (modoIngreso ? 'Ingreso de Inventario' : 'Nuevo Artículo')}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={modoIngreso ? handleIngresoInventario : handleSubmit} className="space-y-4">
         {/* Código de Barras (solo en creación) */}
         {!isEdit && (
           <div>
@@ -533,37 +653,170 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         )}
 
         {/* Nombre */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Nombre <span className="text-red-600">*</span>
-          </label>
-          <input
-            type="text"
-            name="nombre"
-            value={formData.nombre}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            placeholder="Ej: TORNILLO HEXAGONAL 1/4"
-            style={{ textTransform: 'uppercase' }}
-            required
-          />
-        </div>
+        {!modoIngreso ? (
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nombre <span className="text-red-600">*</span>
+            </label>
+            <input
+              type="text"
+              name="nombre"
+              value={formData.nombre}
+              onChange={handleChange}
+              onFocus={() => {
+                // Mostrar autocomplete si ya hay filtros aplicados
+                if (articulosFiltrados.length > 0) {
+                  setMostrarAutocomplete(true);
+                }
+              }}
+              onBlur={() => {
+                // Ocultar autocomplete después de un pequeño delay para permitir clics
+                setTimeout(() => setMostrarAutocomplete(false), 300);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+              placeholder="Ej: TORNILLO HEXAGONAL 1/4"
+              style={{ textTransform: 'uppercase' }}
+              required
+            />
 
-        {/* Descripción */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Descripción
-          </label>
-          <textarea
-            name="descripcion"
-            value={formData.descripcion}
-            onChange={handleChange}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            placeholder="DESCRIPCIÓN DEL ARTÍCULO..."
-            style={{ textTransform: 'uppercase' }}
-          />
-        </div>
+            {/* Autocomplete Dropdown */}
+            {mostrarAutocomplete && articulosFiltrados.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <div className="p-2 bg-blue-50 border-b border-blue-200">
+                  <p className="text-xs text-blue-800 font-medium">
+                    💡 Selecciona un artículo existente para registrar una entrada de inventario
+                  </p>
+                </div>
+                {articulosFiltrados.slice(0, 10).map((art) => (
+                  <button
+                    key={art.id}
+                    type="button"
+                    onClick={() => handleSeleccionarArticulo(art)}
+                    className="w-full px-3 py-2 text-left hover:bg-red-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{art.nombre}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Stock actual: <span className="font-semibold">{art.stock_actual} {art.unidad}</span>
+                          {art.categoria && ` • ${art.categoria.nombre}`}
+                        </p>
+                      </div>
+                      <span className="ml-2 text-xs text-blue-600 font-medium whitespace-nowrap">
+                        Ingresar ➜
+                      </span>
+                    </div>
+                  </button>
+                ))}
+                {articulosFiltrados.length > 10 && (
+                  <div className="p-2 text-center bg-gray-50">
+                    <p className="text-xs text-gray-600">
+                      Mostrando 10 de {articulosFiltrados.length} resultados. Sigue escribiendo para refinar la búsqueda.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Modo Ingreso: Información del artículo seleccionado */
+          <div className="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-gray-900">{articuloSeleccionado.nombre}</h3>
+                <p className="text-sm text-gray-600 mt-1">{articuloSeleccionado.descripcion}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelarModoIngreso}
+                className="ml-2 p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                title="Cambiar a crear nuevo artículo"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <div>
+                <p className="text-gray-600">Stock Actual</p>
+                <p className="font-bold text-lg text-blue-700">
+                  {articuloSeleccionado.stock_actual} {articuloSeleccionado.unidad}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-600">Categoría</p>
+                <p className="font-semibold text-gray-900">
+                  {articuloSeleccionado.categoria?.nombre || 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-600">Ubicación</p>
+                <p className="font-semibold text-gray-900">
+                  {articuloSeleccionado.ubicacion?.codigo || 'N/A'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modo Ingreso: Campos simplificados */}
+        {modoIngreso ? (
+          <>
+            {/* Cantidad a Ingresar */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cantidad a Ingresar <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="number"
+                value={cantidadIngreso}
+                onChange={(e) => setCantidadIngreso(e.target.value)}
+                min="0"
+                step={articuloSeleccionado.unidad === 'piezas' ? '1' : '0.01'}
+                className="w-full px-3 py-2 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-semibold"
+                placeholder={`Cantidad en ${articuloSeleccionado.unidad}`}
+                required
+                autoFocus
+              />
+              <p className="mt-1 text-xs text-gray-600">
+                Stock resultante: <span className="font-semibold text-blue-700">
+                  {cantidadIngreso ? (parseFloat(articuloSeleccionado.stock_actual) + parseFloat(cantidadIngreso)).toFixed(2) : articuloSeleccionado.stock_actual} {articuloSeleccionado.unidad}
+                </span>
+              </p>
+            </div>
+
+            {/* Observaciones del Ingreso */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Observaciones
+              </label>
+              <textarea
+                value={observacionesIngreso}
+                onChange={(e) => setObservacionesIngreso(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="MOTIVO DEL INGRESO, PROVEEDOR, ETC..."
+                style={{ textTransform: 'uppercase' }}
+              />
+            </div>
+          </>
+        ) : (
+          /* Modo Creación: Todos los campos del artículo */
+          <>
+            {/* Descripción */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Descripción
+              </label>
+              <textarea
+                name="descripcion"
+                value={formData.descripcion}
+                onChange={handleChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                placeholder="DESCRIPCIÓN DEL ARTÍCULO..."
+                style={{ textTransform: 'uppercase' }}
+              />
+            </div>
 
         {/* Imagen del artículo */}
         <div>
@@ -957,61 +1210,67 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
           </div>
         </div>
 
-        {/* Toggle Es Herramienta */}
-        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          <input
-            type="checkbox"
-            id="es_herramienta"
-            name="es_herramienta"
-            checked={formData.es_herramienta}
-            onChange={(e) => setFormData({ ...formData, es_herramienta: e.target.checked })}
-            className="w-4 h-4 text-red-700 bg-gray-100 border-gray-300 rounded focus:ring-red-700 focus:ring-2"
-          />
-          <label htmlFor="es_herramienta" className="text-sm font-medium text-gray-700 cursor-pointer">
-            ¿Es una herramienta para renta?
-          </label>
-        </div>
+            {/* Toggle Es Herramienta */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <input
+                type="checkbox"
+                id="es_herramienta"
+                name="es_herramienta"
+                checked={formData.es_herramienta}
+                onChange={(e) => setFormData({ ...formData, es_herramienta: e.target.checked })}
+                className="w-4 h-4 text-red-700 bg-gray-100 border-gray-300 rounded focus:ring-red-700 focus:ring-2"
+              />
+              <label htmlFor="es_herramienta" className="text-sm font-medium text-gray-700 cursor-pointer">
+                ¿Es una herramienta para renta?
+              </label>
+            </div>
 
-        {!isEdit && !formData.codigo_ean13 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-800">
-              ℹ️ Si no proporcionas un código EAN-13, se generará uno automáticamente.
-            </p>
-          </div>
-        )}
+            {!isEdit && !formData.codigo_ean13 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-800">
+                  ℹ️ Si no proporcionas un código EAN-13, se generará uno automáticamente.
+                </p>
+              </div>
+            )}
 
-        {!isEdit && formData.codigo_ean13 && /^[0-9]{13}$/.test(formData.codigo_ean13) && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-            <p className="text-sm text-green-800">
-              ✅ Se utilizará el código EAN-13 proporcionado: <span className="font-mono font-semibold">{formData.codigo_ean13}</span>
-            </p>
-          </div>
+            {!isEdit && formData.codigo_ean13 && /^[0-9]{13}$/.test(formData.codigo_ean13) && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="text-sm text-green-800">
+                  ✅ Se utilizará el código EAN-13 proporcionado: <span className="font-mono font-semibold">{formData.codigo_ean13}</span>
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         {/* Botones */}
         <div className="flex gap-3 pt-4 border-t">
           <button
             type="button"
-            onClick={handleClose}
+            onClick={modoIngreso ? handleCancelarModoIngreso : handleClose}
             disabled={loading}
             className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
           >
-            Cancelar
+            {modoIngreso ? 'Volver' : 'Cancelar'}
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors disabled:opacity-50"
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 ${
+              modoIngreso
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-red-700 hover:bg-red-800'
+            } text-white rounded-lg transition-colors disabled:opacity-50`}
           >
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                Guardando...
+                {modoIngreso ? 'Registrando...' : 'Guardando...'}
               </>
             ) : (
               <>
                 <Save size={18} />
-                {isEdit ? 'Actualizar' : 'Crear Artículo'}
+                {modoIngreso ? 'Registrar Ingreso' : (isEdit ? 'Actualizar' : 'Crear Artículo')}
               </>
             )}
           </button>
