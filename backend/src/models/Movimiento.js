@@ -44,7 +44,16 @@ const Movimiento = sequelize.define('Movimiento', {
     proyecto: {
         type: DataTypes.STRING(200),
         allowNull: true,
-        comment: 'Nombre del proyecto/obra (si aplica)'
+        comment: 'DEPRECATED: Nombre del proyecto (usar proyecto_id). Mantener para compatibilidad temporal'
+    },
+    proyecto_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'proyectos',
+            key: 'id'
+        },
+        comment: 'Referencia al proyecto normalizado'
     },
     tipo_pedido: {
         type: DataTypes.ENUM('proyecto', 'equipo'),

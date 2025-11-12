@@ -11,6 +11,7 @@ import OrdenCompra from './OrdenCompra.js';
 import DetalleOrdenCompra from './DetalleOrdenCompra.js';
 import SolicitudCompra from './SolicitudCompra.js';
 import Notificacion from './Notificacion.js';
+import Proyecto from './Proyecto.js';
 
 // Definir relaciones
 
@@ -234,6 +235,26 @@ Usuario.hasMany(Notificacion, {
     as: 'notificaciones'
 });
 
+// Proyecto - Usuario (Muchos a Uno) - Supervisor del proyecto
+Proyecto.belongsTo(Usuario, {
+    foreignKey: 'supervisor_id',
+    as: 'supervisor'
+});
+Usuario.hasMany(Proyecto, {
+    foreignKey: 'supervisor_id',
+    as: 'proyectos_supervisados'
+});
+
+// Movimiento - Proyecto (Muchos a Uno) - Proyecto al que pertenece el movimiento
+Movimiento.belongsTo(Proyecto, {
+    foreignKey: 'proyecto_id',
+    as: 'proyectoInfo'
+});
+Proyecto.hasMany(Movimiento, {
+    foreignKey: 'proyecto_id',
+    as: 'movimientos'
+});
+
 // Exportar todos los modelos
 export {
     sequelize,
@@ -248,7 +269,8 @@ export {
     OrdenCompra,
     DetalleOrdenCompra,
     SolicitudCompra,
-    Notificacion
+    Notificacion,
+    Proyecto
 };
 
 export default {
@@ -264,5 +286,6 @@ export default {
     OrdenCompra,
     DetalleOrdenCompra,
     SolicitudCompra,
-    Notificacion
+    Notificacion,
+    Proyecto
 };
