@@ -1137,6 +1137,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
               </div>
             )}
         </div>
+        )}
 
         {/* Proveedores Múltiples */}
         {!esAlmacen && (
