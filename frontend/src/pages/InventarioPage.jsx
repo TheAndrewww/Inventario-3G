@@ -833,21 +833,14 @@ const InventarioPage = () => {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Artículo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo Código</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Actual</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Mín</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Máx</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo Unit.</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedores</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creado</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actualizado</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -858,7 +851,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => !item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-blue-50 sticky top-[49px] z-20 border-b border-blue-200 shadow-sm">
-                    <td colSpan="18" className="px-6 py-3">
+                    <td colSpan="11" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-blue-900">
                         📦 Consumibles
                         <span className="text-xs font-normal text-blue-700">
@@ -886,11 +879,6 @@ const InventarioPage = () => {
                           : 'hover:bg-gray-50'
                       }`}
                     >
-                      {/* ID */}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">
-                        {item.id}
-                      </td>
-
                       {/* Artículo con imagen */}
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
@@ -910,21 +898,6 @@ const InventarioPage = () => {
                             <div className="text-sm text-gray-500">{item.descripcion}</div>
                           </div>
                         </div>
-                      </td>
-
-                      {/* Código EAN13 */}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                        {item.codigo_ean13 || 'N/A'}
-                      </td>
-
-                      {/* Tipo de código */}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.codigo_tipo || 'N/A'}
-                      </td>
-
-                      {/* SKU */}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                        {item.sku || 'N/A'}
                       </td>
 
                       {/* Categoría */}
@@ -967,11 +940,6 @@ const InventarioPage = () => {
                         {item.unidad}
                       </td>
 
-                      {/* Costo Unitario */}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
-                        ${parseFloat(item.costo_unitario || 0).toFixed(2)}
-                      </td>
-
                       {/* Proveedores */}
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                         {item.proveedores && item.proveedores.length > 0 ? (
@@ -985,20 +953,6 @@ const InventarioPage = () => {
                         ) : (
                           'N/A'
                         )}
-                      </td>
-
-                      {/* Tipo (Consumible/Herramienta) */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${item.es_herramienta ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
-                          {item.es_herramienta ? '🔧 Herramienta' : '📦 Consumible'}
-                        </span>
-                      </td>
-
-                      {/* Estado (Activo/Inactivo) */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${item.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {item.activo ? '✓ Activo' : '✗ Inactivo'}
-                        </span>
                       </td>
 
                       {/* Fecha creación */}
@@ -1075,7 +1029,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-orange-50 sticky top-[49px] z-20 border-b border-orange-200 shadow-sm">
-                    <td colSpan="18" className="px-6 py-3">
+                    <td colSpan="11" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-orange-900">
                         🔧 Herramientas
                         <span className="text-xs font-normal text-orange-700">
@@ -1103,11 +1057,6 @@ const InventarioPage = () => {
                             : 'hover:bg-gray-50'
                         }`}
                       >
-                        {/* ID */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">
-                          {item.id}
-                        </td>
-
                         {/* Artículo con imagen */}
                         <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
@@ -1127,21 +1076,6 @@ const InventarioPage = () => {
                               <div className="text-sm text-gray-500">{item.descripcion}</div>
                             </div>
                           </div>
-                        </td>
-
-                        {/* Código EAN13 */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                          {item.codigo_ean13 || 'N/A'}
-                        </td>
-
-                        {/* Tipo de código */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.codigo_tipo || 'N/A'}
-                        </td>
-
-                        {/* SKU */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                          {item.sku || 'N/A'}
                         </td>
 
                         {/* Categoría */}
@@ -1184,11 +1118,6 @@ const InventarioPage = () => {
                           {item.unidad}
                         </td>
 
-                        {/* Costo Unitario */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
-                          ${parseFloat(item.costo_unitario || 0).toFixed(2)}
-                        </td>
-
                         {/* Proveedores */}
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                           {item.proveedores && item.proveedores.length > 0 ? (
@@ -1202,20 +1131,6 @@ const InventarioPage = () => {
                           ) : (
                             'N/A'
                           )}
-                        </td>
-
-                        {/* Tipo (Consumible/Herramienta) */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${item.es_herramienta ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
-                            {item.es_herramienta ? '🔧 Herramienta' : '📦 Consumible'}
-                          </span>
-                        </td>
-
-                        {/* Estado (Activo/Inactivo) */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${item.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {item.activo ? '✓ Activo' : '✗ Inactivo'}
-                          </span>
                         </td>
 
                         {/* Fecha creación */}
@@ -1291,7 +1206,7 @@ const InventarioPage = () => {
               {/* Mensaje si no hay artículos */}
               {filteredArticulos.length === 0 && (
                 <tr>
-                  <td colSpan="18" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="11" className="px-6 py-8 text-center text-gray-500">
                     No se encontraron artículos
                   </td>
                 </tr>
