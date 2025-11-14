@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { Articulo, Categoria, Ubicacion, Proveedor } from '../models/index.js';
+import { Articulo, Categoria, Ubicacion, Proveedor, ArticuloProveedor } from '../models/index.js';
 import { generarCodigoEAN13, generarCodigoEAN13Temporal, validarCodigoEAN13 } from '../utils/ean13-generator.js';
 import { generarImagenCodigoBarras, generarSVGCodigoBarras } from '../utils/barcode-generator.js';
 
@@ -66,6 +66,15 @@ export const getArticulos = async (req, res) => {
                     as: 'proveedor',
                     attributes: ['id', 'nombre', 'contacto', 'telefono'],
                     required: false
+                },
+                {
+                    model: Proveedor,
+                    as: 'proveedores',
+                    attributes: ['id', 'nombre', 'contacto', 'telefono', 'email'],
+                    through: {
+                        attributes: ['costo_unitario', 'es_preferido', 'sku_proveedor', 'notas']
+                    },
+                    required: false
                 }
             ],
             order: [[order_by, order_dir.toUpperCase()]],
@@ -127,6 +136,15 @@ export const getArticuloById = async (req, res) => {
                     as: 'proveedor',
                     attributes: ['id', 'nombre', 'contacto', 'telefono', 'email'],
                     required: false
+                },
+                {
+                    model: Proveedor,
+                    as: 'proveedores',
+                    attributes: ['id', 'nombre', 'contacto', 'telefono', 'email'],
+                    through: {
+                        attributes: ['costo_unitario', 'es_preferido', 'sku_proveedor', 'notas']
+                    },
+                    required: false
                 }
             ]
         });
@@ -187,6 +205,15 @@ export const getArticuloByEAN13 = async (req, res) => {
                     as: 'proveedor',
                     attributes: ['id', 'nombre', 'contacto', 'telefono'],
                     required: false
+                },
+                {
+                    model: Proveedor,
+                    as: 'proveedores',
+                    attributes: ['id', 'nombre', 'contacto', 'telefono', 'email'],
+                    through: {
+                        attributes: ['costo_unitario', 'es_preferido', 'sku_proveedor', 'notas']
+                    },
+                    required: false
                 }
             ]
         });
@@ -227,6 +254,7 @@ export const createArticulo = async (req, res) => {
             categoria_id,
             ubicacion_id,
             proveedor_id,
+            proveedores_ids, // Nuevo: array de IDs de proveedores
             stock_actual,
             stock_minimo,
             stock_maximo,
@@ -320,6 +348,28 @@ export const createArticulo = async (req, res) => {
             articulo.codigo_ean13 = codigoBasadoEnId;
         }
 
+        // Asociar múltiples proveedores si se proporcionaron
+        if (proveedores_ids && Array.isArray(proveedores_ids) && proveedores_ids.length > 0) {
+            for (const proveedorData of proveedores_ids) {
+                const { proveedor_id: provId, costo_unitario: costoProveedor, es_preferido } = proveedorData;
+
+                await ArticuloProveedor.create({
+                    articulo_id: articulo.id,
+                    proveedor_id: provId,
+                    costo_unitario: costoProveedor || costo_unitario || 0,
+                    es_preferido: es_preferido || false
+                });
+            }
+        } else if (proveedor_id) {
+            // Compatibilidad con API anterior: si solo se envía proveedor_id único
+            await ArticuloProveedor.create({
+                articulo_id: articulo.id,
+                proveedor_id: proveedor_id,
+                costo_unitario: costo_unitario || 0,
+                es_preferido: true
+            });
+        }
+
         // Obtener artículo completo con relaciones
         const articuloCompleto = await Articulo.findByPk(articulo.id, {
             include: [
@@ -337,6 +387,15 @@ export const createArticulo = async (req, res) => {
                     model: Proveedor,
                     as: 'proveedor',
                     attributes: ['id', 'nombre', 'contacto', 'telefono'],
+                    required: false
+                },
+                {
+                    model: Proveedor,
+                    as: 'proveedores',
+                    attributes: ['id', 'nombre', 'contacto', 'telefono', 'email'],
+                    through: {
+                        attributes: ['costo_unitario', 'es_preferido', 'sku_proveedor', 'notas']
+                    },
                     required: false
                 }
             ]
@@ -375,6 +434,7 @@ export const updateArticulo = async (req, res) => {
             categoria_id,
             ubicacion_id,
             proveedor_id,
+            proveedores_ids, // Nuevo: array de IDs de proveedores
             stock_actual,
             stock_minimo,
             stock_maximo,
@@ -464,6 +524,24 @@ export const updateArticulo = async (req, res) => {
             ...(es_herramienta !== undefined && { es_herramienta })
         });
 
+        // Actualizar múltiples proveedores si se proporcionaron
+        if (proveedores_ids && Array.isArray(proveedores_ids)) {
+            // Eliminar todas las asociaciones actuales
+            await ArticuloProveedor.destroy({ where: { articulo_id: id } });
+
+            // Crear nuevas asociaciones
+            for (const proveedorData of proveedores_ids) {
+                const { proveedor_id: provId, costo_unitario: costoProveedor, es_preferido } = proveedorData;
+
+                await ArticuloProveedor.create({
+                    articulo_id: id,
+                    proveedor_id: provId,
+                    costo_unitario: costoProveedor || 0,
+                    es_preferido: es_preferido || false
+                });
+            }
+        }
+
         // Obtener artículo actualizado con relaciones
         const articuloActualizado = await Articulo.findByPk(id, {
             include: [
@@ -481,6 +559,15 @@ export const updateArticulo = async (req, res) => {
                     model: Proveedor,
                     as: 'proveedor',
                     attributes: ['id', 'nombre', 'contacto', 'telefono'],
+                    required: false
+                },
+                {
+                    model: Proveedor,
+                    as: 'proveedores',
+                    attributes: ['id', 'nombre', 'contacto', 'telefono', 'email'],
+                    through: {
+                        attributes: ['costo_unitario', 'es_preferido', 'sku_proveedor', 'notas']
+                    },
                     required: false
                 }
             ]

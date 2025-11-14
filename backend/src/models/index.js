@@ -4,6 +4,7 @@ import Categoria from './Categoria.js';
 import Ubicacion from './Ubicacion.js';
 import Proveedor from './Proveedor.js';
 import Articulo from './Articulo.js';
+import ArticuloProveedor from './ArticuloProveedor.js';
 import Movimiento from './Movimiento.js';
 import DetalleMovimiento from './DetalleMovimiento.js';
 import Equipo from './Equipo.js';
@@ -35,7 +36,7 @@ Ubicacion.hasMany(Articulo, {
     as: 'articulos'
 });
 
-// Artículo - Proveedor (Muchos a Uno)
+// Artículo - Proveedor (Muchos a Uno) - Legacy, se mantiene por compatibilidad
 Articulo.belongsTo(Proveedor, {
     foreignKey: 'proveedor_id',
     as: 'proveedor'
@@ -43,6 +44,40 @@ Articulo.belongsTo(Proveedor, {
 Proveedor.hasMany(Articulo, {
     foreignKey: 'proveedor_id',
     as: 'articulos'
+});
+
+// Artículo - Proveedor (Muchos a Muchos a través de ArticuloProveedor)
+Articulo.belongsToMany(Proveedor, {
+    through: ArticuloProveedor,
+    foreignKey: 'articulo_id',
+    otherKey: 'proveedor_id',
+    as: 'proveedores'
+});
+Proveedor.belongsToMany(Articulo, {
+    through: ArticuloProveedor,
+    foreignKey: 'proveedor_id',
+    otherKey: 'articulo_id',
+    as: 'articulosProveedor'
+});
+
+// ArticuloProveedor - Articulo (Muchos a Uno)
+ArticuloProveedor.belongsTo(Articulo, {
+    foreignKey: 'articulo_id',
+    as: 'articulo'
+});
+Articulo.hasMany(ArticuloProveedor, {
+    foreignKey: 'articulo_id',
+    as: 'articuloProveedores'
+});
+
+// ArticuloProveedor - Proveedor (Muchos a Uno)
+ArticuloProveedor.belongsTo(Proveedor, {
+    foreignKey: 'proveedor_id',
+    as: 'proveedor'
+});
+Proveedor.hasMany(ArticuloProveedor, {
+    foreignKey: 'proveedor_id',
+    as: 'proveedorArticulos'
 });
 
 // Movimiento - Usuario (Muchos a Uno) - Usuario que realiza
@@ -263,6 +298,7 @@ export {
     Ubicacion,
     Proveedor,
     Articulo,
+    ArticuloProveedor,
     Movimiento,
     DetalleMovimiento,
     Equipo,
@@ -280,6 +316,7 @@ export default {
     Ubicacion,
     Proveedor,
     Articulo,
+    ArticuloProveedor,
     Movimiento,
     DetalleMovimiento,
     Equipo,
