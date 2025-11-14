@@ -70,8 +70,11 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
 
   const isEdit = !!articulo;
 
-  // Verificar permisos para crear proveedores (solo admin y supervisor)
+  // Verificar permisos para crear proveedores (solo admin y encargado)
   const puedeCrearProveedores = ['administrador', 'encargado'].includes(user?.rol);
+
+  // Detectar si es rol almacén (campos limitados)
+  const esAlmacen = user?.rol === 'almacen';
 
   // Cargar catálogos y datos del artículo si es edición
   useEffect(() => {
@@ -521,12 +524,13 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       return;
     }
 
-    if (!formData.categoria_id) {
+    // Solo validar categoria y ubicacion si NO es almacen
+    if (!esAlmacen && !formData.categoria_id) {
       toast.error('Selecciona una categoría');
       return;
     }
 
-    if (!formData.ubicacion_id) {
+    if (!esAlmacen && !formData.ubicacion_id) {
       toast.error('Selecciona una ubicación');
       return;
     }
@@ -536,7 +540,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       return;
     }
 
-    if (!formData.stock_minimo || parseFloat(formData.stock_minimo) < 0) {
+    // Solo validar stock_minimo si NO es almacen
+    if (!esAlmacen && (!formData.stock_minimo || parseFloat(formData.stock_minimo) < 0)) {
       toast.error('El stock mínimo debe ser mayor o igual a 0');
       return;
     }
@@ -547,7 +552,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         toast.error('El stock actual debe ser un número entero para piezas');
         return;
       }
-      if (!Number.isInteger(parseFloat(formData.stock_minimo))) {
+      // Solo validar stock_minimo si NO es almacen
+      if (!esAlmacen && formData.stock_minimo && !Number.isInteger(parseFloat(formData.stock_minimo))) {
         toast.error('El stock mínimo debe ser un número entero para piezas');
         return;
       }
@@ -560,13 +566,37 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
     try {
       setLoading(true);
 
+      // Si es almacen y no hay categoria/ubicacion, buscar o usar "Sin Categoría" y "Sin Ubicación"
+      let categoriaId = formData.categoria_id;
+      let ubicacionId = formData.ubicacion_id;
+
+      if (esAlmacen) {
+        // Buscar "Sin Categoría" en la lista de categorías
+        if (!categoriaId) {
+          const sinCategoria = categorias.find(c =>
+            c.nombre?.toUpperCase() === 'SIN CATEGORÍA' ||
+            c.nombre?.toUpperCase() === 'SIN CATEGORIA'
+          );
+          categoriaId = sinCategoria?.id || categorias[0]?.id || 1;
+        }
+
+        // Buscar "Sin Ubicación" en la lista de ubicaciones
+        if (!ubicacionId) {
+          const sinUbicacion = ubicaciones.find(u =>
+            u.codigo?.toUpperCase() === 'SIN-UBICACION' ||
+            u.codigo?.toUpperCase() === 'SIN UBICACION'
+          );
+          ubicacionId = sinUbicacion?.id || ubicaciones[0]?.id || 1;
+        }
+      }
+
       const dataToSend = {
         nombre: formData.nombre.trim().toUpperCase(),
         descripcion: formData.descripcion.trim().toUpperCase(),
-        categoria_id: parseInt(formData.categoria_id),
-        ubicacion_id: parseInt(formData.ubicacion_id),
+        categoria_id: parseInt(categoriaId),
+        ubicacion_id: parseInt(ubicacionId),
         stock_actual: parseFloat(formData.stock_actual),
-        stock_minimo: parseFloat(formData.stock_minimo),
+        stock_minimo: esAlmacen ? 0 : parseFloat(formData.stock_minimo),
         stock_maximo: formData.stock_maximo ? parseFloat(formData.stock_maximo) : null,
         unidad: formData.unidad.toUpperCase(),
         costo_unitario: parseFloat(formData.costo_unitario) || 0,
@@ -897,7 +927,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
           />
         </div>
 
-        {/* Categoría */}
+        {/* Categoría - Solo visible para admin y encargado */}
+        {!esAlmacen && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Categoría <span className="text-red-600">*</span>
@@ -911,7 +942,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
               disabled={loading}
-              required
+              required={!esAlmacen}
             >
               <option value="">Seleccionar...</option>
               {categorias.map(cat => (
@@ -1000,8 +1031,10 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             </div>
           )}
         </div>
+        )}
 
-        {/* Ubicación */}
+        {/* Ubicación - Solo visible para admin y encargado */}
+        {!esAlmacen && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Ubicación <span className="text-red-600">*</span>
@@ -1015,7 +1048,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
                 disabled={loading}
-                required
+                required={!esAlmacen}
               >
                 <option value="">Seleccionar...</option>
                 {ubicaciones.map(ub => (
@@ -1106,6 +1139,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         </div>
 
         {/* Proveedores Múltiples */}
+        {!esAlmacen && (
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-sm font-medium text-gray-700">
@@ -1244,9 +1278,10 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             </button>
           )}
         </div>
+        )}
 
         {/* Stock Actual, Mínimo y Máximo */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className={`grid ${esAlmacen ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Stock Actual <span className="text-red-600">*</span>
@@ -1264,6 +1299,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             />
           </div>
 
+          {!esAlmacen && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Stock Mínimo <span className="text-red-600">*</span>
@@ -1277,10 +1313,12 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
               step={formData.unidad === 'piezas' ? '1' : '0.01'}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
               placeholder="20"
-              required
+              required={!esAlmacen}
             />
           </div>
+          )}
 
+          {!esAlmacen && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Stock Máximo
@@ -1296,10 +1334,11 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
               placeholder="500"
             />
           </div>
+          )}
         </div>
 
         {/* Unidad y Costo */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className={`grid ${esAlmacen ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Unidad
@@ -1317,6 +1356,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             </select>
           </div>
 
+          {!esAlmacen && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Costo Unitario
@@ -1332,6 +1372,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
               placeholder="0.00"
             />
           </div>
+          )}
         </div>
 
             {/* Toggle Es Herramienta */}

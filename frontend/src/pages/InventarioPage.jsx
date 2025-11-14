@@ -66,9 +66,12 @@ const InventarioPage = () => {
 
   // Verificar permisos según el rol
   const puedeCrearArticulos = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
+  const puedeEditarArticulos = ['administrador', 'encargado'].includes(user?.rol); // Almacén NO puede editar
   const puedeAgregarAlPedido = ['administrador', 'diseñador'].includes(user?.rol);
   const puedeGestionarInventario = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
+  const puedeRegistrarSalida = ['administrador', 'almacen'].includes(user?.rol); // Almacén puede registrar salidas
   const esAdministrador = user?.rol === 'administrador';
+  const esAlmacen = user?.rol === 'almacen';
 
   useEffect(() => {
     fetchArticulos();
@@ -978,7 +981,7 @@ const InventarioPage = () => {
                               Entrada
                             </button>
                           )}
-                          {esAdministrador && (
+                          {puedeRegistrarSalida && (
                             <button
                               onClick={() => handleAbrirSalida(item)}
                               className="inline-flex items-center gap-1 px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700"
@@ -997,7 +1000,7 @@ const InventarioPage = () => {
                               Agregar
                             </button>
                           )}
-                          {puedeCrearArticulos && (
+                          {puedeEditarArticulos && (
                             mostrarDesactivados ? (
                               <button
                                 onClick={() => handleReactivar(item)}
@@ -1156,7 +1159,7 @@ const InventarioPage = () => {
                                 Entrada
                               </button>
                             )}
-                            {esAdministrador && (
+                            {puedeRegistrarSalida && (
                               <button
                                 onClick={() => handleAbrirSalida(item)}
                                 className="inline-flex items-center gap-1 px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700"
@@ -1175,7 +1178,7 @@ const InventarioPage = () => {
                                 Agregar
                               </button>
                             )}
-                            {puedeCrearArticulos && (
+                            {puedeEditarArticulos && (
                               mostrarDesactivados ? (
                                 <button
                                   onClick={() => handleReactivar(item)}
@@ -1349,7 +1352,7 @@ const InventarioPage = () => {
                           Entrada
                         </button>
                       )}
-                      {esAdministrador && (
+                      {puedeRegistrarSalida && (
                         <button
                           onClick={() => handleAbrirSalida(item)}
                           className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-700"
@@ -1367,7 +1370,7 @@ const InventarioPage = () => {
                           Agregar
                         </button>
                       )}
-                      {puedeCrearArticulos && (
+                      {puedeEditarArticulos && (
                         mostrarDesactivados ? (
                           <button
                             onClick={() => handleReactivar(item)}
@@ -1525,7 +1528,7 @@ const InventarioPage = () => {
                           Entrada
                         </button>
                       )}
-                      {esAdministrador && (
+                      {puedeRegistrarSalida && (
                         <button
                           onClick={() => handleAbrirSalida(item)}
                           className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-700"
@@ -1543,7 +1546,7 @@ const InventarioPage = () => {
                           Agregar
                         </button>
                       )}
-                      {puedeCrearArticulos && (
+                      {puedeEditarArticulos && (
                         mostrarDesactivados ? (
                           <button
                             onClick={() => handleReactivar(item)}
@@ -1583,7 +1586,7 @@ const InventarioPage = () => {
         isOpen={modalDetalleOpen}
         onClose={() => setModalDetalleOpen(false)}
         onEdit={handleEditar}
-        canEdit={puedeCrearArticulos}
+        canEdit={puedeEditarArticulos}
       />
 
       {/* Modal de formulario para crear/editar */}
