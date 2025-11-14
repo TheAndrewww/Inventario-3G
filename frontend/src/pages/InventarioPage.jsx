@@ -833,13 +833,24 @@ const InventarioPage = () => {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Artículo</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo Unit.</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Artículo</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo Código</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Actual</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Mín</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Máx</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo Unit.</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedores</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creado</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actualizado</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -847,7 +858,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => !item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-blue-50 sticky top-[49px] z-20 border-b border-blue-200 shadow-sm">
-                    <td colSpan="7" className="px-6 py-3">
+                    <td colSpan="18" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-blue-900">
                         📦 Consumibles
                         <span className="text-xs font-normal text-blue-700">
@@ -861,13 +872,27 @@ const InventarioPage = () => {
                     ? getImageUrl(item.imagen_url)
                     : null;
 
+                  // Detectar si la ubicación es "REVISAR"
+                  const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
+                                             item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
+
                   return (
                     <tr
                       key={item.id}
                       onClick={() => handleVerDetalle(item)}
-                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      className={`transition-colors cursor-pointer ${
+                        esUbicacionRevisar
+                          ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                          : 'hover:bg-gray-50'
+                      }`}
                     >
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      {/* ID */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">
+                        {item.id}
+                      </td>
+
+                      {/* Artículo con imagen */}
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           {imagenUrl ? (
                             <img
@@ -886,31 +911,108 @@ const InventarioPage = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                        {item.codigo_ean13}
+
+                      {/* Código EAN13 */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                        {item.codigo_ean13 || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+
+                      {/* Tipo de código */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.codigo_tipo || 'N/A'}
+                      </td>
+
+                      {/* SKU */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                        {item.sku || 'N/A'}
+                      </td>
+
+                      {/* Categoría */}
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                           {item.categoria?.nombre || 'Sin categoría'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                            {parseFloat(item.stock_actual).toFixed(0)} {item.unidad}
+
+                      {/* Ubicación */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
+                        {esUbicacionRevisar ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border-2 border-yellow-400">
+                            ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
                           </span>
-                          {parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) && (
-                            <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">Bajo</span>
-                          )}
-                        </div>
+                        ) : (
+                          <span className="text-gray-500">{item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}</span>
+                        )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+
+                      {/* Stock Actual */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                          {parseFloat(item.stock_actual).toFixed(2)}
+                        </span>
+                      </td>
+
+                      {/* Stock Mínimo */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {parseFloat(item.stock_minimo).toFixed(2)}
+                      </td>
+
+                      {/* Stock Máximo */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}
+                      </td>
+
+                      {/* Unidad */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase">
+                        {item.unidad}
+                      </td>
+
+                      {/* Costo Unitario */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                         ${parseFloat(item.costo_unitario || 0).toFixed(2)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
+
+                      {/* Proveedores */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {item.proveedores && item.proveedores.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            {item.proveedores.map((prov, idx) => (
+                              <span key={idx} className={`text-xs ${prov.ArticuloProveedor?.es_preferido ? 'font-semibold text-green-700' : 'text-gray-600'}`}>
+                                {prov.nombre}{prov.ArticuloProveedor?.es_preferido ? ' ⭐' : ''}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          'N/A'
+                        )}
+                      </td>
+
+                      {/* Tipo (Consumible/Herramienta) */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${item.es_herramienta ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+                          {item.es_herramienta ? '🔧 Herramienta' : '📦 Consumible'}
+                        </span>
+                      </td>
+
+                      {/* Estado (Activo/Inactivo) */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${item.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {item.activo ? '✓ Activo' : '✗ Inactivo'}
+                        </span>
+                      </td>
+
+                      {/* Fecha creación */}
+                      <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
+                        {item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                      </td>
+
+                      {/* Fecha actualización */}
+                      <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
+                        {item.updated_at ? new Date(item.updated_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                      </td>
+
+                      {/* Acciones */}
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                           {puedeGestionarInventario && (
                             <button
@@ -973,7 +1075,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-orange-50 sticky top-[49px] z-20 border-b border-orange-200 shadow-sm">
-                    <td colSpan="7" className="px-6 py-3">
+                    <td colSpan="18" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-orange-900">
                         🔧 Herramientas
                         <span className="text-xs font-normal text-orange-700">
@@ -987,13 +1089,27 @@ const InventarioPage = () => {
                       ? getImageUrl(item.imagen_url)
                       : null;
 
+                    // Detectar si la ubicación es "REVISAR"
+                    const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
+                                               item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
+
                     return (
                       <tr
                         key={item.id}
                         onClick={() => handleVerDetalle(item)}
-                        className="hover:bg-gray-50 transition-colors cursor-pointer"
+                        className={`transition-colors cursor-pointer ${
+                          esUbicacionRevisar
+                            ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                            : 'hover:bg-gray-50'
+                        }`}
                       >
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        {/* ID */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">
+                          {item.id}
+                        </td>
+
+                        {/* Artículo con imagen */}
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             {imagenUrl ? (
                               <img
@@ -1012,31 +1128,108 @@ const InventarioPage = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                          {item.codigo_ean13}
+
+                        {/* Código EAN13 */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                          {item.codigo_ean13 || 'N/A'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+
+                        {/* Tipo de código */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {item.codigo_tipo || 'N/A'}
+                        </td>
+
+                        {/* SKU */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                          {item.sku || 'N/A'}
+                        </td>
+
+                        {/* Categoría */}
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                             {item.categoria?.nombre || 'Sin categoría'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                              {parseFloat(item.stock_actual).toFixed(0)} {item.unidad}
+
+                        {/* Ubicación */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm">
+                          {esUbicacionRevisar ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border-2 border-yellow-400">
+                              ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
                             </span>
-                            {parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) && (
-                              <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">Bajo</span>
-                            )}
-                          </div>
+                          ) : (
+                            <span className="text-gray-500">{item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}</span>
+                          )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+
+                        {/* Stock Actual */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                            {parseFloat(item.stock_actual).toFixed(2)}
+                          </span>
+                        </td>
+
+                        {/* Stock Mínimo */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                          {parseFloat(item.stock_minimo).toFixed(2)}
+                        </td>
+
+                        {/* Stock Máximo */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                          {item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}
+                        </td>
+
+                        {/* Unidad */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase">
+                          {item.unidad}
+                        </td>
+
+                        {/* Costo Unitario */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                           ${parseFloat(item.costo_unitario || 0).toFixed(2)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
+
+                        {/* Proveedores */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {item.proveedores && item.proveedores.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {item.proveedores.map((prov, idx) => (
+                                <span key={idx} className={`text-xs ${prov.ArticuloProveedor?.es_preferido ? 'font-semibold text-green-700' : 'text-gray-600'}`}>
+                                  {prov.nombre}{prov.ArticuloProveedor?.es_preferido ? ' ⭐' : ''}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            'N/A'
+                          )}
+                        </td>
+
+                        {/* Tipo (Consumible/Herramienta) */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${item.es_herramienta ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+                            {item.es_herramienta ? '🔧 Herramienta' : '📦 Consumible'}
+                          </span>
+                        </td>
+
+                        {/* Estado (Activo/Inactivo) */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${item.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {item.activo ? '✓ Activo' : '✗ Inactivo'}
+                          </span>
+                        </td>
+
+                        {/* Fecha creación */}
+                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
+                          {item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                        </td>
+
+                        {/* Fecha actualización */}
+                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
+                          {item.updated_at ? new Date(item.updated_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
                           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                             {puedeGestionarInventario && (
                               <button
@@ -1098,7 +1291,7 @@ const InventarioPage = () => {
               {/* Mensaje si no hay artículos */}
               {filteredArticulos.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="18" className="px-6 py-8 text-center text-gray-500">
                     No se encontraron artículos
                   </td>
                 </tr>
@@ -1125,11 +1318,19 @@ const InventarioPage = () => {
                   ? getImageUrl(item.imagen_url)
                   : null;
 
+                // Detectar si la ubicación es "REVISAR"
+                const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
+                                           item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
+
                 return (
                   <div
                     key={`consumible-${item.id}`}
                     onClick={() => handleVerDetalle(item)}
-                    className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                    className={`p-4 transition-colors cursor-pointer ${
+                      esUbicacionRevisar
+                        ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                        : 'hover:bg-gray-50'
+                    }`}
                   >
                     <div className="flex gap-3">
                       {/* Imagen */}
@@ -1147,25 +1348,77 @@ const InventarioPage = () => {
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 truncate">{item.nombre}</h3>
-                        <p className="text-xs text-gray-500 truncate mb-2">{item.descripcion}</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-medium text-gray-900">{item.nombre}</h3>
+                          <span className="text-xs text-gray-400 font-mono">#{item.id}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-2">{item.descripcion}</p>
 
-                        <div className="flex flex-wrap gap-2 text-xs mb-2">
-                          <span className="inline-flex px-2 py-1 rounded-full bg-blue-100 text-blue-800 font-medium">
+                        {/* Badges */}
+                        <div className="flex flex-wrap gap-1 text-xs mb-2">
+                          <span className="inline-flex px-2 py-1 rounded bg-blue-100 text-blue-800 font-medium">
                             {item.categoria?.nombre || 'Sin categoría'}
                           </span>
-                          <span className={`inline-flex px-2 py-1 rounded font-medium ${
-                            parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo)
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {parseFloat(item.stock_actual).toFixed(0)} {item.unidad}
+                          <span className={`inline-flex px-2 py-1 rounded font-medium ${item.es_herramienta ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+                            {item.es_herramienta ? '🔧' : '📦'}
+                          </span>
+                          <span className={`inline-flex px-2 py-1 rounded font-medium ${item.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {item.activo ? '✓' : '✗'}
                           </span>
                         </div>
 
-                        <div className="text-xs text-gray-600 space-y-1">
-                          <div className="font-mono">{item.codigo_ean13}</div>
-                          <div>${parseFloat(item.costo_unitario || 0).toFixed(2)}</div>
+                        {/* Detalles principales */}
+                        <div className="text-xs text-gray-600 space-y-1 mb-2">
+                          <div><span className="font-semibold">Código:</span> <span className="font-mono">{item.codigo_ean13 || 'N/A'}</span></div>
+                          {item.codigo_tipo && <div><span className="font-semibold">Tipo:</span> {item.codigo_tipo}</div>}
+                          {item.sku && <div><span className="font-semibold">SKU:</span> <span className="font-mono">{item.sku}</span></div>}
+                          <div>
+                            <span className="font-semibold">Ubicación:</span>{' '}
+                            {esUbicacionRevisar ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border border-yellow-400 text-[10px]">
+                                ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
+                              </span>
+                            ) : (
+                              <span>{item.ubicacion?.codigo || 'N/A'}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Stock info */}
+                        <div className="bg-gray-50 rounded p-2 mb-2">
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                              <div className="text-gray-500">Stock</div>
+                              <div className={`font-semibold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                                {parseFloat(item.stock_actual).toFixed(2)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">Mín</div>
+                              <div className="font-semibold text-gray-700">{parseFloat(item.stock_minimo).toFixed(2)}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">Máx</div>
+                              <div className="font-semibold text-gray-700">{item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}</div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">Unidad: <span className="uppercase font-medium">{item.unidad}</span></div>
+                        </div>
+
+                        {/* Costo y proveedores */}
+                        <div className="text-xs space-y-1">
+                          <div><span className="font-semibold">Costo:</span> <span className="text-green-700 font-bold">${parseFloat(item.costo_unitario || 0).toFixed(2)}</span></div>
+                          {item.proveedores && item.proveedores.length > 0 && (
+                            <div>
+                              <span className="font-semibold">Proveedores:</span> {item.proveedores.map(p => `${p.nombre}${p.ArticuloProveedor?.es_preferido ? '⭐' : ''}`).join(', ')}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Fechas */}
+                        <div className="text-[10px] text-gray-400 mt-2 space-x-2">
+                          {item.created_at && <span>Creado: {new Date(item.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
+                          {item.updated_at && <span>Act: {new Date(item.updated_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
                         </div>
                       </div>
                     </div>
@@ -1241,11 +1494,19 @@ const InventarioPage = () => {
                   ? getImageUrl(item.imagen_url)
                   : null;
 
+                // Detectar si la ubicación es "REVISAR"
+                const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
+                                           item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
+
                 return (
                   <div
                     key={`herramienta-${item.id}`}
                     onClick={() => handleVerDetalle(item)}
-                    className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                    className={`p-4 transition-colors cursor-pointer ${
+                      esUbicacionRevisar
+                        ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                        : 'hover:bg-gray-50'
+                    }`}
                   >
                     <div className="flex gap-3">
                       {/* Imagen */}
@@ -1263,25 +1524,77 @@ const InventarioPage = () => {
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 truncate">{item.nombre}</h3>
-                        <p className="text-xs text-gray-500 truncate mb-2">{item.descripcion}</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-medium text-gray-900">{item.nombre}</h3>
+                          <span className="text-xs text-gray-400 font-mono">#{item.id}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-2">{item.descripcion}</p>
 
-                        <div className="flex flex-wrap gap-2 text-xs mb-2">
-                          <span className="inline-flex px-2 py-1 rounded-full bg-blue-100 text-blue-800 font-medium">
+                        {/* Badges */}
+                        <div className="flex flex-wrap gap-1 text-xs mb-2">
+                          <span className="inline-flex px-2 py-1 rounded bg-blue-100 text-blue-800 font-medium">
                             {item.categoria?.nombre || 'Sin categoría'}
                           </span>
-                          <span className={`inline-flex px-2 py-1 rounded font-medium ${
-                            parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo)
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {parseFloat(item.stock_actual).toFixed(0)} {item.unidad}
+                          <span className={`inline-flex px-2 py-1 rounded font-medium ${item.es_herramienta ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+                            {item.es_herramienta ? '🔧' : '📦'}
+                          </span>
+                          <span className={`inline-flex px-2 py-1 rounded font-medium ${item.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {item.activo ? '✓' : '✗'}
                           </span>
                         </div>
 
-                        <div className="text-xs text-gray-600 space-y-1">
-                          <div className="font-mono">{item.codigo_ean13}</div>
-                          <div>${parseFloat(item.costo_unitario || 0).toFixed(2)}</div>
+                        {/* Detalles principales */}
+                        <div className="text-xs text-gray-600 space-y-1 mb-2">
+                          <div><span className="font-semibold">Código:</span> <span className="font-mono">{item.codigo_ean13 || 'N/A'}</span></div>
+                          {item.codigo_tipo && <div><span className="font-semibold">Tipo:</span> {item.codigo_tipo}</div>}
+                          {item.sku && <div><span className="font-semibold">SKU:</span> <span className="font-mono">{item.sku}</span></div>}
+                          <div>
+                            <span className="font-semibold">Ubicación:</span>{' '}
+                            {esUbicacionRevisar ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border border-yellow-400 text-[10px]">
+                                ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
+                              </span>
+                            ) : (
+                              <span>{item.ubicacion?.codigo || 'N/A'}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Stock info */}
+                        <div className="bg-gray-50 rounded p-2 mb-2">
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                              <div className="text-gray-500">Stock</div>
+                              <div className={`font-semibold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                                {parseFloat(item.stock_actual).toFixed(2)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">Mín</div>
+                              <div className="font-semibold text-gray-700">{parseFloat(item.stock_minimo).toFixed(2)}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">Máx</div>
+                              <div className="font-semibold text-gray-700">{item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}</div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">Unidad: <span className="uppercase font-medium">{item.unidad}</span></div>
+                        </div>
+
+                        {/* Costo y proveedores */}
+                        <div className="text-xs space-y-1">
+                          <div><span className="font-semibold">Costo:</span> <span className="text-green-700 font-bold">${parseFloat(item.costo_unitario || 0).toFixed(2)}</span></div>
+                          {item.proveedores && item.proveedores.length > 0 && (
+                            <div>
+                              <span className="font-semibold">Proveedores:</span> {item.proveedores.map(p => `${p.nombre}${p.ArticuloProveedor?.es_preferido ? '⭐' : ''}`).join(', ')}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Fechas */}
+                        <div className="text-[10px] text-gray-400 mt-2 space-x-2">
+                          {item.created_at && <span>Creado: {new Date(item.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
+                          {item.updated_at && <span>Act: {new Date(item.updated_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
                         </div>
                       </div>
                     </div>

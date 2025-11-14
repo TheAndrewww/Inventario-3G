@@ -58,7 +58,7 @@ export const crearUbicacion = async (req, res) => {
         // Crear la ubicación
         const nuevaUbicacion = await Ubicacion.create({
             codigo: codigo.trim(),
-            almacen: almacen ? almacen.trim() : null,
+            almacen: almacen && almacen.trim() ? almacen.trim() : 'Principal', // Usar valor por defecto si está vacío
             pasillo: pasillo ? pasillo.trim() : null,
             estante: estante ? estante.trim() : null,
             nivel: nivel || null,
