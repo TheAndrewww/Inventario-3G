@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
-const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
+const Modal = ({ isOpen, onClose, title, children, size = 'md', closeOnBackdropClick = true }) => {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -23,10 +23,16 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
     xl: 'max-w-4xl'
   };
 
+  const handleBackdropClick = () => {
+    if (closeOnBackdropClick) {
+      onClose();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-2 sm:p-4"
-      onClick={onClose}
+      onClick={handleBackdropClick}
     >
       <div
         className={`bg-white rounded-lg sm:rounded-xl ${sizes[size]} w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col`}

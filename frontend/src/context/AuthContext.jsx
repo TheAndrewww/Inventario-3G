@@ -40,6 +40,21 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
+  // Escuchar evento de logout automático por token expirado
+  useEffect(() => {
+    const handleAuthLogout = () => {
+      console.log('Token expirado - Cerrando sesión automáticamente');
+      setUser(null);
+      setIsAuthenticated(false);
+    };
+
+    window.addEventListener('auth:logout', handleAuthLogout);
+
+    return () => {
+      window.removeEventListener('auth:logout', handleAuthLogout);
+    };
+  }, []);
+
   const login = async (email, password) => {
     try {
       const data = await authService.login(email, password);

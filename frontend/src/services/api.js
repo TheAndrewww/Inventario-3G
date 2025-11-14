@@ -1,4 +1,5 @@
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -37,10 +38,29 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Solo registrar el error, no redirigir automáticamente
-    // React Router y el AuthContext manejarán la navegación
+    // Manejar errores de autenticación (token expirado o inválido)
     if (error.response?.status === 401) {
-      console.log('Error 401: Token inválido o expirado');
+      console.log('Error 401: Token inválido o expirado - Cerrando sesión');
+
+      // Limpiar el localStorage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+
+      // Emitir evento personalizado para que AuthContext actualice su estado
+      window.dispatchEvent(new Event('auth:logout'));
+
+      // Mostrar notificación al usuario
+      toast.error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.', {
+        duration: 4000,
+      });
+
+      // Redirigir al login si no estamos ya ahí
+      if (!window.location.pathname.includes('/login')) {
+        // Usar setTimeout para que el toast se muestre antes de redirigir
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 500);
+      }
     }
     return Promise.reject(error);
   }

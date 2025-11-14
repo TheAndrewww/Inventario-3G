@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import notificacionesService from '../services/notificaciones.service';
 import pushNotificationService from '../services/push-notifications.service';
 
@@ -19,6 +19,9 @@ export const NotificacionesProvider = ({ children }) => {
   const [pushPermission, setPushPermission] = useState('default');
   const [pushSupported, setPushSupported] = useState(false);
   const [lastNotificationCount, setLastNotificationCount] = useState(0);
+
+  // Ref para evitar inicialización duplicada en StrictMode
+  const initialized = useRef(false);
 
   // Función para obtener todas las notificaciones
   const fetchNotificaciones = useCallback(async (soloNoLeidas = false) => {
@@ -138,22 +141,25 @@ export const NotificacionesProvider = ({ children }) => {
 
   // Cargar notificaciones y conteo al montar el componente
   useEffect(() => {
+    // Evitar doble ejecución en React StrictMode
+    if (initialized.current) return;
+    initialized.current = true;
+
     fetchNotificaciones();
     fetchCount();
-  }, [fetchNotificaciones, fetchCount]);
 
-  // Polling: actualizar cada 30 segundos
-  useEffect(() => {
+    // Polling: actualizar cada 30 segundos
     const interval = setInterval(() => {
       fetchCount();
-      // Solo refrescar si no hay loading activo
-      if (!loading) {
-        fetchNotificaciones();
-      }
-    }, 30000); // 30 segundos
+      fetchNotificaciones();
+    }, 30000);
 
-    return () => clearInterval(interval);
-  }, [fetchNotificaciones, fetchCount, loading]);
+    return () => {
+      clearInterval(interval);
+      initialized.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Solo ejecutar al montar
 
   const value = {
     notificaciones,
