@@ -53,6 +53,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
     es_herramienta: false
   });
 
+  // Estado para múltiples proveedores
+  const [proveedoresSeleccionados, setProveedoresSeleccionados] = useState([]);
+
   // Tipos de código soportados
   const tiposCodigo = [
     { value: 'EAN13', label: 'EAN-13 (13 dígitos)' },
@@ -92,6 +95,26 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
           costo_unitario: articulo.costo_unitario || '',
           es_herramienta: articulo.es_herramienta || false
         });
+
+        // Cargar proveedores seleccionados si existen
+        if (articulo.proveedores && articulo.proveedores.length > 0) {
+          setProveedoresSeleccionados(
+            articulo.proveedores.map(prov => ({
+              proveedor_id: prov.id,
+              costo_unitario: prov.ArticuloProveedor?.costo_unitario || 0,
+              es_preferido: prov.ArticuloProveedor?.es_preferido || false
+            }))
+          );
+        } else if (articulo.proveedor_id) {
+          // Si solo tiene el proveedor legacy
+          setProveedoresSeleccionados([{
+            proveedor_id: articulo.proveedor_id,
+            costo_unitario: articulo.costo_unitario || 0,
+            es_preferido: true
+          }]);
+        } else {
+          setProveedoresSeleccionados([]);
+        }
 
         // Cargar imagen actual si existe
         if (articulo.imagen_url) {
@@ -353,6 +376,36 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
     }));
   };
 
+  // Agregar proveedor
+  const handleAgregarProveedor = () => {
+    setProveedoresSeleccionados(prev => [...prev, {
+      proveedor_id: '',
+      costo_unitario: formData.costo_unitario || 0,
+      es_preferido: prev.length === 0 // El primero es preferido por defecto
+    }]);
+  };
+
+  // Eliminar proveedor
+  const handleEliminarProveedor = (index) => {
+    setProveedoresSeleccionados(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Actualizar datos de un proveedor específico
+  const handleProveedorChange = (index, field, value) => {
+    setProveedoresSeleccionados(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  // Marcar como preferido (solo uno puede ser preferido)
+  const handleMarcarPreferido = (index) => {
+    setProveedoresSeleccionados(prev =>
+      prev.map((prov, i) => ({ ...prov, es_preferido: i === index }))
+    );
+  };
+
   // Manejar selección de artículo existente desde autocomplete
   const handleSeleccionarArticulo = (articulo) => {
     setArticuloSeleccionado(articulo);
@@ -512,7 +565,6 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         descripcion: formData.descripcion.trim().toUpperCase(),
         categoria_id: parseInt(formData.categoria_id),
         ubicacion_id: parseInt(formData.ubicacion_id),
-        proveedor_id: formData.proveedor_id ? parseInt(formData.proveedor_id) : null,
         stock_actual: parseFloat(formData.stock_actual),
         stock_minimo: parseFloat(formData.stock_minimo),
         stock_maximo: formData.stock_maximo ? parseFloat(formData.stock_maximo) : null,
@@ -520,6 +572,18 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         costo_unitario: parseFloat(formData.costo_unitario) || 0,
         es_herramienta: formData.es_herramienta
       };
+
+      // Agregar proveedores si se seleccionaron
+      if (proveedoresSeleccionados.length > 0) {
+        const proveedoresValidos = proveedoresSeleccionados.filter(p => p.proveedor_id);
+        if (proveedoresValidos.length > 0) {
+          dataToSend.proveedores_ids = proveedoresValidos.map(p => ({
+            proveedor_id: parseInt(p.proveedor_id),
+            costo_unitario: parseFloat(p.costo_unitario) || 0,
+            es_preferido: p.es_preferido || false
+          }));
+        }
+      }
 
       // Agregar código y tipo solo si se proporcionó un código
       if (formData.codigo_ean13 && formData.codigo_ean13.trim()) {
@@ -617,6 +681,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       });
       setSelectedImage(null);
       setCurrentImageUrl(null);
+      setProveedoresSeleccionados([]);
       onClose();
     }
   };
@@ -626,6 +691,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       isOpen={isOpen}
       onClose={handleClose}
       title={isEdit ? 'Editar Artículo' : (modoIngreso ? 'Ingreso de Inventario' : 'Nuevo Artículo')}
+      closeOnBackdropClick={false}
     >
       <form onSubmit={modoIngreso ? handleIngresoInventario : handleSubmit} className="space-y-4">
         {/* Código de Barras (solo en creación) */}
@@ -1039,85 +1105,143 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             )}
         </div>
 
-        {/* Proveedor */}
+        {/* Proveedores Múltiples */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Proveedor
-          </label>
-
-          {!showNuevoProveedor ? (
-            <select
-              key={`proveedor-select-${proveedores.length}`}
-              name="proveedor_id"
-              value={formData.proveedor_id}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              disabled={loading}
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Proveedores
+            </label>
+            <button
+              type="button"
+              onClick={handleAgregarProveedor}
+              className="text-sm text-red-700 hover:text-red-800 font-medium flex items-center gap-1"
             >
-              <option value="">Seleccionar...</option>
-              {proveedores.map(prov => (
-                <option key={prov.id} value={prov.id}>
-                  {prov.nombre}
-                </option>
-              ))}
-              {puedeCrearProveedores && (
-                <option value="nuevo_proveedor" className="text-red-700 font-medium">
-                  + Crear nuevo proveedor
-                </option>
-              )}
-            </select>
+              <span className="text-lg">+</span> Agregar Proveedor
+            </button>
+          </div>
+
+          {proveedoresSeleccionados.length === 0 ? (
+            <div className="p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg text-center">
+              <p className="text-sm text-gray-500">
+                No hay proveedores seleccionados. Haz clic en "Agregar Proveedor" para comenzar.
+              </p>
+            </div>
           ) : (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={nuevoProveedorNombre}
-                onChange={(e) => setNuevoProveedorNombre(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleCrearProveedorRapido();
-                  }
-                  if (e.key === 'Escape') {
-                    handleCancelarNuevoProveedor();
-                  }
-                }}
-                placeholder="NOMBRE DEL NUEVO PROVEEDOR"
-                className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
-                style={{ textTransform: 'uppercase' }}
-                autoFocus
-                disabled={creandoProveedor}
-              />
-              <button
-                type="button"
-                onClick={handleCrearProveedorRapido}
-                disabled={creandoProveedor}
-                className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
-                title="Guardar proveedor"
-              >
-                {creandoProveedor ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Check size={18} />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={handleCancelarNuevoProveedor}
-                disabled={creandoProveedor}
-                className="px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                title="Cancelar"
-              >
-                <X size={18} />
-              </button>
+            <div className="space-y-2">
+              {proveedoresSeleccionados.map((provSel, index) => (
+                <div key={index} className="flex gap-2 items-start p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex gap-2">
+                      <select
+                        value={provSel.proveedor_id}
+                        onChange={(e) => handleProveedorChange(index, 'proveedor_id', e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 text-sm"
+                        required
+                      >
+                        <option value="">Seleccionar proveedor...</option>
+                        {proveedores.map(prov => (
+                          <option key={prov.id} value={prov.id}>
+                            {prov.nombre}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        value={provSel.costo_unitario}
+                        onChange={(e) => handleProveedorChange(index, 'costo_unitario', e.target.value)}
+                        placeholder="Costo"
+                        min="0"
+                        step="0.01"
+                        className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`preferido-${index}`}
+                        checked={provSel.es_preferido}
+                        onChange={() => handleMarcarPreferido(index)}
+                        className="w-4 h-4 text-red-700 bg-gray-100 border-gray-300 rounded focus:ring-red-700 focus:ring-2"
+                      />
+                      <label htmlFor={`preferido-${index}`} className="text-xs text-gray-600 cursor-pointer">
+                        Proveedor preferido
+                      </label>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleEliminarProveedor(index)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Eliminar proveedor"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 
           {showNuevoProveedor && (
-            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-xs text-yellow-800">
-                ⚠️ <strong>Proveedor pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
-              </p>
+            <div className="mt-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={nuevoProveedorNombre}
+                  onChange={(e) => setNuevoProveedorNombre(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCrearProveedorRapido();
+                    }
+                    if (e.key === 'Escape') {
+                      handleCancelarNuevoProveedor();
+                    }
+                  }}
+                  placeholder="NOMBRE DEL NUEVO PROVEEDOR"
+                  className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                  style={{ textTransform: 'uppercase' }}
+                  autoFocus
+                  disabled={creandoProveedor}
+                />
+                <button
+                  type="button"
+                  onClick={handleCrearProveedorRapido}
+                  disabled={creandoProveedor}
+                  className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                  title="Guardar proveedor"
+                >
+                  {creandoProveedor ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <Check size={18} />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelarNuevoProveedor}
+                  disabled={creandoProveedor}
+                  className="px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                  title="Cancelar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-xs text-yellow-800">
+                  ⚠️ <strong>Proveedor pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
+                </p>
+              </div>
             </div>
+          )}
+
+          {puedeCrearProveedores && !showNuevoProveedor && (
+            <button
+              type="button"
+              onClick={() => setShowNuevoProveedor(true)}
+              className="mt-2 text-sm text-red-700 hover:text-red-800 font-medium"
+            >
+              + Crear nuevo proveedor
+            </button>
           )}
         </div>
 
