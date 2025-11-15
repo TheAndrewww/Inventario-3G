@@ -14,11 +14,25 @@ const SHEET_NAME = 'NOVIEMBRE';
  */
 const authenticate = async () => {
   try {
-    const auth = new google.auth.GoogleAuth({
-      keyFile: path.join(__dirname, '../../google-credentials.json'),
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-    });
+    let authConfig;
 
+    // En producción, usar variable de entorno
+    if (process.env.GOOGLE_CREDENTIALS_JSON) {
+      const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+      authConfig = {
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+      };
+    }
+    // En desarrollo, usar archivo local
+    else {
+      authConfig = {
+        keyFile: path.join(__dirname, '../../google-credentials.json'),
+        scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+      };
+    }
+
+    const auth = new google.auth.GoogleAuth(authConfig);
     const client = await auth.getClient();
     const sheets = google.sheets({ version: 'v4', auth: client });
 
