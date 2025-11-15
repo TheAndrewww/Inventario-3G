@@ -322,6 +322,10 @@ export const createArticulo = async (req, res) => {
             codigoFinal = generarCodigoEAN13Temporal();
         }
 
+        // Determinar si el artículo debe marcarse como pendiente de revisión
+        // (cuando lo crea un usuario con rol almacén)
+        const esAlmacen = req.usuario?.rol === 'almacen';
+
         // Crear artículo
         const articulo = await Articulo.create({
             codigo_ean13: codigoFinal,
@@ -338,7 +342,8 @@ export const createArticulo = async (req, res) => {
             costo_unitario: costo_unitario || 0,
             imagen_url: imagen,
             activo: true,
-            es_herramienta: es_herramienta || false
+            es_herramienta: es_herramienta || false,
+            pendiente_revision: esAlmacen
         });
 
         // Si se generó automáticamente y es EAN13, actualizar con código basado en ID
@@ -505,6 +510,9 @@ export const updateArticulo = async (req, res) => {
             }
         }
 
+        // Si el usuario que edita es admin o encargado, marcar como revisado
+        const esAdminOEncargado = ['administrador', 'encargado'].includes(req.usuario?.rol);
+
         // Actualizar artículo
         await articulo.update({
             ...(codigo_ean13 && { codigo_ean13 }),
@@ -521,7 +529,9 @@ export const updateArticulo = async (req, res) => {
             ...(costo_unitario !== undefined && { costo_unitario }),
             ...(imagen !== undefined && { imagen }),
             ...(activo !== undefined && { activo }),
-            ...(es_herramienta !== undefined && { es_herramienta })
+            ...(es_herramienta !== undefined && { es_herramienta }),
+            // Si es admin o encargado, marcar como revisado
+            ...(esAdminOEncargado && { pendiente_revision: false })
         });
 
         // Actualizar múltiples proveedores si se proporcionaron

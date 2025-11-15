@@ -872,12 +872,17 @@ const InventarioPage = () => {
                   const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
                                              item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
 
+                  // Detectar si el artículo está pendiente de revisión (creado por almacén)
+                  const esPendienteRevision = item.pendiente_revision === true;
+
                   return (
                     <tr
                       key={item.id}
                       onClick={() => handleVerDetalle(item)}
                       className={`transition-colors cursor-pointer ${
-                        esUbicacionRevisar
+                        esPendienteRevision
+                          ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                          : esUbicacionRevisar
                           ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
                           : 'hover:bg-gray-50'
                       }`}
@@ -1050,12 +1055,17 @@ const InventarioPage = () => {
                     const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
                                                item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
 
+                    // Detectar si el artículo está pendiente de revisión (creado por almacén)
+                    const esPendienteRevision = item.pendiente_revision === true;
+
                     return (
                       <tr
                         key={item.id}
                         onClick={() => handleVerDetalle(item)}
                         className={`transition-colors cursor-pointer ${
-                          esUbicacionRevisar
+                          esPendienteRevision
+                            ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                            : esUbicacionRevisar
                             ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
                             : 'hover:bg-gray-50'
                         }`}
@@ -1240,12 +1250,17 @@ const InventarioPage = () => {
                 const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
                                            item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
 
+                // Detectar si el artículo está pendiente de revisión (creado por almacén)
+                const esPendienteRevision = item.pendiente_revision === true;
+
                 return (
                   <div
                     key={`consumible-${item.id}`}
                     onClick={() => handleVerDetalle(item)}
                     className={`p-4 transition-colors cursor-pointer ${
-                      esUbicacionRevisar
+                      esPendienteRevision
+                        ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                        : esUbicacionRevisar
                         ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
                         : 'hover:bg-gray-50'
                     }`}
@@ -1416,12 +1431,17 @@ const InventarioPage = () => {
                 const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
                                            item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
 
+                // Detectar si el artículo está pendiente de revisión (creado por almacén)
+                const esPendienteRevision = item.pendiente_revision === true;
+
                 return (
                   <div
                     key={`herramienta-${item.id}`}
                     onClick={() => handleVerDetalle(item)}
                     className={`p-4 transition-colors cursor-pointer ${
-                      esUbicacionRevisar
+                      esPendienteRevision
+                        ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                        : esUbicacionRevisar
                         ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
                         : 'hover:bg-gray-50'
                     }`}

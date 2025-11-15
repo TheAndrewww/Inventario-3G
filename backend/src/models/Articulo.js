@@ -111,6 +111,12 @@ const Articulo = sequelize.define('Articulo', {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
         comment: 'Indica si el artículo es una herramienta que se renta/presta'
+    },
+    pendiente_revision: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Indica si el artículo fue creado por almacén y está pendiente de revisión por admin'
     }
 }, {
     tableName: 'articulos',
