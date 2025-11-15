@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { PedidoProvider } from './context/PedidoContext';
 import { NotificacionesProvider } from './context/NotificacionesContext';
+import { CalendarioProvider } from './context/CalendarioContext';
 import PrivateRoute from './components/auth/PrivateRoute';
 import DashboardLayout from './components/layout/DashboardLayout';
 import LoginPage from './pages/LoginPage';
@@ -18,13 +19,15 @@ import PerfilPage from './pages/PerfilPage';
 import ProveedoresPage from './pages/ProveedoresPage';
 import OrdenesCompraPage from './pages/OrdenesCompraPage';
 import RentaHerramientasPage from './pages/RentaHerramientasPage';
+import CalendarioPage from './pages/CalendarioPage';
 
 function App() {
   return (
     <Router>
       <AuthProvider>
         <NotificacionesProvider>
-          <PedidoProvider>
+          <CalendarioProvider>
+            <PedidoProvider>
           <Toaster
             position="top-right"
             toastOptions={{
@@ -73,6 +76,7 @@ function App() {
               <Route path="renta-herramientas" element={<RentaHerramientasPage />} />
               <Route path="historial" element={<HistorialPage />} />
               <Route path="proveedores" element={<ProveedoresPage />} />
+              <Route path="calendario" element={<CalendarioPage />} />
               <Route path="perfil" element={<PerfilPage />} />
             </Route>
 
@@ -80,6 +84,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </PedidoProvider>
+          </CalendarioProvider>
         </NotificacionesProvider>
       </AuthProvider>
     </Router>

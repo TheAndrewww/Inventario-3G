@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackagePlus } from 'lucide-react';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackagePlus, Calendar } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -62,6 +62,12 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       icon: Wrench,
       label: 'Renta Herramientas',
       roles: ['administrador', 'encargado']
+    },
+    {
+      path: '/calendario',
+      icon: Calendar,
+      label: 'Calendario',
+      roles: ['administrador', 'diseñador', 'almacen', 'ventas', 'compras', 'encargado']
     },
     {
       path: '/historial',

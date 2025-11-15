@@ -4,6 +4,9 @@ node_modules/
 # Environment variables
 .env
 
+# Google Credentials
+google-credentials.json
+
 # Logs
 logs/
 *.log
@@ -26,3 +29,6 @@ build/
 
 # Testing
 coverage/
+
+# Debug scripts
+debug-*.js

@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { Outlet } from 'react-router-dom';
+import { useCalendario } from '../../context/CalendarioContext';
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Cerrado por defecto en móvil
   const [isMobile, setIsMobile] = useState(false);
+  const { modoPantallaCompleta } = useCalendario();
 
   // Detectar si es móvil
   useEffect(() => {
@@ -32,6 +34,15 @@ const DashboardLayout = () => {
       setSidebarOpen(false);
     }
   };
+
+  // Si está en modo pantalla completa, solo mostrar el contenido
+  if (modoPantallaCompleta) {
+    return (
+      <main className="h-screen overflow-auto bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Outlet />
+      </main>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
