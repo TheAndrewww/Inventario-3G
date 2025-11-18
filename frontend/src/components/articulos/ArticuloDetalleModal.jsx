@@ -1,10 +1,26 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Package, MapPin, DollarSign, Hash, Box, Edit } from 'lucide-react';
 import { Modal } from '../common';
 import BarcodeDisplay from './BarcodeDisplay';
 import { getImageUrl } from '../../utils/imageUtils';
 
 const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = false }) => {
+  const [imagenExpandida, setImagenExpandida] = useState(false);
+
+  // Cerrar imagen expandida con tecla Escape
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && imagenExpandida) {
+        setImagenExpandida(false);
+      }
+    };
+
+    if (imagenExpandida) {
+      window.addEventListener('keydown', handleEscape);
+      return () => window.removeEventListener('keydown', handleEscape);
+    }
+  }, [imagenExpandida]);
+
   if (!articulo) return null;
 
   const stockBajo = parseFloat(articulo.stock_actual) <= parseFloat(articulo.stock_minimo);
@@ -23,7 +39,9 @@ const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = fal
                 <img
                   src={imagenUrl}
                   alt={articulo.nombre}
-                  className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200"
+                  className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => setImagenExpandida(true)}
+                  title="Haz clic para ver la imagen en tamaño completo"
                 />
               ) : (
                 <div className="w-24 h-24 bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center text-4xl">
@@ -145,6 +163,33 @@ const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = fal
           )}
         </div>
       </div>
+
+      {/* Modal de imagen expandida */}
+      {imagenExpandida && imagenUrl && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-90 z-[9999] flex items-center justify-center p-4"
+          onClick={() => setImagenExpandida(false)}
+        >
+          <div className="relative max-w-7xl max-h-full">
+            <button
+              onClick={() => setImagenExpandida(false)}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors"
+              title="Cerrar (Esc)"
+            >
+              <X size={32} />
+            </button>
+            <img
+              src={imagenUrl}
+              alt={articulo.nombre}
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <p className="text-white text-center mt-4 text-sm">
+              {articulo.nombre}
+            </p>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 };
