@@ -293,6 +293,26 @@ const InventarioPage = () => {
     }
   };
 
+  const handleEliminarPermanente = async (articulo) => {
+    if (!window.confirm(`¿Estás seguro de ELIMINAR PERMANENTEMENTE "${articulo.nombre}"?\n\nEsta acción NO se puede deshacer y borrará el artículo de la base de datos.`)) {
+      return;
+    }
+
+    // Segunda confirmación para mayor seguridad
+    if (!window.confirm(`CONFIRMAR: Eliminar permanentemente "${articulo.nombre}"`)) {
+      return;
+    }
+
+    try {
+      await articulosService.deletePermanente(articulo.id);
+      toast.success('Artículo eliminado permanentemente');
+      fetchArticulos();
+    } catch (error) {
+      console.error('Error al eliminar artículo permanentemente:', error);
+      toast.error(error.message || 'Error al eliminar artículo permanentemente');
+    }
+  };
+
   const handleAbrirEntrada = (articulo) => {
     setArticuloParaEntrada(articulo);
     setCantidadEntrada('');
@@ -1007,14 +1027,26 @@ const InventarioPage = () => {
                           )}
                           {puedeEditarArticulos && (
                             mostrarDesactivados ? (
-                              <button
-                                onClick={() => handleReactivar(item)}
-                                className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                                title="Reactivar artículo"
-                              >
-                                <Plus size={16} />
-                                Reactivar
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleReactivar(item)}
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                                  title="Reactivar artículo"
+                                >
+                                  <Plus size={16} />
+                                  Reactivar
+                                </button>
+                                {esAdministrador && (
+                                  <button
+                                    onClick={() => handleEliminarPermanente(item)}
+                                    className="inline-flex items-center gap-1 px-3 py-2 bg-red-800 text-white text-sm rounded-lg hover:bg-red-900"
+                                    title="Eliminar permanentemente"
+                                  >
+                                    <Trash2 size={16} />
+                                    Eliminar
+                                  </button>
+                                )}
+                              </>
                             ) : (
                               <button
                                 onClick={() => handleEliminar(item)}
@@ -1190,14 +1222,26 @@ const InventarioPage = () => {
                             )}
                             {puedeEditarArticulos && (
                               mostrarDesactivados ? (
-                                <button
-                                  onClick={() => handleReactivar(item)}
-                                  className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                                  title="Reactivar artículo"
-                                >
-                                  <Plus size={16} />
-                                  Reactivar
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => handleReactivar(item)}
+                                    className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                                    title="Reactivar artículo"
+                                  >
+                                    <Plus size={16} />
+                                    Reactivar
+                                  </button>
+                                  {esAdministrador && (
+                                    <button
+                                      onClick={() => handleEliminarPermanente(item)}
+                                      className="inline-flex items-center gap-1 px-3 py-2 bg-red-800 text-white text-sm rounded-lg hover:bg-red-900"
+                                      title="Eliminar permanentemente"
+                                    >
+                                      <Trash2 size={16} />
+                                      Eliminar
+                                    </button>
+                                  )}
+                                </>
                               ) : (
                                 <button
                                   onClick={() => handleEliminar(item)}
@@ -1387,13 +1431,24 @@ const InventarioPage = () => {
                       )}
                       {puedeEditarArticulos && (
                         mostrarDesactivados ? (
-                          <button
-                            onClick={() => handleReactivar(item)}
-                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
-                          >
-                            <Plus size={14} />
-                            Reactivar
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleReactivar(item)}
+                              className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
+                            >
+                              <Plus size={14} />
+                              Reactivar
+                            </button>
+                            {esAdministrador && (
+                              <button
+                                onClick={() => handleEliminarPermanente(item)}
+                                className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-800 text-white text-xs rounded-lg hover:bg-red-900"
+                              >
+                                <Trash2 size={14} />
+                                Eliminar
+                              </button>
+                            )}
+                          </>
                         ) : (
                           <button
                             onClick={() => handleEliminar(item)}
@@ -1568,13 +1623,24 @@ const InventarioPage = () => {
                       )}
                       {puedeEditarArticulos && (
                         mostrarDesactivados ? (
-                          <button
-                            onClick={() => handleReactivar(item)}
-                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
-                          >
-                            <Plus size={14} />
-                            Reactivar
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleReactivar(item)}
+                              className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
+                            >
+                              <Plus size={14} />
+                              Reactivar
+                            </button>
+                            {esAdministrador && (
+                              <button
+                                onClick={() => handleEliminarPermanente(item)}
+                                className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-800 text-white text-xs rounded-lg hover:bg-red-900"
+                              >
+                                <Trash2 size={14} />
+                                Eliminar
+                              </button>
+                            )}
+                          </>
                         ) : (
                           <button
                             onClick={() => handleEliminar(item)}

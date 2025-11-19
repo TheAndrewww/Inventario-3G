@@ -6,6 +6,7 @@ import {
     createArticulo,
     updateArticulo,
     deleteArticulo,
+    deleteArticuloPermanente,
     getArticuloBarcode,
     getArticuloBarcodeSVG,
     getArticuloEtiqueta,
@@ -78,6 +79,13 @@ router.post('/', verificarToken, accesoInventario, createArticulo);
  * @access  Private (Almacen, Supervisor, Admin)
  */
 router.put('/:id', verificarToken, accesoInventario, updateArticulo);
+
+/**
+ * @route   DELETE /api/articulos/:id/permanente
+ * @desc    Eliminar permanentemente un artículo de la base de datos
+ * @access  Private (Solo Admin)
+ */
+router.delete('/:id/permanente', verificarToken, esAdministrador, deleteArticuloPermanente);
 
 /**
  * @route   DELETE /api/articulos/:id

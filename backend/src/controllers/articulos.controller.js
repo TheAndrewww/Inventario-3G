@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { Articulo, Categoria, Ubicacion, Proveedor, ArticuloProveedor } from '../models/index.js';
+import { Articulo, Categoria, Ubicacion, Proveedor, ArticuloProveedor, DetalleMovimiento, SolicitudCompra, DetalleOrdenCompra } from '../models/index.js';
 import { generarCodigoEAN13, generarCodigoEAN13Temporal, validarCodigoEAN13 } from '../utils/ean13-generator.js';
 import { generarImagenCodigoBarras, generarSVGCodigoBarras } from '../utils/barcode-generator.js';
 
@@ -635,6 +635,80 @@ export const deleteArticulo = async (req, res) => {
 };
 
 /**
+ * DELETE /api/articulos/:id/permanente
+ * Eliminar permanentemente un artículo de la base de datos
+ */
+export const deleteArticuloPermanente = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const articulo = await Articulo.findByPk(id);
+
+        if (!articulo) {
+            return res.status(404).json({
+                success: false,
+                message: 'Artículo no encontrado'
+            });
+        }
+
+        // Verificar que el artículo esté desactivado antes de eliminar permanentemente
+        if (articulo.activo) {
+            return res.status(400).json({
+                success: false,
+                message: 'Solo se pueden eliminar permanentemente artículos desactivados'
+            });
+        }
+
+        // Eliminar todas las relaciones del artículo
+
+        // 1. Eliminar relaciones con proveedores
+        await ArticuloProveedor.destroy({ where: { articulo_id: id } });
+
+        // 2. Eliminar detalles de movimientos
+        if (DetalleMovimiento) {
+            await DetalleMovimiento.destroy({ where: { articulo_id: id } });
+        }
+
+        // 3. Eliminar solicitudes de compra
+        if (SolicitudCompra) {
+            await SolicitudCompra.destroy({ where: { articulo_id: id } });
+        }
+
+        // 4. Eliminar detalles de órdenes de compra
+        if (DetalleOrdenCompra) {
+            await DetalleOrdenCompra.destroy({ where: { articulo_id: id } });
+        }
+
+        // Eliminar imagen de Cloudinary si existe
+        if (articulo.imagen_url) {
+            try {
+                const { eliminarImagen } = await import('../config/cloudinary.js');
+                await eliminarImagen(articulo.imagen_url);
+            } catch (error) {
+                console.log('Error al eliminar imagen de Cloudinary:', error.message);
+                // Continuar aunque falle la eliminación de la imagen
+            }
+        }
+
+        // Hard delete - eliminar permanentemente
+        await articulo.destroy();
+
+        res.status(200).json({
+            success: true,
+            message: 'Artículo eliminado permanentemente'
+        });
+
+    } catch (error) {
+        console.error('Error en deleteArticuloPermanente:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al eliminar artículo permanentemente',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
  * GET /api/articulos/:id/barcode
  * Generar código de barras EAN-13 como imagen PNG
  */
@@ -886,6 +960,7 @@ export default {
     createArticulo,
     updateArticulo,
     deleteArticulo,
+    deleteArticuloPermanente,
     getArticuloBarcode,
     getArticuloBarcodeSVG,
     getArticuloEtiqueta,

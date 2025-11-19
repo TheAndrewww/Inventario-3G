@@ -53,13 +53,23 @@ const articulosService = {
     }
   },
 
-  // Eliminar artículo
+  // Eliminar artículo (soft delete - desactivar)
   async delete(id) {
     try {
       const response = await api.delete(`/articulos/${id}`);
       return response.data.data;
     } catch (error) {
       throw error.response?.data || { message: 'Error al eliminar artículo' };
+    }
+  },
+
+  // Eliminar artículo permanentemente (hard delete)
+  async deletePermanente(id) {
+    try {
+      const response = await api.delete(`/articulos/${id}/permanente`);
+      return response.data.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al eliminar artículo permanentemente' };
     }
   },
 
