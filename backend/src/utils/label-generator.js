@@ -70,10 +70,10 @@ export const generarEtiquetaIndividual = async (articulo) => {
             // - Código de barras (centro)
             // - Código EAN-13 en texto (abajo, centrado)
 
-            let yPos = 8;
+            let yPos = 5;
 
-            // 1. NOMBRE DEL ARTÍCULO (arriba)
-            doc.fontSize(7);
+            // 1. NOMBRE DEL ARTÍCULO (arriba) - TIPOGRAFÍA MÁS GRANDE
+            doc.fontSize(10);
             doc.font('Helvetica-Bold');
 
             // Ajustar nombre del artículo a 2 líneas máximo
@@ -99,7 +99,7 @@ export const generarEtiquetaIndividual = async (articulo) => {
                             linea2 = testLinea2;
                         } else {
                             // Si la palabra es muy larga, cortarla
-                            linea2 = palabra.substring(0, 15) + '...';
+                            linea2 = palabra.substring(0, 12) + '...';
                             break;
                         }
                     }
@@ -109,20 +109,20 @@ export const generarEtiquetaIndividual = async (articulo) => {
             // Centrar y escribir línea 1
             const xLinea1 = (anchoEtiqueta - doc.widthOfString(linea1)) / 2;
             doc.text(linea1, xLinea1, yPos);
-            yPos += 8;
+            yPos += 11;
 
             // Centrar y escribir línea 2 si existe
             if (linea2) {
                 const xLinea2 = (anchoEtiqueta - doc.widthOfString(linea2)) / 2;
                 doc.text(linea2, xLinea2, yPos);
-                yPos += 8;
+                yPos += 11;
             } else {
-                yPos += 4; // Espacio extra si solo hay 1 línea
+                yPos += 6; // Espacio extra si solo hay 1 línea
             }
 
-            // 2. CÓDIGO DE BARRAS (centro)
+            // 2. CÓDIGO DE BARRAS (centro) - MÁS GRANDE
             const barcodeWidth = anchoEtiqueta - 20;
-            const barcodeHeight = 30;
+            const barcodeHeight = 35;
             const xBarcode = 10;
 
             if (barcodeBuffer) {
@@ -132,20 +132,20 @@ export const generarEtiquetaIndividual = async (articulo) => {
                     height: barcodeHeight,
                     align: 'center'
                 });
-                yPos += barcodeHeight + 2;
+                yPos += barcodeHeight + 3;
             } else {
                 // Fallback: rectángulo placeholder con texto
                 doc.rect(xBarcode, yPos, barcodeWidth, barcodeHeight).stroke('#CCCCCC');
-                doc.fontSize(8);
+                doc.fontSize(9);
                 doc.font('Helvetica');
                 const placeholder = 'CÓDIGO DE BARRAS';
                 const xPlaceholder = xBarcode + (barcodeWidth - doc.widthOfString(placeholder)) / 2;
-                doc.text(placeholder, xPlaceholder, yPos + 10);
-                yPos += barcodeHeight + 2;
+                doc.text(placeholder, xPlaceholder, yPos + 12);
+                yPos += barcodeHeight + 3;
             }
 
-            // 3. CÓDIGO EAN-13 EN TEXTO (abajo)
-            doc.fontSize(8);
+            // 3. CÓDIGO EAN-13 EN TEXTO (abajo) - MÁS GRANDE
+            doc.fontSize(9);
             doc.font('Helvetica-Bold');
             const codigoTexto = articulo.codigo_ean13;
             const xCodigo = (anchoEtiqueta - doc.widthOfString(codigoTexto)) / 2;
@@ -231,8 +231,8 @@ export const generarEtiquetasLote = async (articulos) => {
                 // Renderizar contenido de la etiqueta
                 let yPos = y + 5;
 
-                // 1. NOMBRE DEL ARTÍCULO
-                doc.fontSize(7);
+                // 1. NOMBRE DEL ARTÍCULO - TIPOGRAFÍA MÁS GRANDE
+                doc.fontSize(10);
                 doc.font('Helvetica-Bold');
 
                 const nombreMaxWidth = anchoEtiqueta - 10;
@@ -255,7 +255,7 @@ export const generarEtiquetasLote = async (articulos) => {
                             if (anchoLinea2 <= nombreMaxWidth) {
                                 linea2 = testLinea2;
                             } else {
-                                linea2 = palabra.substring(0, 15) + '...';
+                                linea2 = palabra.substring(0, 12) + '...';
                                 break;
                             }
                         }
@@ -264,19 +264,19 @@ export const generarEtiquetasLote = async (articulos) => {
 
                 const xLinea1 = x + (anchoEtiqueta - doc.widthOfString(linea1)) / 2;
                 doc.text(linea1, xLinea1, yPos);
-                yPos += 8;
+                yPos += 11;
 
                 if (linea2) {
                     const xLinea2 = x + (anchoEtiqueta - doc.widthOfString(linea2)) / 2;
                     doc.text(linea2, xLinea2, yPos);
-                    yPos += 8;
+                    yPos += 11;
                 } else {
-                    yPos += 4;
+                    yPos += 6;
                 }
 
-                // 2. CÓDIGO DE BARRAS
+                // 2. CÓDIGO DE BARRAS - MÁS GRANDE
                 const barcodeWidth = anchoEtiqueta - 20;
-                const barcodeHeight = 30;
+                const barcodeHeight = 35;
                 const xBarcode = x + 10;
 
                 if (barcodeBuffer) {
@@ -285,20 +285,20 @@ export const generarEtiquetasLote = async (articulos) => {
                         width: barcodeWidth,
                         height: barcodeHeight
                     });
-                    yPos += barcodeHeight + 2;
+                    yPos += barcodeHeight + 3;
                 } else {
                     // Fallback: rectángulo placeholder
                     doc.rect(xBarcode, yPos, barcodeWidth, barcodeHeight).stroke('#CCCCCC');
-                    doc.fontSize(7);
+                    doc.fontSize(9);
                     doc.font('Helvetica');
                     const placeholder = 'CÓDIGO DE BARRAS';
                     const xPlaceholder = xBarcode + (barcodeWidth - doc.widthOfString(placeholder)) / 2;
-                    doc.text(placeholder, xPlaceholder, yPos + 10);
-                    yPos += barcodeHeight + 2;
+                    doc.text(placeholder, xPlaceholder, yPos + 12);
+                    yPos += barcodeHeight + 3;
                 }
 
-                // 3. CÓDIGO EAN-13 EN TEXTO
-                doc.fontSize(8);
+                // 3. CÓDIGO EAN-13 EN TEXTO - MÁS GRANDE
+                doc.fontSize(9);
                 doc.font('Helvetica-Bold');
                 const codigoTexto = articulo.codigo_ean13;
                 const xCodigo = x + (anchoEtiqueta - doc.widthOfString(codigoTexto)) / 2;
