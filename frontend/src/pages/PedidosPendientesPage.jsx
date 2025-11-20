@@ -197,23 +197,23 @@ const PedidosPendientesPage = () => {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-bold text-gray-900">{pedido.ticket_id}</h3>
+                    <h3 className="text-lg font-bold text-gray-900">
+                      {pedido.ubicacionDestino ? (
+                        <>
+                          {pedido.ubicacionDestino.almacen.includes('Camioneta') ? '🚛' : '📦'} {pedido.ubicacionDestino.almacen}
+                        </>
+                      ) : (
+                        pedido.proyecto || 'Sin especificar'
+                      )}
+                    </h3>
                     <span className="px-3 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
                       Pendiente
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
-                      {pedido.ubicacionDestino ? <Truck size={16} /> : <Package size={16} />}
-                      <span className="font-medium">
-                        {pedido.ubicacionDestino ? (
-                          <>
-                            {pedido.ubicacionDestino.almacen.includes('Camioneta') ? '🚛' : '📦'} {pedido.ubicacionDestino.almacen}
-                          </>
-                        ) : (
-                          pedido.proyecto || 'Sin especificar'
-                        )}
-                      </span>
+                      <ClipboardList size={16} />
+                      <span className="font-mono">{pedido.ticket_id}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <User size={16} />

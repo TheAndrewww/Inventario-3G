@@ -31,6 +31,11 @@ api.interceptors.request.use(
 // Interceptor para manejar errores de respuesta y decodificación UTF-8
 api.interceptors.response.use(
   (response) => {
+    // No tocar las respuestas de tipo blob (para descargas de archivos)
+    if (response.data instanceof Blob) {
+      return response;
+    }
+
     // Asegurar que la respuesta se interprete correctamente como UTF-8
     if (response.data && typeof response.data === 'object') {
       response.data = JSON.parse(JSON.stringify(response.data));

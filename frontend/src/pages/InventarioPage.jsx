@@ -44,6 +44,12 @@ const InventarioPage = () => {
   const [observacionesSalida, setObservacionesSalida] = useState('');
   const [loadingSalida, setLoadingSalida] = useState(false);
 
+  // Estados para generación de etiquetas
+  const [modalEtiquetasOpen, setModalEtiquetasOpen] = useState(false);
+  const [articulosSeleccionadosEtiquetas, setArticulosSeleccionadosEtiquetas] = useState([]);
+  const [busquedaEtiquetas, setBusquedaEtiquetas] = useState('');
+  const [loadingEtiquetas, setLoadingEtiquetas] = useState(false);
+
   // Estados para gestión de categorías
   const [modalCategoriaOpen, setModalCategoriaOpen] = useState(false);
   const [categoriaEditando, setCategoriaEditando] = useState(null);
@@ -597,6 +603,73 @@ const InventarioPage = () => {
     }
   };
 
+  // Funciones para generación de etiquetas
+  const handleAbrirModalEtiquetas = () => {
+    setModalEtiquetasOpen(true);
+    setArticulosSeleccionadosEtiquetas([]);
+    setBusquedaEtiquetas('');
+  };
+
+  const handleSeleccionarTodosEtiquetas = () => {
+    const articulosActivos = articulos.filter(a => a.activo);
+    const articulosFiltrados = busquedaEtiquetas.length > 0
+      ? articulosActivos.filter(a =>
+          a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
+          a.codigo_ean13?.toLowerCase().includes(busquedaEtiquetas.toLowerCase())
+        )
+      : articulosActivos;
+
+    const todosSeleccionados = articulosFiltrados.every(a =>
+      articulosSeleccionadosEtiquetas.includes(a.id)
+    );
+
+    if (todosSeleccionados) {
+      // Deseleccionar todos los filtrados
+      setArticulosSeleccionadosEtiquetas(prev =>
+        prev.filter(id => !articulosFiltrados.find(a => a.id === id))
+      );
+    } else {
+      // Seleccionar todos los filtrados
+      const nuevosIds = articulosFiltrados.map(a => a.id);
+      setArticulosSeleccionadosEtiquetas(prev => {
+        const conjunto = new Set([...prev, ...nuevosIds]);
+        return Array.from(conjunto);
+      });
+    }
+  };
+
+  const handleToggleArticuloEtiqueta = (articuloId) => {
+    setArticulosSeleccionadosEtiquetas(prev => {
+      if (prev.includes(articuloId)) {
+        return prev.filter(id => id !== articuloId);
+      } else {
+        return [...prev, articuloId];
+      }
+    });
+  };
+
+  const handleGenerarEtiquetas = async () => {
+    if (articulosSeleccionadosEtiquetas.length === 0) {
+      toast.error('Debes seleccionar al menos un artículo');
+      return;
+    }
+
+    try {
+      setLoadingEtiquetas(true);
+      console.log('Generando etiquetas para IDs:', articulosSeleccionadosEtiquetas);
+      await articulosService.generarEtiquetasLote(articulosSeleccionadosEtiquetas);
+      toast.success(`PDF con ${articulosSeleccionadosEtiquetas.length} etiquetas generado correctamente`);
+      setModalEtiquetasOpen(false);
+      setArticulosSeleccionadosEtiquetas([]);
+    } catch (error) {
+      console.error('Error completo al generar etiquetas:', error);
+      const errorMsg = error.message || error.toString() || 'Error desconocido al generar las etiquetas';
+      toast.error(errorMsg);
+    } finally {
+      setLoadingEtiquetas(false);
+    }
+  };
+
   if (loading) {
     return <Loader fullScreen />;
   }
@@ -685,6 +758,14 @@ const InventarioPage = () => {
               >
                 <Trash2 size={18} />
                 <span className="hidden sm:inline">{mostrarDesactivados ? 'Ver Activos' : 'Ver Desactivados'}</span>
+              </button>
+              <button
+                onClick={handleAbrirModalEtiquetas}
+                className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                title="Generar etiquetas para imprimir"
+              >
+                <Barcode size={18} />
+                <span className="hidden sm:inline">Generar Etiquetas</span>
               </button>
               <button
                 onClick={handleNuevoArticulo}
@@ -2055,6 +2136,126 @@ const InventarioPage = () => {
               ) : (
                 <>
                   {ubicacionEditando ? 'Actualizar' : 'Crear'} Ubicación
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de generación de etiquetas */}
+      <Modal
+        isOpen={modalEtiquetasOpen}
+        onClose={() => setModalEtiquetasOpen(false)}
+        title="Generar Etiquetas"
+        size="xl"
+      >
+        <div className="space-y-4">
+          {/* Buscador */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Buscar artículos por nombre o código..."
+              value={busquedaEtiquetas}
+              onChange={(e) => setBusquedaEtiquetas(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+            />
+          </div>
+
+          {/* Contador y botón seleccionar todos */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600">
+              {articulosSeleccionadosEtiquetas.length} artículo(s) seleccionado(s)
+            </span>
+            <button
+              onClick={handleSeleccionarTodosEtiquetas}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              {(() => {
+                const articulosActivos = articulos.filter(a => a.activo);
+                const articulosFiltrados = busquedaEtiquetas.length > 0
+                  ? articulosActivos.filter(a =>
+                      a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
+                      a.codigo_ean13?.toLowerCase().includes(busquedaEtiquetas.toLowerCase())
+                    )
+                  : articulosActivos;
+
+                const todosSeleccionados = articulosFiltrados.length > 0 &&
+                  articulosFiltrados.every(a => articulosSeleccionadosEtiquetas.includes(a.id));
+
+                return todosSeleccionados ? 'Deseleccionar todos' : 'Seleccionar todos';
+              })()}
+            </button>
+          </div>
+
+          {/* Lista de artículos con checkboxes */}
+          <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
+            <div className="divide-y divide-gray-200">
+              {(() => {
+                const articulosActivos = articulos.filter(a => a.activo);
+                const articulosFiltrados = busquedaEtiquetas.length > 0
+                  ? articulosActivos.filter(a =>
+                      a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
+                      a.codigo_ean13?.toLowerCase().includes(busquedaEtiquetas.toLowerCase())
+                    )
+                  : articulosActivos;
+
+                if (articulosFiltrados.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-gray-500">
+                      <Package size={48} className="mx-auto mb-3 text-gray-300" />
+                      <p>No se encontraron artículos</p>
+                    </div>
+                  );
+                }
+
+                return articulosFiltrados.map((articulo) => (
+                  <label
+                    key={articulo.id}
+                    className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={articulosSeleccionadosEtiquetas.includes(articulo.id)}
+                      onChange={() => handleToggleArticuloEtiqueta(articulo.id)}
+                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-gray-900 truncate">{articulo.nombre}</h4>
+                      <p className="text-sm text-gray-500 truncate">
+                        EAN-13: {articulo.codigo_ean13} • Stock: {articulo.stock_actual}
+                      </p>
+                    </div>
+                  </label>
+                ));
+              })()}
+            </div>
+          </div>
+
+          {/* Botones de acción */}
+          <div className="flex gap-3 pt-4 border-t">
+            <button
+              onClick={() => setModalEtiquetasOpen(false)}
+              className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              disabled={loadingEtiquetas}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleGenerarEtiquetas}
+              disabled={articulosSeleccionadosEtiquetas.length === 0 || loadingEtiquetas}
+              className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loadingEtiquetas ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <span>Generando...</span>
+                </>
+              ) : (
+                <>
+                  <Barcode size={20} />
+                  <span>Generar PDF</span>
                 </>
               )}
             </button>

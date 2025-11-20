@@ -118,6 +118,71 @@ const articulosService = {
     } catch (error) {
       throw error.response?.data || { message: 'Error al buscar artículos' };
     }
+  },
+
+  // Generar PDF con múltiples etiquetas
+  async generarEtiquetasLote(articulosIds) {
+    try {
+      const response = await api.post('/articulos/etiquetas/lote',
+        { articulos_ids: articulosIds },
+        {
+          responseType: 'blob',
+          headers: {
+            'Accept': 'application/pdf'
+          }
+        }
+      );
+
+      console.log('Tipo de respuesta:', typeof response.data);
+      console.log('Es Blob?', response.data instanceof Blob);
+      console.log('Response data:', response.data);
+      console.log('Content-Type:', response.headers['content-type']);
+
+      // Verificar si es un Blob
+      if (!(response.data instanceof Blob)) {
+        console.error('response.data no es un Blob:', response.data);
+        throw new Error('La respuesta no es un archivo PDF válido');
+      }
+
+      // Verificar si el blob contiene JSON de error (cuando el servidor devuelve error)
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const errorData = JSON.parse(text);
+        throw new Error(errorData.message || 'Error al generar etiquetas');
+      }
+
+      // Crear link de descarga
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `etiquetas-${articulosIds.length}-articulos.pdf`);
+      document.body.appendChild(link);
+      link.click();
+
+      // Limpiar
+      setTimeout(() => {
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      }, 100);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error al generar etiquetas:', error);
+
+      // Si el error tiene un blob con JSON, intentar leerlo
+      if (error.response?.data instanceof Blob && error.response.data.type === 'application/json') {
+        try {
+          const text = await error.response.data.text();
+          const errorData = JSON.parse(text);
+          throw { message: errorData.message || 'Error al generar etiquetas' };
+        } catch (parseError) {
+          throw { message: 'Error al generar etiquetas' };
+        }
+      }
+
+      throw { message: error.message || 'Error al generar etiquetas' };
+    }
   }
 };
 

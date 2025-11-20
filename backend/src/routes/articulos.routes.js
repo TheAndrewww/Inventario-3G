@@ -10,6 +10,7 @@ import {
     getArticuloBarcode,
     getArticuloBarcodeSVG,
     getArticuloEtiqueta,
+    generarEtiquetasLote,
     uploadArticuloImagen,
     deleteArticuloImagen
 } from '../controllers/articulos.controller.js';
@@ -37,6 +38,14 @@ router.get('/', verificarToken, getArticulos);
  * @access  Private
  */
 router.get('/ean13/:codigoEAN13', verificarToken, getArticuloByEAN13);
+
+/**
+ * @route   POST /api/articulos/etiquetas/lote
+ * @desc    Generar PDF con múltiples etiquetas (3cm x 9cm) en hojas A4
+ * @access  Private
+ * @body    { articulos_ids: [1, 2, 3, ...] }
+ */
+router.post('/etiquetas/lote', verificarToken, generarEtiquetasLote);
 
 /**
  * @route   GET /api/articulos/:id/barcode

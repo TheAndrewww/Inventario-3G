@@ -813,24 +813,80 @@ export const getArticuloEtiqueta = async (req, res) => {
             });
         }
 
-        // Generar imagen del código de barras usando el tipo especificado
-        const tipoCodigo = articulo.codigo_tipo || 'EAN13';
-        const imagenBuffer = await generarImagenCodigoBarras(articulo.codigo_ean13, tipoCodigo, {
-            scale: 4,
-            height: 12
+        // Importar generador de etiquetas
+        const { generarEtiquetaIndividual } = await import('../utils/label-generator.js');
+
+        // Generar etiqueta completa de 3cm x 9cm con nombre y código de barras
+        const etiquetaBuffer = await generarEtiquetaIndividual({
+            nombre: articulo.nombre,
+            codigo_ean13: articulo.codigo_ean13
         });
 
-        // Por ahora solo devolvemos el código de barras
-        // En el futuro se puede generar una etiqueta completa con más datos
-        res.setHeader('Content-Type', 'image/png');
-        res.setHeader('Content-Disposition', `attachment; filename="etiqueta-${articulo.nombre.replace(/\s+/g, '-')}.png"`);
-        res.send(imagenBuffer);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="etiqueta-${articulo.nombre.replace(/\s+/g, '-')}.pdf"`);
+        res.send(etiquetaBuffer);
 
     } catch (error) {
         console.error('Error en getArticuloEtiqueta:', error);
         res.status(500).json({
             success: false,
             message: 'Error al generar etiqueta',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * POST /api/articulos/etiquetas/lote
+ * Generar PDF con múltiples etiquetas (3cm x 9cm) organizadas en hojas A4
+ */
+export const generarEtiquetasLote = async (req, res) => {
+    try {
+        const { articulos_ids } = req.body;
+
+        // Validar que se proporcionaron IDs
+        if (!articulos_ids || !Array.isArray(articulos_ids) || articulos_ids.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Debes proporcionar un array de IDs de artículos'
+            });
+        }
+
+        // Buscar todos los artículos
+        const articulos = await Articulo.findAll({
+            where: {
+                id: articulos_ids,
+                activo: true
+            },
+            attributes: ['id', 'nombre', 'codigo_ean13'],
+            order: [['nombre', 'ASC']]
+        });
+
+        if (articulos.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No se encontraron artículos activos con los IDs proporcionados'
+            });
+        }
+
+        // Importar generador de etiquetas
+        const labelGenerator = await import('../utils/label-generator.js');
+
+        // Generar PDF con todas las etiquetas
+        const pdfBuffer = await labelGenerator.generarEtiquetasLote(articulos.map(a => ({
+            nombre: a.nombre,
+            codigo_ean13: a.codigo_ean13
+        })));
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="etiquetas-lote-${articulos.length}-articulos.pdf"`);
+        res.send(pdfBuffer);
+
+    } catch (error) {
+        console.error('Error en generarEtiquetasLote:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al generar etiquetas',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
