@@ -403,7 +403,7 @@ const PedidoPage = () => {
                     </div>
                   ) : resultadosBusqueda.length > 0 ? (
                     <div className="divide-y divide-gray-200">
-                      {resultadosBusqueda.slice(0, 5).map((articulo) => {
+                      {resultadosBusqueda.map((articulo) => {
                         const imagenUrl = articulo.imagen_url
                           ? getImageUrl(articulo.imagen_url)
                           : null;
