@@ -136,6 +136,37 @@ const OrdenesCompraPage = () => {
     }
   };
 
+  // Función para cargar imagen desde URL y obtener base64 + dimensiones
+  const loadImageWithDimensions = async (url) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          // Crear imagen para obtener dimensiones
+          const img = new Image();
+          img.onload = () => {
+            resolve({
+              base64: reader.result,
+              width: img.width,
+              height: img.height,
+              aspectRatio: img.width / img.height
+            });
+          };
+          img.onerror = reject;
+          img.src = reader.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error cargando imagen:', error);
+      return null;
+    }
+  };
+
   const generarPDFOrden = async (orden) => {
     try {
       // Obtener detalle completo de la orden
@@ -144,202 +175,171 @@ const OrdenesCompraPage = () => {
 
       const doc = new jsPDF();
 
-      // Encabezado
-      doc.setFontSize(20);
-      doc.setTextColor(220, 38, 38);
-      doc.text('INVENTARIO 3G', 105, 20, { align: 'center' });
+      // URLs de los logos
+      const logoCompletoUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1762292854/logo_completo_web_eknzcb.png';
+      const marcaAguaUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1763602391/iso_black_1_mmxd6k.png';
 
-      doc.setFontSize(16);
+      // Cargar imágenes con dimensiones
+      const [logoData, marcaAguaData] = await Promise.all([
+        loadImageWithDimensions(logoCompletoUrl),
+        loadImageWithDimensions(marcaAguaUrl)
+      ]);
+
+      // === HEADER ===
+      // Logo completo arriba a la izquierda (respetando relación de aspecto)
+      if (logoData) {
+        const logoWidth = 70; // Ancho deseado en mm
+        const logoHeight = logoWidth / logoData.aspectRatio; // Alto calculado
+        doc.addImage(logoData.base64, 'PNG', 15, 10, logoWidth, logoHeight);
+      }
+
+      // Ticket ID debajo del logo
+      doc.setFontSize(14);
       doc.setTextColor(0, 0, 0);
-      doc.text('Orden de Compra', 105, 30, { align: 'center' });
-
-      // Línea separadora
-      doc.setDrawColor(220, 38, 38);
-      doc.setLineWidth(0.5);
-      doc.line(20, 35, 190, 35);
-
-      // Información de la orden
-      doc.setFontSize(11);
-      let yPos = 45;
-
       doc.setFont(undefined, 'bold');
-      doc.text('Ticket ID:', 20, yPos);
+      doc.text(`OC. ${ordenCompleta.ticket_id || 'N/A'}`, 15, 42);
+
+      // Información a la derecha
+      let rightX = 120;
+      let rightY = 15;
+
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('PROVEEDOR', rightX, rightY);
       doc.setFont(undefined, 'normal');
-      doc.text(ordenCompleta.ticket_id || 'N/A', 60, yPos);
+      doc.text(ordenCompleta.proveedor?.nombre || 'Sin proveedor', rightX, rightY + 5);
 
-      yPos += 8;
+      rightY += 15;
       doc.setFont(undefined, 'bold');
-      doc.text('Proveedor:', 20, yPos);
+      doc.text('CREADO POR', rightX, rightY);
       doc.setFont(undefined, 'normal');
-      doc.text(ordenCompleta.proveedor?.nombre || 'Sin proveedor', 60, yPos);
+      doc.text(ordenCompleta.creador?.nombre || 'N/A', rightX, rightY + 5);
 
-      yPos += 8;
+      rightY += 15;
       doc.setFont(undefined, 'bold');
-      doc.text('Estado:', 20, yPos);
-      doc.setFont(undefined, 'normal');
-      doc.text(ordenCompleta.estado || 'N/A', 60, yPos);
-
-      yPos += 8;
-      doc.setFont(undefined, 'bold');
-      doc.text('Creado por:', 20, yPos);
-      doc.setFont(undefined, 'normal');
-      doc.text(ordenCompleta.creador?.nombre || 'N/A', 60, yPos);
-
-      yPos += 8;
-      doc.setFont(undefined, 'bold');
-      doc.text('Fecha Creación:', 20, yPos);
+      doc.text('FECHA:', rightX, rightY);
       doc.setFont(undefined, 'normal');
       doc.text(
         new Date(ordenCompleta.created_at).toLocaleDateString('es-MX', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
         }),
-        60,
-        yPos
+        rightX,
+        rightY + 5
       );
 
-      if (ordenCompleta.fecha_llegada_estimada) {
-        yPos += 8;
-        doc.setFont(undefined, 'bold');
-        doc.text('Llegada Estimada:', 20, yPos);
-        doc.setFont(undefined, 'normal');
-        doc.text(
-          new Date(ordenCompleta.fecha_llegada_estimada).toLocaleDateString('es-MX', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          }),
-          60,
-          yPos
-        );
-      }
-
-      yPos += 8;
-      doc.setFont(undefined, 'bold');
-      doc.text('Total Estimado:', 20, yPos);
-      doc.setFont(undefined, 'normal');
-      doc.text(
-        `$${parseFloat(ordenCompleta.total_estimado || 0).toLocaleString('es-MX', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        })}`,
-        60,
-        yPos
-      );
-
-      // Información del proveedor si existe
-      if (ordenCompleta.proveedor) {
-        yPos += 12;
-        doc.setFont(undefined, 'bold');
-        doc.setFontSize(12);
-        doc.text('Información del Proveedor:', 20, yPos);
-
-        yPos += 8;
-        doc.setFontSize(10);
-        doc.setFont(undefined, 'normal');
-
-        if (ordenCompleta.proveedor.telefono) {
-          doc.text(`Tel: ${ordenCompleta.proveedor.telefono}`, 20, yPos);
-          yPos += 6;
-        }
-        if (ordenCompleta.proveedor.email) {
-          doc.text(`Email: ${ordenCompleta.proveedor.email}`, 20, yPos);
-          yPos += 6;
-        }
-        if (ordenCompleta.proveedor.direccion) {
-          const splitDireccion = doc.splitTextToSize(
-            `Dirección: ${ordenCompleta.proveedor.direccion}`,
-            170
-          );
-          doc.text(splitDireccion, 20, yPos);
-          yPos += splitDireccion.length * 5;
-        }
-      }
-
-      // Observaciones
-      if (ordenCompleta.observaciones) {
-        yPos += 10;
-        doc.setFont(undefined, 'bold');
-        doc.setFontSize(11);
-        doc.text('Observaciones:', 20, yPos);
-        yPos += 6;
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(10);
-        const splitObs = doc.splitTextToSize(ordenCompleta.observaciones, 170);
-        doc.text(splitObs, 20, yPos);
-        yPos += splitObs.length * 5;
-      }
-
-      // Tabla de artículos
-      yPos += 15;
+      // === TÍTULO PRINCIPAL ===
+      let yPos = 60;
       doc.setFontSize(12);
       doc.setFont(undefined, 'bold');
-      doc.text('Artículos:', 20, yPos);
-
-      yPos += 8;
-      doc.setFontSize(10);
-
-      // Encabezados de tabla
-      doc.setFillColor(220, 38, 38);
-      doc.rect(20, yPos - 5, 170, 7, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.text('Artículo', 22, yPos);
-      doc.text('Cantidad', 120, yPos);
-      doc.text('Costo Unit.', 145, yPos);
-      doc.text('Subtotal', 170, yPos);
-
       doc.setTextColor(0, 0, 0);
-      yPos += 8;
+      doc.text('ORDEN DE COMPRA', 15, yPos);
 
-      // Filas de artículos
-      ordenCompleta.detalles?.forEach((detalle, index) => {
-        if (yPos > 270) {
+      yPos += 10;
+
+      // === INFORMACIÓN ADICIONAL ===
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+
+      if (ordenCompleta.proveedor?.telefono) {
+        doc.text(`Tel: ${ordenCompleta.proveedor.telefono}`, 15, yPos);
+        yPos += 5;
+      }
+      if (ordenCompleta.proveedor?.email) {
+        doc.text(`Email: ${ordenCompleta.proveedor.email}`, 15, yPos);
+        yPos += 5;
+      }
+
+      yPos += 5;
+
+      // === ARTÍCULOS AGRUPADOS POR CATEGORÍA ===
+      const articulos = ordenCompleta.detalles || [];
+
+      // Agrupar artículos por categoría
+      const articulosPorCategoria = {};
+      articulos.forEach(detalle => {
+        const categoria = detalle.articulo?.categoria?.nombre || 'GENERAL';
+        if (!articulosPorCategoria[categoria]) {
+          articulosPorCategoria[categoria] = [];
+        }
+        articulosPorCategoria[categoria].push(detalle);
+      });
+
+      // Mostrar artículos por categoría
+      doc.setFontSize(10);
+      let totalGeneral = 0;
+
+      Object.keys(articulosPorCategoria).forEach(categoria => {
+        if (yPos > 220) {
           doc.addPage();
           yPos = 20;
         }
 
-        const bgColor = index % 2 === 0 ? 245 : 255;
-        doc.setFillColor(bgColor, bgColor, bgColor);
-        doc.rect(20, yPos - 5, 170, 7, 'F');
+        // Nombre de categoría
+        doc.setFont(undefined, 'bold');
+        doc.text(categoria.toUpperCase(), 15, yPos);
+        yPos += 6;
 
-        const articuloText = doc.splitTextToSize(
-          detalle.articulo?.nombre || `Artículo ID: ${detalle.articulo_id}`,
-          90
-        );
-        doc.text(articuloText, 22, yPos);
+        // Lista de artículos
+        doc.setFont(undefined, 'normal');
+        articulosPorCategoria[categoria].forEach(detalle => {
+          if (yPos > 220) {
+            doc.addPage();
+            yPos = 20;
+          }
 
-        doc.text(
-          `${detalle.cantidad_solicitada} ${detalle.articulo?.unidad || 'uds'}`,
-          120,
-          yPos
-        );
+          const nombreArticulo = detalle.articulo?.nombre || `Artículo ID: ${detalle.articulo_id}`;
+          const cantidad = detalle.cantidad_solicitada;
+          const unidad = detalle.articulo?.unidad || 'uds';
+          const costoUnit = parseFloat(detalle.costo_unitario || 0);
+          const subtotal = cantidad * costoUnit;
+          totalGeneral += subtotal;
 
-        doc.text(
-          `$${parseFloat(detalle.costo_unitario || 0).toFixed(2)}`,
-          145,
-          yPos
-        );
+          // Bullet point con artículo y precio
+          doc.text(`• ${nombreArticulo} - ${cantidad} ${unidad} x $${costoUnit.toFixed(2)} = $${subtotal.toFixed(2)}`, 20, yPos);
+          yPos += 6;
+        });
 
-        const subtotal = parseFloat(detalle.cantidad_solicitada) * parseFloat(detalle.costo_unitario || 0);
-        doc.text(`$${subtotal.toFixed(2)}`, 170, yPos);
-
-        yPos += Math.max(articuloText.length * 5, 7);
+        yPos += 4;
       });
 
-      // Pie de página
+      // === TOTAL ===
+      yPos += 5;
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(11);
+      doc.text(`TOTAL: $${totalGeneral.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 15, yPos);
+
+      // === MARCA DE AGUA ===
+      if (marcaAguaData) {
+        // Configurar opacidad para la marca de agua (efecto difuminado)
+        const gState = doc.GState({ opacity: 0.08 });
+        doc.setGState(gState);
+
+        // Calcular dimensiones respetando relación de aspecto
+        const watermarkWidth = 160; // Ancho más grande
+        const watermarkHeight = watermarkWidth / marcaAguaData.aspectRatio;
+
+        // Agregar marca de agua grande, más abajo y a la derecha (cortada)
+        doc.addImage(marcaAguaData.base64, 'PNG', 60, 180, watermarkWidth, watermarkHeight, undefined, 'NONE', 0);
+
+        // Restaurar opacidad normal
+        doc.setGState(doc.GState({ opacity: 1 }));
+      }
+
+      // === FOOTER CON BARRA ROJA ===
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(128, 128, 128);
-        doc.text(
-          `Generado el ${new Date().toLocaleDateString('es-MX')} a las ${new Date().toLocaleTimeString('es-MX')}`,
-          105,
-          285,
-          { align: 'center' }
-        );
-        doc.text(`Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
+
+        // Barra roja
+        doc.setFillColor(185, 28, 28);
+        doc.rect(0, 280, 210, 17, 'F');
+
+        // Texto en la barra
+        doc.setFontSize(10);
+        doc.setTextColor(255, 255, 255);
+        doc.text('4621302459 | admin@3gvelarias.com', 105, 289, { align: 'center' });
       }
 
       // Descargar PDF

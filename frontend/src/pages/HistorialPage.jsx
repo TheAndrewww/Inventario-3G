@@ -26,193 +26,184 @@ const HistorialPage = () => {
     setSelectedMovimiento(null);
   };
 
-  const generatePDF = (movimiento) => {
-    const doc = new jsPDF();
+  // Función para cargar imagen desde URL y obtener base64 + dimensiones
+  const loadImageWithDimensions = async (url) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
 
-    // Logo y encabezado
-    doc.setFontSize(20);
-    doc.setTextColor(220, 38, 38); // Rojo de 3G
-    doc.text('INVENTARIO 3G', 105, 20, { align: 'center' });
-
-    doc.setFontSize(16);
-    doc.setTextColor(0, 0, 0);
-    doc.text('Ticket de Movimiento', 105, 30, { align: 'center' });
-
-    // Línea separadora
-    doc.setDrawColor(220, 38, 38);
-    doc.setLineWidth(0.5);
-    doc.line(20, 35, 190, 35);
-
-    // Información del ticket
-    doc.setFontSize(11);
-    let yPos = 45;
-
-    doc.setFont(undefined, 'bold');
-    doc.text('ID Ticket:', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(movimiento.ticket_id || 'N/A', 60, yPos);
-
-    yPos += 8;
-    doc.setFont(undefined, 'bold');
-    doc.text('Fecha:', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(
-      `${new Date(movimiento.createdAt).toLocaleDateString('es-MX')} ${new Date(movimiento.createdAt).toLocaleTimeString('es-MX')}`,
-      60,
-      yPos
-    );
-
-    yPos += 8;
-    doc.setFont(undefined, 'bold');
-    doc.text('Usuario:', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(movimiento.usuario?.nombre || 'N/A', 60, yPos);
-
-    yPos += 8;
-    doc.setFont(undefined, 'bold');
-    doc.text('Tipo:', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(movimiento.tipo || 'N/A', 60, yPos);
-
-    yPos += 8;
-    doc.setFont(undefined, 'bold');
-    doc.text('Estado:', 20, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(movimiento.estado === 'pendiente_aprobacion' ? 'Pendiente Aprobación' : movimiento.estado || 'N/A', 60, yPos);
-
-    if (movimiento.proyecto) {
-      yPos += 8;
-      doc.setFont(undefined, 'bold');
-      doc.text('Proyecto:', 20, yPos);
-      doc.setFont(undefined, 'normal');
-      doc.text(movimiento.proyecto, 60, yPos);
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          // Crear imagen para obtener dimensiones
+          const img = new Image();
+          img.onload = () => {
+            resolve({
+              base64: reader.result,
+              width: img.width,
+              height: img.height,
+              aspectRatio: img.width / img.height
+            });
+          };
+          img.onerror = reject;
+          img.src = reader.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error cargando imagen:', error);
+      return null;
     }
+  };
 
-    if (movimiento.tipo_pedido) {
-      yPos += 8;
-      doc.setFont(undefined, 'bold');
-      doc.text('Tipo de Pedido:', 20, yPos);
-      doc.setFont(undefined, 'normal');
-      doc.text(movimiento.tipo_pedido, 60, yPos);
-    }
+  const generatePDF = async (movimiento) => {
+    try {
+      const doc = new jsPDF();
 
-    if (movimiento.equipo) {
-      yPos += 8;
-      doc.setFont(undefined, 'bold');
-      doc.text('Equipo:', 20, yPos);
-      doc.setFont(undefined, 'normal');
-      doc.text(movimiento.equipo.nombre, 60, yPos);
-    }
+      // URLs de los logos
+      const logoCompletoUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1762292854/logo_completo_web_eknzcb.png';
+      const marcaAguaUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1763602391/iso_black_1_mmxd6k.png';
 
-    if (movimiento.aprobadoPor) {
-      yPos += 8;
-      doc.setFont(undefined, 'bold');
-      doc.text('Aprobado/Rechazado por:', 20, yPos);
-      doc.setFont(undefined, 'normal');
-      doc.text(movimiento.aprobadoPor.nombre, 60, yPos);
+      // Cargar imágenes con dimensiones
+      const [logoData, marcaAguaData] = await Promise.all([
+        loadImageWithDimensions(logoCompletoUrl),
+        loadImageWithDimensions(marcaAguaUrl)
+      ]);
 
-      if (movimiento.fecha_aprobacion) {
-        yPos += 8;
-        doc.setFont(undefined, 'bold');
-        doc.text('Fecha Aprobación:', 20, yPos);
-        doc.setFont(undefined, 'normal');
-        doc.text(
-          `${new Date(movimiento.fecha_aprobacion).toLocaleDateString('es-MX')} ${new Date(movimiento.fecha_aprobacion).toLocaleTimeString('es-MX')}`,
-          60,
-          yPos
-        );
-      }
-    }
-
-    if (movimiento.observaciones) {
-      yPos += 10;
-      doc.setFont(undefined, 'bold');
-      doc.text('Observaciones:', 20, yPos);
-      yPos += 6;
-      doc.setFont(undefined, 'normal');
-      const splitObservaciones = doc.splitTextToSize(movimiento.observaciones, 170);
-      doc.text(splitObservaciones, 20, yPos);
-      yPos += splitObservaciones.length * 5;
-    }
-
-    if (movimiento.motivo_rechazo) {
-      yPos += 10;
-      doc.setTextColor(220, 38, 38);
-      doc.setFont(undefined, 'bold');
-      doc.text('Motivo de Rechazo:', 20, yPos);
-      yPos += 6;
-      doc.setTextColor(0, 0, 0);
-      doc.setFont(undefined, 'normal');
-      const splitMotivo = doc.splitTextToSize(movimiento.motivo_rechazo, 170);
-      doc.text(splitMotivo, 20, yPos);
-      yPos += splitMotivo.length * 5;
-      doc.setTextColor(0, 0, 0);
-    }
-
-    // Tabla de artículos
-    yPos += 15;
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text('Artículos:', 20, yPos);
-
-    yPos += 8;
-    doc.setFontSize(10);
-
-    // Encabezados de tabla
-    doc.setFillColor(220, 38, 38);
-    doc.rect(20, yPos - 5, 170, 7, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.text('Artículo', 22, yPos);
-    doc.text('Cantidad', 130, yPos);
-    doc.text('Observaciones', 155, yPos);
-
-    doc.setTextColor(0, 0, 0);
-    yPos += 8;
-
-    // Filas de artículos
-    movimiento.detalles?.forEach((detalle, index) => {
-      if (yPos > 270) {
-        doc.addPage();
-        yPos = 20;
+      // === HEADER ===
+      // Logo completo arriba a la izquierda (respetando relación de aspecto)
+      if (logoData) {
+        const logoWidth = 70; // Ancho deseado en mm
+        const logoHeight = logoWidth / logoData.aspectRatio; // Alto calculado
+        doc.addImage(logoData.base64, 'PNG', 15, 10, logoWidth, logoHeight);
       }
 
-      const bgColor = index % 2 === 0 ? 245 : 255;
-      doc.setFillColor(bgColor, bgColor, bgColor);
-      doc.rect(20, yPos - 5, 170, 7, 'F');
+      // Información a la derecha
+      let rightX = 120;
+      let rightY = 15;
 
-      const articuloText = doc.splitTextToSize(
-        detalle.articulo?.nombre || `Artículo ID: ${detalle.articulo_id}`,
-        100
-      );
-      doc.text(articuloText, 22, yPos);
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('SUPERVISOR', rightX, rightY);
+      doc.setFont(undefined, 'normal');
+      doc.text(movimiento.aprobadoPor?.nombre || movimiento.usuario?.nombre || 'N/A', rightX, rightY + 5);
 
-      doc.text(`${detalle.cantidad} ${detalle.articulo?.unidad || 'uds'}`, 130, yPos);
+      rightY += 15;
+      doc.setFont(undefined, 'bold');
+      doc.text('NOMBRE DE PROYECTO', rightX, rightY);
+      doc.setFont(undefined, 'normal');
+      doc.text(movimiento.proyecto || movimiento.equipo?.nombre || 'Sin proyecto', rightX, rightY + 5);
 
-      const obsText = detalle.observaciones || '-';
-      const splitObs = doc.splitTextToSize(obsText, 30);
-      doc.text(splitObs, 155, yPos);
-
-      yPos += Math.max(articuloText.length * 5, splitObs.length * 5, 7);
-    });
-
-    // Pie de página
-    const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(128, 128, 128);
+      rightY += 15;
+      doc.setFont(undefined, 'bold');
+      doc.text('FECHA DE SALIDA:', rightX, rightY);
+      doc.setFont(undefined, 'normal');
+      const fechaMovimiento = movimiento.created_at || movimiento.createdAt;
       doc.text(
-        `Generado el ${new Date().toLocaleDateString('es-MX')} a las ${new Date().toLocaleTimeString('es-MX')}`,
-        105,
-        285,
-        { align: 'center' }
+        fechaMovimiento ? new Date(fechaMovimiento).toLocaleDateString('es-MX', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        }) : 'N/A',
+        rightX,
+        rightY + 5
       );
-      doc.text(`Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
-    }
 
-    // Descargar PDF
-    doc.save(`Ticket-${movimiento.ticket_id}.pdf`);
-    toast.success('PDF descargado correctamente');
+      // === TÍTULO PRINCIPAL ===
+      let yPos = 60;
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('ORDEN DE SALIDA DE PRODUCTOS', 15, yPos);
+
+      yPos += 10;
+
+      // === ARTÍCULOS AGRUPADOS POR CATEGORÍA ===
+      const articulos = movimiento.detalles || [];
+
+      // Agrupar artículos por categoría
+      const articulosPorCategoria = {};
+      articulos.forEach(detalle => {
+        const categoria = detalle.articulo?.categoria?.nombre || 'GENERAL';
+        if (!articulosPorCategoria[categoria]) {
+          articulosPorCategoria[categoria] = [];
+        }
+        articulosPorCategoria[categoria].push(detalle);
+      });
+
+      // Mostrar artículos por categoría
+      doc.setFontSize(10);
+      Object.keys(articulosPorCategoria).forEach(categoria => {
+        if (yPos > 240) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        // Nombre de categoría
+        doc.setFont(undefined, 'bold');
+        doc.text(categoria.toUpperCase(), 15, yPos);
+        yPos += 6;
+
+        // Lista de artículos
+        doc.setFont(undefined, 'normal');
+        articulosPorCategoria[categoria].forEach(detalle => {
+          if (yPos > 240) {
+            doc.addPage();
+            yPos = 20;
+          }
+
+          const nombreArticulo = detalle.articulo?.nombre || `Artículo ID: ${detalle.articulo_id}`;
+          const cantidad = detalle.cantidad;
+          const unidad = detalle.articulo?.unidad || 'uds';
+
+          // Bullet point con artículo
+          doc.text(`• ${nombreArticulo} - ${cantidad} ${unidad}`, 20, yPos);
+          yPos += 6;
+        });
+
+        yPos += 4;
+      });
+
+      // === MARCA DE AGUA ===
+      if (marcaAguaData) {
+        // Configurar opacidad para la marca de agua (efecto difuminado)
+        const gState = doc.GState({ opacity: 0.08 });
+        doc.setGState(gState);
+
+        // Calcular dimensiones respetando relación de aspecto
+        const watermarkWidth = 160; // Ancho más grande
+        const watermarkHeight = watermarkWidth / marcaAguaData.aspectRatio;
+
+        // Agregar marca de agua grande, más abajo y a la derecha (cortada)
+        doc.addImage(marcaAguaData.base64, 'PNG', 60, 180, watermarkWidth, watermarkHeight, undefined, 'NONE', 0);
+
+        // Restaurar opacidad normal
+        doc.setGState(doc.GState({ opacity: 1 }));
+      }
+
+      // === FOOTER CON BARRA ROJA ===
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+
+        // Barra roja
+        doc.setFillColor(185, 28, 28); // Rojo oscuro
+        doc.rect(0, 280, 210, 17, 'F');
+
+        // Texto en la barra
+        doc.setFontSize(10);
+        doc.setTextColor(255, 255, 255);
+        doc.text('4621302459 | admin@3gvelarias.com', 105, 289, { align: 'center' });
+      }
+
+      // Descargar PDF
+      doc.save(`Orden-Salida-${movimiento.ticket_id}.pdf`);
+      toast.success('PDF descargado correctamente');
+    } catch (error) {
+      console.error('Error al generar PDF:', error);
+      toast.error('Error al generar el PDF');
+    }
   };
 
   const fetchHistorial = async () => {
@@ -292,7 +283,7 @@ const HistorialPage = () => {
                     {item.ticket_id}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(item.createdAt).toLocaleDateString('es-MX')} {new Date(item.createdAt).toLocaleTimeString('es-MX')}
+                    {new Date(item.created_at || item.createdAt).toLocaleDateString('es-MX')} {new Date(item.created_at || item.createdAt).toLocaleTimeString('es-MX')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {item.usuario?.nombre || 'N/A'}
@@ -381,7 +372,7 @@ const HistorialPage = () => {
               <div>
                 <label className="text-sm font-medium text-gray-500">Fecha</label>
                 <p className="text-lg text-gray-900">
-                  {new Date(selectedMovimiento.createdAt).toLocaleDateString('es-MX')} {new Date(selectedMovimiento.createdAt).toLocaleTimeString('es-MX')}
+                  {new Date(selectedMovimiento.created_at || selectedMovimiento.createdAt).toLocaleDateString('es-MX')} {new Date(selectedMovimiento.created_at || selectedMovimiento.createdAt).toLocaleTimeString('es-MX')}
                 </p>
               </div>
               <div className="col-span-2">
