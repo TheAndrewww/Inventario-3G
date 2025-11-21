@@ -933,24 +933,30 @@ export const uploadArticuloImagen = async (req, res) => {
         let imageBuffer = req.file.buffer;
         let processedWithNanoBanana = false;
 
-        // Si es foto de cámara, procesar con Gemini 3
+        // Si es foto de cámara, procesar con Gemini
         if (isFromCamera === 'true' || isFromCamera === true) {
             try {
-                console.log('📸 Foto de cámara detectada, procesando con Gemini 3...');
+                console.log('📸 Foto de cámara detectada, procesando con Gemini...');
                 const { procesarImagenConNanoBanana, isNanoBananaEnabled } = await import('../services/nanoBanana.service.js');
 
                 if (isNanoBananaEnabled()) {
-                    const processedBuffer = await procesarImagenConNanoBanana(imageBuffer, req.file.originalname);
+                    // Procesar con metadata del artículo para prompt contextual
+                    const processedBuffer = await procesarImagenConNanoBanana(imageBuffer, {
+                        imageName: req.file.originalname,
+                        nombre: articulo.nombre,
+                        descripcion: articulo.descripcion,
+                        unidad: articulo.unidad
+                    });
                     imageBuffer = processedBuffer;
                     processedWithNanoBanana = true;
-                    console.log('✅ Imagen procesada con Gemini 3');
+                    console.log('✅ Imagen procesada con Gemini usando contexto del artículo');
                 } else {
-                    console.log('⚠️ Gemini 3 no está configurado, usando imagen original');
+                    console.log('⚠️ Gemini no está configurado, usando imagen original');
                 }
             } catch (geminiError) {
-                console.error('❌ Error al procesar con Gemini 3:', geminiError.message);
+                console.error('❌ Error al procesar con Gemini:', geminiError.message);
                 console.log('📤 Continuando con imagen original...');
-                // Si falla Gemini 3, continuar con imagen original
+                // Si falla Gemini, continuar con imagen original
             }
         } else {
             console.log('📁 Archivo subido, sin procesamiento de IA');
@@ -1070,8 +1076,12 @@ export const reprocessArticuloImagen = async (req, res) => {
 
         console.log(`🔄 Reprocesando imagen del artículo ${id} con Gemini...`);
 
-        // Procesar imagen con Nano Banana
-        const processedBuffer = await procesarImagenDesdeUrl(articulo.imagen_url);
+        // Procesar imagen con Gemini usando metadata del artículo
+        const processedBuffer = await procesarImagenDesdeUrl(articulo.imagen_url, {
+            nombre: articulo.nombre,
+            descripcion: articulo.descripcion,
+            unidad: articulo.unidad
+        });
 
         // Eliminar imagen anterior de Cloudinary
         try {
