@@ -17,7 +17,7 @@ const OrdenesCompraPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
-  const [vistaActual, setVistaActual] = useState('ordenes'); // 'ordenes' o 'solicitudes'
+  const [vistaActual, setVistaActual] = useState('solicitudes'); // 'solicitudes' o 'ordenes'
   const [modalNuevaOrden, setModalNuevaOrden] = useState(false);
   const [modalDetalle, setModalDetalle] = useState(false);
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
@@ -960,35 +960,62 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
 
   const fetchData = async () => {
     try {
-      const [artData, provData, catData, ubData] = await Promise.all([
+      // Usar Promise.allSettled para que no falle todo si uno falla
+      const results = await Promise.allSettled([
         articulosService.getAll(),
         proveedoresService.listar(),
-        categoriasService.listar(),
-        ubicacionesService.listar()
+        categoriasService.getAll(),
+        ubicacionesService.getAll()
       ]);
 
-      // Procesar respuesta de artículos
-      const articulosArray = Array.isArray(artData) ? artData : [];
+      const [artResult, provResult, catResult, ubResult] = results;
 
-      // Procesar respuesta de proveedores (puede venir en data.proveedores o directamente)
-      const proveedoresArray = Array.isArray(provData)
-        ? provData
-        : (provData?.data?.proveedores || provData?.data || []);
+      // Procesar respuesta de artículos
+      if (artResult.status === 'fulfilled') {
+        const artData = artResult.value;
+        const articulosArray = Array.isArray(artData) ? artData : [];
+        setArticulos(articulosArray);
+      } else {
+        console.error('Error al cargar artículos:', artResult.reason);
+      }
+
+      // Procesar respuesta de proveedores
+      if (provResult.status === 'fulfilled') {
+        const provData = provResult.value;
+        const proveedoresArray = Array.isArray(provData)
+          ? provData
+          : (provData?.data?.proveedores || provData?.data || []);
+        setProveedores(proveedoresArray);
+      } else {
+        console.error('Error al cargar proveedores:', provResult.reason);
+      }
 
       // Procesar respuesta de categorías
-      const categoriasArray = Array.isArray(catData)
-        ? catData
-        : (catData?.data?.categorias || catData?.data || []);
+      if (catResult.status === 'fulfilled') {
+        const catData = catResult.value;
+        const categoriasArray = Array.isArray(catData)
+          ? catData
+          : (catData?.data?.categorias || catData?.data || []);
+        setCategorias(categoriasArray);
+      } else {
+        console.error('Error al cargar categorías:', catResult.reason);
+      }
 
       // Procesar respuesta de ubicaciones
-      const ubicacionesArray = Array.isArray(ubData)
-        ? ubData
-        : (ubData?.data?.ubicaciones || ubData?.data || []);
+      if (ubResult.status === 'fulfilled') {
+        const ubData = ubResult.value;
+        const ubicacionesArray = Array.isArray(ubData)
+          ? ubData
+          : (ubData?.data?.ubicaciones || ubData?.data || []);
+        setUbicaciones(ubicacionesArray);
+      } else {
+        console.error('Error al cargar ubicaciones:', ubResult.reason);
+      }
 
-      setArticulos(articulosArray);
-      setProveedores(proveedoresArray);
-      setCategorias(categoriasArray);
-      setUbicaciones(ubicacionesArray);
+      // Mostrar error solo si falló algo crítico (artículos o proveedores)
+      if (artResult.status === 'rejected' || provResult.status === 'rejected') {
+        toast.error('Error al cargar algunos datos');
+      }
     } catch (error) {
       console.error('Error al cargar datos:', error);
       toast.error('Error al cargar datos');
@@ -1195,15 +1222,6 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
               </div>
               <button
                 type="button"
-                onClick={() => setMostrarScanner(!mostrarScanner)}
-                className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors flex items-center gap-2"
-                title="Escanear código de barras"
-              >
-                <Camera size={18} />
-                Scanner
-              </button>
-              <button
-                type="button"
                 onClick={() => {
                   setSearchTerm('');
                   setMostrarCatalogo(!mostrarCatalogo);
@@ -1346,16 +1364,6 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
               </div>
             )}
           </div>
-
-          {/* Scanner de códigos de barras */}
-          {mostrarScanner && (
-            <div className="mb-4 p-4 border-2 border-red-200 rounded-lg bg-red-50">
-              <EAN13ScannerOrdenesCompra
-                onArticuloEscaneado={handleArticuloEscaneado}
-                onClose={() => setMostrarScanner(false)}
-              />
-            </div>
-          )}
 
           {/* Lista de artículos seleccionados */}
           {articulosSeleccionados.length > 0 && (

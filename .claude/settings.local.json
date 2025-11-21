@@ -191,7 +191,16 @@
       "Bash(railway run:*)",
       "Bash(railway link:*)",
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkAzZy5jb20iLCJyb2wiOiJhZG1pbmlzdHJhZG9yIiwiaWF0IjoxNzYyMzcyNzQ5LCJleHAiOjE3NjI5Nzc1NDl9.XKDEUklHkzzEPyXjSiNFs5z2zamlc7KK6RYfsaqzmqs\")",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(railway up)",
+      "Bash(vercel --version:*)",
+      "Bash(find:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:ucySgWXQglBlFGtvdsJceRGPjPdPcqHz@centerbeam.proxy.rlwy.net:15724/railway\" node scripts/run-proyectos-migration.js:*)",
+      "Bash(open:*)",
+      "WebFetch(domain:ai.google.dev)",
+      "WebSearch",
+      "Bash(railway variables:*)",
+      "Bash(railway shell:*)"
     ],
     "deny": [],
     "ask": []
