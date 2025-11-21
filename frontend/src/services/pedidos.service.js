@@ -45,10 +45,19 @@ const pedidosService = {
   },
 
   /**
-   * Cancelar pedido
+   * Cancelar pedido (SIN revertir stock)
    */
   cancelar: async (id, motivo) => {
     const response = await api.put(`/pedidos/${id}/cancelar`, { motivo });
+    return response.data;
+  },
+
+  /**
+   * Anular pedido (CON reversión completa de stock y solicitudes)
+   * Solo para supervisores y administradores
+   */
+  anular: async (id, motivo) => {
+    const response = await api.put(`/pedidos/${id}/anular`, { motivo });
     return response.data;
   },
 
