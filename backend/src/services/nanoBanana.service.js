@@ -13,37 +13,16 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-image';
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 /**
- * Detecta si el artículo tiene dimensiones/medidas en su nombre o descripción
- * Ejemplos: "1/4", "3/8", "20cm", "5mm", "M10", etc.
- */
-const tieneDimensiones = (nombre, descripcion) => {
-    const texto = `${nombre} ${descripcion}`.toLowerCase();
-
-    // Patrones comunes de dimensiones
-    const patronesDimensiones = [
-        /\d+\/\d+/,           // Fracciones: 1/4, 3/8, etc.
-        /\d+\s*(mm|cm|m|pulg|"|')/i,  // Unidades: 20mm, 5cm, 3", etc.
-        /m\d+/i,              // Roscas métricas: M10, M8, etc.
-        /\d+x\d+/,            // Dimensiones: 10x20, 5x8, etc.
-        /#\d+/,               // Números de calibre: #8, #10, etc.
-        /\d+\s*(kg|g|lb)/i    // Pesos: 5kg, 10lb, etc.
-    ];
-
-    return patronesDimensiones.some(patron => patron.test(texto));
-};
-
-/**
- * Genera un prompt dinámico basado en la metadata del artículo
- * @param {Object} metadata - Información del artículo (nombre, descripción, unidad)
- * @returns {string} - Prompt personalizado
+ * Genera un prompt personalizado incluyendo metadata del artículo
+ * @param {Object} metadata - Información del artículo
+ * @returns {string} - Prompt optimizado
  */
 const generarPrompt = (metadata = {}) => {
-    const { nombre, descripcion, unidad } = metadata;
+    const { nombre, descripcion } = metadata;
 
-    // Prompt base
-    let prompt = `Genera una imagen de catálogo profesional de alta calidad basada en esta foto de producto.`;
+    let prompt = `Genera una imagen de catálogo profesional basada en esta foto de producto.`;
 
-    // Agregar contexto del artículo si está disponible
+    // Agregar contexto del artículo para mejor precisión
     if (nombre) {
         prompt += ` El producto es: "${nombre}".`;
     }
@@ -52,28 +31,15 @@ const generarPrompt = (metadata = {}) => {
         prompt += ` Descripción: "${descripcion}".`;
     }
 
-    // Detectar si tiene dimensiones y agregar líneas de señalamiento
-    const tieneMedidas = tieneDimensiones(nombre || '', descripcion || '');
-
-    if (tieneMedidas) {
-        prompt += `\n\nEste artículo tiene especificaciones de tamaño/medidas. IMPORTANTE: Agrega líneas de señalamiento (líneas de acotación o cotas) profesionales que indiquen las dimensiones principales del producto. Las líneas deben ser de grosor medio-grueso, en color rojo vibrante (#FF0000 o #E30613), con flechas pequeñas en los extremos, ubicadas estratégicamente sin obstruir el producto. Estilo técnico de dibujo industrial pero minimalista.`;
-    }
-
-    // Instrucciones generales
-    prompt += `\n\nInstrucciones generales:
-- Si la imagen contiene múltiples piezas idénticas, muestra SOLO UNA UNIDAD representativa centrada
-- Mantén el objeto EXACTAMENTE igual: misma forma, color, textura y proporciones originales
-- Mejora la iluminación para que parezca fotografía de estudio profesional de alta calidad tipo e-commerce
-- Fondo completamente blanco puro (#FFFFFF), limpio, uniforme, sin sombras duras ni ruido
-- Estilo fotorrealista con acabado nítido, enfoque perfecto y calidad fotográfica profesional
-- NO modifiques el diseño del artículo ni agregues elementos decorativos
-- Solo mejora la presentación fotográfica del producto para inventario/catálogo`;
-
-    if (unidad) {
-        prompt += `\n- Unidad de medida del producto: ${unidad}`;
-    }
-
-    prompt += `\n\nGenera la imagen en alta resolución con calidad de catálogo profesional.`;
+    prompt += `\n\nInstrucciones:
+- Si la imagen original contiene múltiples piezas idénticas del mismo artículo, muestra solo una unidad representativa centrada
+- Mantén el objeto exactamente igual, respetando fielmente su forma, color, textura y proporciones originales
+- Mejora la iluminación y la nitidez para que parezca una fotografía de producto de alta calidad tipo e-commerce
+- Fondo completamente blanco (#FFFFFF), limpio y uniforme, sin sombras duras ni ruido
+- Estilo fotorrealista con acabado nítido, enfoque perfecto y calidad fotográfica tipo estudio profesional
+- NO modifiques el diseño del artículo ni agregues elementos extras (sin textos, sin líneas, sin anotaciones)
+- Solo mejora la presentación fotográfica como producto profesional para inventario
+- Genera la imagen en alta resolución con calidad de catálogo profesional`;
 
     return prompt;
 };
@@ -96,7 +62,6 @@ export const isNanoBananaEnabled = () => {
  * @param {string} options.imageName - Nombre del archivo (opcional)
  * @param {string} options.nombre - Nombre del artículo (opcional)
  * @param {string} options.descripcion - Descripción del artículo (opcional)
- * @param {string} options.unidad - Unidad de medida del artículo (opcional)
  * @returns {Promise<Buffer>} - Buffer de la imagen procesada
  */
 export const procesarImagenConNanoBanana = async (imageBuffer, options = {}) => {
@@ -105,18 +70,15 @@ export const procesarImagenConNanoBanana = async (imageBuffer, options = {}) => 
     }
 
     try {
-        const { imageName = 'image.jpg', nombre, descripcion, unidad } = options;
+        const { imageName = 'image.jpg', nombre, descripcion } = options;
 
         console.log(`✨ Iniciando procesamiento con Gemini (${GEMINI_MODEL}): ${imageName}`);
         if (nombre) {
             console.log(`   📦 Artículo: ${nombre}`);
         }
 
-        // Generar prompt dinámico basado en metadata
-        const prompt = generarPrompt({ nombre, descripcion, unidad });
-
-        // Log del prompt generado (solo primeros 200 caracteres)
-        console.log(`   📝 Prompt generado: ${prompt.substring(0, 200)}...`);
+        // Generar prompt personalizado con metadata del artículo
+        const prompt = generarPrompt({ nombre, descripcion });
 
         // Convertir buffer to base64
         const base64Image = imageBuffer.toString('base64');
@@ -218,10 +180,11 @@ export const procesarImagenConNanoBanana = async (imageBuffer, options = {}) => 
 /**
  * Procesa una imagen desde una URL usando Gemini
  * @param {string} imageUrl - URL de la imagen a procesar
- * @param {Object} metadata - Información del artículo (nombre, descripción, unidad)
+ * @param {Object} options - Opciones de procesamiento (opcional)
+ * @param {string} options.nombre - Nombre del artículo para logs (opcional)
  * @returns {Promise<Buffer>} - Buffer de la imagen procesada
  */
-export const procesarImagenDesdeUrl = async (imageUrl, metadata = {}) => {
+export const procesarImagenDesdeUrl = async (imageUrl, options = {}) => {
     if (!isNanoBananaEnabled()) {
         throw new Error('Gemini no está configurado. Agrega GEMINI_API_KEY en las variables de entorno.');
     }
@@ -237,10 +200,10 @@ export const procesarImagenDesdeUrl = async (imageUrl, metadata = {}) => {
 
         const imageBuffer = Buffer.from(imageResponse.data);
 
-        // Procesar con Gemini usando metadata del artículo
+        // Procesar con Gemini
         return await procesarImagenConNanoBanana(imageBuffer, {
             imageName: 'existing-image.jpg',
-            ...metadata
+            ...options
         });
 
     } catch (error) {
