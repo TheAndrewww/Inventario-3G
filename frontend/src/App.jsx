@@ -21,6 +21,7 @@ import OrdenesCompraPage from './pages/OrdenesCompraPage';
 import RentaHerramientasPage from './pages/RentaHerramientasPage';
 import CalendarioPage from './pages/CalendarioPage';
 import ProcesamientoMasivoPage from './pages/ProcesamientoMasivoPage';
+import MonitorPedidosPage from './pages/MonitorPedidosPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 
 function App() {
@@ -82,6 +83,7 @@ function App() {
               <Route path="proveedores" element={<ProveedoresPage />} />
               <Route path="calendario" element={<CalendarioPage />} />
               <Route path="procesamiento-masivo" element={<ProcesamientoMasivoPage />} />
+              <Route path="monitor-pedidos" element={<MonitorPedidosPage />} />
               <Route path="perfil" element={<PerfilPage />} />
             </Route>
 

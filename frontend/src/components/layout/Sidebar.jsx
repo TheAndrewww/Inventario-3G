@@ -40,6 +40,12 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       roles: ['administrador', 'almacen']
     },
     {
+      path: '/monitor-pedidos',
+      icon: BarChart3,
+      label: 'Monitor Pedidos',
+      roles: ['administrador', 'almacen', 'encargado']
+    },
+    {
       path: '/recibir-pedidos',
       icon: CheckSquare,
       label: 'Recibir Pedidos',
