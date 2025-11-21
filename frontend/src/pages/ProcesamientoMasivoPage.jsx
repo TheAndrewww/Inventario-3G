@@ -27,9 +27,11 @@ const ProcesamientoMasivoPage = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
 
-  // Cargar artículos con imagen
+  // Cargar artículos, estado de cola e historial al iniciar
   useEffect(() => {
     fetchArticulos();
+    fetchQueueStatus();
+    fetchHistorial();
   }, []);
 
   // Auto-refresh del estado de la cola cada 3 segundos cuando hay procesamiento activo
@@ -214,270 +216,252 @@ const ProcesamientoMasivoPage = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-          <Wand2 className="w-8 h-8 text-purple-600" />
-          Procesamiento Masivo con IA
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Mejora múltiples imágenes de artículos con Gemini AI
-        </p>
+    <div className="h-full flex flex-col">
+      {/* Header Compacto */}
+      <div className="px-4 py-3 border-b bg-white flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Wand2 className="w-6 h-6 text-purple-600" />
+          <h1 className="text-xl font-bold text-gray-900">Procesamiento Masivo con IA</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedArticulos.length > 0 && (
+            <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+              {selectedArticulos.length} seleccionados
+            </span>
+          )}
+          <Button
+            onClick={handleSelectAll}
+            size="sm"
+            variant="outline"
+          >
+            {selectedArticulos.length === articulos.length ? 'Deseleccionar' : 'Seleccionar Todos'}
+          </Button>
+          <Button
+            onClick={handleProcesarSeleccionados}
+            disabled={selectedArticulos.length === 0 || processing}
+            size="sm"
+          >
+            {processing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Procesando...
+              </>
+            ) : (
+              <>
+                <Wand2 className="w-4 h-4 mr-2" />
+                Procesar ({selectedArticulos.length})
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
-      {/* Estado de la Cola */}
-      {queueStatus && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-l-4 border-purple-500">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-purple-600" />
-              Estado de la Cola
+      {/* Layout Horizontal de 3 Columnas */}
+      <div className="flex-1 flex gap-4 p-4 overflow-hidden">
+
+        {/* Columna 1: Estado de la Cola */}
+        <div className="w-64 flex-shrink-0 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-purple-600" />
+              Estado
             </h2>
-            <Button
-              onClick={fetchQueueStatus}
-              size="sm"
-              variant="outline"
-            >
-              <RefreshCw className="w-4 h-4" />
+            <Button onClick={fetchQueueStatus} size="sm" variant="outline">
+              <RefreshCw className="w-3 h-3" />
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-              <div className="text-2xl font-bold text-yellow-700">
-                {queueStatus.stats.pendientes}
+          {queueStatus ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-yellow-50 p-2 rounded border border-yellow-200 text-center">
+                  <div className="text-xl font-bold text-yellow-700">{queueStatus.stats.pendientes}</div>
+                  <div className="text-xs text-yellow-600">Pendientes</div>
+                </div>
+                <div className="bg-blue-50 p-2 rounded border border-blue-200 text-center">
+                  <div className="text-xl font-bold text-blue-700">{queueStatus.stats.procesando}</div>
+                  <div className="text-xs text-blue-600">Procesando</div>
+                </div>
+                <div className="bg-green-50 p-2 rounded border border-green-200 text-center">
+                  <div className="text-xl font-bold text-green-700">{queueStatus.stats.completados}</div>
+                  <div className="text-xs text-green-600">Completados</div>
+                </div>
+                <div className="bg-red-50 p-2 rounded border border-red-200 text-center">
+                  <div className="text-xl font-bold text-red-700">{queueStatus.stats.fallidos}</div>
+                  <div className="text-xs text-red-600">Fallidos</div>
+                </div>
               </div>
-              <div className="text-sm text-yellow-600">Pendientes</div>
-            </div>
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <div className="text-2xl font-bold text-blue-700">
-                {queueStatus.stats.procesando}
-              </div>
-              <div className="text-sm text-blue-600">Procesando</div>
-            </div>
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <div className="text-2xl font-bold text-green-700">
-                {queueStatus.stats.completados}
-              </div>
-              <div className="text-sm text-green-600">Completados</div>
-            </div>
-            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-              <div className="text-2xl font-bold text-red-700">
-                {queueStatus.stats.fallidos}
-              </div>
-              <div className="text-sm text-red-600">Fallidos</div>
-            </div>
-          </div>
 
-          {/* Artículo Actual */}
-          {queueStatus.articuloActual && (
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                  <div>
-                    <div className="font-semibold text-blue-900">
-                      {queueStatus.articuloActual.articulo_nombre}
-                    </div>
-                    <div className="text-sm text-blue-600">
-                      Procesando... {Math.round(queueStatus.articuloActual.segundos_procesando)}s
-                    </div>
+              {queueStatus.articuloActual && (
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                    <span className="text-xs text-blue-600 font-medium">Procesando ahora</span>
+                  </div>
+                  <div className="text-sm font-semibold text-blue-900 truncate">
+                    {queueStatus.articuloActual.articulo_nombre}
+                  </div>
+                  <div className="text-xs text-blue-600">
+                    {Math.round(queueStatus.articuloActual.segundos_procesando)}s - Intento {queueStatus.articuloActual.intentos}
                   </div>
                 </div>
-                <div className="text-sm text-blue-600">
-                  Intento {queueStatus.articuloActual.intentos}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {autoRefresh && (
-            <div className="mt-4 text-sm text-gray-600 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Actualizando automáticamente cada 3 segundos...
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Selección de Artículos */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <ImageIcon className="w-5 h-5 text-purple-600" />
-            Seleccionar Artículos ({articulos.length} con imagen)
-          </h2>
-          <div className="flex gap-2">
-            <Button
-              onClick={handleSelectAll}
-              size="sm"
-              variant="outline"
-            >
-              {selectedArticulos.length === articulos.length ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
-            </Button>
-            <Button
-              onClick={handleProcesarSeleccionados}
-              disabled={selectedArticulos.length === 0 || processing}
-              size="sm"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Procesando...
-                </>
-              ) : (
-                <>
-                  <Wand2 className="w-4 h-4 mr-2" />
-                  Procesar ({selectedArticulos.length})
-                </>
               )}
-            </Button>
-          </div>
-        </div>
 
-        {selectedArticulos.length > 0 && (
-          <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-            <div className="text-sm text-purple-700">
-              <strong>{selectedArticulos.length}</strong> artículo(s) seleccionado(s) para procesar
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-          {articulos.map(articulo => (
-            <div
-              key={articulo.id}
-              onClick={() => handleSelectArticulo(articulo.id)}
-              className={`
-                p-4 rounded-lg border-2 cursor-pointer transition-all
-                ${selectedArticulos.includes(articulo.id)
-                  ? 'border-purple-500 bg-purple-50'
-                  : 'border-gray-200 hover:border-purple-300 bg-white'
-                }
-              `}
-            >
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={selectedArticulos.includes(articulo.id)}
-                  onChange={() => handleSelectArticulo(articulo.id)}
-                  className="mt-1 w-5 h-5 text-purple-600"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-gray-900 truncate">
-                    {articulo.nombre}
-                  </div>
-                  <div className="text-sm text-gray-600 truncate">
-                    ID: {articulo.id}
-                  </div>
-                  {articulo.imagen_url && (
-                    <img
-                      src={articulo.imagen_url}
-                      alt={articulo.nombre}
-                      className="mt-2 w-full h-24 object-cover rounded"
-                    />
-                  )}
+              {autoRefresh && (
+                <div className="text-xs text-gray-500 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Auto-refresh activo
                 </div>
-              </div>
+              )}
             </div>
-          ))}
+          ) : (
+            <div className="text-sm text-gray-500 text-center py-4">
+              Sin datos de cola
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Historial */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div
-          className="flex items-center justify-between cursor-pointer"
-          onClick={toggleHistorial}
-        >
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-purple-600" />
-            Historial de Procesamiento
-          </h2>
-          <div className="flex items-center gap-2">
-            {showHistory && (
+        {/* Columna 2: Selección de Artículos (Principal - Más Grande) */}
+        <div className="flex-1 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden min-w-0">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-purple-600" />
+              Artículos ({articulos.length})
+            </h2>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {articulos.map(articulo => (
+                <div
+                  key={articulo.id}
+                  onClick={() => handleSelectArticulo(articulo.id)}
+                  className={`
+                    rounded-lg border-2 cursor-pointer transition-all overflow-hidden
+                    ${selectedArticulos.includes(articulo.id)
+                      ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-300'
+                      : 'border-gray-200 hover:border-purple-300 bg-white'
+                    }
+                  `}
+                >
+                  {/* Imagen Grande */}
+                  <div className="relative aspect-square bg-gray-100">
+                    {articulo.imagen_url ? (
+                      <img
+                        src={articulo.imagen_url}
+                        alt={articulo.nombre}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageIcon className="w-8 h-8 text-gray-300" />
+                      </div>
+                    )}
+                    {/* Checkbox en esquina */}
+                    <div className="absolute top-2 left-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedArticulos.includes(articulo.id)}
+                        onChange={() => handleSelectArticulo(articulo.id)}
+                        className="w-5 h-5 text-purple-600 rounded border-2 border-white shadow"
+                      />
+                    </div>
+                    {/* Badge de seleccionado */}
+                    {selectedArticulos.includes(articulo.id) && (
+                      <div className="absolute top-2 right-2">
+                        <CheckCircle2 className="w-5 h-5 text-purple-600 bg-white rounded-full" />
+                      </div>
+                    )}
+                  </div>
+                  {/* Info del artículo */}
+                  <div className="p-2">
+                    <div className="text-sm font-medium text-gray-900 truncate" title={articulo.nombre}>
+                      {articulo.nombre}
+                    </div>
+                    <div className="text-xs text-gray-500">ID: {articulo.id}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Columna 3: Historial */}
+        <div className="w-80 flex-shrink-0 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-purple-600" />
+              Historial
+            </h2>
+            <div className="flex items-center gap-1">
               <Button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleLimpiarCola();
-                }}
+                onClick={handleLimpiarCola}
+                size="sm"
+                variant="outline"
+                title="Limpiar cola antigua"
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+              <Button
+                onClick={fetchHistorial}
                 size="sm"
                 variant="outline"
               >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Limpiar Cola
+                <RefreshCw className="w-3 h-3" />
               </Button>
-            )}
-            {showHistory ? (
-              <ChevronUp className="w-5 h-5 text-gray-600" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-gray-600" />
-            )}
+            </div>
           </div>
-        </div>
 
-        {showHistory && (
-          <div className="mt-4">
+          <div className="flex-1 overflow-y-auto">
             {loadingHistory ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
+                <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
               </div>
             ) : historial.length === 0 ? (
-              <div className="text-center py-8 text-gray-600">
-                No hay historial de procesamiento
+              <div className="text-center py-8 text-gray-500 text-sm">
+                <Clock className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                Sin historial
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {historial.map(item => (
                   <div
                     key={item.id}
-                    className={`p-4 rounded-lg border ${getEstadoColor(item.estado)}`}
+                    className={`p-3 rounded-lg border text-sm ${getEstadoColor(item.estado)}`}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate" title={item.articulo_nombre}>
                           {item.articulo_nombre}
                         </div>
-                        <div className="text-sm text-gray-600 mt-1">
+                        <div className="text-xs text-gray-600 mt-0.5">
                           ID: {item.articulo_id} | Intentos: {item.intentos}/{item.max_intentos}
                         </div>
-                        {item.error_message && (
-                          <div className="text-sm text-red-600 mt-2 flex items-start gap-2">
-                            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                            <span>{item.error_message}</span>
+                        {item.duracion_segundos && (
+                          <div className="text-xs text-gray-500">
+                            {Math.round(item.duracion_segundos)}s
                           </div>
                         )}
-                        {item.duracion_segundos && (
-                          <div className="text-sm text-gray-600 mt-1">
-                            Duración: {Math.round(item.duracion_segundos)}s
+                        {item.error_message && (
+                          <div className="text-xs text-red-600 mt-1 flex items-start gap-1">
+                            <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                            <span className="truncate" title={item.error_message}>{item.error_message}</span>
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-sm font-semibold">
-                          {getEstadoTexto(item.estado)}
-                        </div>
-                        {item.estado === 'completed' && (
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
-                        )}
-                        {item.estado === 'processing' && (
-                          <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                        )}
-                        {item.estado === 'pending' && (
-                          <Clock className="w-5 h-5 text-yellow-600" />
-                        )}
+                      <div className="flex-shrink-0 flex items-center gap-1">
+                        {item.estado === 'completed' && <CheckCircle2 className="w-4 h-4 text-green-600" />}
+                        {item.estado === 'processing' && <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />}
+                        {item.estado === 'pending' && <Clock className="w-4 h-4 text-yellow-600" />}
                         {item.estado === 'failed' && (
                           <>
-                            <XCircle className="w-5 h-5 text-red-600" />
-                            <Button
+                            <XCircle className="w-4 h-4 text-red-600" />
+                            <button
                               onClick={() => handleRetryItem(item.id)}
-                              size="sm"
-                              variant="outline"
+                              className="text-xs text-red-600 hover:text-red-800 underline"
                             >
-                              <RefreshCw className="w-4 h-4 mr-1" />
                               Reintentar
-                            </Button>
+                            </button>
                           </>
                         )}
                       </div>
@@ -487,7 +471,7 @@ const ProcesamientoMasivoPage = () => {
               </div>
             )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
