@@ -1,4 +1,4 @@
-import { Movimiento, DetalleMovimiento, Articulo, Usuario, Categoria, Ubicacion, Equipo, SolicitudCompra } from '../models/index.js';
+import { Movimiento, DetalleMovimiento, Articulo, Usuario, Categoria, Ubicacion, Equipo, SolicitudCompra, OrdenCompra } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { crearNotificacion, notificarPorRol } from './notificaciones.controller.js';
@@ -722,8 +722,231 @@ export const listarPedidosPendientes = async (req, res) => {
 };
 
 /**
- * Cancelar un pedido
+ * Anular un pedido completamente (con reversión de stock y solicitudes)
+ * Esta función revierte TODOS los cambios asociados al pedido
+ * Solo supervisor o admin pueden anular
+ */
+export const anularPedido = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body;
+    const usuario = req.usuario;
+
+    // Validar motivo
+    if (!motivo || motivo.trim().length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar un motivo para anular el pedido'
+      });
+    }
+
+    // Obtener el pedido con todos sus detalles y solicitudes
+    const pedido = await Movimiento.findOne({
+      where: { id, tipo: 'pedido' },
+      include: [
+        {
+          model: DetalleMovimiento,
+          as: 'detalles',
+          include: [
+            {
+              model: Articulo,
+              as: 'articulo'
+            }
+          ]
+        },
+        {
+          model: SolicitudCompra,
+          as: 'solicitudes_compra',
+          include: [
+            {
+              model: OrdenCompra,
+              as: 'ordenCompra'
+            }
+          ]
+        },
+        {
+          model: Usuario,
+          as: 'usuario',
+          attributes: ['id', 'nombre', 'email']
+        }
+      ],
+      transaction
+    });
+
+    if (!pedido) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Pedido no encontrado'
+      });
+    }
+
+    // Verificar permisos: solo supervisor o admin
+    if (!['supervisor', 'administrador'].includes(usuario.rol)) {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        message: 'Solo supervisores y administradores pueden anular pedidos'
+      });
+    }
+
+    // No se puede anular si ya está entregado
+    if (pedido.estado === 'entregado') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'No se puede anular un pedido que ya fue entregado. Contacte al administrador.'
+      });
+    }
+
+    // Ya está cancelado/anulado
+    if (pedido.estado === 'cancelado') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Este pedido ya fue cancelado/anulado previamente'
+      });
+    }
+
+    // Validar solicitudes de compra asociadas
+    const solicitudesCompletadas = pedido.solicitudes_compra?.filter(s => s.estado === 'completada') || [];
+    if (solicitudesCompletadas.length > 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `No se puede anular porque ${solicitudesCompletadas.length} solicitud(es) de compra ya fueron completadas (material recibido). Contacte al administrador.`
+      });
+    }
+
+    // Verificar órdenes de compra asociadas
+    const solicitudesEnOrden = pedido.solicitudes_compra?.filter(s => s.estado === 'en_orden' && s.ordenCompra) || [];
+    const ordenesAfectadas = [...new Set(solicitudesEnOrden.map(s => s.ordenCompra.ticket_id))];
+
+    if (ordenesAfectadas.length > 0) {
+      console.log(`⚠️ Advertencia: Este pedido tiene solicitudes en órdenes de compra: ${ordenesAfectadas.join(', ')}`);
+      // Continuar, pero las solicitudes serán canceladas
+    }
+
+    // PASO 1: Revertir el stock de todos los artículos del pedido
+    console.log(`\n🔄 [Anulación] Iniciando reversión del pedido ${pedido.ticket_id}`);
+    const articulosRevertidos = [];
+
+    for (const detalle of pedido.detalles) {
+      const articulo = detalle.articulo;
+      const cantidadARevertir = parseFloat(detalle.cantidad);
+      const stockAntes = parseFloat(articulo.stock_actual);
+      const stockDespues = stockAntes + cantidadARevertir;
+
+      await articulo.update({
+        stock_actual: stockDespues
+      }, { transaction });
+
+      articulosRevertidos.push({
+        articulo_id: articulo.id,
+        nombre: articulo.nombre,
+        cantidad_revertida: cantidadARevertir,
+        stock_antes: stockAntes,
+        stock_despues: stockDespues
+      });
+
+      console.log(`   ✅ ${articulo.nombre}: ${stockAntes} + ${cantidadARevertir} = ${stockDespues}`);
+    }
+
+    // PASO 2: Cancelar todas las solicitudes de compra asociadas
+    const solicitudesCanceladas = [];
+    const solicitudesPendientes = pedido.solicitudes_compra?.filter(s => s.estado === 'pendiente') || [];
+    const solicitudesEnOrdenActivas = pedido.solicitudes_compra?.filter(s => s.estado === 'en_orden') || [];
+
+    for (const solicitud of [...solicitudesPendientes, ...solicitudesEnOrdenActivas]) {
+      await solicitud.update({
+        estado: 'cancelada',
+        observaciones: `Cancelada automáticamente por anulación del pedido ${pedido.ticket_id} por ${usuario.nombre}. Motivo: ${motivo}`
+      }, { transaction });
+
+      solicitudesCanceladas.push({
+        ticket_id: solicitud.ticket_id,
+        articulo: solicitud.articulo?.nombre,
+        cantidad: solicitud.cantidad_solicitada,
+        estado_anterior: solicitud.estado === 'cancelada' ? (solicitudesEnOrdenActivas.includes(solicitud) ? 'en_orden' : 'pendiente') : solicitud.estado
+      });
+
+      console.log(`   🚫 Solicitud ${solicitud.ticket_id} cancelada (estaba en: ${solicitud.estado === 'cancelada' ? (solicitudesEnOrdenActivas.includes(solicitud) ? 'en_orden' : 'pendiente') : solicitud.estado})`);
+    }
+
+    // PASO 3: Marcar el pedido como anulado
+    const observacionesActualizadas = `${pedido.observaciones || ''}\n\n[ANULADO por ${usuario.nombre} - ${new Date().toLocaleString('es-MX')}]\nMotivo: ${motivo}\n- Stock revertido: ${articulosRevertidos.length} artículo(s)\n- Solicitudes canceladas: ${solicitudesCanceladas.length}`;
+
+    await pedido.update({
+      estado: 'cancelado',
+      observaciones: observacionesActualizadas,
+      aprobado_por_id: usuario.id, // Registrar quién anuló
+      fecha_aprobacion: new Date(),
+      motivo_rechazo: motivo // Guardar el motivo de anulación
+    }, { transaction });
+
+    await transaction.commit();
+
+    // Notificar al creador del pedido
+    try {
+      await crearNotificacion({
+        usuario_id: pedido.usuario_id,
+        tipo: 'pedido_anulado',
+        titulo: 'Pedido anulado',
+        mensaje: `Tu pedido ${pedido.ticket_id} fue anulado por ${usuario.nombre}. Motivo: ${motivo}. El stock ha sido revertido.`,
+        url: '/pedidos',
+        datos_adicionales: {
+          pedido_id: pedido.id,
+          ticket_id: pedido.ticket_id,
+          anulado_por: usuario.nombre,
+          motivo: motivo,
+          articulos_revertidos: articulosRevertidos.length,
+          solicitudes_canceladas: solicitudesCanceladas.length
+        }
+      });
+    } catch (notifError) {
+      console.error('Error al enviar notificación de anulación:', notifError);
+    }
+
+    console.log(`\n✅ [Anulación] Pedido ${pedido.ticket_id} anulado completamente\n`);
+
+    res.status(200).json({
+      success: true,
+      message: `Pedido anulado exitosamente. Stock revertido: ${articulosRevertidos.length} artículo(s). Solicitudes canceladas: ${solicitudesCanceladas.length}.`,
+      data: {
+        pedido: {
+          id: pedido.id,
+          ticket_id: pedido.ticket_id,
+          estado: 'cancelado',
+          anulado_por: usuario.nombre,
+          fecha_anulacion: new Date(),
+          tipo_cancelacion: 'anulacion_completa' // Para diferenciar de cancelación simple
+        },
+        reversiones: {
+          stock_revertido: articulosRevertidos,
+          solicitudes_canceladas: solicitudesCanceladas,
+          ordenes_afectadas: ordenesAfectadas
+        }
+      }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al anular pedido:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al anular el pedido',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Cancelar un pedido (SIN revertir stock)
  * Solo diseñador que creó el pedido, supervisor o admin
+ * DEPRECADO: Usar anularPedido para reversión completa
  */
 export const cancelarPedido = async (req, res) => {
   try {

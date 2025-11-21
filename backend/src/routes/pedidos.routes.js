@@ -6,6 +6,7 @@ import {
   marcarArticuloDispersado,
   listarPedidosPendientes,
   cancelarPedido,
+  anularPedido,
   actualizarCantidadArticulo,
   agregarArticuloAPedido,
   eliminarArticuloDePedido,
@@ -101,7 +102,7 @@ router.put(
 
 /**
  * @route   PUT /api/pedidos/:id/cancelar
- * @desc    Cancelar un pedido
+ * @desc    Cancelar un pedido (SIN revertir stock)
  * @access  Creador del pedido, Supervisor, Administrador
  */
 router.put(
@@ -109,6 +110,18 @@ router.put(
   verificarToken,
   verificarRol('diseñador', 'supervisor', 'administrador'),
   cancelarPedido
+);
+
+/**
+ * @route   PUT /api/pedidos/:id/anular
+ * @desc    Anular un pedido completamente (CON reversión de stock y solicitudes)
+ * @access  Supervisor, Administrador
+ */
+router.put(
+  '/:id/anular',
+  verificarToken,
+  verificarRol('supervisor', 'administrador'),
+  anularPedido
 );
 
 /**
