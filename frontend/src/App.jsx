@@ -21,8 +21,11 @@ import OrdenesCompraPage from './pages/OrdenesCompraPage';
 import RentaHerramientasPage from './pages/RentaHerramientasPage';
 import CalendarioPage from './pages/CalendarioPage';
 import ProcesamientoMasivoPage from './pages/ProcesamientoMasivoPage';
+import { useVersionCheck } from './hooks/useVersionCheck';
 
 function App() {
+  // Auto-reload cuando se detecta nueva versión en producción
+  useVersionCheck();
   return (
     <Router>
       <AuthProvider>
