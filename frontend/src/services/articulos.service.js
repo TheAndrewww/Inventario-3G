@@ -89,6 +89,9 @@ const articulosService = {
       const formData = new FormData();
       formData.append('imagen', file);
 
+      // Enviar flag de si es foto de cámara (para procesamiento con Nano Banana)
+      formData.append('isFromCamera', file.isFromCamera || false);
+
       const response = await api.post(`/articulos/${id}/imagen`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
@@ -107,6 +110,16 @@ const articulosService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Error al eliminar imagen' };
+    }
+  },
+
+  // Reprocesar imagen existente con Nano Banana (IA)
+  async reprocessImagen(id) {
+    try {
+      const response = await api.post(`/articulos/${id}/imagen/reprocess`);
+      return response.data.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al reprocesar imagen' };
     }
   },
 

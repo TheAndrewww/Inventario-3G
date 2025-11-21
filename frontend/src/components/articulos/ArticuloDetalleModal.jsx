@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, MapPin, DollarSign, Hash, Box, Edit } from 'lucide-react';
+import { X, Package, MapPin, DollarSign, Hash, Box, Edit, Sparkles } from 'lucide-react';
 import { Modal } from '../common';
 import BarcodeDisplay from './BarcodeDisplay';
 import { getImageUrl } from '../../utils/imageUtils';
+import articulosService from '../../services/articulos.service';
 
-const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = false }) => {
+const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = false, onImageReprocessed }) => {
   const [imagenExpandida, setImagenExpandida] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
 
   // Cerrar imagen expandida con tecla Escape
   useEffect(() => {
@@ -27,6 +29,31 @@ const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = fal
 
   const imagenUrl = getImageUrl(articulo.imagen_url);
 
+  // Manejar reprocesamiento de imagen con IA
+  const handleReprocessImage = async () => {
+    if (!articulo.imagen_url) return;
+
+    if (!confirm('¿Reprocesar esta imagen con IA para mejorar su calidad? Esto puede tardar unos segundos.')) {
+      return;
+    }
+
+    setReprocessing(true);
+    try {
+      const result = await articulosService.reprocessImagen(articulo.id);
+      alert('✅ Imagen reprocesada exitosamente con IA');
+
+      // Notificar al componente padre para actualizar la lista
+      if (onImageReprocessed) {
+        onImageReprocessed(articulo.id, result.imagen_url);
+      }
+    } catch (error) {
+      console.error('Error al reprocesar imagen:', error);
+      alert('❌ ' + (error.message || 'Error al reprocesar imagen. Verifica que Nano Banana esté configurado.'));
+    } finally {
+      setReprocessing(false);
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Detalles del Artículo">
       <div className="space-y-6">
@@ -36,13 +63,35 @@ const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = fal
             {/* Imagen del artículo */}
             <div className="flex-shrink-0">
               {imagenUrl ? (
-                <img
-                  src={imagenUrl}
-                  alt={articulo.nombre}
-                  className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => setImagenExpandida(true)}
-                  title="Haz clic para ver la imagen en tamaño completo"
-                />
+                <div className="space-y-2">
+                  <img
+                    src={imagenUrl}
+                    alt={articulo.nombre}
+                    className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setImagenExpandida(true)}
+                    title="Haz clic para ver la imagen en tamaño completo"
+                  />
+                  {canEdit && (
+                    <button
+                      onClick={handleReprocessImage}
+                      disabled={reprocessing}
+                      className="w-24 px-2 py-1 text-xs bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      title="Reprocesar con IA para mejorar calidad"
+                    >
+                      {reprocessing ? (
+                        <>
+                          <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full"></div>
+                          <span>IA...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={12} />
+                          <span>Mejorar IA</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
               ) : (
                 <div className="w-24 h-24 bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center text-4xl">
                   📦

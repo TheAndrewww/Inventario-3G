@@ -12,7 +12,8 @@ import {
     getArticuloEtiqueta,
     generarEtiquetasLote,
     uploadArticuloImagen,
-    deleteArticuloImagen
+    deleteArticuloImagen,
+    reprocessArticuloImagen
 } from '../controllers/articulos.controller.js';
 import {
     verificarToken,
@@ -109,6 +110,13 @@ router.delete('/:id', verificarToken, esEncargadoOAdmin, deleteArticulo);
  * @access  Private (Almacen, Supervisor, Admin)
  */
 router.post('/:id/imagen', verificarToken, accesoInventario, multerUpload.single('imagen'), uploadArticuloImagen);
+
+/**
+ * @route   POST /api/articulos/:id/imagen/reprocess
+ * @desc    Reprocesar imagen existente con Nano Banana (IA)
+ * @access  Private (Almacen, Supervisor, Admin)
+ */
+router.post('/:id/imagen/reprocess', verificarToken, accesoInventario, reprocessArticuloImagen);
 
 /**
  * @route   DELETE /api/articulos/:id/imagen

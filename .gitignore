@@ -7,6 +7,10 @@ package-lock.json
 .env.local
 .env.*.local
 
+# Google API Credentials (NO SUBIR)
+google-credentials.json
+*-credentials.json
+
 # Production builds
 backend/dist/
 frontend/dist/
@@ -68,6 +72,7 @@ NOTES.md
 
 # Archivos de prueba
 test-*.html
+test-*.js
 *-backup.*
 *-old.*
 

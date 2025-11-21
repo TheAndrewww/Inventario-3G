@@ -899,6 +899,7 @@ export const generarEtiquetasLote = async (req, res) => {
 export const uploadArticuloImagen = async (req, res) => {
     try {
         const { id } = req.params;
+        const { isFromCamera } = req.body; // Recibir flag de origen
 
         // Verificar que el artículo existe
         const articulo = await Articulo.findByPk(id);
@@ -929,26 +930,47 @@ export const uploadArticuloImagen = async (req, res) => {
             }
         }
 
-        // Cloudinary provee la URL en req.file.path
-        // Asegurarse de que la URL tenga el formato correcto (https://)
-        let imageUrl = req.file.path;
+        let imageBuffer = req.file.buffer;
+        let processedWithNanoBanana = false;
 
-        // Corregir si la URL está malformada (https// en lugar de https://)
-        if (imageUrl && imageUrl.includes('https//')) {
-            imageUrl = imageUrl.replace('https//', 'https://');
+        // Si es foto de cámara, procesar con Gemini 3
+        if (isFromCamera === 'true' || isFromCamera === true) {
+            try {
+                console.log('📸 Foto de cámara detectada, procesando con Gemini 3...');
+                const { procesarImagenConNanoBanana, isNanoBananaEnabled } = await import('../services/nanoBanana.service.js');
+
+                if (isNanoBananaEnabled()) {
+                    const processedBuffer = await procesarImagenConNanoBanana(imageBuffer, req.file.originalname);
+                    imageBuffer = processedBuffer;
+                    processedWithNanoBanana = true;
+                    console.log('✅ Imagen procesada con Gemini 3');
+                } else {
+                    console.log('⚠️ Gemini 3 no está configurado, usando imagen original');
+                }
+            } catch (geminiError) {
+                console.error('❌ Error al procesar con Gemini 3:', geminiError.message);
+                console.log('📤 Continuando con imagen original...');
+                // Si falla Gemini 3, continuar con imagen original
+            }
+        } else {
+            console.log('📁 Archivo subido, sin procesamiento de IA');
         }
-        if (imageUrl && imageUrl.includes('http//')) {
-            imageUrl = imageUrl.replace('http//', 'http://');
-        }
+
+        // Subir a Cloudinary
+        const { uploadBufferToCloudinary } = await import('../config/cloudinary.js');
+        const imageUrl = await uploadBufferToCloudinary(imageBuffer);
+
+        console.log('☁️ Imagen subida a Cloudinary:', imageUrl);
 
         // Actualizar artículo con nueva imagen
         await articulo.update({ imagen_url: imageUrl });
 
         res.status(200).json({
             success: true,
-            message: 'Imagen subida exitosamente',
+            message: `Imagen subida exitosamente${processedWithNanoBanana ? ' (procesada con IA)' : ''}`,
             data: {
-                imagen_url: imageUrl
+                imagen_url: imageUrl,
+                processed_with_ai: processedWithNanoBanana
             }
         });
 
@@ -1009,6 +1031,83 @@ export const deleteArticuloImagen = async (req, res) => {
     }
 };
 
+/**
+ * POST /api/articulos/:id/imagen/reprocess
+ * Reprocesar imagen existente con Nano Banana
+ */
+export const reprocessArticuloImagen = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Verificar que el artículo existe
+        const articulo = await Articulo.findByPk(id);
+
+        if (!articulo) {
+            return res.status(404).json({
+                success: false,
+                message: 'Artículo no encontrado'
+            });
+        }
+
+        if (!articulo.imagen_url) {
+            return res.status(404).json({
+                success: false,
+                message: 'El artículo no tiene imagen para reprocesar'
+            });
+        }
+
+        // Importar servicios necesarios
+        const { procesarImagenDesdeUrl, isNanoBananaEnabled } = await import('../services/nanoBanana.service.js');
+        const { uploadBufferToCloudinary, eliminarImagen } = await import('../config/cloudinary.js');
+
+        // Verificar que Gemini está configurado
+        if (!isNanoBananaEnabled()) {
+            return res.status(503).json({
+                success: false,
+                message: 'Gemini (Nano Banana) no está configurado. Agrega GEMINI_API_KEY en las variables de entorno.'
+            });
+        }
+
+        console.log(`🔄 Reprocesando imagen del artículo ${id} con Gemini...`);
+
+        // Procesar imagen con Nano Banana
+        const processedBuffer = await procesarImagenDesdeUrl(articulo.imagen_url);
+
+        // Eliminar imagen anterior de Cloudinary
+        try {
+            await eliminarImagen(articulo.imagen_url);
+            console.log('🗑️ Imagen anterior eliminada de Cloudinary');
+        } catch (error) {
+            console.log('⚠️ Error al eliminar imagen anterior:', error.message);
+            // Continuar aunque falle la eliminación
+        }
+
+        // Subir nueva imagen procesada a Cloudinary
+        const newImageUrl = await uploadBufferToCloudinary(processedBuffer);
+        console.log('☁️ Nueva imagen subida a Cloudinary:', newImageUrl);
+
+        // Actualizar artículo con nueva URL
+        await articulo.update({ imagen_url: newImageUrl });
+
+        res.status(200).json({
+            success: true,
+            message: 'Imagen reprocesada exitosamente con IA',
+            data: {
+                imagen_url: newImageUrl,
+                processed_with_ai: true
+            }
+        });
+
+    } catch (error) {
+        console.error('Error en reprocessArticuloImagen:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al reprocesar imagen',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
 export default {
     getArticulos,
     getArticuloById,
@@ -1021,5 +1120,6 @@ export default {
     getArticuloBarcodeSVG,
     getArticuloEtiqueta,
     uploadArticuloImagen,
-    deleteArticuloImagen
+    deleteArticuloImagen,
+    reprocessArticuloImagen
 };

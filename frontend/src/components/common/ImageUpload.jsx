@@ -35,9 +35,14 @@ const ImageUpload = ({ currentImage, onImageSelect, onImageRemove, disabled = fa
       };
       reader.readAsDataURL(file);
 
+      // Marcar que es un archivo subido (NO procesar con Nano Banana)
+      const fileWithMetadata = Object.assign(file, {
+        isFromCamera: false
+      });
+
       // Notificar al componente padre
       if (onImageSelect) {
-        onImageSelect(file);
+        onImageSelect(fileWithMetadata);
       }
     }
   };
@@ -56,9 +61,14 @@ const ImageUpload = ({ currentImage, onImageSelect, onImageRemove, disabled = fa
     };
     reader.readAsDataURL(file);
 
+    // Marcar que es una foto de cámara (PROCESAR con Nano Banana)
+    const fileWithMetadata = Object.assign(file, {
+      isFromCamera: true
+    });
+
     // Notificar al componente padre
     if (onImageSelect) {
-      onImageSelect(file);
+      onImageSelect(fileWithMetadata);
     }
   };
 

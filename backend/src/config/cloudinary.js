@@ -1,5 +1,4 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
 
 // Configurar Cloudinary
@@ -9,20 +8,8 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Configurar almacenamiento en Cloudinary
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'inventario-3g/articulos', // Carpeta en Cloudinary
-        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-        transformation: [{ width: 800, height: 800, crop: 'limit' }], // Optimizar tamaño
-        public_id: (req, file) => {
-            // Generar nombre único
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-            return `articulo_${uniqueSuffix}`;
-        }
-    }
-});
+// Usar memoria storage para poder procesar con Nano Banana antes de subir
+const storage = multer.memoryStorage();
 
 // Filtro para validar tipo de archivo
 const fileFilter = (req, file, cb) => {
@@ -35,7 +22,7 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
-// Configuración de multer con Cloudinary
+// Configuración de multer con memory storage
 export const uploadArticuloImagen = multer({
     storage: storage,
     fileFilter: fileFilter,
@@ -43,6 +30,36 @@ export const uploadArticuloImagen = multer({
         fileSize: 5 * 1024 * 1024, // 5MB máximo
     }
 });
+
+/**
+ * Sube un buffer de imagen a Cloudinary
+ * @param {Buffer} imageBuffer - Buffer de la imagen
+ * @param {string} folder - Carpeta en Cloudinary
+ * @returns {Promise<string>} - URL de la imagen subida
+ */
+export const uploadBufferToCloudinary = (imageBuffer, folder = 'inventario-3g/articulos') => {
+    return new Promise((resolve, reject) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+
+        const uploadStream = cloudinary.uploader.upload_stream(
+            {
+                folder: folder,
+                public_id: `articulo_${uniqueSuffix}`,
+                transformation: [{ width: 800, height: 800, crop: 'limit' }],
+                format: 'jpg'
+            },
+            (error, result) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve(result.secure_url);
+                }
+            }
+        );
+
+        uploadStream.end(imageBuffer);
+    });
+};
 
 // Función para eliminar imagen de Cloudinary
 export const eliminarImagen = async (imagenUrl) => {
