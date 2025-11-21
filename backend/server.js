@@ -190,6 +190,36 @@ const startServer = async () => {
             } else {
                 console.log('✅ Usuario administrador ya existe');
             }
+
+            // Verificar/crear tabla de cola de procesamiento de imágenes
+            console.log('🔍 Verificando tabla image_processing_queue...');
+            const [queueTableCheck] = await sequelize.query(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'image_processing_queue'"
+            );
+
+            const queueTableExists = parseInt(queueTableCheck[0].count) > 0;
+
+            if (!queueTableExists) {
+                console.log('🔄 Creando tabla image_processing_queue...');
+
+                // Leer y ejecutar el archivo de migración
+                const fs = await import('fs');
+                const path = await import('path');
+                const { fileURLToPath } = await import('url');
+
+                const __filename = fileURLToPath(import.meta.url);
+                const __dirname = path.dirname(__filename);
+                const migrationPath = path.join(__dirname, 'migrations', '20250120_create_image_processing_queue.sql');
+
+                const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+
+                // Ejecutar el SQL de migración
+                await sequelize.query(migrationSQL);
+
+                console.log('✅ Tabla image_processing_queue creada exitosamente');
+            } else {
+                console.log('✅ Tabla image_processing_queue ya existe');
+            }
         }
 
         // Iniciar servidor
