@@ -10,7 +10,9 @@ import {
   Loader2,
   AlertCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  X,
+  ZoomIn
 } from 'lucide-react';
 import articulosService from '../services/articulos.service';
 import { Loader, Button } from '../components/common';
@@ -26,6 +28,7 @@ const ProcesamientoMasivoPage = () => {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [imagenModal, setImagenModal] = useState(null); // Para ver imagen grande
 
   // Cargar artículos, estado de cola e historial al iniciar
   useEffect(() => {
@@ -345,13 +348,26 @@ const ProcesamientoMasivoPage = () => {
                   `}
                 >
                   {/* Imagen Grande */}
-                  <div className="relative aspect-square bg-gray-100">
+                  <div className="relative aspect-square bg-gray-100 group">
                     {articulo.imagen_url ? (
-                      <img
-                        src={articulo.imagen_url}
-                        alt={articulo.nombre}
-                        className="w-full h-full object-cover"
-                      />
+                      <>
+                        <img
+                          src={articulo.imagen_url}
+                          alt={articulo.nombre}
+                          className="w-full h-full object-cover"
+                        />
+                        {/* Botón de zoom */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setImagenModal({ url: articulo.imagen_url, nombre: articulo.nombre });
+                          }}
+                          className="absolute bottom-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Ver imagen completa"
+                        >
+                          <ZoomIn className="w-4 h-4" />
+                        </button>
+                      </>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <ImageIcon className="w-8 h-8 text-gray-300" />
@@ -473,6 +489,35 @@ const ProcesamientoMasivoPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal para ver imagen grande */}
+      {imagenModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          onClick={() => setImagenModal(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] m-4">
+            {/* Botón cerrar */}
+            <button
+              onClick={() => setImagenModal(null)}
+              className="absolute -top-10 right-0 p-2 text-white hover:text-gray-300 transition-colors"
+            >
+              <X className="w-8 h-8" />
+            </button>
+            {/* Nombre del artículo */}
+            <div className="absolute -top-10 left-0 text-white font-medium truncate max-w-md">
+              {imagenModal.nombre}
+            </div>
+            {/* Imagen */}
+            <img
+              src={imagenModal.url}
+              alt={imagenModal.nombre}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
