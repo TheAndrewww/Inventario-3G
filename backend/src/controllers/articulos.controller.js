@@ -899,7 +899,6 @@ export const generarEtiquetasLote = async (req, res) => {
 export const uploadArticuloImagen = async (req, res) => {
     try {
         const { id } = req.params;
-        const { isFromCamera } = req.body; // Recibir flag de origen
 
         // Verificar que el artículo existe
         const articulo = await Articulo.findByPk(id);
@@ -930,39 +929,11 @@ export const uploadArticuloImagen = async (req, res) => {
             }
         }
 
-        let imageBuffer = req.file.buffer;
-        let processedWithNanoBanana = false;
+        const imageBuffer = req.file.buffer;
 
-        // Si es foto de cámara, procesar con Gemini
-        if (isFromCamera === 'true' || isFromCamera === true) {
-            try {
-                console.log('📸 Foto de cámara detectada, procesando con Gemini...');
-                const { procesarImagenConNanoBanana, isNanoBananaEnabled } = await import('../services/nanoBanana.service.js');
-
-                if (isNanoBananaEnabled()) {
-                    // Procesar con metadata del artículo para prompt contextual
-                    const processedBuffer = await procesarImagenConNanoBanana(imageBuffer, {
-                        imageName: req.file.originalname,
-                        nombre: articulo.nombre,
-                        descripcion: articulo.descripcion,
-                        unidad: articulo.unidad
-                    });
-                    imageBuffer = processedBuffer;
-                    processedWithNanoBanana = true;
-                    console.log('✅ Imagen procesada con Gemini usando contexto del artículo');
-                } else {
-                    console.log('⚠️ Gemini no está configurado, usando imagen original');
-                }
-            } catch (geminiError) {
-                console.error('❌ Error al procesar con Gemini:', geminiError.message);
-                console.log('📤 Continuando con imagen original...');
-                // Si falla Gemini, continuar con imagen original
-            }
-        } else {
-            console.log('📁 Archivo subido, sin procesamiento de IA');
-        }
-
-        // Subir a Cloudinary
+        // Subir imagen directamente a Cloudinary (sin procesamiento IA automático)
+        // El procesamiento con IA se hace manualmente con el botón "Mejorar IA"
+        console.log('📤 Subiendo imagen a Cloudinary...');
         const { uploadBufferToCloudinary } = await import('../config/cloudinary.js');
         const imageUrl = await uploadBufferToCloudinary(imageBuffer);
 
@@ -973,10 +944,9 @@ export const uploadArticuloImagen = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: `Imagen subida exitosamente${processedWithNanoBanana ? ' (procesada con IA)' : ''}`,
+            message: 'Imagen subida exitosamente',
             data: {
-                imagen_url: imageUrl,
-                processed_with_ai: processedWithNanoBanana
+                imagen_url: imageUrl
             }
         });
 
