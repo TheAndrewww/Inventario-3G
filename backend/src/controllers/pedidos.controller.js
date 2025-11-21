@@ -125,7 +125,11 @@ export const crearPedido = async (req, res) => {
       if (nuevoStock < 0) {
         // Stock negativo: necesitamos comprar para cubrir el déficit + reponer hasta el máximo
         const deficit = Math.abs(nuevoStock); // Cantidad en negativo
-        const stockMaximo = parseFloat(articulo.stock_maximo) || parseFloat(articulo.stock_minimo) * 3;
+
+        // Calcular stock máximo con valores predeterminados si son NULL
+        const stockMin = parseFloat(articulo.stock_minimo) || 10; // Default: 10
+        const stockMaximo = parseFloat(articulo.stock_maximo) || (stockMin * 3); // Default: 3x mínimo
+
         const cantidadTotal = deficit + stockMaximo; // Déficit + reposición completa
 
         // Generar ticket_id para la solicitud
@@ -164,9 +168,13 @@ export const crearPedido = async (req, res) => {
           deficit: deficit
         });
 
-      } else if (nuevoStock < parseFloat(articulo.stock_minimo)) {
+      } else if (articulo.stock_minimo && nuevoStock < parseFloat(articulo.stock_minimo)) {
         // Stock positivo pero bajo el mínimo: reponer hasta el máximo
-        const stockMaximo = parseFloat(articulo.stock_maximo) || parseFloat(articulo.stock_minimo) * 3;
+
+        // Calcular stock máximo con valores predeterminados si son NULL
+        const stockMin = parseFloat(articulo.stock_minimo) || 10; // Default: 10
+        const stockMaximo = parseFloat(articulo.stock_maximo) || (stockMin * 3); // Default: 3x mínimo
+
         const cantidadAReponer = stockMaximo - nuevoStock;
 
         // Generar ticket_id para la solicitud
