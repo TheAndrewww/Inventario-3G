@@ -109,6 +109,16 @@ export const crearPedido = async (req, res) => {
     // Array para almacenar las solicitudes de compra creadas
     const solicitudesCreadas = [];
 
+    // Obtener contador base de solicitudes del día (una sola vez, antes del loop)
+    const contadorBaseSolicitudes = await SolicitudCompra.count({
+      where: {
+        created_at: {
+          [Op.between]: [inicioDelDia, finDelDia]
+        }
+      }
+    });
+    let contadorSolicitudesIncremental = 0; // Contador incremental para este pedido
+
     // Procesar cada artículo: descontar stock y crear solicitudes si es necesario
     for (const articuloPedido of articulos) {
       const articulo = articulosDB.find(a => a.id === articuloPedido.articulo_id);
@@ -132,20 +142,12 @@ export const crearPedido = async (req, res) => {
 
         const cantidadTotal = deficit + stockMaximo; // Déficit + reposición completa
 
-        // Generar ticket_id para la solicitud
+        // Generar ticket_id para la solicitud (usando contador incremental)
+        contadorSolicitudesIncremental++;
         const fechaSolicitud = new Date();
         const ddmmyySC = fechaSolicitud.toISOString().slice(2, 10).replace(/-/g, '').match(/.{2}/g).reverse().join('');
         const hhmmSC = fechaSolicitud.toTimeString().slice(0, 5).replace(':', '');
-
-        const contadorSolicitudes = await SolicitudCompra.count({
-          where: {
-            created_at: {
-              [Op.between]: [inicioDelDia, finDelDia]
-            }
-          }
-        });
-
-        const nnSC = String(contadorSolicitudes + 1).padStart(2, '0');
+        const nnSC = String(contadorBaseSolicitudes + contadorSolicitudesIncremental).padStart(2, '0');
         const ticket_id_solicitud = `SC-${ddmmyySC}-${hhmmSC}-${nnSC}`;
 
         const solicitud = await SolicitudCompra.create({
@@ -177,20 +179,12 @@ export const crearPedido = async (req, res) => {
 
         const cantidadAReponer = stockMaximo - nuevoStock;
 
-        // Generar ticket_id para la solicitud
+        // Generar ticket_id para la solicitud (usando contador incremental)
+        contadorSolicitudesIncremental++;
         const fechaSolicitud = new Date();
         const ddmmyySC = fechaSolicitud.toISOString().slice(2, 10).replace(/-/g, '').match(/.{2}/g).reverse().join('');
         const hhmmSC = fechaSolicitud.toTimeString().slice(0, 5).replace(':', '');
-
-        const contadorSolicitudes = await SolicitudCompra.count({
-          where: {
-            created_at: {
-              [Op.between]: [inicioDelDia, finDelDia]
-            }
-          }
-        });
-
-        const nnSC = String(contadorSolicitudes + 1).padStart(2, '0');
+        const nnSC = String(contadorBaseSolicitudes + contadorSolicitudesIncremental).padStart(2, '0');
         const ticket_id_solicitud = `SC-${ddmmyySC}-${hhmmSC}-${nnSC}`;
 
         const solicitud = await SolicitudCompra.create({
