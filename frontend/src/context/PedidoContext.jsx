@@ -41,7 +41,8 @@ export const PedidoProvider = ({ children }) => {
             : item
         );
       } else {
-        return [...prevItems, { ...articulo, cantidad }];
+        // Agregar nuevo artículo al INICIO del array (arriba)
+        return [{ ...articulo, cantidad }, ...prevItems];
       }
     });
   };
