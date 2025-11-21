@@ -133,6 +133,67 @@ const articulosService = {
     }
   },
 
+  // ============ COLA DE PROCESAMIENTO MASIVO ============
+
+  // Agregar múltiples artículos a la cola de procesamiento
+  async batchProcessImages(articulosIds, prioridad = 0) {
+    try {
+      const response = await api.post('/articulos/batch-process-images', {
+        articuloIds: articulosIds,
+        prioridad: prioridad
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al agregar artículos a la cola' };
+    }
+  },
+
+  // Obtener estado actual de la cola de procesamiento
+  async getProcessingQueueStatus() {
+    try {
+      const response = await api.get('/articulos/processing-queue/status');
+      return response.data.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al obtener estado de la cola' };
+    }
+  },
+
+  // Obtener historial de la cola de procesamiento
+  async getProcessingQueueHistory(limit = 50, offset = 0) {
+    try {
+      const response = await api.get('/articulos/processing-queue/history', {
+        params: { limit, offset }
+      });
+      return response.data.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al obtener historial de la cola' };
+    }
+  },
+
+  // Reintentar artículo fallido en la cola
+  async retryQueueItem(queueId) {
+    try {
+      const response = await api.post(`/articulos/processing-queue/${queueId}/retry`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al reintentar procesamiento' };
+    }
+  },
+
+  // Limpiar cola (eliminar completados y fallidos antiguos)
+  async cleanProcessingQueue(dias = 7) {
+    try {
+      const response = await api.delete('/articulos/processing-queue/clean', {
+        params: { dias }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al limpiar cola' };
+    }
+  },
+
+  // ============ ETIQUETAS ============
+
   // Generar PDF con múltiples etiquetas
   async generarEtiquetasLote(articulosIds) {
     try {

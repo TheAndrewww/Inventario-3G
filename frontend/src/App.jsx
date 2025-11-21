@@ -20,6 +20,7 @@ import ProveedoresPage from './pages/ProveedoresPage';
 import OrdenesCompraPage from './pages/OrdenesCompraPage';
 import RentaHerramientasPage from './pages/RentaHerramientasPage';
 import CalendarioPage from './pages/CalendarioPage';
+import ProcesamientoMasivoPage from './pages/ProcesamientoMasivoPage';
 
 function App() {
   return (
@@ -77,6 +78,7 @@ function App() {
               <Route path="historial" element={<HistorialPage />} />
               <Route path="proveedores" element={<ProveedoresPage />} />
               <Route path="calendario" element={<CalendarioPage />} />
+              <Route path="procesamiento-masivo" element={<ProcesamientoMasivoPage />} />
               <Route path="perfil" element={<PerfilPage />} />
             </Route>
 

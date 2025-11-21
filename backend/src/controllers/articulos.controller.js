@@ -1118,6 +1118,150 @@ export const reprocessArticuloImagen = async (req, res) => {
     }
 };
 
+/**
+ * POST /api/articulos/batch-process-images
+ * Agregar múltiples artículos a la cola de procesamiento masivo
+ */
+export const batchProcessImages = async (req, res) => {
+    try {
+        const { articuloIds, prioridad = 0 } = req.body;
+
+        if (!Array.isArray(articuloIds) || articuloIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Se requiere un array de IDs de artículos'
+            });
+        }
+
+        // Importar servicio de cola
+        const { agregarArticulosACola } = await import('../services/imageProcessingQueue.service.js');
+
+        // Agregar a la cola
+        const resultado = await agregarArticulosACola(articuloIds, prioridad);
+
+        res.status(200).json({
+            success: true,
+            message: `${resultado.agregados} artículo(s) agregado(s) a la cola de procesamiento`,
+            data: resultado
+        });
+
+    } catch (error) {
+        console.error('Error en batchProcessImages:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al agregar artículos a la cola',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * GET /api/articulos/processing-queue/status
+ * Obtener estado actual de la cola de procesamiento
+ */
+export const getProcessingQueueStatus = async (req, res) => {
+    try {
+        const { obtenerEstadoCola } = await import('../services/imageProcessingQueue.service.js');
+        const estado = await obtenerEstadoCola();
+
+        res.status(200).json({
+            success: true,
+            data: estado
+        });
+
+    } catch (error) {
+        console.error('Error en getProcessingQueueStatus:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener estado de la cola',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * GET /api/articulos/processing-queue/history
+ * Obtener historial de la cola de procesamiento
+ */
+export const getProcessingQueueHistory = async (req, res) => {
+    try {
+        const { limit = 50, offset = 0 } = req.query;
+        const { obtenerHistorialCola } = await import('../services/imageProcessingQueue.service.js');
+
+        const historial = await obtenerHistorialCola(parseInt(limit), parseInt(offset));
+
+        res.status(200).json({
+            success: true,
+            data: {
+                historial,
+                limit: parseInt(limit),
+                offset: parseInt(offset)
+            }
+        });
+
+    } catch (error) {
+        console.error('Error en getProcessingQueueHistory:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener historial de la cola',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * POST /api/articulos/processing-queue/:id/retry
+ * Reintentar procesamiento de un artículo fallido
+ */
+export const retryQueueItem = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reintentarArticulo } = await import('../services/imageProcessingQueue.service.js');
+
+        await reintentarArticulo(parseInt(id));
+
+        res.status(200).json({
+            success: true,
+            message: 'Artículo marcado para reintento'
+        });
+
+    } catch (error) {
+        console.error('Error en retryQueueItem:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al reintentar artículo',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * DELETE /api/articulos/processing-queue/clean
+ * Limpiar cola (eliminar completados y fallidos antiguos)
+ */
+export const cleanProcessingQueue = async (req, res) => {
+    try {
+        const { dias = 7 } = req.query;
+        const { limpiarCola } = await import('../services/imageProcessingQueue.service.js');
+
+        const eliminados = await limpiarCola(parseInt(dias));
+
+        res.status(200).json({
+            success: true,
+            message: `${eliminados} elemento(s) eliminado(s) de la cola`,
+            data: { eliminados }
+        });
+
+    } catch (error) {
+        console.error('Error en cleanProcessingQueue:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al limpiar cola',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
 export default {
     getArticulos,
     getArticuloById,
@@ -1131,5 +1275,10 @@ export default {
     getArticuloEtiqueta,
     uploadArticuloImagen,
     deleteArticuloImagen,
-    reprocessArticuloImagen
+    reprocessArticuloImagen,
+    batchProcessImages,
+    getProcessingQueueStatus,
+    getProcessingQueueHistory,
+    retryQueueItem,
+    cleanProcessingQueue
 };

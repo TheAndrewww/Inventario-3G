@@ -193,12 +193,16 @@ const startServer = async () => {
         }
 
         // Iniciar servidor
-        app.listen(PORT, () => {
+        app.listen(PORT, async () => {
             console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
             console.log(`📦 Ambiente: ${process.env.NODE_ENV || 'development'}`);
 
             // Iniciar cron jobs
             iniciarCronJobs();
+
+            // Iniciar worker de procesamiento de imágenes
+            const { iniciarWorker } = await import('./src/workers/imageProcessingWorker.js');
+            iniciarWorker();
         });
     } catch (error) {
         console.error('❌ Error al iniciar el servidor:', error);

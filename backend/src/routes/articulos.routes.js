@@ -13,7 +13,12 @@ import {
     generarEtiquetasLote,
     uploadArticuloImagen,
     deleteArticuloImagen,
-    reprocessArticuloImagen
+    reprocessArticuloImagen,
+    batchProcessImages,
+    getProcessingQueueStatus,
+    getProcessingQueueHistory,
+    retryQueueItem,
+    cleanProcessingQueue
 } from '../controllers/articulos.controller.js';
 import {
     verificarToken,
@@ -47,6 +52,44 @@ router.get('/ean13/:codigoEAN13', verificarToken, getArticuloByEAN13);
  * @body    { articulos_ids: [1, 2, 3, ...] }
  */
 router.post('/etiquetas/lote', verificarToken, generarEtiquetasLote);
+
+/**
+ * @route   POST /api/articulos/batch-process-images
+ * @desc    Agregar múltiples artículos a la cola de procesamiento masivo con Gemini
+ * @access  Private (Almacen, Supervisor, Admin)
+ * @body    { articuloIds: [1, 2, 3, ...], prioridad: 0 }
+ */
+router.post('/batch-process-images', verificarToken, accesoInventario, batchProcessImages);
+
+/**
+ * @route   GET /api/articulos/processing-queue/status
+ * @desc    Obtener estado actual de la cola de procesamiento
+ * @access  Private
+ */
+router.get('/processing-queue/status', verificarToken, getProcessingQueueStatus);
+
+/**
+ * @route   GET /api/articulos/processing-queue/history
+ * @desc    Obtener historial de la cola de procesamiento
+ * @access  Private
+ * @query   limit, offset
+ */
+router.get('/processing-queue/history', verificarToken, getProcessingQueueHistory);
+
+/**
+ * @route   POST /api/articulos/processing-queue/:id/retry
+ * @desc    Reintentar procesamiento de un artículo fallido
+ * @access  Private (Admin)
+ */
+router.post('/processing-queue/:id/retry', verificarToken, esAdministrador, retryQueueItem);
+
+/**
+ * @route   DELETE /api/articulos/processing-queue/clean
+ * @desc    Limpiar cola (eliminar completados y fallidos antiguos)
+ * @access  Private (Admin)
+ * @query   dias (default: 7)
+ */
+router.delete('/processing-queue/clean', verificarToken, esAdministrador, cleanProcessingQueue);
 
 /**
  * @route   GET /api/articulos/:id/barcode
