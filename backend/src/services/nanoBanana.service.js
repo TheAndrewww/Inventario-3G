@@ -56,7 +56,7 @@ const generarPrompt = (metadata = {}) => {
     const tieneMedidas = tieneDimensiones(nombre || '', descripcion || '');
 
     if (tieneMedidas) {
-        prompt += `\n\nEste artículo tiene especificaciones de tamaño/medidas. IMPORTANTE: Agrega líneas de señalamiento (líneas de acotación o cotas) sutiles y profesionales que indiquen las dimensiones principales del producto. Las líneas deben ser finas, en color gris oscuro (#333333), con flechas pequeñas en los extremos, ubicadas estratégicamente sin obstruir el producto. Estilo técnico de dibujo industrial pero minimalista.`;
+        prompt += `\n\nEste artículo tiene especificaciones de tamaño/medidas. IMPORTANTE: Agrega líneas de señalamiento (líneas de acotación o cotas) profesionales que indiquen las dimensiones principales del producto. Las líneas deben ser de grosor medio-grueso, en color rojo vibrante (#FF0000 o #E30613), con flechas en los extremos, ubicadas estratégicamente sin obstruir el producto. Estilo técnico de dibujo industrial. MUY IMPORTANTE: NO agregues texto, números, letras ni etiquetas en la imagen. SOLO las líneas y flechas sin ningún tipo de texto.`;
     }
 
     // Instrucciones generales
@@ -67,13 +67,10 @@ const generarPrompt = (metadata = {}) => {
 - Fondo completamente blanco puro (#FFFFFF), limpio, uniforme, sin sombras duras ni ruido
 - Estilo fotorrealista con acabado nítido, enfoque perfecto y calidad fotográfica profesional
 - NO modifiques el diseño del artículo ni agregues elementos decorativos
+- PROHIBIDO agregar cualquier tipo de texto, números, letras o palabras en la imagen (incluyendo "${unidad || 'unidades'}", medidas, o cualquier etiqueta)
 - Solo mejora la presentación fotográfica del producto para inventario/catálogo`;
 
-    if (unidad) {
-        prompt += `\n- Unidad de medida del producto: ${unidad}`;
-    }
-
-    prompt += `\n\nGenera la imagen en alta resolución con calidad de catálogo profesional.`;
+    prompt += `\n\nGenera la imagen en alta resolución con calidad de catálogo profesional. Recuerda: NINGÚN TEXTO en la imagen.`;
 
     return prompt;
 };
