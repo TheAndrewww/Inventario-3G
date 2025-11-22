@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, Camera, Download, FileText, PlusCircle } from 'lucide-react';
+import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, Camera, Download, FileText, PlusCircle, RotateCcw } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import articulosService from '../services/articulos.service';
 import proveedoresService from '../services/proveedores.service';
@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import EAN13ScannerOrdenesCompra from '../components/scanner/EAN13ScannerOrdenesCompra';
 import { jsPDF } from 'jspdf';
+import AnularOrdenCompraModal from '../components/ordenes-compra/AnularOrdenCompraModal';
 
 const OrdenesCompraPage = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -27,11 +28,14 @@ const OrdenesCompraPage = () => {
   const [filterCategoria, setFilterCategoria] = useState('');
   const [searchSolicitudes, setSearchSolicitudes] = useState('');
   const [estadisticas, setEstadisticas] = useState(null);
+  const [modalAnular, setModalAnular] = useState(false);
+  const [ordenAAnular, setOrdenAAnular] = useState(null);
   const { user } = useAuth();
 
   // Verificar permisos
   const puedeCrearOrdenes = ['administrador', 'diseñador', 'almacen', 'compras'].includes(user?.rol);
   const esDiseñador = user?.rol === 'diseñador';
+  const puedeAnularOrdenes = ['administrador', 'almacen', 'compras'].includes(user?.rol);
 
   useEffect(() => {
     fetchData();
@@ -134,6 +138,23 @@ const OrdenesCompraPage = () => {
     } catch (error) {
       toast.error('Error al actualizar el estado');
     }
+  };
+
+  const handleAbrirModalAnular = (orden) => {
+    setOrdenAAnular(orden);
+    setModalAnular(true);
+  };
+
+  const handleAnularOrden = async (ordenId, motivo) => {
+    const response = await ordenesCompraService.anular(ordenId, motivo);
+    toast.success(response.message);
+    await fetchData();
+    await fetchEstadisticas();
+    setModalAnular(false);
+    setOrdenAAnular(null);
+    setModalDetalle(false);
+    setOrdenSeleccionada(null);
+    return response;
   };
 
   // Función para cargar imagen desde URL y obtener base64 + dimensiones
@@ -918,6 +939,8 @@ const OrdenesCompraPage = () => {
             setOrdenSeleccionada(null);
           }}
           onActualizarEstado={handleActualizarEstado}
+          puedeAnularOrdenes={puedeAnularOrdenes}
+          onAbrirModalAnular={handleAbrirModalAnular}
         />
       )}
 
@@ -932,6 +955,19 @@ const OrdenesCompraPage = () => {
             setSolicitudesSeleccionadas([]);
             fetchData();
           }}
+        />
+      )}
+
+      {/* Modal Anular Orden de Compra */}
+      {modalAnular && ordenAAnular && (
+        <AnularOrdenCompraModal
+          isOpen={modalAnular}
+          onClose={() => {
+            setModalAnular(false);
+            setOrdenAAnular(null);
+          }}
+          orden={ordenAAnular}
+          onAnular={handleAnularOrden}
         />
       )}
     </div>
@@ -1533,7 +1569,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
 };
 
 // Modal para ver detalle de orden con trazabilidad
-const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado }) => {
+const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, onAbrirModalAnular }) => {
   const [tabActual, setTabActual] = React.useState('detalle'); // 'detalle' o 'historial'
 
   return (
@@ -1647,6 +1683,16 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado }) => {
           )}
 
           <div className="flex gap-3 justify-end mt-6">
+            {puedeAnularOrdenes && orden.estado !== 'cancelada' && (
+              <Button
+                onClick={() => onAbrirModalAnular(orden)}
+                variant="danger"
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <RotateCcw size={16} />
+                Anular Orden
+              </Button>
+            )}
             <Button onClick={onClose} variant="secondary">
               Cerrar
             </Button>
@@ -1657,6 +1703,16 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado }) => {
           <TimelineHistorial ordenId={orden.id} />
 
           <div className="flex gap-3 justify-end mt-6">
+            {puedeAnularOrdenes && orden.estado !== 'cancelada' && (
+              <Button
+                onClick={() => onAbrirModalAnular(orden)}
+                variant="danger"
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <RotateCcw size={16} />
+                Anular Orden
+              </Button>
+            )}
             <Button onClick={onClose} variant="secondary">
               Cerrar
             </Button>

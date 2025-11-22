@@ -59,6 +59,12 @@ const ordenesCompraService = {
   obtenerHistorial: async (id) => {
     const response = await api.get(`/ordenes-compra/${id}/historial`);
     return response.data;
+  },
+
+  // Anular orden de compra (CON reversión completa de stock y solicitudes)
+  anular: async (id, motivo) => {
+    const response = await api.put(`/ordenes-compra/${id}/anular`, { motivo });
+    return response.data;
   }
 };
 
