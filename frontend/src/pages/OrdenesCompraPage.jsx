@@ -71,9 +71,30 @@ const OrdenesCompraPage = () => {
   };
 
   const handleClickSolicitud = (solicitud) => {
-    // Abrir modal de crear orden directamente con esta solicitud
+    // Identificar el proveedor preferido de la solicitud clickeada
+    const proveedorPreferido = solicitud.articulo?.proveedor?.id;
+
+    // Si tiene proveedor preferido, seleccionar todas las solicitudes con el mismo proveedor
+    if (proveedorPreferido) {
+      const solicitudesMismoProveedor = solicitudes
+        .filter(s => s.articulo?.proveedor?.id === proveedorPreferido)
+        .map(s => s.id);
+
+      if (solicitudesMismoProveedor.length > 1) {
+        const nombreProveedor = solicitud.articulo?.proveedor?.nombre;
+        toast.success(
+          `Se seleccionaron ${solicitudesMismoProveedor.length} solicitudes del proveedor ${nombreProveedor}`,
+          { duration: 3000 }
+        );
+      }
+
+      setSolicitudesSeleccionadas(solicitudesMismoProveedor);
+    } else {
+      // Si no tiene proveedor preferido, solo seleccionar esta solicitud
+      setSolicitudesSeleccionadas([solicitud.id]);
+    }
+
     setModalCrearDesdeSeleccion(true);
-    setSolicitudesSeleccionadas([solicitud.id]);
   };
 
   const handleAbrirModalCrearDesdeSeleccion = () => {
