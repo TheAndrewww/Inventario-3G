@@ -119,6 +119,9 @@ export const crearPedido = async (req, res) => {
     });
     let contadorSolicitudesIncremental = 0; // Contador incremental para este pedido
 
+    // Determinar el nombre del pedido para usar en los motivos
+    const nombrePedido = equipo ? equipo.nombre : (proyecto || 'Pedido sin nombre');
+
     // Procesar cada artículo: descontar stock y crear solicitudes si es necesario
     for (const articuloPedido of articulos) {
       const articulo = articulosDB.find(a => a.id === articuloPedido.articulo_id);
@@ -158,7 +161,7 @@ export const crearPedido = async (req, res) => {
 
           await solicitudExistente.update({
             cantidad_solicitada: nuevaCantidad,
-            motivo: `${solicitudExistente.motivo}\n\n[ACTUALIZACIÓN] Pedido ${ticket_id} agregó ${deficit} ${articulo.unidad} adicionales de déficit. Nueva cantidad total: ${nuevaCantidad} ${articulo.unidad}.`,
+            motivo: `${solicitudExistente.motivo}\n\n[ACTUALIZACIÓN] Pedido ${nombrePedido} agregó ${deficit} ${articulo.unidad} adicionales de déficit. Nueva cantidad total: ${nuevaCantidad} ${articulo.unidad}.`,
             prioridad: 'alta' // Mantener prioridad alta
           }, { transaction });
 
@@ -190,7 +193,7 @@ export const crearPedido = async (req, res) => {
             ticket_id: ticket_id_solicitud,
             articulo_id: articulo.id,
             cantidad_solicitada: cantidadTotal,
-            motivo: `Stock negativo después de pedido ${ticket_id}. Déficit: ${deficit} ${articulo.unidad}. Se solicitan ${cantidadTotal} ${articulo.unidad} (${deficit} para cubrir déficit + ${stockMaximo} para reposición hasta stock máximo).`,
+            motivo: `Stock negativo después de pedido ${nombrePedido}. Déficit: ${deficit} ${articulo.unidad}. Se solicitan ${cantidadTotal} ${articulo.unidad} (${deficit} para cubrir déficit + ${stockMaximo} para reposición hasta stock máximo).`,
             pedido_origen_id: null, // Se asignará después de crear el pedido
             usuario_solicitante_id: usuario_id,
             prioridad: 'alta', // Prioridad alta por stock negativo
@@ -233,7 +236,7 @@ export const crearPedido = async (req, res) => {
 
           await solicitudExistente.update({
             cantidad_solicitada: nuevaCantidad,
-            motivo: `${solicitudExistente.motivo}\n\n[ACTUALIZACIÓN] Pedido ${ticket_id} redujo el stock a ${nuevoStock} ${articulo.unidad}. Cantidad ajustada a ${nuevaCantidad} ${articulo.unidad} para alcanzar stock máximo.`,
+            motivo: `${solicitudExistente.motivo}\n\n[ACTUALIZACIÓN] Pedido ${nombrePedido} redujo el stock a ${nuevoStock} ${articulo.unidad}. Cantidad ajustada a ${nuevaCantidad} ${articulo.unidad} para alcanzar stock máximo.`,
             prioridad: 'media'
           }, { transaction });
 
@@ -264,7 +267,7 @@ export const crearPedido = async (req, res) => {
             ticket_id: ticket_id_solicitud,
             articulo_id: articulo.id,
             cantidad_solicitada: cantidadAReponer,
-            motivo: `Stock bajo mínimo después de pedido ${ticket_id}. Stock actual: ${nuevoStock} ${articulo.unidad}. Se solicita reposición hasta stock máximo (${stockMaximo} ${articulo.unidad}).`,
+            motivo: `Stock bajo mínimo después de pedido ${nombrePedido}. Stock actual: ${nuevoStock} ${articulo.unidad}. Se solicita reposición hasta stock máximo (${stockMaximo} ${articulo.unidad}).`,
             pedido_origen_id: null, // Se asignará después de crear el pedido
             usuario_solicitante_id: usuario_id,
             prioridad: 'media',
