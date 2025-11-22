@@ -70,34 +70,10 @@ const OrdenesCompraPage = () => {
     }
   };
 
-  const handleToggleSolicitud = (solicitudId) => {
-    setSolicitudesSeleccionadas(prev => {
-      if (prev.includes(solicitudId)) {
-        return prev.filter(id => id !== solicitudId);
-      } else {
-        return [...prev, solicitudId];
-      }
-    });
-  };
-
-  const handleToggleTodas = () => {
-    if (filteredSolicitudes.length === 0) return;
-
-    // Si todas las solicitudes filtradas están seleccionadas, deseleccionar todas
-    const todasSeleccionadas = filteredSolicitudes.every(s => solicitudesSeleccionadas.includes(s.id));
-
-    if (todasSeleccionadas) {
-      // Remover las IDs de las solicitudes filtradas de la selección
-      const idsARemover = filteredSolicitudes.map(s => s.id);
-      setSolicitudesSeleccionadas(prev => prev.filter(id => !idsARemover.includes(id)));
-    } else {
-      // Agregar todas las IDs de las solicitudes filtradas que no estén ya seleccionadas
-      const nuevasIds = filteredSolicitudes.map(s => s.id);
-      setSolicitudesSeleccionadas(prev => {
-        const set = new Set([...prev, ...nuevasIds]);
-        return Array.from(set);
-      });
-    }
+  const handleClickSolicitud = (solicitud) => {
+    // Abrir modal de crear orden directamente con esta solicitud
+    setModalCrearDesdeSeleccion(true);
+    setSolicitudesSeleccionadas([solicitud.id]);
   };
 
   const handleAbrirModalCrearDesdeSeleccion = () => {
@@ -770,16 +746,10 @@ const OrdenesCompraPage = () => {
               {filteredSolicitudes.length !== solicitudes.length ? (
                 <>
                   Mostrando {filteredSolicitudes.length} de {solicitudes.length} solicitudes
-                  {solicitudesSeleccionadas.length > 0 && (
-                    <> • {solicitudesSeleccionadas.length} seleccionada{solicitudesSeleccionadas.length !== 1 ? 's' : ''}</>
-                  )}
                 </>
               ) : (
                 <>
                   {solicitudes.length} solicitud{solicitudes.length !== 1 ? 'es' : ''} pendiente{solicitudes.length !== 1 ? 's' : ''}
-                  {solicitudesSeleccionadas.length > 0 && (
-                    <> • {solicitudesSeleccionadas.length} seleccionada{solicitudesSeleccionadas.length !== 1 ? 's' : ''}</>
-                  )}
                 </>
               )}
             </div>
@@ -790,23 +760,14 @@ const OrdenesCompraPage = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={filteredSolicitudes.length > 0 && solicitudesSeleccionadas.length === filteredSolicitudes.length}
-                        onChange={handleToggleTodas}
-                        className="w-4 h-4 text-red-700 border-gray-300 rounded focus:ring-red-700"
-                        title="Seleccionar todos los resultados filtrados"
-                      />
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ticket
-                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Artículo
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cantidad
+                      Cant. Solicitada
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Stock Actual
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Prioridad
@@ -822,7 +783,7 @@ const OrdenesCompraPage = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredSolicitudes.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                         {solicitudes.length === 0 ? (
                           <>
                             <CheckCircle size={48} className="mx-auto mb-2 text-green-300" />
@@ -850,19 +811,9 @@ const OrdenesCompraPage = () => {
                     filteredSolicitudes.map((solicitud) => (
                       <tr
                         key={solicitud.id}
-                        className={`hover:bg-gray-50 ${solicitudesSeleccionadas.includes(solicitud.id) ? 'bg-red-50' : ''}`}
+                        onClick={() => handleClickSolicitud(solicitud)}
+                        className="hover:bg-red-50 cursor-pointer transition-colors"
                       >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <input
-                            type="checkbox"
-                            checked={solicitudesSeleccionadas.includes(solicitud.id)}
-                            onChange={() => handleToggleSolicitud(solicitud.id)}
-                            className="w-4 h-4 text-red-700 border-gray-300 rounded focus:ring-red-700"
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="font-medium text-gray-900">{solicitud.ticket_id}</div>
-                        </td>
                         <td className="px-6 py-4">
                           <div className="text-sm font-medium text-gray-900">
                             {solicitud.articulo?.nombre}
@@ -874,6 +825,11 @@ const OrdenesCompraPage = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
                             {parseFloat(solicitud.cantidad_solicitada).toFixed(0)} {solicitud.articulo?.unidad}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-gray-900">
+                            {parseFloat(solicitud.articulo?.stock_actual || 0).toFixed(0)} {solicitud.articulo?.unidad}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -895,24 +851,6 @@ const OrdenesCompraPage = () => {
               </table>
             </div>
           </div>
-
-          {/* Botón flotante para crear orden */}
-          {solicitudesSeleccionadas.length > 0 && (
-            <div className="fixed bottom-8 right-8 z-50">
-              <button
-                onClick={handleAbrirModalCrearDesdeSeleccion}
-                className="bg-red-700 hover:bg-red-800 text-white px-6 py-4 rounded-full shadow-lg flex items-center gap-3 transition-all transform hover:scale-105"
-              >
-                <ShoppingCart size={24} />
-                <span className="font-semibold">
-                  Crear Orden con {solicitudesSeleccionadas.length} solicitud{solicitudesSeleccionadas.length !== 1 ? 'es' : ''}
-                </span>
-                <span className="bg-white text-red-700 px-3 py-1 rounded-full font-bold">
-                  {solicitudesSeleccionadas.length}
-                </span>
-              </button>
-            </div>
-          )}
         </>
       )}
 
