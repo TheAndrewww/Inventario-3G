@@ -8,9 +8,10 @@ import {
   actualizarEstadoOrden,
   crearOrdenDesdeSolicitudes,
   obtenerEstadisticas,
-  obtenerHistorialTrazabilidad
+  obtenerHistorialTrazabilidad,
+  anularOrdenCompra
 } from '../controllers/ordenesCompra.controller.js';
-import { verificarToken } from '../middleware/auth.middleware.js';
+import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
@@ -26,6 +27,11 @@ router.get('/ordenes-compra/:id', obtenerOrdenCompra);
 router.get('/ordenes-compra/:id/historial', obtenerHistorialTrazabilidad);
 router.put('/ordenes-compra/:id/enviar', enviarOrdenCompra);
 router.put('/ordenes-compra/:id/estado', actualizarEstadoOrden);
+router.put(
+  '/ordenes-compra/:id/anular',
+  verificarRol('compras', 'almacen', 'administrador'),
+  anularOrdenCompra
+);
 
 // Rutas de solicitudes de compra
 router.get('/solicitudes-compra', listarSolicitudesCompra);

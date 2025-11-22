@@ -1099,3 +1099,241 @@ export const obtenerHistorialTrazabilidad = async (req, res) => {
     });
   }
 };
+
+/**
+ * Anular una orden de compra completamente
+ * - Revierte el stock si la orden fue recibida (parcial o totalmente)
+ * - Cambia el estado de las solicitudes vinculadas de 'en_orden' a 'pendiente'
+ * - Marca la orden como 'cancelada'
+ * - Notifica a los usuarios involucrados
+ * - Solo accesible para: compras, almacén, administrador
+ */
+export const anularOrdenCompra = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body;
+    const usuario_anulador = req.usuario;
+
+    // Validar que el motivo sea proporcionado
+    if (!motivo || motivo.trim().length < 10) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar un motivo de anulación de al menos 10 caracteres'
+      });
+    }
+
+    // Validar permisos (solo compras, almacén, administrador)
+    if (!['compras', 'almacen', 'administrador'].includes(usuario_anulador.rol)) {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        message: 'No tiene permisos para anular órdenes de compra'
+      });
+    }
+
+    // Obtener la orden con todas sus relaciones
+    const orden = await OrdenCompra.findByPk(id, {
+      include: [
+        {
+          model: Usuario,
+          as: 'creador',
+          attributes: ['id', 'nombre', 'email', 'rol']
+        },
+        {
+          model: Proveedor,
+          as: 'proveedor',
+          attributes: ['id', 'nombre']
+        },
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalles',
+          include: [
+            {
+              model: Articulo,
+              as: 'articulo'
+            }
+          ]
+        },
+        {
+          model: SolicitudCompra,
+          as: 'solicitudes_origen'
+        }
+      ],
+      transaction
+    });
+
+    if (!orden) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Orden de compra no encontrada'
+      });
+    }
+
+    // Validar que la orden pueda ser anulada
+    if (orden.estado === 'cancelada') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Esta orden ya está cancelada'
+      });
+    }
+
+    // Inicializar reporte de reversiones
+    const reversiones = {
+      stock_revertido: [],
+      solicitudes_reactivadas: [],
+      movimientos_creados: []
+    };
+
+    // 1. REVERTIR STOCK si la orden fue recibida (parcial o totalmente)
+    if (orden.estado === 'recibida' || orden.estado === 'parcial') {
+      const articulosConStock = orden.detalles.filter(detalle =>
+        parseFloat(detalle.cantidad_recibida) > 0
+      );
+
+      if (articulosConStock.length > 0) {
+        // Crear movimiento de ajuste de salida para revertir el stock
+        const fecha = new Date();
+        const ddmmyy = fecha.toISOString().slice(2, 10).replace(/-/g, '').match(/.{2}/g).reverse().join('');
+        const hhmm = fecha.toTimeString().slice(0, 5).replace(':', '');
+
+        const inicioDelDia = new Date(fecha.setHours(0, 0, 0, 0));
+        const finDelDia = new Date(fecha.setHours(23, 59, 59, 999));
+
+        const contadorHoy = await Movimiento.count({
+          where: {
+            created_at: {
+              [Op.between]: [inicioDelDia, finDelDia]
+            }
+          },
+          transaction
+        });
+
+        const nn = String(contadorHoy + 1).padStart(2, '0');
+        const ticket_id_movimiento = `MOV-${ddmmyy}-${hhmm}-${nn}`;
+
+        // Crear movimiento de ajuste
+        const movimiento = await Movimiento.create({
+          ticket_id: ticket_id_movimiento,
+          tipo: 'ajuste_salida',
+          usuario_id: usuario_anulador.id,
+          estado: 'completado',
+          observaciones: `Reversión de orden de compra ${orden.ticket_id} anulada. Motivo: ${motivo}`
+        }, { transaction });
+
+        // Revertir stock de cada artículo
+        for (const detalle of articulosConStock) {
+          const articulo = detalle.articulo;
+          const cantidadRecibida = parseFloat(detalle.cantidad_recibida);
+          const stockAntes = parseFloat(articulo.stock_actual);
+          const stockDespues = stockAntes - cantidadRecibida;
+
+          // Actualizar stock del artículo
+          await articulo.update({
+            stock_actual: stockDespues
+          }, { transaction });
+
+          reversiones.stock_revertido.push({
+            articulo_id: articulo.id,
+            nombre: articulo.nombre,
+            cantidad_revertida: cantidadRecibida,
+            stock_antes: stockAntes,
+            stock_despues: stockDespues
+          });
+        }
+
+        reversiones.movimientos_creados.push({
+          ticket_id: ticket_id_movimiento,
+          tipo: 'ajuste_salida',
+          articulos_afectados: articulosConStock.length
+        });
+      }
+    }
+
+    // 2. REACTIVAR SOLICITUDES DE COMPRA vinculadas
+    if (orden.solicitudes_origen && orden.solicitudes_origen.length > 0) {
+      const solicitudesIds = orden.solicitudes_origen.map(s => s.id);
+
+      // Cambiar estado de solicitudes de 'en_orden' a 'pendiente'
+      await SolicitudCompra.update(
+        {
+          estado: 'pendiente',
+          orden_compra_id: null
+        },
+        {
+          where: {
+            id: solicitudesIds,
+            estado: 'en_orden'
+          },
+          transaction
+        }
+      );
+
+      reversiones.solicitudes_reactivadas = orden.solicitudes_origen.map(sol => ({
+        ticket_id: sol.ticket_id,
+        articulo: sol.articulo?.nombre || 'N/A',
+        cantidad: sol.cantidad_solicitada,
+        estado_anterior: 'en_orden'
+      }));
+    }
+
+    // 3. MARCAR ORDEN COMO CANCELADA
+    await orden.update({
+      estado: 'cancelada',
+      observaciones: orden.observaciones
+        ? `${orden.observaciones}\n\n[ANULADA] ${new Date().toLocaleString('es-MX')}: ${motivo}`
+        : `[ANULADA] ${new Date().toLocaleString('es-MX')}: ${motivo}`
+    }, { transaction });
+
+    await transaction.commit();
+
+    // 4. NOTIFICAR a usuarios relevantes
+    try {
+      // Notificar al creador de la orden
+      await notificarPorRol({
+        roles: ['compras', 'administrador'],
+        tipo: 'orden_anulada',
+        titulo: 'Orden de compra anulada',
+        mensaje: `${usuario_anulador.nombre} anuló la orden ${orden.ticket_id}. Motivo: ${motivo}`,
+        url: `/ordenes-compra`,
+        datos_adicionales: {
+          orden_id: orden.id,
+          ticket_id: orden.ticket_id,
+          anulado_por: usuario_anulador.nombre,
+          motivo,
+          stock_revertido: reversiones.stock_revertido.length,
+          solicitudes_reactivadas: reversiones.solicitudes_reactivadas.length
+        }
+      });
+    } catch (notifError) {
+      console.error('Error al enviar notificación:', notifError);
+      // No fallar la anulación si falla la notificación
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Orden de compra ${orden.ticket_id} anulada exitosamente`,
+      data: {
+        orden: {
+          id: orden.id,
+          ticket_id: orden.ticket_id,
+          estado: 'cancelada'
+        },
+        reversiones
+      }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al anular orden de compra:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al anular la orden de compra',
+      error: error.message
+    });
+  }
+};
