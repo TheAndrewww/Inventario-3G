@@ -1876,7 +1876,7 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
   }, [solicitudes, articulosEliminados]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Crear Orden desde Solicitudes">
+    <Modal isOpen={isOpen} onClose={onClose} title="Crear Orden desde Solicitudes" size="xl">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Información de solicitudes */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
