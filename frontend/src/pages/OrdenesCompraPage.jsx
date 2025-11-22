@@ -1672,6 +1672,26 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, onClose, onSucce
     fetchProveedores();
   }, []);
 
+  // Efecto para seleccionar automáticamente el proveedor preferido
+  useEffect(() => {
+    if (solicitudes.length === 0) return;
+
+    // Obtener los proveedores preferidos de todos los artículos
+    const proveedoresPreferidos = solicitudes
+      .map(s => s.articulo?.proveedor?.id)
+      .filter(id => id !== null && id !== undefined);
+
+    // Si todos los artículos tienen el mismo proveedor preferido, seleccionarlo
+    if (proveedoresPreferidos.length > 0) {
+      const primerProveedor = proveedoresPreferidos[0];
+      const todosTienenMismoProveedor = proveedoresPreferidos.every(id => id === primerProveedor);
+
+      if (todosTienenMismoProveedor) {
+        setProveedorId(primerProveedor.toString());
+      }
+    }
+  }, [solicitudes]);
+
   const fetchProveedores = async () => {
     try {
       const provData = await proveedoresService.listar();
@@ -1766,6 +1786,27 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, onClose, onSucce
               </option>
             ))}
           </select>
+
+          {/* Mensaje informativo si hay proveedor seleccionado automáticamente */}
+          {proveedorId && (() => {
+            const proveedoresPreferidos = solicitudes
+              .map(s => s.articulo?.proveedor?.id)
+              .filter(id => id !== null && id !== undefined);
+
+            const todosTienenMismoProveedor = proveedoresPreferidos.length > 0 &&
+              proveedoresPreferidos.every(id => id === proveedoresPreferidos[0]);
+
+            if (todosTienenMismoProveedor && proveedoresPreferidos[0].toString() === proveedorId) {
+              const nombreProveedor = proveedores.find(p => p.id.toString() === proveedorId)?.nombre;
+              return (
+                <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                  <CheckCircle size={12} />
+                  Proveedor preferido de {solicitudes.length === 1 ? 'este artículo' : 'estos artículos'}: {nombreProveedor}
+                </p>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         {/* Lista de artículos */}
