@@ -140,35 +140,73 @@ export const crearPedido = async (req, res) => {
         const stockMin = parseFloat(articulo.stock_minimo) || 10; // Default: 10
         const stockMaximo = parseFloat(articulo.stock_maximo) || (stockMin * 3); // Default: 3x mínimo
 
-        const cantidadTotal = deficit + stockMaximo; // Déficit + reposición completa
-
-        // Generar ticket_id para la solicitud (usando contador incremental)
-        contadorSolicitudesIncremental++;
-        const fechaSolicitud = new Date();
-        const ddmmyySC = fechaSolicitud.toISOString().slice(2, 10).replace(/-/g, '').match(/.{2}/g).reverse().join('');
-        const hhmmSC = fechaSolicitud.toTimeString().slice(0, 5).replace(':', '');
-        const nnSC = String(contadorBaseSolicitudes + contadorSolicitudesIncremental).padStart(2, '0');
-        const ticket_id_solicitud = `SC-${ddmmyySC}-${hhmmSC}-${nnSC}`;
-
-        const solicitud = await SolicitudCompra.create({
-          ticket_id: ticket_id_solicitud,
-          articulo_id: articulo.id,
-          cantidad_solicitada: cantidadTotal,
-          motivo: `Stock negativo después de pedido ${ticket_id}. Déficit: ${deficit} ${articulo.unidad}. Se solicitan ${cantidadTotal} ${articulo.unidad} (${deficit} para cubrir déficit + ${stockMaximo} para reposición hasta stock máximo).`,
-          pedido_origen_id: null, // Se asignará después de crear el pedido
-          usuario_solicitante_id: usuario_id,
-          prioridad: 'alta', // Prioridad alta por stock negativo
-          estado: 'pendiente'
-        }, { transaction });
-
-        solicitudesCreadas.push({
-          solicitud_id: solicitud.id,
-          solicitud_obj: solicitud, // Guardar referencia para actualizar luego
-          articulo: articulo.nombre,
-          cantidad_solicitada: cantidadTotal,
-          motivo: 'Stock negativo - déficit a cubrir',
-          deficit: deficit
+        // CONSOLIDACIÓN: Verificar si ya existe una solicitud pendiente de este artículo
+        const solicitudExistente = await SolicitudCompra.findOne({
+          where: {
+            articulo_id: articulo.id,
+            estado: 'pendiente'
+          },
+          transaction
         });
+
+        let solicitud;
+
+        if (solicitudExistente) {
+          // ACTUALIZAR solicitud existente: solo agregar el déficit adicional (no duplicar stock máximo)
+          const cantidadAnterior = parseFloat(solicitudExistente.cantidad_solicitada);
+          const nuevaCantidad = cantidadAnterior + deficit; // Solo agregar el déficit nuevo
+
+          await solicitudExistente.update({
+            cantidad_solicitada: nuevaCantidad,
+            motivo: `${solicitudExistente.motivo}\n\n[ACTUALIZACIÓN] Pedido ${ticket_id} agregó ${deficit} ${articulo.unidad} adicionales de déficit. Nueva cantidad total: ${nuevaCantidad} ${articulo.unidad}.`,
+            prioridad: 'alta' // Mantener prioridad alta
+          }, { transaction });
+
+          solicitud = solicitudExistente;
+
+          solicitudesCreadas.push({
+            solicitud_id: solicitud.id,
+            solicitud_obj: solicitud,
+            articulo: articulo.nombre,
+            cantidad_solicitada: nuevaCantidad,
+            motivo: 'Solicitud consolidada - déficit adicional agregado',
+            deficit: deficit,
+            consolidada: true
+          });
+
+        } else {
+          // CREAR nueva solicitud: déficit + stock máximo (solo una vez)
+          const cantidadTotal = deficit + stockMaximo;
+
+          // Generar ticket_id para la solicitud (usando contador incremental)
+          contadorSolicitudesIncremental++;
+          const fechaSolicitud = new Date();
+          const ddmmyySC = fechaSolicitud.toISOString().slice(2, 10).replace(/-/g, '').match(/.{2}/g).reverse().join('');
+          const hhmmSC = fechaSolicitud.toTimeString().slice(0, 5).replace(':', '');
+          const nnSC = String(contadorBaseSolicitudes + contadorSolicitudesIncremental).padStart(2, '0');
+          const ticket_id_solicitud = `SC-${ddmmyySC}-${hhmmSC}-${nnSC}`;
+
+          solicitud = await SolicitudCompra.create({
+            ticket_id: ticket_id_solicitud,
+            articulo_id: articulo.id,
+            cantidad_solicitada: cantidadTotal,
+            motivo: `Stock negativo después de pedido ${ticket_id}. Déficit: ${deficit} ${articulo.unidad}. Se solicitan ${cantidadTotal} ${articulo.unidad} (${deficit} para cubrir déficit + ${stockMaximo} para reposición hasta stock máximo).`,
+            pedido_origen_id: null, // Se asignará después de crear el pedido
+            usuario_solicitante_id: usuario_id,
+            prioridad: 'alta', // Prioridad alta por stock negativo
+            estado: 'pendiente'
+          }, { transaction });
+
+          solicitudesCreadas.push({
+            solicitud_id: solicitud.id,
+            solicitud_obj: solicitud,
+            articulo: articulo.nombre,
+            cantidad_solicitada: cantidadTotal,
+            motivo: 'Stock negativo - déficit a cubrir',
+            deficit: deficit,
+            consolidada: false
+          });
+        }
 
       } else if (articulo.stock_minimo && nuevoStock < parseFloat(articulo.stock_minimo)) {
         // Stock positivo pero bajo el mínimo: reponer hasta el máximo
@@ -177,34 +215,71 @@ export const crearPedido = async (req, res) => {
         const stockMin = parseFloat(articulo.stock_minimo) || 10; // Default: 10
         const stockMaximo = parseFloat(articulo.stock_maximo) || (stockMin * 3); // Default: 3x mínimo
 
-        const cantidadAReponer = stockMaximo - nuevoStock;
-
-        // Generar ticket_id para la solicitud (usando contador incremental)
-        contadorSolicitudesIncremental++;
-        const fechaSolicitud = new Date();
-        const ddmmyySC = fechaSolicitud.toISOString().slice(2, 10).replace(/-/g, '').match(/.{2}/g).reverse().join('');
-        const hhmmSC = fechaSolicitud.toTimeString().slice(0, 5).replace(':', '');
-        const nnSC = String(contadorBaseSolicitudes + contadorSolicitudesIncremental).padStart(2, '0');
-        const ticket_id_solicitud = `SC-${ddmmyySC}-${hhmmSC}-${nnSC}`;
-
-        const solicitud = await SolicitudCompra.create({
-          ticket_id: ticket_id_solicitud,
-          articulo_id: articulo.id,
-          cantidad_solicitada: cantidadAReponer,
-          motivo: `Stock bajo mínimo después de pedido ${ticket_id}. Stock actual: ${nuevoStock} ${articulo.unidad}. Se solicita reposición hasta stock máximo (${stockMaximo} ${articulo.unidad}).`,
-          pedido_origen_id: null, // Se asignará después de crear el pedido
-          usuario_solicitante_id: usuario_id,
-          prioridad: 'media',
-          estado: 'pendiente'
-        }, { transaction });
-
-        solicitudesCreadas.push({
-          solicitud_id: solicitud.id,
-          solicitud_obj: solicitud, // Guardar referencia para actualizar luego
-          articulo: articulo.nombre,
-          cantidad_solicitada: cantidadAReponer,
-          motivo: 'Reposición por stock bajo mínimo'
+        // CONSOLIDACIÓN: Verificar si ya existe una solicitud pendiente de este artículo
+        const solicitudExistente = await SolicitudCompra.findOne({
+          where: {
+            articulo_id: articulo.id,
+            estado: 'pendiente'
+          },
+          transaction
         });
+
+        let solicitud;
+
+        if (solicitudExistente) {
+          // ACTUALIZAR solicitud existente: recalcular para llegar al stock máximo
+          // Considerando el nuevo stock actual (más bajo que antes)
+          const nuevaCantidad = stockMaximo - nuevoStock;
+
+          await solicitudExistente.update({
+            cantidad_solicitada: nuevaCantidad,
+            motivo: `${solicitudExistente.motivo}\n\n[ACTUALIZACIÓN] Pedido ${ticket_id} redujo el stock a ${nuevoStock} ${articulo.unidad}. Cantidad ajustada a ${nuevaCantidad} ${articulo.unidad} para alcanzar stock máximo.`,
+            prioridad: 'media'
+          }, { transaction });
+
+          solicitud = solicitudExistente;
+
+          solicitudesCreadas.push({
+            solicitud_id: solicitud.id,
+            solicitud_obj: solicitud,
+            articulo: articulo.nombre,
+            cantidad_solicitada: nuevaCantidad,
+            motivo: 'Solicitud consolidada - cantidad ajustada',
+            consolidada: true
+          });
+
+        } else {
+          // CREAR nueva solicitud
+          const cantidadAReponer = stockMaximo - nuevoStock;
+
+          // Generar ticket_id para la solicitud (usando contador incremental)
+          contadorSolicitudesIncremental++;
+          const fechaSolicitud = new Date();
+          const ddmmyySC = fechaSolicitud.toISOString().slice(2, 10).replace(/-/g, '').match(/.{2}/g).reverse().join('');
+          const hhmmSC = fechaSolicitud.toTimeString().slice(0, 5).replace(':', '');
+          const nnSC = String(contadorBaseSolicitudes + contadorSolicitudesIncremental).padStart(2, '0');
+          const ticket_id_solicitud = `SC-${ddmmyySC}-${hhmmSC}-${nnSC}`;
+
+          solicitud = await SolicitudCompra.create({
+            ticket_id: ticket_id_solicitud,
+            articulo_id: articulo.id,
+            cantidad_solicitada: cantidadAReponer,
+            motivo: `Stock bajo mínimo después de pedido ${ticket_id}. Stock actual: ${nuevoStock} ${articulo.unidad}. Se solicita reposición hasta stock máximo (${stockMaximo} ${articulo.unidad}).`,
+            pedido_origen_id: null, // Se asignará después de crear el pedido
+            usuario_solicitante_id: usuario_id,
+            prioridad: 'media',
+            estado: 'pendiente'
+          }, { transaction });
+
+          solicitudesCreadas.push({
+            solicitud_id: solicitud.id,
+            solicitud_obj: solicitud,
+            articulo: articulo.nombre,
+            cantidad_solicitada: cantidadAReponer,
+            motivo: 'Reposición por stock bajo mínimo',
+            consolidada: false
+          });
+        }
       }
     }
 
