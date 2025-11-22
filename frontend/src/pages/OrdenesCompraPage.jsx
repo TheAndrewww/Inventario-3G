@@ -930,6 +930,7 @@ const OrdenesCompraPage = () => {
           isOpen={modalCrearDesdeSeleccion}
           solicitudes={solicitudes.filter(s => solicitudesSeleccionadas.includes(s.id))}
           cantidadesIniciales={cantidadesSolicitudesEditadas}
+          generarPDFOrden={generarPDFOrden}
           onClose={() => setModalCrearDesdeSeleccion(false)}
           onSuccess={() => {
             setModalCrearDesdeSeleccion(false);
@@ -1705,7 +1706,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
 };
 
 // Modal para crear orden desde solicitudes seleccionadas
-const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesIniciales = {}, onClose, onSuccess }) => {
+const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesIniciales = {}, generarPDFOrden, onClose, onSuccess }) => {
   const [proveedores, setProveedores] = useState([]);
   const [proveedorId, setProveedorId] = useState('');
   const [observaciones, setObservaciones] = useState('');
@@ -1834,7 +1835,7 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
         }
       });
 
-      await ordenesCompraService.crearOrdenDesdeSolicitudes(
+      const response = await ordenesCompraService.crearOrdenDesdeSolicitudes(
         solicitudes_ids,
         proveedorId ? parseInt(proveedorId) : null,
         observaciones.trim() || null,
@@ -1842,6 +1843,12 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
       );
 
       toast.success(`Orden creada exitosamente con ${solicitudesValidas.length} solicitud(es)`);
+
+      // Generar PDF automáticamente
+      if (response.data?.orden && generarPDFOrden) {
+        await generarPDFOrden(response.data.orden);
+      }
+
       onSuccess();
     } catch (error) {
       console.error('Error al crear orden:', error);
