@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, Camera, Download, FileText, PlusCircle, RotateCcw } from 'lucide-react';
+import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2 } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import articulosService from '../services/articulos.service';
 import proveedoresService from '../services/proveedores.service';
@@ -1711,6 +1711,7 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
   const [observaciones, setObservaciones] = useState('');
   const [loading, setLoading] = useState(false);
   const [cantidadesEditadas, setCantidadesEditadas] = useState({});
+  const [articulosEliminados, setArticulosEliminados] = useState(new Set());
 
   useEffect(() => {
     fetchProveedores();
@@ -1792,12 +1793,30 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
     }));
   };
 
+  const handleEliminarArticulo = (articuloId) => {
+    setArticulosEliminados(prev => {
+      const nuevos = new Set(prev);
+      nuevos.add(articuloId);
+      return nuevos;
+    });
+    toast.success('Artículo eliminado de la orden');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Validar que queden artículos después de eliminar
+    if (articulosAgrupados.length === 0) {
+      toast.error('Debes tener al menos un artículo en la orden');
+      return;
+    }
+
     try {
       setLoading(true);
-      const solicitudes_ids = solicitudes.map(s => s.id);
+
+      // Filtrar solicitudes: solo incluir las que NO tienen artículos eliminados
+      const solicitudesValidas = solicitudes.filter(s => !articulosEliminados.has(s.articulo?.id));
+      const solicitudes_ids = solicitudesValidas.map(s => s.id);
 
       // Preparar cantidades personalizadas (solo si fueron editadas)
       const cantidades_custom = {};
@@ -1822,7 +1841,7 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
         huboEdiciones ? cantidades_custom : null
       );
 
-      toast.success(`Orden creada exitosamente con ${solicitudes.length} solicitud(es)`);
+      toast.success(`Orden creada exitosamente con ${solicitudesValidas.length} solicitud(es)`);
       onSuccess();
     } catch (error) {
       console.error('Error al crear orden:', error);
@@ -1832,11 +1851,15 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
     }
   };
 
-  // Agrupar solicitudes por artículo (en caso de que haya duplicados)
+  // Agrupar solicitudes por artículo (en caso de que haya duplicados) y filtrar eliminados
   const articulosAgrupados = React.useMemo(() => {
     const mapa = new Map();
     solicitudes.forEach(solicitud => {
       const artId = solicitud.articulo?.id;
+
+      // Filtrar artículos eliminados
+      if (articulosEliminados.has(artId)) return;
+
       if (mapa.has(artId)) {
         const existente = mapa.get(artId);
         existente.cantidad_total += parseFloat(solicitud.cantidad_solicitada);
@@ -1850,7 +1873,7 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
       }
     });
     return Array.from(mapa.values());
-  }, [solicitudes]);
+  }, [solicitudes, articulosEliminados]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Crear Orden desde Solicitudes">
@@ -1910,14 +1933,24 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
           <h4 className="text-sm font-medium text-gray-700 mb-2">
             Artículos en la orden:
           </h4>
-          <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
-            <table className="min-w-full divide-y divide-gray-200">
+          {articulosAgrupados.length === 0 ? (
+            <div className="border border-gray-200 rounded-lg p-8 text-center">
+              <Package className="mx-auto text-gray-400 mb-2" size={48} />
+              <p className="text-gray-600 font-medium">No hay artículos en esta orden</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Todos los artículos han sido eliminados
+              </p>
+            </div>
+          ) : (
+            <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+              <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Artículo</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Cantidad</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Costo Unit.</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Subtotal</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Acciones</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -1953,12 +1986,23 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
                       <td className="px-4 py-2 text-sm font-medium">
                         ${subtotal.toFixed(2)}
                       </td>
+                      <td className="px-4 py-2 text-sm">
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarArticulo(item.articulo?.id)}
+                          className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 rounded transition-colors"
+                          title="Eliminar artículo de la orden"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          )}
         </div>
 
         {/* Total */}
@@ -1997,7 +2041,7 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
           </Button>
           <Button
             type="submit"
-            disabled={loading}
+            disabled={loading || articulosAgrupados.length === 0}
           >
             {loading ? 'Creando Orden...' : 'Crear Orden de Compra'}
           </Button>
