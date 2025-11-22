@@ -1710,6 +1710,7 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
   const [proveedores, setProveedores] = useState([]);
   const [proveedorId, setProveedorId] = useState('');
   const [observaciones, setObservaciones] = useState('');
+  const [fechaLlegadaEstimada, setFechaLlegadaEstimada] = useState('');
   const [loading, setLoading] = useState(false);
   const [cantidadesEditadas, setCantidadesEditadas] = useState({});
   const [articulosEliminados, setArticulosEliminados] = useState(new Set());
@@ -1839,7 +1840,8 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
         solicitudes_ids,
         proveedorId ? parseInt(proveedorId) : null,
         observaciones.trim() || null,
-        huboEdiciones ? cantidades_custom : null
+        huboEdiciones ? cantidades_custom : null,
+        fechaLlegadaEstimada || null
       );
 
       toast.success(`Orden creada exitosamente con ${solicitudesValidas.length} solicitud(es)`);
@@ -1933,6 +1935,19 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
             }
             return null;
           })()}
+        </div>
+
+        {/* Fecha de llegada estimada */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Fecha de Llegada Estimada (Opcional)
+          </label>
+          <input
+            type="date"
+            value={fechaLlegadaEstimada}
+            onChange={(e) => setFechaLlegadaEstimada(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+          />
         </div>
 
         {/* Lista de artículos */}

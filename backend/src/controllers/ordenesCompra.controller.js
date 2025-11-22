@@ -552,7 +552,7 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { solicitudes_ids, proveedor_id, observaciones, cantidades_custom } = req.body;
+    const { solicitudes_ids, proveedor_id, observaciones, cantidades_custom, fecha_llegada_estimada } = req.body;
     const usuario_id = req.usuario.id;
 
     // Validaciones
@@ -672,7 +672,8 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
       usuario_creador_id: usuario_id,
       estado: 'borrador',
       total_estimado: totalEstimado,
-      observaciones: observaciones || `Orden creada desde ${solicitudes.length} solicitud(es) pendiente(s)`
+      observaciones: observaciones || `Orden creada desde ${solicitudes.length} solicitud(es) pendiente(s)`,
+      fecha_llegada_estimada: fecha_llegada_estimada || null
     }, { transaction });
 
     // Crear detalles de la orden
