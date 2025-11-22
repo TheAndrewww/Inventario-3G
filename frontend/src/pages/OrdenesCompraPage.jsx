@@ -30,6 +30,7 @@ const OrdenesCompraPage = () => {
   const [estadisticas, setEstadisticas] = useState(null);
   const [modalAnular, setModalAnular] = useState(false);
   const [ordenAAnular, setOrdenAAnular] = useState(null);
+  const [cantidadesSolicitudesEditadas, setCantidadesSolicitudesEditadas] = useState({});
   const { user } = useAuth();
 
   // Verificar permisos
@@ -52,6 +53,7 @@ const OrdenesCompraPage = () => {
         const data = await ordenesCompraService.listarSolicitudes({ estado: 'pendiente' });
         setSolicitudes(data.data?.solicitudes || []);
         setSolicitudesSeleccionadas([]); // Limpiar selección al cambiar vista
+        setCantidadesSolicitudesEditadas({}); // Limpiar cantidades editadas
       }
     } catch (error) {
       console.error('Error al cargar datos:', error);
@@ -68,6 +70,16 @@ const OrdenesCompraPage = () => {
     } catch (error) {
       console.error('Error al cargar estadísticas:', error);
     }
+  };
+
+  const handleCantidadSolicitudChange = (solicitudId, nuevaCantidad) => {
+    const cantidad = parseFloat(nuevaCantidad);
+    if (isNaN(cantidad) || cantidad < 0) return;
+
+    setCantidadesSolicitudesEditadas(prev => ({
+      ...prev,
+      [solicitudId]: cantidad
+    }));
   };
 
   const handleClickSolicitud = (solicitud) => {
@@ -843,9 +855,20 @@ const OrdenesCompraPage = () => {
                             {solicitud.articulo?.categoria?.nombre}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {parseFloat(solicitud.cantidad_solicitada).toFixed(0)} {solicitud.articulo?.unidad}
+                        <td
+                          className="px-6 py-4 whitespace-nowrap"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={cantidadesSolicitudesEditadas[solicitud.id] ?? parseFloat(solicitud.cantidad_solicitada)}
+                              onChange={(e) => handleCantidadSolicitudChange(solicitud.id, e.target.value)}
+                              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-center"
+                            />
+                            <span className="text-sm text-gray-600">{solicitud.articulo?.unidad}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -908,6 +931,7 @@ const OrdenesCompraPage = () => {
         <ModalCrearOrdenDesdeSolicitudes
           isOpen={modalCrearDesdeSeleccion}
           solicitudes={solicitudes.filter(s => solicitudesSeleccionadas.includes(s.id))}
+          cantidadesIniciales={cantidadesSolicitudesEditadas}
           onClose={() => setModalCrearDesdeSeleccion(false)}
           onSuccess={() => {
             setModalCrearDesdeSeleccion(false);
@@ -1683,7 +1707,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
 };
 
 // Modal para crear orden desde solicitudes seleccionadas
-const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, onClose, onSuccess }) => {
+const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesIniciales = {}, onClose, onSuccess }) => {
   const [proveedores, setProveedores] = useState([]);
   const [proveedorId, setProveedorId] = useState('');
   const [observaciones, setObservaciones] = useState('');
@@ -1698,18 +1722,26 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, onClose, onSucce
   useEffect(() => {
     if (solicitudes.length === 0) return;
 
-    // Agrupar y calcular cantidades iniciales
-    const cantidadesIniciales = {};
+    // Agrupar y calcular cantidades
+    const cantidades = {};
     solicitudes.forEach(solicitud => {
       const artId = solicitud.articulo?.id;
-      if (!cantidadesIniciales[artId]) {
-        cantidadesIniciales[artId] = 0;
+      const solicitudId = solicitud.id;
+
+      // Si hay una cantidad editada desde la tabla para esta solicitud, usarla
+      const cantidadEditadaTabla = cantidadesIniciales[solicitudId];
+      const cantidadOriginal = parseFloat(solicitud.cantidad_solicitada);
+
+      if (!cantidades[artId]) {
+        cantidades[artId] = 0;
       }
-      cantidadesIniciales[artId] += parseFloat(solicitud.cantidad_solicitada);
+
+      // Usar cantidad editada si existe, sino la original
+      cantidades[artId] += cantidadEditadaTabla !== undefined ? cantidadEditadaTabla : cantidadOriginal;
     });
 
-    setCantidadesEditadas(cantidadesIniciales);
-  }, [solicitudes]);
+    setCantidadesEditadas(cantidades);
+  }, [solicitudes, cantidadesIniciales]);
 
   // Efecto para seleccionar automáticamente el proveedor preferido
   useEffect(() => {
