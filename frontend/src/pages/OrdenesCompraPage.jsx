@@ -247,7 +247,7 @@ const OrdenesCompraPage = () => {
 
       rightY += 15;
       doc.setFont(undefined, 'bold');
-      doc.text('FECHA:', rightX, rightY);
+      doc.text('FECHA DE PEDIDO:', rightX, rightY);
       doc.setFont(undefined, 'normal');
       doc.text(
         new Date(ordenCompleta.created_at).toLocaleDateString('es-MX', {
@@ -255,6 +255,22 @@ const OrdenesCompraPage = () => {
           month: '2-digit',
           year: 'numeric'
         }),
+        rightX,
+        rightY + 5
+      );
+
+      rightY += 15;
+      doc.setFont(undefined, 'bold');
+      doc.text('FECHA DE LLEGADA:', rightX, rightY);
+      doc.setFont(undefined, 'normal');
+      doc.text(
+        ordenCompleta.fecha_llegada_estimada
+          ? new Date(ordenCompleta.fecha_llegada_estimada).toLocaleDateString('es-MX', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            })
+          : 'Sin definir',
         rightX,
         rightY + 5
       );
@@ -298,7 +314,6 @@ const OrdenesCompraPage = () => {
 
       // Mostrar artículos por categoría
       doc.setFontSize(10);
-      let totalGeneral = 0;
 
       Object.keys(articulosPorCategoria).forEach(categoria => {
         if (yPos > 220) {
@@ -320,25 +335,29 @@ const OrdenesCompraPage = () => {
           }
 
           const nombreArticulo = detalle.articulo?.nombre || `Artículo ID: ${detalle.articulo_id}`;
+          const descripcion = detalle.articulo?.descripcion || '';
           const cantidad = detalle.cantidad_solicitada;
           const unidad = detalle.articulo?.unidad || 'uds';
-          const costoUnit = parseFloat(detalle.costo_unitario || 0);
-          const subtotal = cantidad * costoUnit;
-          totalGeneral += subtotal;
 
-          // Bullet point con artículo y precio
-          doc.text(`• ${nombreArticulo} - ${cantidad} ${unidad} x $${costoUnit.toFixed(2)} = $${subtotal.toFixed(2)}`, 20, yPos);
-          yPos += 6;
+          // Bullet point con nombre, cantidad y descripción
+          doc.setFont(undefined, 'bold');
+          doc.text(`• ${nombreArticulo} - ${cantidad} ${unidad}`, 20, yPos);
+          yPos += 5;
+
+          // Descripción en línea separada si existe
+          if (descripcion) {
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+            doc.text(`  ${descripcion}`, 22, yPos);
+            doc.setFontSize(10);
+            yPos += 5;
+          }
+
+          yPos += 2;
         });
 
         yPos += 4;
       });
-
-      // === TOTAL ===
-      yPos += 5;
-      doc.setFont(undefined, 'bold');
-      doc.setFontSize(11);
-      doc.text(`TOTAL: $${totalGeneral.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 15, yPos);
 
       // === MARCA DE AGUA ===
       if (marcaAguaData) {

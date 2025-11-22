@@ -200,7 +200,8 @@
       "WebFetch(domain:ai.google.dev)",
       "WebSearch",
       "Bash(railway variables:*)",
-      "Bash(railway shell:*)"
+      "Bash(railway shell:*)",
+      "Bash(vercel --prod:*)"
     ],
     "deny": [],
     "ask": []
