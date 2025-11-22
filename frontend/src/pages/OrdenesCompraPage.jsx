@@ -1688,10 +1688,28 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, onClose, onSucce
   const [proveedorId, setProveedorId] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [loading, setLoading] = useState(false);
+  const [cantidadesEditadas, setCantidadesEditadas] = useState({});
 
   useEffect(() => {
     fetchProveedores();
   }, []);
+
+  // Inicializar cantidades editadas cuando cambien las solicitudes
+  useEffect(() => {
+    if (solicitudes.length === 0) return;
+
+    // Agrupar y calcular cantidades iniciales
+    const cantidadesIniciales = {};
+    solicitudes.forEach(solicitud => {
+      const artId = solicitud.articulo?.id;
+      if (!cantidadesIniciales[artId]) {
+        cantidadesIniciales[artId] = 0;
+      }
+      cantidadesIniciales[artId] += parseFloat(solicitud.cantidad_solicitada);
+    });
+
+    setCantidadesEditadas(cantidadesIniciales);
+  }, [solicitudes]);
 
   // Efecto para seleccionar automáticamente el proveedor preferido
   useEffect(() => {
@@ -1727,11 +1745,21 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, onClose, onSucce
   };
 
   const calcularTotal = () => {
-    return solicitudes.reduce((total, solicitud) => {
-      const cantidad = parseFloat(solicitud.cantidad_solicitada);
-      const costo = parseFloat(solicitud.articulo?.costo_unitario || 0);
+    return articulosAgrupados.reduce((total, item) => {
+      const cantidad = cantidadesEditadas[item.articulo?.id] || item.cantidad_total;
+      const costo = parseFloat(item.articulo?.costo_unitario || 0);
       return total + (cantidad * costo);
     }, 0);
+  };
+
+  const handleCantidadChange = (articuloId, nuevaCantidad) => {
+    const cantidad = parseFloat(nuevaCantidad);
+    if (isNaN(cantidad) || cantidad < 0) return;
+
+    setCantidadesEditadas(prev => ({
+      ...prev,
+      [articuloId]: cantidad
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -1741,10 +1769,27 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, onClose, onSucce
       setLoading(true);
       const solicitudes_ids = solicitudes.map(s => s.id);
 
+      // Preparar cantidades personalizadas (solo si fueron editadas)
+      const cantidades_custom = {};
+      let huboEdiciones = false;
+
+      articulosAgrupados.forEach(item => {
+        const articuloId = item.articulo?.id;
+        const cantidadEditada = cantidadesEditadas[articuloId];
+        const cantidadOriginal = item.cantidad_total;
+
+        // Solo incluir si la cantidad fue editada
+        if (cantidadEditada && cantidadEditada !== cantidadOriginal) {
+          cantidades_custom[articuloId] = cantidadEditada;
+          huboEdiciones = true;
+        }
+      });
+
       await ordenesCompraService.crearOrdenDesdeSolicitudes(
         solicitudes_ids,
         proveedorId ? parseInt(proveedorId) : null,
-        observaciones.trim() || null
+        observaciones.trim() || null,
+        huboEdiciones ? cantidades_custom : null
       );
 
       toast.success(`Orden creada exitosamente con ${solicitudes.length} solicitud(es)`);
@@ -1848,7 +1893,8 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, onClose, onSucce
               <tbody className="bg-white divide-y divide-gray-200">
                 {articulosAgrupados.map((item, index) => {
                   const costo = parseFloat(item.articulo?.costo_unitario || 0);
-                  const subtotal = item.cantidad_total * costo;
+                  const cantidadActual = cantidadesEditadas[item.articulo?.id] || item.cantidad_total;
+                  const subtotal = cantidadActual * costo;
 
                   return (
                     <tr key={index}>
@@ -1859,7 +1905,17 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, onClose, onSucce
                         </div>
                       </td>
                       <td className="px-4 py-2 text-sm">
-                        {item.cantidad_total.toFixed(0)} {item.articulo?.unidad}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={cantidadActual}
+                            onChange={(e) => handleCantidadChange(item.articulo?.id, e.target.value)}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-center"
+                          />
+                          <span className="text-gray-600">{item.articulo?.unidad}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-2 text-sm">
                         ${costo.toFixed(2)}

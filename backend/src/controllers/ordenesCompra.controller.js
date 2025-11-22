@@ -552,7 +552,7 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { solicitudes_ids, proveedor_id, observaciones } = req.body;
+    const { solicitudes_ids, proveedor_id, observaciones, cantidades_custom } = req.body;
     const usuario_id = req.usuario.id;
 
     // Validaciones
@@ -626,18 +626,30 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
 
     for (const solicitud of solicitudes) {
       const articulo = solicitud.articulo;
-      const cantidad = parseFloat(solicitud.cantidad_solicitada);
+      const cantidadOriginal = parseFloat(solicitud.cantidad_solicitada);
       const costo = parseFloat(articulo.costo_unitario) || 0;
-      const subtotal = cantidad * costo;
 
-      totalEstimado += subtotal;
-
-      // Si ya existe el artículo en la orden, sumar la cantidad
+      // Si ya existe el artículo en la orden
       if (articulosMap.has(articulo.id)) {
         const itemExistente = articulosMap.get(articulo.id);
-        itemExistente.cantidad += cantidad;
-        itemExistente.subtotal += subtotal;
+
+        // Si hay cantidad personalizada, NO sumar (ya se usó la cantidad custom)
+        if (!cantidades_custom || !cantidades_custom[articulo.id]) {
+          // Solo sumar si NO hay cantidad personalizada
+          itemExistente.cantidad += cantidadOriginal;
+          itemExistente.subtotal = itemExistente.cantidad * costo;
+        }
+
+        // Agregar ticket_id a observaciones
+        itemExistente.observaciones += `, ${solicitud.ticket_id}`;
       } else {
+        // Primera vez que vemos este artículo
+        const cantidad = cantidades_custom && cantidades_custom[articulo.id]
+          ? parseFloat(cantidades_custom[articulo.id])
+          : cantidadOriginal;
+
+        const subtotal = cantidad * costo;
+
         articulosMap.set(articulo.id, {
           articulo_id: articulo.id,
           cantidad,
@@ -646,6 +658,11 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
           observaciones: `Desde solicitud(es): ${solicitud.ticket_id}`
         });
       }
+    }
+
+    // Calcular total estimado
+    for (const [_, detalle] of articulosMap) {
+      totalEstimado += detalle.subtotal;
     }
 
     // Crear la orden de compra
