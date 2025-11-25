@@ -253,13 +253,11 @@ const CalendarioPage = () => {
         </div>
       )}
 
-      {/* Contenedor con escala aplicada */}
+      {/* Contenedor con escala aplicada mediante variables CSS */}
       <div
         className="flex-1 flex flex-col overflow-hidden"
         style={modoPantallaCompleta ? {
-          transform: `scale(${escala / 100})`,
-          transformOrigin: 'top center',
-          transition: 'transform 0.2s ease'
+          '--escala': escala / 100,
         } : undefined}
       >
         {/* Distribución de Equipos y Reloj */}
@@ -279,15 +277,27 @@ const CalendarioPage = () => {
               </div>
 
               {/* Fecha y Hora */}
-              <div className="col-span-2 bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md p-2 flex items-center justify-between text-white">
+              <div
+                className="col-span-2 bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md flex items-center justify-between text-white"
+                style={{ padding: `calc(0.5rem * var(--escala, 1))` }}
+              >
                 {/* Fecha a la izquierda */}
                 <div className="flex-1">
-                  <div className="text-2xl font-bold capitalize mb-1">
+                  <div
+                    className="font-bold capitalize"
+                    style={{
+                      fontSize: `calc(1.5rem * var(--escala, 1))`,
+                      marginBottom: `calc(0.25rem * var(--escala, 1))`
+                    }}
+                  >
                     {horaActual.toLocaleDateString('es-MX', {
                       weekday: 'long'
                     })}
                   </div>
-                  <div className="text-lg font-medium opacity-90 capitalize">
+                  <div
+                    className="font-medium opacity-90 capitalize"
+                    style={{ fontSize: `calc(1.125rem * var(--escala, 1))` }}
+                  >
                     {horaActual.toLocaleDateString('es-MX', {
                       day: 'numeric',
                       month: 'long',
@@ -297,9 +307,15 @@ const CalendarioPage = () => {
                 </div>
 
                 {/* Hora a la derecha */}
-                <div className="flex items-center space-x-2">
-                  <Clock className="w-6 h-6" />
-                  <div className="text-4xl font-bold tabular-nums">
+                <div
+                  className="flex items-center"
+                  style={{ gap: `calc(0.5rem * var(--escala, 1))` }}
+                >
+                  <Clock style={{ width: `calc(1.5rem * var(--escala, 1))`, height: `calc(1.5rem * var(--escala, 1))` }} />
+                  <div
+                    className="font-bold tabular-nums"
+                    style={{ fontSize: `calc(2.25rem * var(--escala, 1))` }}
+                  >
                     {horaActual.toLocaleTimeString('es-MX', {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -311,16 +327,31 @@ const CalendarioPage = () => {
               </div>
 
               {/* Distribución de Equipos */}
-              <div className="col-span-3 bg-white rounded-lg shadow-md p-1.5 flex flex-col">
-                <div className="flex items-center space-x-1 mb-1">
-                  <Users className="w-3 h-3 text-red-700" />
-                  <h3 className="text-[10px] font-bold text-gray-800">
+              <div
+                className="col-span-3 bg-white rounded-lg shadow-md flex flex-col"
+                style={{ padding: `calc(0.375rem * var(--escala, 1))` }}
+              >
+                <div
+                  className="flex items-center"
+                  style={{
+                    gap: `calc(0.25rem * var(--escala, 1))`,
+                    marginBottom: `calc(0.25rem * var(--escala, 1))`
+                  }}
+                >
+                  <Users style={{ width: `calc(0.75rem * var(--escala, 1))`, height: `calc(0.75rem * var(--escala, 1))` }} className="text-red-700" />
+                  <h3
+                    className="font-bold text-gray-800"
+                    style={{ fontSize: `calc(0.625rem * var(--escala, 1))` }}
+                  >
                     Distribución de Equipos
                   </h3>
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
-                  <div className="flex flex-wrap gap-1 content-start">
+                  <div
+                    className="flex flex-wrap content-start"
+                    style={{ gap: `calc(0.25rem * var(--escala, 1))` }}
+                  >
                     {distribucionEquipos.equipos.map((equipo, index) => {
                       const colores = COLORES_EQUIPO[equipo.tipoEquipo];
 
@@ -337,24 +368,37 @@ const CalendarioPage = () => {
                       return (
                         <div
                           key={index}
-                          className={colores ? `${colores.bg} ${colores.border} border rounded-lg p-1 flex flex-col gap-0.5 flex-1 min-w-fit` : `border rounded-lg p-1 flex flex-col gap-0.5 flex-1 min-w-fit`}
-                          style={estiloPersonalizado || undefined}
+                          className={colores ? `${colores.bg} ${colores.border} border rounded-lg flex flex-col flex-1 min-w-fit` : `border rounded-lg flex flex-col flex-1 min-w-fit`}
+                          style={{
+                            ...estiloPersonalizado,
+                            padding: `calc(0.25rem * var(--escala, 1))`,
+                            gap: `calc(0.125rem * var(--escala, 1))`
+                          }}
                         >
                           {/* Nombre del equipo */}
-                          <div className={`text-[11px] font-bold ${colores ? colores.text : ''}`}>
+                          <div
+                            className={`font-bold ${colores ? colores.text : ''}`}
+                            style={{ fontSize: `calc(0.6875rem * var(--escala, 1))` }}
+                          >
                             {equipo.nombre}
                           </div>
                           {/* Encargado */}
                           {encargado && (
-                            <div className={`text-[10px] font-semibold ${colores ? colores.text : ''} underline uppercase`}>
+                            <div
+                              className={`font-semibold ${colores ? colores.text : ''} underline uppercase`}
+                              style={{ fontSize: `calc(0.625rem * var(--escala, 1))` }}
+                            >
                               {encargado}
                             </div>
                           )}
                           {/* Otros integrantes */}
                           {otrosIntegrantes.length > 0 && (
-                            <div className={`flex flex-col text-[9px] ${colores ? colores.text : ''} opacity-75`}>
+                            <div className={`flex flex-col ${colores ? colores.text : ''} opacity-75`}>
                               {otrosIntegrantes.map((integrante, idx) => (
-                                <span key={idx}>
+                                <span
+                                  key={idx}
+                                  style={{ fontSize: `calc(0.5625rem * var(--escala, 1))` }}
+                                >
                                   {integrante}
                                 </span>
                               ))}
@@ -497,29 +541,64 @@ const CalendarioPage = () => {
                         return (
                           <div key={diaIndex} className={`flex flex-col ${dia.numero === null ? 'bg-gray-100' : esAsueto ? 'bg-red-50' : esDiaActual ? 'bg-yellow-50' : ''} overflow-hidden relative`}>
                             {/* Header del día */}
-                            <div className={`${dia.numero === null ? 'bg-gray-400' : esAsueto ? 'bg-red-600' : esDiaActual ? 'bg-yellow-500' : 'bg-blue-600'} text-white ${esGrande ? 'p-3' : 'p-1'} ${esDiaActual || esAsueto ? 'shadow-lg' : ''}`}>
-                              <div className={`font-bold ${esGrande ? 'text-sm' : 'text-[6px]'}`}>
+                            <div
+                              className={`${dia.numero === null ? 'bg-gray-400' : esAsueto ? 'bg-red-600' : esDiaActual ? 'bg-yellow-500' : 'bg-blue-600'} text-white ${esDiaActual || esAsueto ? 'shadow-lg' : ''}`}
+                              style={{ padding: esGrande ? `calc(0.75rem * var(--escala, 1))` : `calc(0.25rem * var(--escala, 1))` }}
+                            >
+                              <div
+                                className="font-bold"
+                                style={{ fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))` }}
+                              >
                                 {dia.nombre}
                               </div>
-                              <div className={`${esGrande ? 'text-3xl' : 'text-[11px]'} font-bold`}>
+                              <div
+                                className="font-bold"
+                                style={{ fontSize: esGrande ? `calc(1.875rem * var(--escala, 1))` : `calc(0.6875rem * var(--escala, 1))` }}
+                              >
                                 {dia.numero || '-'}
                               </div>
                               {esDiaActual && (
-                                <div className={`font-bold mt-1 animate-pulse ${esGrande ? 'text-[10px]' : 'text-[7px]'}`}>
+                                <div
+                                  className="font-bold animate-pulse"
+                                  style={{
+                                    fontSize: esGrande ? `calc(0.625rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
+                                    marginTop: `calc(0.25rem * var(--escala, 1))`
+                                  }}
+                                >
                                   HOY
                                 </div>
                               )}
                               {esAsueto && (
-                                <div className={`font-bold mt-1 animate-pulse ${esGrande ? 'text-[10px]' : 'text-[7px]'}`}>
+                                <div
+                                  className="font-bold animate-pulse"
+                                  style={{
+                                    fontSize: esGrande ? `calc(0.625rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
+                                    marginTop: `calc(0.25rem * var(--escala, 1))`
+                                  }}
+                                >
                                   ASUETO
                                 </div>
                               )}
                             </div>
 
                           {/* Proyectos del día */}
-                          <div className={`flex-1 ${esGrande ? 'p-3' : 'p-1'} ${esGrande ? 'space-y-2' : 'space-y-0.5'} overflow-y-auto overflow-x-hidden`}>
+                          <div
+                            className="flex-1 overflow-y-auto overflow-x-hidden"
+                            style={{
+                              padding: esGrande ? `calc(0.75rem * var(--escala, 1))` : `calc(0.25rem * var(--escala, 1))`,
+                              gap: esGrande ? `calc(0.5rem * var(--escala, 1))` : `calc(0.125rem * var(--escala, 1))`,
+                              display: 'flex',
+                              flexDirection: 'column'
+                            }}
+                          >
                             {dia.proyectos.filter(p => !p.nombre.toUpperCase().includes('ASUETO')).length === 0 ? (
-                              <div className={`text-center text-gray-400 ${esGrande ? 'text-sm' : 'text-[7px]'} mt-2`}>
+                              <div
+                                className="text-center text-gray-400"
+                                style={{
+                                  fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
+                                  marginTop: `calc(0.5rem * var(--escala, 1))`
+                                }}
+                              >
                                 Sin proyectos
                               </div>
                             ) : (
@@ -533,22 +612,35 @@ const CalendarioPage = () => {
                                 return (
                                   <div
                                     key={proyectoIndex}
-                                    className="flex items-stretch gap-1 mb-1"
+                                    className="flex items-stretch"
+                                    style={{
+                                      gap: `calc(0.25rem * var(--escala, 1))`,
+                                      marginBottom: `calc(0.25rem * var(--escala, 1))`
+                                    }}
                                   >
                                     {/* Nombre del proyecto */}
-                                    <div className={`flex-1 ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded ${esGrande ? 'px-3 py-2.5' : 'px-1.5 py-1.5'} flex items-center overflow-hidden min-w-0`}>
-                                      <span className={`font-medium ${esGrande ? 'text-base' : 'text-[7px]'} ${coloresProyecto.text} leading-tight break-words w-full`}>
+                                    <div
+                                      className={`flex-1 ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded flex items-center overflow-hidden min-w-0`}
+                                      style={{
+                                        padding: esGrande ? `calc(0.625rem * var(--escala, 1)) calc(0.75rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))`
+                                      }}
+                                    >
+                                      <span
+                                        className={`font-medium ${coloresProyecto.text} leading-tight break-words w-full`}
+                                        style={{ fontSize: esGrande ? `calc(1rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))` }}
+                                      >
                                         {textoProyecto}
                                       </span>
                                     </div>
 
                                     {/* Hora */}
                                     {proyecto.hora && (
-                                      <div className={`${coloresHora.bg} ${coloresHora.text} rounded flex items-center justify-center flex-shrink-0 overflow-hidden`}
+                                      <div
+                                        className={`${coloresHora.bg} ${coloresHora.text} rounded flex items-center justify-center flex-shrink-0 overflow-hidden`}
                                         style={{
-                                          width: esGrande ? '32px' : '14px',
-                                          maxWidth: esGrande ? '32px' : '14px',
-                                          padding: esGrande ? '10px 5px' : '4px 2px'
+                                          width: esGrande ? `calc(2rem * var(--escala, 1))` : `calc(0.875rem * var(--escala, 1))`,
+                                          maxWidth: esGrande ? `calc(2rem * var(--escala, 1))` : `calc(0.875rem * var(--escala, 1))`,
+                                          padding: esGrande ? `calc(0.625rem * var(--escala, 1)) calc(0.3125rem * var(--escala, 1))` : `calc(0.25rem * var(--escala, 1)) calc(0.125rem * var(--escala, 1))`
                                         }}
                                       >
                                         <div style={{
@@ -557,7 +649,10 @@ const CalendarioPage = () => {
                                           whiteSpace: 'nowrap',
                                           overflow: 'hidden'
                                         }}>
-                                          <span className={`font-bold ${esGrande ? 'text-sm' : 'text-[6px]'} text-center leading-tight`}>
+                                          <span
+                                            className="font-bold text-center leading-tight"
+                                            style={{ fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))` }}
+                                          >
                                             {proyecto.hora}
                                           </span>
                                         </div>
