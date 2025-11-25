@@ -121,7 +121,7 @@ const CalendarioPage = () => {
   };
 
   const reducirEscala = () => {
-    setEscala(prev => Math.max(prev - 10, 50)); // Mínimo 50%
+    setEscala(prev => Math.max(prev - 10, 30)); // Mínimo 30%
   };
 
   // Guardar escala en localStorage
@@ -244,7 +244,7 @@ const CalendarioPage = () => {
           {/* Botón reducir zoom */}
           <button
             onClick={reducirEscala}
-            disabled={escala <= 50}
+            disabled={escala <= 30}
             className="p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 transition-all shadow-lg disabled:opacity-30 disabled:cursor-not-allowed"
             title="Reducir zoom"
           >
