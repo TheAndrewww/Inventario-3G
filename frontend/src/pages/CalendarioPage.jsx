@@ -53,6 +53,7 @@ const CalendarioPage = () => {
     const escalaGuardada = localStorage.getItem('calendarioEscala');
     return escalaGuardada ? parseFloat(escalaGuardada) : 100;
   });
+  const [mostrarControles, setMostrarControles] = useState(true);
   const { modoPantallaCompleta, togglePantallaCompleta, setModoPantallaCompleta } = useCalendario();
 
   // Cargar datos del calendario
@@ -148,6 +149,43 @@ const CalendarioPage = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [setModoPantallaCompleta]);
 
+  // Auto-ocultar controles en pantalla completa
+  useEffect(() => {
+    if (!modoPantallaCompleta) {
+      setMostrarControles(true);
+      return;
+    }
+
+    let temporizador;
+
+    const manejarMovimientoMouse = () => {
+      setMostrarControles(true);
+
+      // Limpiar temporizador anterior
+      if (temporizador) {
+        clearTimeout(temporizador);
+      }
+
+      // Ocultar controles después de 3 segundos de inactividad
+      temporizador = setTimeout(() => {
+        setMostrarControles(false);
+      }, 3000);
+    };
+
+    // Mostrar controles al mover el mouse
+    document.addEventListener('mousemove', manejarMovimientoMouse);
+
+    // Iniciar temporizador inicial
+    manejarMovimientoMouse();
+
+    return () => {
+      document.removeEventListener('mousemove', manejarMovimientoMouse);
+      if (temporizador) {
+        clearTimeout(temporizador);
+      }
+    };
+  }, [modoPantallaCompleta]);
+
   if (loading && !calendario) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -157,7 +195,10 @@ const CalendarioPage = () => {
   }
 
   return (
-    <div className={`h-screen flex flex-col ${modoPantallaCompleta ? 'p-2 bg-gray-900' : 'p-4 bg-gradient-to-br from-red-50 to-orange-100'} overflow-hidden`}>
+    <div
+      className={`h-screen flex flex-col ${modoPantallaCompleta ? 'p-2 bg-gray-900' : 'p-4 bg-gradient-to-br from-red-50 to-orange-100'} overflow-hidden`}
+      style={modoPantallaCompleta && !mostrarControles ? { cursor: 'none' } : undefined}
+    >
       {/* Header compacto - Solo en modo normal */}
       {!modoPantallaCompleta && (
         <div className="mb-4">
@@ -216,7 +257,9 @@ const CalendarioPage = () => {
       {modoPantallaCompleta && (
         <button
           onClick={togglePantallaCompleta}
-          className="fixed top-4 right-4 z-50 p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 transition-all shadow-lg"
+          className={`fixed top-4 right-4 z-50 p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 shadow-lg transition-all duration-300 ${
+            mostrarControles ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
+          }`}
           title="Salir de pantalla completa"
         >
           <Minimize2 className="w-6 h-6" />
@@ -225,7 +268,9 @@ const CalendarioPage = () => {
 
       {/* Controles de zoom en pantalla completa */}
       {modoPantallaCompleta && (
-        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+        <div className={`fixed bottom-4 right-4 z-50 flex flex-col gap-2 transition-all duration-300 ${
+          mostrarControles ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+        }`}>
           {/* Indicador de escala */}
           <div className="bg-gray-800 bg-opacity-70 text-white px-3 py-2 rounded-lg text-center font-bold">
             {escala}%
