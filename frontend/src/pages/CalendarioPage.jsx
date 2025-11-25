@@ -7,10 +7,7 @@ import {
   Clock,
   RefreshCw,
   Maximize2,
-  Minimize2,
-  Play,
-  Pause,
-  Timer
+  Minimize2
 } from 'lucide-react';
 import { obtenerCalendarioMes, obtenerDistribucionEquipos } from '../services/calendario.service';
 import { toast } from 'react-hot-toast';
@@ -43,13 +40,12 @@ const COLORES_EQUIPO = {
 const CalendarioPage = () => {
   const [mesActual, setMesActual] = useState(MESES[new Date().getMonth()]);
   const [calendario, setCalendario] = useState(null);
+  const [calendarioSiguienteMes, setCalendarioSiguienteMes] = useState(null);
   const [distribucionEquipos, setDistribucionEquipos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [ultimaActualizacion, setUltimaActualizacion] = useState(null);
-  const [proximaActualizacion, setProximaActualizacion] = useState(null);
-  const [intervaloActualizacion, setIntervaloActualizacion] = useState(2); // en minutos
-  const [actualizacionAutomatica, setActualizacionAutomatica] = useState(true);
-  const [segundosRestantes, setSegundosRestantes] = useState(0);
+  const [intervaloActualizacion] = useState(2); // en minutos
+  const [actualizacionAutomatica] = useState(true);
   const [horaActual, setHoraActual] = useState(new Date());
   const { modoPantallaCompleta, togglePantallaCompleta, setModoPantallaCompleta } = useCalendario();
 
@@ -58,22 +54,21 @@ const CalendarioPage = () => {
     try {
       setLoading(true);
 
-      const [calendarioData, distribucionData] = await Promise.all([
+      // Obtener mes siguiente
+      const indiceActual = MESES.indexOf(mesActual);
+      const indiceSiguiente = indiceActual === 11 ? 0 : indiceActual + 1;
+      const mesSiguiente = MESES[indiceSiguiente];
+
+      const [calendarioData, calendarioSiguienteData, distribucionData] = await Promise.all([
         obtenerCalendarioMes(mesActual),
+        obtenerCalendarioMes(mesSiguiente),
         obtenerDistribucionEquipos(mesActual)
       ]);
 
       setCalendario(calendarioData.data);
+      setCalendarioSiguienteMes(calendarioSiguienteData.data);
       setDistribucionEquipos(distribucionData.data);
-      const ahora = new Date();
-      setUltimaActualizacion(ahora);
-
-      // Calcular próxima actualización
-      if (actualizacionAutomatica) {
-        const proxima = new Date(ahora.getTime() + intervaloActualizacion * 60 * 1000);
-        setProximaActualizacion(proxima);
-        setSegundosRestantes(intervaloActualizacion * 60);
-      }
+      setUltimaActualizacion(new Date());
 
       if (mostrarToast) {
         toast.success('Calendario actualizado');
@@ -89,6 +84,7 @@ const CalendarioPage = () => {
   // Cargar calendario al montar y cuando cambia el mes
   useEffect(() => {
     cargarCalendario(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mesActual]);
 
   // Auto-actualización configurable
@@ -102,20 +98,6 @@ const CalendarioPage = () => {
     return () => clearInterval(intervalo);
   }, [mesActual, intervaloActualizacion, actualizacionAutomatica]);
 
-  // Contador de segundos restantes
-  useEffect(() => {
-    if (!actualizacionAutomatica || segundosRestantes <= 0) return;
-
-    const countdown = setInterval(() => {
-      setSegundosRestantes(prev => {
-        if (prev <= 1) return 0;
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(countdown);
-  }, [actualizacionAutomatica, segundosRestantes]);
-
   // Navegación entre meses
   const cambiarMes = (direccion) => {
     const indiceActual = MESES.indexOf(mesActual);
@@ -125,41 +107,6 @@ const CalendarioPage = () => {
     if (nuevoIndice > 11) nuevoIndice = 0;
 
     setMesActual(MESES[nuevoIndice]);
-  };
-
-  // Togglear actualización automática
-  const toggleActualizacionAutomatica = () => {
-    setActualizacionAutomatica(prev => !prev);
-    if (!actualizacionAutomatica) {
-      // Si se reactiva, programar próxima actualización
-      const proxima = new Date(new Date().getTime() + intervaloActualizacion * 60 * 1000);
-      setProximaActualizacion(proxima);
-      setSegundosRestantes(intervaloActualizacion * 60);
-    } else {
-      setProximaActualizacion(null);
-      setSegundosRestantes(0);
-    }
-  };
-
-  // Cambiar intervalo de actualización
-  const cambiarIntervalo = (minutos) => {
-    setIntervaloActualizacion(minutos);
-    if (actualizacionAutomatica) {
-      const proxima = new Date(new Date().getTime() + minutos * 60 * 1000);
-      setProximaActualizacion(proxima);
-      setSegundosRestantes(minutos * 60);
-    }
-  };
-
-  // Formatear tiempo restante
-  const formatearTiempoRestante = () => {
-    if (segundosRestantes <= 0) return '0s';
-    const minutos = Math.floor(segundosRestantes / 60);
-    const segundos = segundosRestantes % 60;
-    if (minutos > 0) {
-      return `${minutos}m ${segundos}s`;
-    }
-    return `${segundos}s`;
   };
 
   // Actualizar reloj cada segundo
@@ -457,17 +404,23 @@ const CalendarioPage = () => {
               const hoy = new Date();
               const diaHoy = hoy.getDate();
 
+              // Combinar semanas del mes actual y el siguiente
+              const todasLasSemanas = [
+                ...(calendario?.semanas || []),
+                ...(calendarioSiguienteMes?.semanas || [])
+              ];
+
               // Encontrar la semana actual
-              let semanaActualIndex = calendario.semanas.findIndex(semana =>
+              let semanaActualIndex = todasLasSemanas.findIndex(semana =>
                 semana.dias.some(dia => dia.numero === diaHoy)
               );
 
               // Si no encontramos la semana actual, usar la primera
               if (semanaActualIndex === -1) semanaActualIndex = 0;
 
-              const semanaActual = calendario.semanas[semanaActualIndex];
-              const semanaSiguiente1 = calendario.semanas[semanaActualIndex + 1];
-              const semanaSiguiente2 = calendario.semanas[semanaActualIndex + 2];
+              const semanaActual = todasLasSemanas[semanaActualIndex];
+              const semanaSiguiente1 = todasLasSemanas[semanaActualIndex + 1] || null;
+              const semanaSiguiente2 = todasLasSemanas[semanaActualIndex + 2] || null;
 
               const renderSemana = (semana, esGrande = false) => {
                 if (!semana) return null;
@@ -485,29 +438,29 @@ const CalendarioPage = () => {
                         return (
                           <div key={diaIndex} className={`flex flex-col ${dia.numero === null ? 'bg-gray-100' : esAsueto ? 'bg-red-50' : esDiaActual ? 'bg-yellow-50' : ''} overflow-hidden relative`}>
                             {/* Header del día */}
-                            <div className={`${dia.numero === null ? 'bg-gray-400' : esAsueto ? 'bg-red-600' : esDiaActual ? 'bg-yellow-500' : 'bg-blue-600'} text-white ${esGrande ? 'p-3' : 'p-1.5'} ${esDiaActual || esAsueto ? 'shadow-lg' : ''}`}>
-                              <div className={`font-bold ${esGrande ? 'text-sm' : 'text-[9px]'}`}>
+                            <div className={`${dia.numero === null ? 'bg-gray-400' : esAsueto ? 'bg-red-600' : esDiaActual ? 'bg-yellow-500' : 'bg-blue-600'} text-white ${esGrande ? 'p-3' : 'p-1'} ${esDiaActual || esAsueto ? 'shadow-lg' : ''}`}>
+                              <div className={`font-bold ${esGrande ? 'text-sm' : 'text-[6px]'}`}>
                                 {dia.nombre}
                               </div>
-                              <div className={`${esGrande ? 'text-3xl' : 'text-base'} font-bold`}>
+                              <div className={`${esGrande ? 'text-3xl' : 'text-[11px]'} font-bold`}>
                                 {dia.numero || '-'}
                               </div>
                               {esDiaActual && (
-                                <div className="text-[10px] font-bold mt-1 animate-pulse">
+                                <div className={`font-bold mt-1 animate-pulse ${esGrande ? 'text-[10px]' : 'text-[7px]'}`}>
                                   HOY
                                 </div>
                               )}
                               {esAsueto && (
-                                <div className="text-[10px] font-bold mt-1 animate-pulse">
+                                <div className={`font-bold mt-1 animate-pulse ${esGrande ? 'text-[10px]' : 'text-[7px]'}`}>
                                   ASUETO
                                 </div>
                               )}
                             </div>
 
                           {/* Proyectos del día */}
-                          <div className={`flex-1 ${esGrande ? 'p-3' : 'p-1.5'} ${esGrande ? 'space-y-2' : 'space-y-1'} overflow-y-auto overflow-x-hidden`}>
+                          <div className={`flex-1 ${esGrande ? 'p-3' : 'p-1'} ${esGrande ? 'space-y-2' : 'space-y-0.5'} overflow-y-auto overflow-x-hidden`}>
                             {dia.proyectos.filter(p => !p.nombre.toUpperCase().includes('ASUETO')).length === 0 ? (
-                              <div className={`text-center text-gray-400 ${esGrande ? 'text-sm' : 'text-[10px]'} mt-2`}>
+                              <div className={`text-center text-gray-400 ${esGrande ? 'text-sm' : 'text-[7px]'} mt-2`}>
                                 Sin proyectos
                               </div>
                             ) : (
@@ -524,8 +477,8 @@ const CalendarioPage = () => {
                                     className="flex items-stretch gap-1 mb-1"
                                   >
                                     {/* Nombre del proyecto */}
-                                    <div className={`flex-1 ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded ${esGrande ? 'px-3 py-2.5' : 'px-2 py-2'} flex items-center overflow-hidden min-w-0`}>
-                                      <span className={`font-medium ${esGrande ? 'text-base' : 'text-[10px]'} ${coloresProyecto.text} leading-relaxed break-words w-full`}>
+                                    <div className={`flex-1 ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded ${esGrande ? 'px-3 py-2.5' : 'px-1.5 py-1.5'} flex items-center overflow-hidden min-w-0`}>
+                                      <span className={`font-medium ${esGrande ? 'text-base' : 'text-[7px]'} ${coloresProyecto.text} leading-tight break-words w-full`}>
                                         {textoProyecto}
                                       </span>
                                     </div>
@@ -534,9 +487,9 @@ const CalendarioPage = () => {
                                     {proyecto.hora && (
                                       <div className={`${coloresHora.bg} ${coloresHora.text} rounded flex items-center justify-center flex-shrink-0 overflow-hidden`}
                                         style={{
-                                          width: esGrande ? '32px' : '20px',
-                                          maxWidth: esGrande ? '32px' : '20px',
-                                          padding: esGrande ? '10px 5px' : '6px 3px'
+                                          width: esGrande ? '32px' : '14px',
+                                          maxWidth: esGrande ? '32px' : '14px',
+                                          padding: esGrande ? '10px 5px' : '4px 2px'
                                         }}
                                       >
                                         <div style={{
@@ -545,7 +498,7 @@ const CalendarioPage = () => {
                                           whiteSpace: 'nowrap',
                                           overflow: 'hidden'
                                         }}>
-                                          <span className={`font-bold ${esGrande ? 'text-sm' : 'text-[9px]'} text-center leading-tight`}>
+                                          <span className={`font-bold ${esGrande ? 'text-sm' : 'text-[6px]'} text-center leading-tight`}>
                                             {proyecto.hora}
                                           </span>
                                         </div>

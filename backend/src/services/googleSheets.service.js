@@ -7,7 +7,6 @@ const __dirname = path.dirname(__filename);
 
 // Configuración del Google Sheet
 const SPREADSHEET_ID = '1LwZhLbcAykxkghhIvttAkVtwUo4suqotlAWhPMRz17w';
-const SHEET_NAME = 'NOVIEMBRE';
 
 /**
  * Autenticar con Google Sheets API usando Service Account
@@ -137,25 +136,19 @@ const getEquipoFromColor = (backgroundColor) => {
 };
 
 /**
- * Convertir número de columna a letra (0 = A, 1 = B, etc.)
- */
-const columnToLetter = (column) => {
-  let temp;
-  let letter = '';
-  while (column >= 0) {
-    temp = column % 26;
-    letter = String.fromCharCode(temp + 65) + letter;
-    column = Math.floor(column / 26) - 1;
-  }
-  return letter;
-};
-
-/**
  * Leer calendario del mes actual desde Google Sheets
  */
 export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
   try {
     const sheets = await authenticate();
+
+    // Validar que el nombre del mes sea válido
+    const mesesValidos = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+                          'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+
+    if (!mesesValidos.includes(mes.toUpperCase())) {
+      console.warn(`⚠️ Mes no válido: ${mes}. Meses válidos: ${mesesValidos.join(', ')}`);
+    }
 
     // Definir el rango a leer (todo el calendario visible)
     // Aumentamos hasta fila 100 para capturar todos los meses (algunos tienen 5-6 semanas)
@@ -323,8 +316,14 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
     };
 
   } catch (error) {
-    console.error('Error al leer calendario:', error);
-    throw new Error(`Error al leer calendario: ${error.message}`);
+    console.error('❌ Error al leer calendario:', error);
+
+    // Error específico cuando no se encuentra la pestaña del mes
+    if (error.message && error.message.includes('Unable to parse range')) {
+      throw new Error(`La pestaña "${mes}" no existe en el Google Sheet. Verifica que exista una pestaña con este nombre exacto.`);
+    }
+
+    throw new Error(`Error al leer calendario del mes ${mes}: ${error.message}`);
   }
 };
 
@@ -354,33 +353,113 @@ export const obtenerProyectosDia = async (mes, dia) => {
 
 /**
  * Obtener distribución de equipos del día actual
- * Lee desde la fila 27 (nombres de equipos), fila 28 (responsables) y siguientes (integrantes)
- * Columnas Q-Y (16-24)
+ * Busca dinámicamente la tabla de distribución en las columnas P-Z
+ * La tabla puede estar desde la fila 7 hacia abajo y siempre ocupa 10 filas
  */
 export const obtenerDistribucionEquipos = async (mes = 'NOVIEMBRE') => {
   try {
     const sheets = await authenticate();
 
-    // Leer filas 27-37 (nombre, responsable y hasta 10 integrantes), columnas Q-Y
-    const range = `${mes}!Q27:Y37`;
+    // Leer un rango amplio desde la fila 7 hacia abajo, columnas P-Z
+    // Buscamos hasta la fila 100 para asegurar que capturamos la tabla donde esté
+    const rangeCompleto = `${mes}!P7:Z100`;
 
     const response = await sheets.spreadsheets.get({
       spreadsheetId: SPREADSHEET_ID,
-      ranges: [range],
+      ranges: [rangeCompleto],
       includeGridData: true,
     });
 
     const sheetData = response.data.sheets[0];
     const rowData = sheetData.data[0].rowData || [];
 
+    // Buscar la fila que contiene los nombres de equipos
+    // Esta fila se identifica porque tiene:
+    // 1. Múltiples celdas con texto (nombres de equipos)
+    // 2. Celdas con colores de fondo (azul, verde, gris, naranja, morado, etc.)
+    let filaInicioTabla = -1;
+
+    for (let rowIndex = 0; rowIndex < rowData.length; rowIndex++) {
+      const cells = rowData[rowIndex].values || [];
+
+      // Contar cuántas celdas tienen texto y color
+      let celdasConTextoYColor = 0;
+      let celdasConTexto = 0;
+
+      for (let colIndex = 0; colIndex < cells.length; colIndex++) {
+        const cell = cells[colIndex];
+        const texto = cell?.formattedValue || '';
+        const backgroundColor = cell?.effectiveFormat?.backgroundColor;
+
+        if (texto && texto.trim() !== '' && texto.length > 2) {
+          celdasConTexto++;
+
+          // Si tiene color de fondo (no es blanco), es probable que sea un nombre de equipo
+          if (backgroundColor) {
+            const { red = 1, green = 1, blue = 1 } = backgroundColor;
+            const esBlanco = red > 0.99 && green > 0.99 && blue > 0.99;
+
+            if (!esBlanco) {
+              celdasConTextoYColor++;
+            }
+          }
+        }
+      }
+
+      // Si encontramos al menos 3 celdas con texto y color, es probable que sea la fila de nombres de equipos
+      if (celdasConTextoYColor >= 3 || (celdasConTexto >= 4 && celdasConTextoYColor >= 2)) {
+        filaInicioTabla = rowIndex;
+        break;
+      }
+    }
+
+    // Si no encontramos la tabla, devolver vacío con información de depuración
+    if (filaInicioTabla === -1) {
+      console.warn(`⚠️ No se encontró la tabla de distribución de equipos para el mes: ${mes}`);
+      console.warn('📍 Se buscó en el rango P7:Z100');
+      console.warn('💡 Verifica que la hoja de Google Sheets tenga una pestaña con el nombre del mes y la estructura esperada');
+      return {
+        success: true,
+        data: {
+          equipos: [],
+          total: 0
+        },
+        warning: 'No se encontró la tabla de distribución de equipos en el rango especificado'
+      };
+    }
+
+    // Leer las 10 filas a partir de la fila encontrada
+    console.log(`✅ Tabla de distribución encontrada en fila ${filaInicioTabla + 7} del mes ${mes}`);
+    const filaFin = Math.min(filaInicioTabla + 10, rowData.length);
+    const filasTabla = rowData.slice(filaInicioTabla, filaFin);
+
     const equipos = [];
 
-    if (rowData.length >= 1) {
-      const filaNombres = rowData[0].values || [];
+    // La estructura es:
+    // Fila 0: Categorías/Áreas (INSTALACION, TALLER, etc.) - IGNORAR
+    // Fila 1: Nombres reales de equipos (EQUIPO I, EQUIPO II, MANUFACTURA, etc.) - USAR
+    // Filas 2-9: Integrantes de cada equipo
 
-      // Procesar cada columna (cada equipo)
-      for (let colIndex = 0; colIndex < filaNombres.length; colIndex++) {
-        const cellNombre = filaNombres[colIndex];
+    if (filasTabla.length >= 2) {
+      // Leer la SEGUNDA fila (índice 1) que contiene los nombres de equipos
+      const filaNombresEquipos = filasTabla[1].values || [];
+
+      // Estructura de columnas:
+      // P (índice 0) = RESPONSABLE o encabezado (ignorar)
+      // Q (índice 1) = Equipo 1 (EQUIPO I)
+      // R (índice 2) = Equipo 2 (EQUIPO II)
+      // S (índice 3) = Equipo 3 (EQUIPO III)
+      // T (índice 4) = Equipo 4 (EQUIPO IV)
+      // U (índice 5) = Equipo 5 (EQUIPO V)
+      // V (índice 6) = Manufactura
+      // W (índice 7) = Herrería
+      // X (índice 8) = Pintura
+      // Y (índice 9) = Almacén
+      // Z (índice 10) = Faltas (ignorar)
+
+      // Procesar solo las columnas Q-Y (índices 1-9)
+      for (let colIndex = 1; colIndex <= 9 && colIndex < filaNombresEquipos.length; colIndex++) {
+        const cellNombre = filaNombresEquipos[colIndex];
         const nombreEquipo = cellNombre?.formattedValue || '';
         const backgroundColor = cellNombre?.effectiveFormat?.backgroundColor;
 
@@ -388,9 +467,9 @@ export const obtenerDistribucionEquipos = async (mes = 'NOVIEMBRE') => {
         if (nombreEquipo && nombreEquipo.trim() !== '') {
           const integrantes = [];
 
-          // Leer todas las filas siguientes (responsable e integrantes)
-          for (let rowIndex = 1; rowIndex < rowData.length; rowIndex++) {
-            const filaActual = rowData[rowIndex].values || [];
+          // Leer las filas siguientes (integrantes) - empezar desde fila 2 (índice 2)
+          for (let rowIndex = 2; rowIndex < filasTabla.length; rowIndex++) {
+            const filaActual = filasTabla[rowIndex].values || [];
             const cellIntegrante = filaActual[colIndex];
             const nombreIntegrante = cellIntegrante?.formattedValue || '';
 
@@ -425,12 +504,19 @@ export const obtenerDistribucionEquipos = async (mes = 'NOVIEMBRE') => {
       success: true,
       data: {
         equipos: equipos,
-        total: equipos.length
+        total: equipos.length,
+        filaEncontrada: filaInicioTabla + 7 // +7 porque empezamos desde la fila 7
       }
     };
   } catch (error) {
-    console.error('Error al obtener distribución de equipos:', error);
-    throw new Error(`Error al obtener distribución de equipos: ${error.message}`);
+    console.error('❌ Error al obtener distribución de equipos:', error);
+
+    // Error específico cuando no se encuentra la pestaña del mes
+    if (error.message && error.message.includes('Unable to parse range')) {
+      throw new Error(`La pestaña "${mes}" no existe en el Google Sheet. Verifica que exista una pestaña con este nombre exacto.`);
+    }
+
+    throw new Error(`Error al obtener distribución de equipos del mes ${mes}: ${error.message}`);
   }
 };
 
