@@ -291,7 +291,8 @@ const CalendarioPage = () => {
                     }}
                   >
                     {horaActual.toLocaleDateString('es-MX', {
-                      weekday: 'long'
+                      weekday: 'long',
+                      timeZone: 'America/Mexico_City'
                     })}
                   </div>
                   <div
@@ -301,7 +302,8 @@ const CalendarioPage = () => {
                     {horaActual.toLocaleDateString('es-MX', {
                       day: 'numeric',
                       month: 'long',
-                      year: 'numeric'
+                      year: 'numeric',
+                      timeZone: 'America/Mexico_City'
                     })}
                   </div>
                 </div>
@@ -320,7 +322,8 @@ const CalendarioPage = () => {
                       hour: '2-digit',
                       minute: '2-digit',
                       second: '2-digit',
-                      hour12: false
+                      hour12: false,
+                      timeZone: 'America/Mexico_City'
                     })}
                   </div>
                 </div>
@@ -480,7 +483,8 @@ const CalendarioPage = () => {
                       hour: '2-digit',
                       minute: '2-digit',
                       second: '2-digit',
-                      hour12: false
+                      hour12: false,
+                      timeZone: 'America/Mexico_City'
                     })}
                   </div>
                   <div className="text-xl font-medium opacity-90">
@@ -488,7 +492,8 @@ const CalendarioPage = () => {
                       weekday: 'long',
                       day: 'numeric',
                       month: 'long',
-                      year: 'numeric'
+                      year: 'numeric',
+                      timeZone: 'America/Mexico_City'
                     })}
                   </div>
                 </div>
