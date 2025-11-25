@@ -137,7 +137,7 @@ const CalendarioPage = () => {
   }
 
   return (
-    <div className={`h-screen flex flex-col ${modoPantallaCompleta ? 'p-4 bg-gray-900' : 'p-4 bg-gradient-to-br from-red-50 to-orange-100'} overflow-hidden`}>
+    <div className={`h-screen flex flex-col ${modoPantallaCompleta ? 'p-2 bg-gray-900' : 'p-4 bg-gradient-to-br from-red-50 to-orange-100'} overflow-hidden`}>
       {/* Header compacto - Solo en modo normal */}
       {!modoPantallaCompleta && (
         <div className="mb-4">
@@ -205,7 +205,7 @@ const CalendarioPage = () => {
 
       {/* Distribución de Equipos y Reloj */}
       {distribucionEquipos && distribucionEquipos.equipos && distribucionEquipos.equipos.length > 0 && (
-        <div className={`${modoPantallaCompleta ? 'mb-2' : 'mb-4'} grid grid-cols-1 ${modoPantallaCompleta ? 'lg:grid-cols-6' : 'lg:grid-cols-3'} gap-${modoPantallaCompleta ? '3' : '4'}`}>
+        <div className={`${modoPantallaCompleta ? 'mb-2 grid-cols-6 gap-2' : 'mb-4 grid-cols-1 lg:grid-cols-3 gap-4'} grid`}>
           {modoPantallaCompleta ? (
             <>
               {/* Fila única: Logo + Fecha y Hora + Distribución de Equipos */}
@@ -220,15 +220,15 @@ const CalendarioPage = () => {
               </div>
 
               {/* Fecha y Hora */}
-              <div className="lg:col-span-2 bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md p-4 flex items-center justify-between text-white">
+              <div className="col-span-2 bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md p-2 flex items-center justify-between text-white">
                 {/* Fecha a la izquierda */}
                 <div className="flex-1">
-                  <div className="text-5xl font-bold capitalize mb-2">
+                  <div className="text-2xl font-bold capitalize mb-1">
                     {horaActual.toLocaleDateString('es-MX', {
                       weekday: 'long'
                     })}
                   </div>
-                  <div className="text-3xl font-medium opacity-90 capitalize">
+                  <div className="text-lg font-medium opacity-90 capitalize">
                     {horaActual.toLocaleDateString('es-MX', {
                       day: 'numeric',
                       month: 'long',
@@ -238,9 +238,9 @@ const CalendarioPage = () => {
                 </div>
 
                 {/* Hora a la derecha */}
-                <div className="flex items-center space-x-3">
-                  <Clock className="w-10 h-10" />
-                  <div className="text-7xl font-bold tabular-nums">
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-6 h-6" />
+                  <div className="text-4xl font-bold tabular-nums">
                     {horaActual.toLocaleTimeString('es-MX', {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -252,16 +252,16 @@ const CalendarioPage = () => {
               </div>
 
               {/* Distribución de Equipos */}
-              <div className="lg:col-span-3 bg-white rounded-lg shadow-md p-2 flex flex-col">
-                <div className="flex items-center space-x-1 mb-1.5">
-                  <Users className="w-3.5 h-3.5 text-red-700" />
-                  <h3 className="text-xs font-bold text-gray-800">
+              <div className="col-span-3 bg-white rounded-lg shadow-md p-1.5 flex flex-col">
+                <div className="flex items-center space-x-1 mb-1">
+                  <Users className="w-3 h-3 text-red-700" />
+                  <h3 className="text-[10px] font-bold text-gray-800">
                     Distribución de Equipos
                   </h3>
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
-                  <div className="flex flex-wrap gap-1.5 content-start">
+                  <div className="flex flex-wrap gap-1 content-start">
                     {distribucionEquipos.equipos.map((equipo, index) => {
                       const colores = COLORES_EQUIPO[equipo.tipoEquipo];
 
@@ -278,22 +278,22 @@ const CalendarioPage = () => {
                       return (
                         <div
                           key={index}
-                          className={colores ? `${colores.bg} ${colores.border} border-2 rounded-lg p-2 flex flex-col gap-1 flex-1 min-w-fit` : `border-2 rounded-lg p-2 flex flex-col gap-1 flex-1 min-w-fit`}
+                          className={colores ? `${colores.bg} ${colores.border} border rounded-lg p-1 flex flex-col gap-0.5 flex-1 min-w-fit` : `border rounded-lg p-1 flex flex-col gap-0.5 flex-1 min-w-fit`}
                           style={estiloPersonalizado || undefined}
                         >
                           {/* Nombre del equipo */}
-                          <div className={`text-base font-bold ${colores ? colores.text : ''}`}>
+                          <div className={`text-[11px] font-bold ${colores ? colores.text : ''}`}>
                             {equipo.nombre}
                           </div>
                           {/* Encargado */}
                           {encargado && (
-                            <div className={`text-sm font-semibold ${colores ? colores.text : ''} underline uppercase`}>
+                            <div className={`text-[10px] font-semibold ${colores ? colores.text : ''} underline uppercase`}>
                               {encargado}
                             </div>
                           )}
                           {/* Otros integrantes */}
                           {otrosIntegrantes.length > 0 && (
-                            <div className={`flex flex-col text-xs ${colores ? colores.text : ''} opacity-75`}>
+                            <div className={`flex flex-col text-[9px] ${colores ? colores.text : ''} opacity-75`}>
                               {otrosIntegrantes.map((integrante, idx) => (
                                 <span key={idx}>
                                   {integrante}
@@ -518,16 +518,20 @@ const CalendarioPage = () => {
               };
 
               return (
-                <div className="flex-1 grid grid-cols-3 gap-3 overflow-hidden">
+                <div className="flex-1 grid grid-cols-3 gap-2 overflow-hidden">
                   {/* Semana actual - 2 columnas (grande) */}
-                  <div className="col-span-2 flex">
+                  <div className="col-span-2 flex h-full">
                     {renderSemana(semanaActual, true)}
                   </div>
 
                   {/* Siguientes 2 semanas - 1 columna */}
-                  <div className="col-span-1 flex flex-col gap-3">
-                    {renderSemana(semanaSiguiente1, false)}
-                    {renderSemana(semanaSiguiente2, false)}
+                  <div className="col-span-1 flex flex-col gap-2 h-full">
+                    <div className="flex-1">
+                      {renderSemana(semanaSiguiente1, false)}
+                    </div>
+                    <div className="flex-1">
+                      {renderSemana(semanaSiguiente2, false)}
+                    </div>
                   </div>
                 </div>
               );
