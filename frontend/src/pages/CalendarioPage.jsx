@@ -7,7 +7,9 @@ import {
   Clock,
   RefreshCw,
   Maximize2,
-  Minimize2
+  Minimize2,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 import { obtenerCalendarioMes, obtenerDistribucionEquipos } from '../services/calendario.service';
 import { toast } from 'react-hot-toast';
@@ -47,6 +49,10 @@ const CalendarioPage = () => {
   const [intervaloActualizacion] = useState(2); // en minutos
   const [actualizacionAutomatica] = useState(true);
   const [horaActual, setHoraActual] = useState(new Date());
+  const [escala, setEscala] = useState(() => {
+    const escalaGuardada = localStorage.getItem('calendarioEscala');
+    return escalaGuardada ? parseFloat(escalaGuardada) : 100;
+  });
   const { modoPantallaCompleta, togglePantallaCompleta, setModoPantallaCompleta } = useCalendario();
 
   // Cargar datos del calendario
@@ -108,6 +114,20 @@ const CalendarioPage = () => {
 
     setMesActual(MESES[nuevoIndice]);
   };
+
+  // Control de escala
+  const aumentarEscala = () => {
+    setEscala(prev => Math.min(prev + 10, 150)); // Máximo 150%
+  };
+
+  const reducirEscala = () => {
+    setEscala(prev => Math.max(prev - 10, 50)); // Mínimo 50%
+  };
+
+  // Guardar escala en localStorage
+  useEffect(() => {
+    localStorage.setItem('calendarioEscala', escala.toString());
+  }, [escala]);
 
   // Actualizar reloj cada segundo
   useEffect(() => {
@@ -203,9 +223,48 @@ const CalendarioPage = () => {
         </button>
       )}
 
-      {/* Distribución de Equipos y Reloj */}
-      {distribucionEquipos && distribucionEquipos.equipos && distribucionEquipos.equipos.length > 0 && (
-        <div className={`${modoPantallaCompleta ? 'mb-2 grid-cols-6 gap-2' : 'mb-4 grid-cols-1 lg:grid-cols-3 gap-4'} grid`}>
+      {/* Controles de zoom en pantalla completa */}
+      {modoPantallaCompleta && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+          {/* Indicador de escala */}
+          <div className="bg-gray-800 bg-opacity-70 text-white px-3 py-2 rounded-lg text-center font-bold">
+            {escala}%
+          </div>
+
+          {/* Botón aumentar zoom */}
+          <button
+            onClick={aumentarEscala}
+            disabled={escala >= 150}
+            className="p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 transition-all shadow-lg disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Aumentar zoom"
+          >
+            <ZoomIn className="w-6 h-6" />
+          </button>
+
+          {/* Botón reducir zoom */}
+          <button
+            onClick={reducirEscala}
+            disabled={escala <= 50}
+            className="p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 transition-all shadow-lg disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Reducir zoom"
+          >
+            <ZoomOut className="w-6 h-6" />
+          </button>
+        </div>
+      )}
+
+      {/* Contenedor con escala aplicada */}
+      <div
+        className="flex-1 flex flex-col overflow-hidden"
+        style={modoPantallaCompleta ? {
+          transform: `scale(${escala / 100})`,
+          transformOrigin: 'top center',
+          transition: 'transform 0.2s ease'
+        } : undefined}
+      >
+        {/* Distribución de Equipos y Reloj */}
+        {distribucionEquipos && distribucionEquipos.equipos && distribucionEquipos.equipos.length > 0 && (
+          <div className={`${modoPantallaCompleta ? 'mb-2 grid-cols-6 gap-2' : 'mb-4 grid-cols-1 lg:grid-cols-3 gap-4'} grid`}>
           {modoPantallaCompleta ? (
             <>
               {/* Fila única: Logo + Fecha y Hora + Distribución de Equipos */}
@@ -635,6 +694,8 @@ const CalendarioPage = () => {
           )}
         </>
       )}
+      </div>
+      {/* Fin del contenedor con escala */}
     </div>
   );
 };
