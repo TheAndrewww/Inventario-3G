@@ -2056,6 +2056,16 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
   const [cantidadesEditadas, setCantidadesEditadas] = useState({});
   const [articulosEliminados, setArticulosEliminados] = useState(new Set());
 
+  // Helper: Obtener el proveedor correcto (de artículo o herramienta)
+  const obtenerProveedorSolicitud = (solicitud) => {
+    // Si el artículo tiene tipo_herramienta_migrado con proveedor, usar ese
+    if (solicitud.articulo?.tipo_herramienta_migrado?.proveedor) {
+      return solicitud.articulo.tipo_herramienta_migrado.proveedor;
+    }
+    // Si no, usar el proveedor directo del artículo
+    return solicitud.articulo?.proveedor || null;
+  };
+
   useEffect(() => {
     fetchProveedores();
   }, []);
@@ -2089,9 +2099,9 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
   useEffect(() => {
     if (solicitudes.length === 0) return;
 
-    // Obtener los proveedores preferidos de todos los artículos
+    // Obtener los proveedores preferidos de todos los artículos (incluyendo herramientas)
     const proveedoresPreferidos = solicitudes
-      .map(s => s.articulo?.proveedor?.id)
+      .map(s => obtenerProveedorSolicitud(s)?.id)
       .filter(id => id !== null && id !== undefined);
 
     // Si todos los artículos tienen el mismo proveedor preferido, seleccionarlo
