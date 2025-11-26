@@ -381,7 +381,7 @@ const OrdenesCompraPage = () => {
           // Bullet point con nombre, cantidad y descripción
           doc.setFont(undefined, 'bold');
           doc.text(`• ${nombreArticulo} - ${cantidad} ${unidad}`, textX, yPos + 5);
-          yPos += 5;
+          yPos += 10; // Aumentar espacio después del nombre
 
           // Descripción en línea separada si existe
           if (descripcion) {
@@ -390,11 +390,11 @@ const OrdenesCompraPage = () => {
             const maxWidth = 180 - textX;
             const descripcionLines = doc.splitTextToSize(`  ${descripcion}`, maxWidth);
             doc.text(descripcionLines, textX + 2, yPos);
-            yPos += descripcionLines.length * 4;
+            yPos += descripcionLines.length * 4.5; // Aumentar espacio entre líneas de descripción
             doc.setFontSize(10);
           }
 
-          yPos += imagenArticulo ? Math.max(3, imgSize - 8) : 2;
+          yPos += imagenArticulo ? Math.max(5, imgSize - 5) : 4; // Más espacio entre artículos
         });
 
         yPos += 4;
