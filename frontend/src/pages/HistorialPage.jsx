@@ -132,6 +132,21 @@ const HistorialPage = () => {
         articulosPorCategoria[categoria].push(detalle);
       });
 
+      // Cargar imágenes de artículos
+      const imagenesArticulos = {};
+      for (const detalle of articulos) {
+        if (detalle.articulo?.imagen_url) {
+          try {
+            const imagenData = await loadImageWithDimensions(detalle.articulo.imagen_url);
+            if (imagenData) {
+              imagenesArticulos[detalle.articulo_id] = imagenData;
+            }
+          } catch (error) {
+            console.error(`Error cargando imagen del artículo ${detalle.articulo_id}:`, error);
+          }
+        }
+      }
+
       // Mostrar artículos por categoría
       doc.setFontSize(10);
       Object.keys(articulosPorCategoria).forEach(categoria => {
@@ -148,18 +163,57 @@ const HistorialPage = () => {
         // Lista de artículos
         doc.setFont(undefined, 'normal');
         articulosPorCategoria[categoria].forEach(detalle => {
-          if (yPos > 240) {
+          const articuloHeight = 20; // Altura reservada para cada artículo con imagen
+
+          if (yPos + articuloHeight > 240) {
             doc.addPage();
             yPos = 20;
           }
 
           const nombreArticulo = detalle.articulo?.nombre || `Artículo ID: ${detalle.articulo_id}`;
+          const descripcion = detalle.articulo?.descripcion || '';
           const cantidad = detalle.cantidad;
           const unidad = detalle.articulo?.unidad || 'uds';
+          const imagenArticulo = imagenesArticulos[detalle.articulo_id];
 
-          // Bullet point con artículo
-          doc.text(`• ${nombreArticulo} - ${cantidad} ${unidad}`, 20, yPos);
-          yPos += 6;
+          // Dibujar imagen del artículo si existe
+          const imgX = 15;
+          const imgY = yPos - 2;
+          const imgSize = 15; // Tamaño de la imagen en mm
+          let textX = 20; // Posición X del texto (sin imagen)
+
+          if (imagenArticulo) {
+            // Calcular dimensiones manteniendo aspecto
+            const imgWidth = imgSize;
+            const imgHeight = imgSize / imagenArticulo.aspectRatio;
+
+            // Dibujar borde alrededor de la imagen
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.2);
+            doc.rect(imgX, imgY, imgWidth, imgHeight);
+
+            // Agregar imagen
+            doc.addImage(imagenArticulo.base64, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+            textX = imgX + imgWidth + 3; // Ajustar posición del texto
+          }
+
+          // Bullet point con nombre y cantidad
+          doc.setFont(undefined, 'bold');
+          doc.text(`• ${nombreArticulo} - ${cantidad} ${unidad}`, textX, yPos + 5);
+          yPos += 5;
+
+          // Descripción en línea separada si existe
+          if (descripcion) {
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+            const maxWidth = 180 - textX;
+            const descripcionLines = doc.splitTextToSize(`  ${descripcion}`, maxWidth);
+            doc.text(descripcionLines, textX + 2, yPos);
+            yPos += descripcionLines.length * 4;
+            doc.setFontSize(10);
+          }
+
+          yPos += imagenArticulo ? Math.max(3, imgSize - 8) : 2;
         });
 
         yPos += 4;
