@@ -181,6 +181,23 @@ const herramientasRentaService = {
      */
     getURLCodigoBarrasSVG: (unidadId) => {
         return `${api.defaults.baseURL}/herramientas-renta/unidades/${unidadId}/barcode-svg`;
+    },
+
+    // ========== MIGRACIÓN ==========
+
+    /**
+     * Ejecutar migración manual de artículos pendientes
+     * Crea tipos de herramienta y unidades para artículos con es_herramienta=true
+     * que aún no han sido migrados
+     */
+    ejecutarMigracionManual: async () => {
+        try {
+            const response = await api.post('/herramientas-renta/migrar-pendientes');
+            return response.data;
+        } catch (error) {
+            console.error('Error al ejecutar migración manual:', error);
+            throw error.response?.data || error;
+        }
     }
 };
 

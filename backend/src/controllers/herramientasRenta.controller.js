@@ -13,6 +13,7 @@ import {
 import { Op } from 'sequelize';
 import { generarCodigoEAN13Temporal, generarCodigoEAN13 } from '../utils/ean13-generator.js';
 import { generarImagenCodigoBarras, generarSVGCodigoBarras } from '../utils/barcode-generator.js';
+import { migrarArticulosPendientes } from '../utils/autoMigrate.js';
 
 // ============ FUNCIONES AUXILIARES ============
 
@@ -955,6 +956,45 @@ export const obtenerCodigoBarrasSVG = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al generar código de barras SVG',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+// ============ MIGRACIÓN MANUAL ============
+
+/**
+ * Ejecutar migración manual de artículos pendientes
+ * POST /api/herramientas-renta/migrar-pendientes
+ * Acceso: Solo administrador
+ */
+export const ejecutarMigracionManual = async (req, res) => {
+    try {
+        console.log('🚀 Ejecutando migración manual de artículos pendientes...');
+
+        const resultado = await migrarArticulosPendientes();
+
+        if (resultado.error) {
+            return res.status(500).json({
+                success: false,
+                message: 'Error al ejecutar la migración',
+                error: resultado.error
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: resultado.mensaje || 'Migración completada',
+            data: {
+                articulos_migrados: resultado.migrados || 0,
+                unidades_creadas: resultado.unidades || 0
+            }
+        });
+    } catch (error) {
+        console.error('Error al ejecutar migración manual:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al ejecutar migración manual',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }

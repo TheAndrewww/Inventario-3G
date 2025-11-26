@@ -13,7 +13,8 @@ import {
     generarCodigoEAN13Unidad,
     generarCodigosMasivos,
     obtenerCodigoBarras,
-    obtenerCodigoBarrasSVG
+    obtenerCodigoBarrasSVG,
+    ejecutarMigracionManual
 } from '../controllers/herramientasRenta.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -154,5 +155,15 @@ router.get('/unidades/:unidadId/barcode', obtenerCodigoBarras);
  * Acceso: Todos los usuarios autenticados
  */
 router.get('/unidades/:unidadId/barcode-svg', obtenerCodigoBarrasSVG);
+
+// ========== RUTAS DE MIGRACIÓN ==========
+
+/**
+ * POST /api/herramientas-renta/migrar-pendientes
+ * Ejecutar migración manual de artículos pendientes
+ * Crea tipos de herramienta y unidades para artículos con es_herramienta=true
+ * Acceso: Solo administrador
+ */
+router.post('/migrar-pendientes', verificarRol('administrador'), ejecutarMigracionManual);
 
 export default router;

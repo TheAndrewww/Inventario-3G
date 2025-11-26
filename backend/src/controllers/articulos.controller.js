@@ -2,6 +2,7 @@ import { Op } from 'sequelize';
 import { Articulo, Categoria, Ubicacion, Proveedor, ArticuloProveedor, DetalleMovimiento, SolicitudCompra, DetalleOrdenCompra } from '../models/index.js';
 import { generarCodigoEAN13, generarCodigoEAN13Temporal, validarCodigoEAN13 } from '../utils/ean13-generator.js';
 import { generarImagenCodigoBarras, generarSVGCodigoBarras } from '../utils/barcode-generator.js';
+import { migrarArticulosPendientes } from '../utils/autoMigrate.js';
 
 /**
  * GET /api/articulos
@@ -405,6 +406,18 @@ export const createArticulo = async (req, res) => {
                 }
             ]
         });
+
+        // 🔧 AUTO-MIGRACIÓN: Si es herramienta, crear tipo y unidades automáticamente
+        if (es_herramienta) {
+            console.log(`🔄 Auto-migración: Artículo ${articulo.id} es herramienta, creando tipo y unidades...`);
+            try {
+                await migrarArticulosPendientes();
+                console.log(`✅ Auto-migración completada para artículo ${articulo.id}`);
+            } catch (error) {
+                console.error(`⚠️ Error en auto-migración del artículo ${articulo.id}:`, error.message);
+                // No fallar la creación del artículo si falla la migración
+            }
+        }
 
         res.status(201).json({
             success: true,
