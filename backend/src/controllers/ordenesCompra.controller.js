@@ -7,7 +7,8 @@ import {
   Proveedor,
   Categoria,
   Ubicacion,
-  Movimiento
+  Movimiento,
+  TipoHerramientaRenta
 } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
@@ -379,7 +380,19 @@ export const listarSolicitudesCompra = async (req, res) => {
           as: 'articulo',
           include: [
             { model: Categoria, as: 'categoria' },
-            { model: Proveedor, as: 'proveedor' }
+            { model: Proveedor, as: 'proveedor' },
+            {
+              model: TipoHerramientaRenta,
+              as: 'tipo_herramienta_migrado',
+              required: false,
+              include: [
+                {
+                  model: Proveedor,
+                  as: 'proveedor',
+                  required: false
+                }
+              ]
+            }
           ]
         },
         {
@@ -1571,7 +1584,19 @@ export const crearSolicitudCompraManual = async (req, res) => {
           include: [
             { model: Categoria, as: 'categoria', required: false },
             { model: Ubicacion, as: 'ubicacion', required: false },
-            { model: Proveedor, as: 'proveedor', required: false }
+            { model: Proveedor, as: 'proveedor', required: false },
+            {
+              model: TipoHerramientaRenta,
+              as: 'tipo_herramienta_migrado',
+              required: false,
+              include: [
+                {
+                  model: Proveedor,
+                  as: 'proveedor',
+                  required: false
+                }
+              ]
+            }
           ]
         },
         {

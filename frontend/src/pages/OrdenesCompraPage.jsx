@@ -95,18 +95,29 @@ const OrdenesCompraPage = () => {
     }));
   };
 
+  // Helper: Obtener el proveedor correcto (de artículo o herramienta)
+  const obtenerProveedorSolicitud = (solicitud) => {
+    // Si el artículo tiene tipo_herramienta_migrado con proveedor, usar ese
+    if (solicitud.articulo?.tipo_herramienta_migrado?.proveedor) {
+      return solicitud.articulo.tipo_herramienta_migrado.proveedor;
+    }
+    // Si no, usar el proveedor directo del artículo
+    return solicitud.articulo?.proveedor || null;
+  };
+
   const handleClickSolicitud = (solicitud) => {
     // Identificar el proveedor preferido de la solicitud clickeada
-    const proveedorPreferido = solicitud.articulo?.proveedor?.id;
+    const proveedor = obtenerProveedorSolicitud(solicitud);
+    const proveedorPreferido = proveedor?.id;
 
     // Si tiene proveedor preferido, seleccionar todas las solicitudes con el mismo proveedor
     if (proveedorPreferido) {
       const solicitudesMismoProveedor = solicitudes
-        .filter(s => s.articulo?.proveedor?.id === proveedorPreferido)
+        .filter(s => obtenerProveedorSolicitud(s)?.id === proveedorPreferido)
         .map(s => s.id);
 
       if (solicitudesMismoProveedor.length > 1) {
-        const nombreProveedor = solicitud.articulo?.proveedor?.nombre;
+        const nombreProveedor = proveedor.nombre;
         toast.success(
           `Se seleccionaron ${solicitudesMismoProveedor.length} solicitudes del proveedor ${nombreProveedor}`,
           { duration: 3000 }
@@ -2248,7 +2259,7 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
           {/* Mensaje informativo si hay proveedor seleccionado automáticamente */}
           {proveedorId && (() => {
             const proveedoresPreferidos = solicitudes
-              .map(s => s.articulo?.proveedor?.id)
+              .map(s => obtenerProveedorSolicitud(s)?.id)
               .filter(id => id !== null && id !== undefined);
 
             const todosTienenMismoProveedor = proveedoresPreferidos.length > 0 &&
