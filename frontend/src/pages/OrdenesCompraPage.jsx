@@ -258,11 +258,14 @@ const OrdenesCompraPage = () => {
 
       setArticulosBuscados(articulosBajoStock);
       setMostrandoBajoStock(true);
-      setModalArticulosEncontrados(true);
 
       if (articulosBajoStock.length === 0) {
-        toast.success('Todos los artículos tienen stock suficiente o ya tienen solicitud pendiente');
+        // Si no hay artículos, cerrar el modal automáticamente
+        setModalArticulosEncontrados(false);
+        toast.success('✅ Todos los artículos tienen stock suficiente o ya tienen solicitud pendiente');
       } else {
+        // Si hay artículos, mostrar el modal
+        setModalArticulosEncontrados(true);
         toast(`${articulosBajoStock.length} artículos bajo stock mínimo sin solicitud`, {
           icon: '⚠️',
           duration: 3000
@@ -293,9 +296,13 @@ const OrdenesCompraPage = () => {
       return;
     }
 
+    // Guardar el artículo ID antes de limpiar el estado
+    const articuloIdCreado = articuloSeleccionado.id;
+    const estabaMostrandoBajoStock = mostrandoBajoStock;
+
     try {
       const response = await ordenesCompraService.crearSolicitudManual(
-        articuloSeleccionado.id,
+        articuloIdCreado,
         parseFloat(cantidadSolicitud),
         prioridadSolicitud,
         motivoSolicitud
@@ -309,9 +316,11 @@ const OrdenesCompraPage = () => {
       // Recargar solicitudes primero
       await fetchData();
 
-      // Si estamos mostrando bajo stock, actualizar la lista automáticamente
-      if (mostrandoBajoStock && modalArticulosEncontrados) {
+      // Si estábamos mostrando bajo stock, actualizar la lista automáticamente
+      // IMPORTANTE: Esto eliminará el artículo que acaba de tener solicitud creada
+      if (estabaMostrandoBajoStock && modalArticulosEncontrados) {
         await handleMostrarBajoStockMinimo();
+        toast.success('Lista de bajo stock actualizada', { duration: 2000 });
       }
     } catch (error) {
       console.error('Error al crear solicitud:', error);
