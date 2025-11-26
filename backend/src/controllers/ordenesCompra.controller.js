@@ -1355,3 +1355,128 @@ export const anularOrdenCompra = async (req, res) => {
     });
   }
 };
+
+/**
+ * Cancelar una solicitud de compra
+ * - Cambia el estado de la solicitud a 'cancelada'
+ * - Solo se pueden cancelar solicitudes en estado 'pendiente'
+ * - Accesible para: compras, almacén, diseñador (propio), administrador
+ */
+export const cancelarSolicitudCompra = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body;
+    const usuario_cancelador = req.usuario;
+
+    // Validar que el motivo sea proporcionado
+    if (!motivo || motivo.trim().length < 10) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar un motivo de cancelación de al menos 10 caracteres'
+      });
+    }
+
+    // Obtener la solicitud
+    const solicitud = await SolicitudCompra.findByPk(id, {
+      include: [
+        {
+          model: Articulo,
+          as: 'articulo',
+          attributes: ['id', 'nombre', 'unidad']
+        },
+        {
+          model: Usuario,
+          as: 'solicitante',
+          attributes: ['id', 'nombre', 'rol']
+        }
+      ],
+      transaction
+    });
+
+    if (!solicitud) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Solicitud de compra no encontrada'
+      });
+    }
+
+    // Validar que la solicitud pueda ser cancelada
+    if (solicitud.estado !== 'pendiente') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `No se puede cancelar una solicitud en estado '${solicitud.estado}'. Solo se pueden cancelar solicitudes pendientes.`
+      });
+    }
+
+    // Validar permisos
+    const esPropio = solicitud.usuario_solicitante_id === usuario_cancelador.id;
+    const tienePermisoRol = ['compras', 'almacen', 'administrador'].includes(usuario_cancelador.rol);
+
+    if (!esPropio && !tienePermisoRol) {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        message: 'No tiene permisos para cancelar esta solicitud'
+      });
+    }
+
+    // Cancelar la solicitud
+    await solicitud.update({
+      estado: 'cancelada',
+      motivo: solicitud.motivo
+        ? `${solicitud.motivo}\n\n[CANCELADA] ${new Date().toLocaleString('es-MX')}: ${motivo}`
+        : `[CANCELADA] ${new Date().toLocaleString('es-MX')}: ${motivo}`
+    }, { transaction });
+
+    await transaction.commit();
+
+    // Notificar a usuarios relevantes
+    try {
+      await notificarPorRol({
+        roles: ['compras', 'administrador'],
+        tipo: 'solicitud_cancelada',
+        titulo: 'Solicitud de compra cancelada',
+        mensaje: `${usuario_cancelador.nombre} canceló la solicitud ${solicitud.ticket_id} de ${solicitud.articulo.nombre}. Motivo: ${motivo}`,
+        url: `/ordenes-compra`,
+        datos_adicionales: {
+          solicitud_id: solicitud.id,
+          ticket_id: solicitud.ticket_id,
+          cancelado_por: usuario_cancelador.nombre,
+          articulo: solicitud.articulo.nombre,
+          cantidad: solicitud.cantidad_solicitada,
+          motivo
+        }
+      });
+    } catch (notifError) {
+      console.error('Error al enviar notificación:', notifError);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Solicitud de compra ${solicitud.ticket_id} cancelada exitosamente`,
+      data: {
+        solicitud: {
+          id: solicitud.id,
+          ticket_id: solicitud.ticket_id,
+          estado: 'cancelada',
+          articulo: solicitud.articulo.nombre,
+          cantidad: solicitud.cantidad_solicitada
+        }
+      }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al cancelar solicitud de compra:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al cancelar la solicitud de compra',
+      error: error.message
+    });
+  }
+};

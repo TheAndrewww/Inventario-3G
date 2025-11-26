@@ -9,7 +9,8 @@ import {
   crearOrdenDesdeSolicitudes,
   obtenerEstadisticas,
   obtenerHistorialTrazabilidad,
-  anularOrdenCompra
+  anularOrdenCompra,
+  cancelarSolicitudCompra
 } from '../controllers/ordenesCompra.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -35,5 +36,10 @@ router.put(
 
 // Rutas de solicitudes de compra
 router.get('/solicitudes-compra', listarSolicitudesCompra);
+router.put(
+  '/solicitudes-compra/:id/cancelar',
+  verificarRol('compras', 'almacen', 'administrador', 'diseñador'),
+  cancelarSolicitudCompra
+);
 
 export default router;

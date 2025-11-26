@@ -67,6 +67,12 @@ const ordenesCompraService = {
   anular: async (id, motivo) => {
     const response = await api.put(`/ordenes-compra/${id}/anular`, { motivo });
     return response.data;
+  },
+
+  // Cancelar solicitud de compra
+  cancelarSolicitud: async (id, motivo) => {
+    const response = await api.put(`/solicitudes-compra/${id}/cancelar`, { motivo });
+    return response.data;
   }
 };
 

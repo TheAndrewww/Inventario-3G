@@ -30,6 +30,8 @@ const OrdenesCompraPage = () => {
   const [estadisticas, setEstadisticas] = useState(null);
   const [modalAnular, setModalAnular] = useState(false);
   const [ordenAAnular, setOrdenAAnular] = useState(null);
+  const [modalCancelarSolicitud, setModalCancelarSolicitud] = useState(false);
+  const [solicitudACancelar, setSolicitudACancelar] = useState(null);
   const [cantidadesSolicitudesEditadas, setCantidadesSolicitudesEditadas] = useState({});
   const { user } = useAuth();
 
@@ -164,6 +166,27 @@ const OrdenesCompraPage = () => {
     setModalDetalle(false);
     setOrdenSeleccionada(null);
     return response;
+  };
+
+  const handleAbrirModalCancelarSolicitud = (solicitud, e) => {
+    e.stopPropagation(); // Evitar que se abra el modal de crear orden
+    setSolicitudACancelar(solicitud);
+    setModalCancelarSolicitud(true);
+  };
+
+  const handleCancelarSolicitud = async (solicitudId, motivo) => {
+    try {
+      const response = await ordenesCompraService.cancelarSolicitud(solicitudId, motivo);
+      toast.success(response.message);
+      await fetchData();
+      await fetchEstadisticas();
+      setModalCancelarSolicitud(false);
+      setSolicitudACancelar(null);
+      return response;
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Error al cancelar la solicitud');
+      throw error;
+    }
   };
 
   // Función para cargar imagen desde URL y obtener base64 + dimensiones
@@ -873,12 +896,15 @@ const OrdenesCompraPage = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Motivo
                     </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Acciones
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredSolicitudes.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
                         {solicitudes.length === 0 ? (
                           <>
                             <CheckCircle size={48} className="mx-auto mb-2 text-green-300" />
@@ -948,6 +974,15 @@ const OrdenesCompraPage = () => {
                             {solicitud.motivo}
                           </div>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={(e) => handleAbrirModalCancelarSolicitud(solicitud, e)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Cancelar solicitud"
+                          >
+                            <XCircle size={18} />
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -1012,6 +1047,19 @@ const OrdenesCompraPage = () => {
           }}
           orden={ordenAAnular}
           onAnular={handleAnularOrden}
+        />
+      )}
+
+      {/* Modal Cancelar Solicitud de Compra */}
+      {modalCancelarSolicitud && solicitudACancelar && (
+        <CancelarSolicitudModal
+          isOpen={modalCancelarSolicitud}
+          onClose={() => {
+            setModalCancelarSolicitud(false);
+            setSolicitudACancelar(null);
+          }}
+          solicitud={solicitudACancelar}
+          onCancelar={handleCancelarSolicitud}
         />
       )}
     </div>
@@ -2493,6 +2541,101 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
             className="bg-green-600 hover:bg-green-700"
           >
             {loading ? 'Creando...' : 'Crear y Agregar'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// Modal para cancelar solicitud de compra
+const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
+  const [motivo, setMotivo] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!motivo || motivo.trim().length < 10) {
+      toast.error('El motivo debe tener al menos 10 caracteres');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onCancelar(solicitud.id, motivo);
+      onClose();
+    } catch (error) {
+      console.error('Error al cancelar solicitud:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Cancelar Solicitud de Compra" size="md">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Información de la solicitud */}
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={24} />
+            <div>
+              <h4 className="text-sm font-semibold text-red-900 mb-2">
+                ¿Está seguro de cancelar esta solicitud?
+              </h4>
+              <div className="text-sm text-red-800 space-y-1">
+                <p><strong>Ticket:</strong> {solicitud.ticket_id}</p>
+                <p><strong>Artículo:</strong> {solicitud.articulo?.nombre}</p>
+                <p><strong>Cantidad:</strong> {solicitud.cantidad_solicitada} {solicitud.articulo?.unidad}</p>
+                <p><strong>Solicitante:</strong> {solicitud.solicitante?.nombre}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Campo de motivo */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Motivo de cancelación *
+          </label>
+          <textarea
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Explique por qué se está cancelando esta solicitud (mínimo 10 caracteres)..."
+            rows={4}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 resize-none"
+            required
+            minLength={10}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            {motivo.length}/10 caracteres mínimo
+          </p>
+        </div>
+
+        {/* Advertencia */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <p className="text-xs text-yellow-800">
+            ⚠️ Esta acción cambiará el estado de la solicitud a "cancelada".
+            La solicitud ya no aparecerá en la lista de pendientes.
+          </p>
+        </div>
+
+        {/* Botones */}
+        <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+          <Button
+            type="button"
+            onClick={onClose}
+            variant="secondary"
+            disabled={loading}
+          >
+            No, mantener
+          </Button>
+          <Button
+            type="submit"
+            disabled={loading || motivo.trim().length < 10}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            {loading ? 'Cancelando...' : 'Sí, cancelar solicitud'}
           </Button>
         </div>
       </form>
