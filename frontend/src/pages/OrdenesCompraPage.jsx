@@ -239,6 +239,10 @@ const OrdenesCompraPage = () => {
   const handleMostrarBajoStockMinimo = async () => {
     try {
       setBuscandoArticulos(true);
+
+      // Obtener solicitudes FRESCAS de la API (no del estado para evitar problemas de timing)
+      const solicitudesFrescas = await ordenesCompraService.listarSolicitudes({ estado: 'pendiente' });
+
       // Obtener TODOS los artículos sin límite de paginación
       const todosArticulos = await articulosService.buscar({ activo: true, limit: 99999 });
 
@@ -247,10 +251,8 @@ const OrdenesCompraPage = () => {
         parseFloat(art.stock_actual) < parseFloat(art.stock_minimo)
       );
 
-      // Filtrar artículos que ya tienen solicitudes pendientes
-      const articulosConSolicitudPendiente = solicitudes
-        .filter(sol => sol.estado === 'pendiente')
-        .map(sol => sol.articulo_id);
+      // Filtrar artículos que ya tienen solicitudes pendientes (usar solicitudes frescas de la API)
+      const articulosConSolicitudPendiente = solicitudesFrescas.map(sol => sol.articulo_id);
 
       articulosBajoStock = articulosBajoStock.filter(art =>
         !articulosConSolicitudPendiente.includes(art.id)
@@ -264,11 +266,11 @@ const OrdenesCompraPage = () => {
         setModalArticulosEncontrados(false);
         toast.success('✅ Todos los artículos tienen stock suficiente o ya tienen solicitud pendiente');
       } else {
-        // Si hay artículos, mostrar el modal
+        // Si hay artículos, mantener el modal abierto y mostrar la lista actualizada
         setModalArticulosEncontrados(true);
-        toast(`${articulosBajoStock.length} artículos bajo stock mínimo sin solicitud`, {
+        toast(`${articulosBajoStock.length} artículo${articulosBajoStock.length !== 1 ? 's' : ''} bajo stock mínimo sin solicitud`, {
           icon: '⚠️',
-          duration: 3000
+          duration: 2000
         });
       }
     } catch (error) {
@@ -319,8 +321,11 @@ const OrdenesCompraPage = () => {
       // Si estábamos mostrando bajo stock, actualizar la lista automáticamente
       // IMPORTANTE: Esto eliminará el artículo que acaba de tener solicitud creada
       if (estabaMostrandoBajoStock && modalArticulosEncontrados) {
+        // Mostrar loading mientras actualiza
+        toast.loading('Actualizando lista...', { id: 'updating-list' });
         await handleMostrarBajoStockMinimo();
-        toast.success('Lista de bajo stock actualizada', { duration: 2000 });
+        toast.dismiss('updating-list');
+        toast.success('✅ Artículo removido de la lista', { duration: 2000 });
       }
     } catch (error) {
       console.error('Error al crear solicitud:', error);
