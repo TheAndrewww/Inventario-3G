@@ -1562,18 +1562,7 @@ export const crearSolicitudCompraManual = async (req, res) => {
       orden_compra_id: null
     }, { transaction });
 
-    await transaction.commit();
-
-    // Notificar al rol de compras
-    await notificarPorRol(
-      'compras',
-      'nueva_solicitud_compra',
-      `Nueva solicitud de compra: ${solicitud.ticket_id}`,
-      `Se ha creado una solicitud manual para ${cantidad_solicitada} ${articulo.unidad} de ${articulo.nombre}`,
-      `/ordenes-compra?vista=solicitudes`
-    );
-
-    // Recargar solicitud con relaciones
+    // Recargar solicitud con relaciones ANTES del commit
     const solicitudCompleta = await SolicitudCompra.findByPk(solicitud.id, {
       include: [
         {
@@ -1590,8 +1579,25 @@ export const crearSolicitudCompraManual = async (req, res) => {
           as: 'solicitante',
           attributes: ['id', 'nombre', 'email', 'rol']
         }
-      ]
+      ],
+      transaction
     });
+
+    // Commit de la transacción
+    await transaction.commit();
+
+    // Notificar al rol de compras (no crítico, si falla no afecta la creación)
+    try {
+      await notificarPorRol(
+        'compras',
+        'nueva_solicitud_compra',
+        `Nueva solicitud de compra: ${solicitud.ticket_id}`,
+        `Se ha creado una solicitud manual para ${cantidad_solicitada} ${articulo.unidad} de ${articulo.nombre}`,
+        `/ordenes-compra?vista=solicitudes`
+      );
+    } catch (notifError) {
+      console.error('Error al enviar notificación (no crítico):', notifError);
+    }
 
     res.status(201).json({
       success: true,
