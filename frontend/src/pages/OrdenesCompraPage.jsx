@@ -18,6 +18,7 @@ const OrdenesCompraPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
+  const [mostrarCanceladas, setMostrarCanceladas] = useState(false);
   const [vistaActual, setVistaActual] = useState('solicitudes'); // 'solicitudes' o 'ordenes'
   const [modalNuevaOrden, setModalNuevaOrden] = useState(false);
   const [modalDetalle, setModalDetalle] = useState(false);
@@ -474,7 +475,10 @@ const OrdenesCompraPage = () => {
 
     const matchesEstado = !filterEstado || orden.estado === filterEstado;
 
-    return matchesSearch && matchesEstado;
+    // Ocultar órdenes canceladas por defecto (a menos que se active el toggle)
+    const matchesCanceladas = mostrarCanceladas || orden.estado !== 'cancelada';
+
+    return matchesSearch && matchesEstado && matchesCanceladas;
   });
 
   // Filtrar solicitudes con filtros inteligentes
@@ -693,6 +697,16 @@ const OrdenesCompraPage = () => {
               <option value="recibida">Recibida</option>
               <option value="cancelada">Cancelada</option>
             </select>
+
+            <label className="flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+              <input
+                type="checkbox"
+                checked={mostrarCanceladas}
+                onChange={(e) => setMostrarCanceladas(e.target.checked)}
+                className="w-4 h-4 text-red-700 rounded focus:ring-red-700 focus:ring-2"
+              />
+              <span className="text-sm text-gray-700 whitespace-nowrap">Mostrar canceladas</span>
+            </label>
 
             {puedeCrearOrdenes && (
               <Button
