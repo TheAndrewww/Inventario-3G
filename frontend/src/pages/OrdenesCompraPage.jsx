@@ -34,6 +34,19 @@ const OrdenesCompraPage = () => {
   const [modalCancelarSolicitud, setModalCancelarSolicitud] = useState(false);
   const [solicitudACancelar, setSolicitudACancelar] = useState(null);
   const [cantidadesSolicitudesEditadas, setCantidadesSolicitudesEditadas] = useState({});
+
+  // Estados para búsqueda y creación de solicitudes
+  const [busquedaArticulo, setBusquedaArticulo] = useState('');
+  const [articulosBuscados, setArticulosBuscados] = useState([]);
+  const [buscandoArticulos, setBuscandoArticulos] = useState(false);
+  const [modalArticulosEncontrados, setModalArticulosEncontrados] = useState(false);
+  const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
+  const [modalCrearSolicitud, setModalCrearSolicitud] = useState(false);
+  const [cantidadSolicitud, setCantidadSolicitud] = useState('');
+  const [prioridadSolicitud, setPrioridadSolicitud] = useState('media');
+  const [motivoSolicitud, setMotivoSolicitud] = useState('');
+  const [mostrandoBajoStock, setMostrandoBajoStock] = useState(false);
+
   const { user } = useAuth();
 
   // Verificar permisos
@@ -173,6 +186,94 @@ const OrdenesCompraPage = () => {
     e.stopPropagation(); // Evitar que se abra el modal de crear orden
     setSolicitudACancelar(solicitud);
     setModalCancelarSolicitud(true);
+  };
+
+  // Buscar artículos por nombre o código
+  const handleBuscarArticulos = async () => {
+    if (!busquedaArticulo || busquedaArticulo.trim().length < 2) {
+      toast.error('Ingresa al menos 2 caracteres para buscar');
+      return;
+    }
+
+    try {
+      setBuscandoArticulos(true);
+      const articulos = await articulosService.buscar({ activo: true, q: busquedaArticulo });
+      setArticulosBuscados(articulos);
+      setMostrandoBajoStock(false);
+      setModalArticulosEncontrados(true);
+
+      if (articulos.length === 0) {
+        toast.info('No se encontraron artículos');
+      }
+    } catch (error) {
+      console.error('Error al buscar artículos:', error);
+      toast.error('Error al buscar artículos');
+    } finally {
+      setBuscandoArticulos(false);
+    }
+  };
+
+  // Mostrar artículos bajo stock mínimo
+  const handleMostrarBajoStockMinimo = async () => {
+    try {
+      setBuscandoArticulos(true);
+      const todosArticulos = await articulosService.buscar({ activo: true });
+      const articulosBajoStock = todosArticulos.filter(art =>
+        parseFloat(art.stock_actual) < parseFloat(art.stock_minimo)
+      );
+
+      setArticulosBuscados(articulosBajoStock);
+      setMostrandoBajoStock(true);
+      setModalArticulosEncontrados(true);
+
+      if (articulosBajoStock.length === 0) {
+        toast.success('Todos los artículos tienen stock suficiente');
+      } else {
+        toast.info(`${articulosBajoStock.length} artículos bajo stock mínimo`);
+      }
+    } catch (error) {
+      console.error('Error al cargar artículos bajo stock:', error);
+      toast.error('Error al cargar artículos');
+    } finally {
+      setBuscandoArticulos(false);
+    }
+  };
+
+  // Abrir modal para crear solicitud de un artículo
+  const handleAbrirModalCrearSolicitudArticulo = (articulo) => {
+    setArticuloSeleccionado(articulo);
+    const stockFaltante = Math.max(0, parseFloat(articulo.stock_maximo || articulo.stock_minimo * 2) - parseFloat(articulo.stock_actual));
+    setCantidadSolicitud(Math.ceil(stockFaltante).toString());
+    setPrioridadSolicitud(parseFloat(articulo.stock_actual) < parseFloat(articulo.stock_minimo) ? 'alta' : 'media');
+    setMotivoSolicitud(`Reposición de stock. Stock actual: ${articulo.stock_actual} ${articulo.unidad}, Stock mínimo: ${articulo.stock_minimo} ${articulo.unidad}`);
+    setModalCrearSolicitud(true);
+  };
+
+  // Crear solicitud de compra manual
+  const handleCrearSolicitudManual = async () => {
+    if (!cantidadSolicitud || parseFloat(cantidadSolicitud) <= 0) {
+      toast.error('La cantidad debe ser mayor a 0');
+      return;
+    }
+
+    try {
+      const response = await ordenesCompraService.crearSolicitudManual(
+        articuloSeleccionado.id,
+        parseFloat(cantidadSolicitud),
+        prioridadSolicitud,
+        motivoSolicitud
+      );
+
+      toast.success(response.message || 'Solicitud creada exitosamente');
+      setModalCrearSolicitud(false);
+      setModalArticulosEncontrados(false);
+      setArticuloSeleccionado(null);
+      setBusquedaArticulo('');
+      await fetchData(); // Recargar solicitudes
+    } catch (error) {
+      console.error('Error al crear solicitud:', error);
+      toast.error(error.response?.data?.message || 'Error al crear solicitud');
+    }
   };
 
   const handleCancelarSolicitud = async (solicitudId, motivo) => {
@@ -816,8 +917,55 @@ const OrdenesCompraPage = () => {
       {/* Vista de Solicitudes */}
       {vistaActual === 'solicitudes' && (
         <>
-          {/* Barra de filtros para solicitudes */}
+          {/* Barra de búsqueda de artículos para crear solicitudes */}
+          <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-lg border-2 border-blue-200 p-6">
+            <div className="mb-4">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <PlusCircle className="text-blue-600" size={24} />
+                Crear Nueva Solicitud de Compra
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Busca artículos por nombre o código para crear solicitudes de compra
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="Buscar artículo por nombre, código o categoría..."
+                  value={busquedaArticulo}
+                  onChange={(e) => setBusquedaArticulo(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleBuscarArticulos()}
+                  className="w-full pl-10 pr-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                />
+              </div>
+
+              <button
+                onClick={handleBuscarArticulos}
+                disabled={buscandoArticulos || !busquedaArticulo}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Search size={20} />
+                {buscandoArticulos ? 'Buscando...' : 'Buscar'}
+              </button>
+
+              <button
+                onClick={handleMostrarBajoStockMinimo}
+                disabled={buscandoArticulos}
+                className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+                title="Ver artículos que necesitan reposición"
+              >
+                <AlertCircle size={20} />
+                Bajo Stock Mínimo
+              </button>
+            </div>
+          </div>
+
+          {/* Barra de filtros para solicitudes existentes */}
           <div className="mb-6 bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Filtrar Solicitudes Existentes:</h3>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
               {/* Búsqueda */}
               <div className="flex-1 relative">
@@ -1076,6 +1224,40 @@ const OrdenesCompraPage = () => {
           onCancelar={handleCancelarSolicitud}
         />
       )}
+
+      {/* Modal Artículos Encontrados */}
+      <ModalArticulosEncontrados
+        isOpen={modalArticulosEncontrados}
+        onClose={() => {
+          setModalArticulosEncontrados(false);
+          setArticulosBuscados([]);
+          setMostrandoBajoStock(false);
+        }}
+        articulos={articulosBuscados}
+        onCrearSolicitud={handleAbrirModalCrearSolicitudArticulo}
+        titulo={mostrandoBajoStock ? '⚠️ Artículos Bajo Stock Mínimo' : '🔍 Resultados de Búsqueda'}
+      />
+
+      {/* Modal Crear Solicitud */}
+      <ModalCrearSolicitud
+        isOpen={modalCrearSolicitud}
+        onClose={() => {
+          setModalCrearSolicitud(false);
+          setArticuloSeleccionado(null);
+          setCantidadSolicitud('');
+          setPrioridadSolicitud('media');
+          setMotivoSolicitud('');
+        }}
+        articulo={articuloSeleccionado}
+        cantidad={cantidadSolicitud}
+        setCantidad={setCantidadSolicitud}
+        prioridad={prioridadSolicitud}
+        setPrioridad={setPrioridadSolicitud}
+        motivo={motivoSolicitud}
+        setMotivo={setMotivoSolicitud}
+        onSubmit={handleCrearSolicitudManual}
+        loading={loading}
+      />
     </div>
   );
 };
@@ -2654,6 +2836,267 @@ const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
         </div>
       </form>
     </Modal>
+  );
+};
+
+// Modal de Artículos Encontrados
+const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitud, titulo }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">{titulo}</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {articulos.length} artículo{articulos.length !== 1 ? 's' : ''} encontrado{articulos.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {articulos.length === 0 ? (
+            <div className="text-center py-12">
+              <Package size={64} className="mx-auto text-gray-300 mb-4" />
+              <p className="text-gray-500">No se encontraron artículos</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {articulos.map((articulo) => {
+                const stockPorcentaje = (parseFloat(articulo.stock_actual) / parseFloat(articulo.stock_minimo || 1)) * 100;
+                const stockBajo = stockPorcentaje < 100;
+                const stockCritico = stockPorcentaje < 50;
+
+                return (
+                  <div
+                    key={articulo.id}
+                    className={`border-2 rounded-lg p-4 hover:shadow-md transition-all ${
+                      stockCritico
+                        ? 'border-red-300 bg-red-50'
+                        : stockBajo
+                        ? 'border-orange-300 bg-orange-50'
+                        : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-start gap-3">
+                          {articulo.imagen_url && (
+                            <img
+                              src={articulo.imagen_url}
+                              alt={articulo.nombre}
+                              className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h4 className="font-bold text-gray-900 text-lg">{articulo.nombre}</h4>
+                            {articulo.descripcion && (
+                              <p className="text-sm text-gray-600 mt-1">{articulo.descripcion}</p>
+                            )}
+                            <div className="flex flex-wrap gap-3 mt-2 text-sm">
+                              {articulo.codigo_ean13 && (
+                                <span className="text-gray-600">
+                                  <strong>EAN-13:</strong> {articulo.codigo_ean13}
+                                </span>
+                              )}
+                              {articulo.categoria && (
+                                <span className="px-2 py-1 bg-gray-100 rounded text-gray-700">
+                                  {articulo.categoria.nombre}
+                                </span>
+                              )}
+                              {articulo.proveedor && (
+                                <span className="px-2 py-1 bg-purple-100 rounded text-purple-700">
+                                  {articulo.proveedor.nombre}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-3 gap-3">
+                          <div className={`text-center p-2 rounded ${stockCritico ? 'bg-red-100' : stockBajo ? 'bg-orange-100' : 'bg-green-100'}`}>
+                            <p className="text-xs text-gray-600">Stock Actual</p>
+                            <p className={`font-bold ${stockCritico ? 'text-red-700' : stockBajo ? 'text-orange-700' : 'text-green-700'}`}>
+                              {articulo.stock_actual} {articulo.unidad}
+                            </p>
+                          </div>
+                          <div className="text-center p-2 rounded bg-gray-100">
+                            <p className="text-xs text-gray-600">Stock Mínimo</p>
+                            <p className="font-bold text-gray-900">
+                              {articulo.stock_minimo} {articulo.unidad}
+                            </p>
+                          </div>
+                          <div className="text-center p-2 rounded bg-gray-100">
+                            <p className="text-xs text-gray-600">Stock Máximo</p>
+                            <p className="font-bold text-gray-900">
+                              {articulo.stock_maximo || 'N/A'} {articulo.stock_maximo ? articulo.unidad : ''}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => onCrearSolicitud(articulo)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 whitespace-nowrap"
+                        >
+                          <Plus size={18} />
+                          Crear Solicitud
+                        </button>
+                        {stockBajo && (
+                          <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                            stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
+                          }`}>
+                            {stockCritico ? '⚠️ Stock Crítico' : '⚡ Stock Bajo'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Modal de Crear Solicitud
+const ModalCrearSolicitud = ({
+  isOpen,
+  onClose,
+  articulo,
+  cantidad,
+  setCantidad,
+  prioridad,
+  setPrioridad,
+  motivo,
+  setMotivo,
+  onSubmit,
+  loading
+}) => {
+  if (!isOpen || !articulo) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Crear Solicitud de Compra</h3>
+              <p className="text-sm text-gray-600 mt-1">{articulo.nombre}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Info del artículo */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-gray-600">Stock Actual</p>
+                <p className="font-bold text-gray-900">{articulo.stock_actual} {articulo.unidad}</p>
+              </div>
+              <div>
+                <p className="text-gray-600">Stock Mínimo</p>
+                <p className="font-bold text-gray-900">{articulo.stock_minimo} {articulo.unidad}</p>
+              </div>
+              <div>
+                <p className="text-gray-600">Stock Máximo</p>
+                <p className="font-bold text-gray-900">{articulo.stock_maximo || 'N/A'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Cantidad */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Cantidad a Solicitar *
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={cantidad}
+                onChange={(e) => setCantidad(e.target.value)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                required
+              />
+              <span className="text-gray-600 font-medium">{articulo.unidad}</span>
+            </div>
+          </div>
+
+          {/* Prioridad */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Prioridad *
+            </label>
+            <select
+              value={prioridad}
+              onChange={(e) => setPrioridad(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              <option value="baja">Baja</option>
+              <option value="media">Media</option>
+              <option value="alta">Alta</option>
+              <option value="urgente">Urgente</option>
+            </select>
+          </div>
+
+          {/* Motivo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Motivo (opcional)
+            </label>
+            <textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Explique por qué se necesita este artículo..."
+              rows={3}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
+            />
+          </div>
+
+          {/* Botones */}
+          <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={onSubmit}
+              disabled={loading || !cantidad || parseFloat(cantidad) <= 0}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Creando...' : 'Crear Solicitud'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

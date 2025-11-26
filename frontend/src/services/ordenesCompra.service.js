@@ -73,6 +73,17 @@ const ordenesCompraService = {
   cancelarSolicitud: async (id, motivo) => {
     const response = await api.put(`/solicitudes-compra/${id}/cancelar`, { motivo });
     return response.data;
+  },
+
+  // Crear solicitud de compra manual
+  crearSolicitudManual: async (articulo_id, cantidad_solicitada, prioridad = 'media', motivo = '') => {
+    const response = await api.post('/solicitudes-compra', {
+      articulo_id,
+      cantidad_solicitada,
+      prioridad,
+      motivo
+    });
+    return response.data;
   }
 };
 

@@ -1480,3 +1480,134 @@ export const cancelarSolicitudCompra = async (req, res) => {
     });
   }
 };
+
+/**
+ * Crear solicitud de compra manual
+ * - Permite a usuarios crear solicitudes de compra manualmente para cualquier artículo
+ */
+export const crearSolicitudCompraManual = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { articulo_id, cantidad_solicitada, prioridad, motivo } = req.body;
+    const usuario_id = req.usuario.id;
+    const usuario_rol = req.usuario.rol;
+
+    // Validar permisos (compras, almacen, administrador, diseñador)
+    if (!['compras', 'almacen', 'administrador', 'diseñador'].includes(usuario_rol)) {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        message: 'No tiene permisos para crear solicitudes de compra'
+      });
+    }
+
+    // Validaciones
+    if (!articulo_id || !cantidad_solicitada) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar el artículo y la cantidad solicitada'
+      });
+    }
+
+    if (parseFloat(cantidad_solicitada) <= 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'La cantidad solicitada debe ser mayor a 0'
+      });
+    }
+
+    // Verificar que el artículo existe
+    const articulo = await Articulo.findByPk(articulo_id, { transaction });
+    if (!articulo) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Artículo no encontrado'
+      });
+    }
+
+    // Generar ticket_id para la solicitud
+    const fechaSolicitud = new Date();
+    const ddmmyySC = fechaSolicitud.toISOString().slice(2, 10).replace(/-/g, '').match(/.{2}/g).reverse().join('');
+    const hhmmSC = fechaSolicitud.toTimeString().slice(0, 5).replace(':', '');
+
+    const inicioDelDia = new Date(fechaSolicitud.setHours(0, 0, 0, 0));
+    const finDelDia = new Date(fechaSolicitud.setHours(23, 59, 59, 999));
+
+    const contadorHoy = await SolicitudCompra.count({
+      where: {
+        created_at: {
+          [Op.between]: [inicioDelDia, finDelDia]
+        }
+      },
+      transaction
+    });
+
+    const nnSC = String(contadorHoy + 1).padStart(2, '0');
+    const ticket_id_solicitud = `SC-${ddmmyySC}-${hhmmSC}-${nnSC}`;
+
+    // Crear la solicitud
+    const solicitud = await SolicitudCompra.create({
+      ticket_id: ticket_id_solicitud,
+      articulo_id: articulo_id,
+      cantidad_solicitada: parseFloat(cantidad_solicitada),
+      motivo: motivo || `Solicitud manual de ${cantidad_solicitada} ${articulo.unidad}`,
+      prioridad: prioridad || 'media',
+      estado: 'pendiente',
+      usuario_solicitante_id: usuario_id,
+      pedido_origen_id: null,
+      orden_compra_id: null
+    }, { transaction });
+
+    await transaction.commit();
+
+    // Notificar al rol de compras
+    await notificarPorRol(
+      'compras',
+      'nueva_solicitud_compra',
+      `Nueva solicitud de compra: ${solicitud.ticket_id}`,
+      `Se ha creado una solicitud manual para ${cantidad_solicitada} ${articulo.unidad} de ${articulo.nombre}`,
+      `/ordenes-compra?vista=solicitudes`
+    );
+
+    // Recargar solicitud con relaciones
+    const solicitudCompleta = await SolicitudCompra.findByPk(solicitud.id, {
+      include: [
+        {
+          model: Articulo,
+          as: 'articulo',
+          include: [
+            { model: Categoria, as: 'categoria' },
+            { model: Ubicacion, as: 'ubicacion' },
+            { model: Proveedor, as: 'proveedor' }
+          ]
+        },
+        {
+          model: Usuario,
+          as: 'solicitante',
+          attributes: ['id', 'nombre', 'email', 'rol']
+        }
+      ]
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Solicitud de compra creada exitosamente',
+      data: {
+        solicitud: solicitudCompleta
+      }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al crear solicitud de compra manual:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al crear la solicitud de compra',
+      error: error.message
+    });
+  }
+};
