@@ -1580,9 +1580,9 @@ export const crearSolicitudCompraManual = async (req, res) => {
           model: Articulo,
           as: 'articulo',
           include: [
-            { model: Categoria, as: 'categoria' },
-            { model: Ubicacion, as: 'ubicacion' },
-            { model: Proveedor, as: 'proveedor' }
+            { model: Categoria, as: 'categoria', required: false },
+            { model: Ubicacion, as: 'ubicacion', required: false },
+            { model: Proveedor, as: 'proveedor', required: false }
           ]
         },
         {

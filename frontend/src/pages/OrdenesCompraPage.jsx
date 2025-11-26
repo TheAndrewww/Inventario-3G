@@ -230,8 +230,19 @@ const OrdenesCompraPage = () => {
       setBuscandoArticulos(true);
       // Obtener TODOS los artículos sin límite de paginación
       const todosArticulos = await articulosService.buscar({ activo: true, limit: 99999 });
-      const articulosBajoStock = todosArticulos.filter(art =>
+
+      // Filtrar artículos con stock bajo mínimo
+      let articulosBajoStock = todosArticulos.filter(art =>
         parseFloat(art.stock_actual) < parseFloat(art.stock_minimo)
+      );
+
+      // Filtrar artículos que ya tienen solicitudes pendientes
+      const articulosConSolicitudPendiente = solicitudesCompra
+        .filter(sol => sol.estado === 'pendiente')
+        .map(sol => sol.articulo_id);
+
+      articulosBajoStock = articulosBajoStock.filter(art =>
+        !articulosConSolicitudPendiente.includes(art.id)
       );
 
       setArticulosBuscados(articulosBajoStock);
@@ -239,9 +250,9 @@ const OrdenesCompraPage = () => {
       setModalArticulosEncontrados(true);
 
       if (articulosBajoStock.length === 0) {
-        toast.success('Todos los artículos tienen stock suficiente');
+        toast.success('Todos los artículos tienen stock suficiente o ya tienen solicitud pendiente');
       } else {
-        toast(`${articulosBajoStock.length} artículos bajo stock mínimo`, {
+        toast(`${articulosBajoStock.length} artículos bajo stock mínimo sin solicitud`, {
           icon: '⚠️',
           duration: 3000
         });
@@ -281,10 +292,14 @@ const OrdenesCompraPage = () => {
 
       toast.success(response.message || 'Solicitud creada exitosamente');
       setModalCrearSolicitud(false);
-      setModalArticulosEncontrados(false);
+      // No cerrar modalArticulosEncontrados para permitir crear más solicitudes
       setArticuloSeleccionado(null);
       setBusquedaArticulo('');
       await fetchData(); // Recargar solicitudes
+      // Actualizar lista de bajo stock para reflejar filtros
+      if (modalArticulosEncontrados && articulosBajoStock.length > 0) {
+        await handleMostrarBajoStockMinimo();
+      }
     } catch (error) {
       console.error('Error al crear solicitud:', error);
       toast.error(error.response?.data?.message || 'Error al crear solicitud');
