@@ -241,7 +241,8 @@ const OrdenesCompraPage = () => {
       setBuscandoArticulos(true);
 
       // Obtener solicitudes FRESCAS de la API (no del estado para evitar problemas de timing)
-      const solicitudesFrescas = await ordenesCompraService.listarSolicitudes({ estado: 'pendiente' });
+      const responseSolicitudes = await ordenesCompraService.listarSolicitudes({ estado: 'pendiente' });
+      const solicitudesFrescas = responseSolicitudes.data?.solicitudes || [];
 
       // Obtener TODOS los artículos sin límite de paginación
       const todosArticulos = await articulosService.buscar({ activo: true, limit: 99999 });
