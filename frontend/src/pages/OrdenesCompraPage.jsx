@@ -362,6 +362,7 @@ const OrdenesCompraPage = () => {
           const imgY = yPos - 2;
           const imgSize = 15; // Tamaño de la imagen en mm
           let textX = 20; // Posición X del texto (sin imagen)
+          let textStartY = yPos + 5; // Posición Y inicial del texto (por defecto)
 
           if (imagenArticulo) {
             // Calcular dimensiones manteniendo aspecto
@@ -376,12 +377,13 @@ const OrdenesCompraPage = () => {
             // Agregar imagen
             doc.addImage(imagenArticulo.base64, 'JPEG', imgX, imgY, imgWidth, imgHeight);
             textX = imgX + imgWidth + 3; // Ajustar posición del texto
+            textStartY = imgY + 4; // Alinear texto con el inicio de la imagen
           }
 
           // Bullet point con nombre, cantidad y descripción
           doc.setFont(undefined, 'bold');
-          doc.text(`• ${nombreArticulo} - ${cantidad} ${unidad}`, textX, yPos + 5);
-          yPos += 10; // Aumentar espacio después del nombre
+          doc.text(`• ${nombreArticulo} - ${cantidad} ${unidad}`, textX, textStartY);
+          yPos = textStartY + 5; // Ajustar yPos para siguiente línea
 
           // Descripción en línea separada si existe
           if (descripcion) {
