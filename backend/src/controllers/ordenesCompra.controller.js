@@ -396,6 +396,12 @@ export const listarSolicitudesCompra = async (req, res) => {
           ]
         },
         {
+          model: Proveedor,
+          as: 'proveedor',
+          required: false,
+          attributes: ['id', 'nombre', 'contacto', 'telefono', 'email']
+        },
+        {
           model: Usuario,
           as: 'solicitante',
           attributes: ['id', 'nombre', 'email', 'rol']

@@ -253,6 +253,16 @@ Usuario.hasMany(SolicitudCompra, {
     as: 'solicitudes_compra'
 });
 
+// SolicitudCompra - Proveedor (Muchos a Uno) - Proveedor sugerido
+SolicitudCompra.belongsTo(Proveedor, {
+    foreignKey: 'proveedor_id',
+    as: 'proveedor'
+});
+Proveedor.hasMany(SolicitudCompra, {
+    foreignKey: 'proveedor_id',
+    as: 'solicitudes_compra'
+});
+
 // SolicitudCompra - OrdenCompra (Muchos a Uno)
 SolicitudCompra.belongsTo(OrdenCompra, {
     foreignKey: 'orden_compra_id',

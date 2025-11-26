@@ -201,7 +201,12 @@
       "WebSearch",
       "Bash(railway variables:*)",
       "Bash(railway shell:*)",
-      "Bash(vercel --prod:*)"
+      "Bash(vercel --prod:*)",
+      "Bash(\"$BACKUP_FILE\")",
+      "Bash(echo:*)",
+      "Bash(npx vercel --prod)",
+      "Bash(npx vercel --prod --yes)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:ucySgWXQglBlFGtvdsJceRGPjPdPcqHz@centerbeam.proxy.rlwy.net:15724/railway\" psql:*)"
     ],
     "deny": [],
     "ask": []

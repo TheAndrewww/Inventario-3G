@@ -1,7 +1,88 @@
-import { Movimiento, DetalleMovimiento, Articulo, Usuario, Categoria, Ubicacion, Equipo, SolicitudCompra, OrdenCompra } from '../models/index.js';
+import { Movimiento, DetalleMovimiento, Articulo, Usuario, Categoria, Ubicacion, Equipo, SolicitudCompra, OrdenCompra, Proveedor, ArticuloProveedor, TipoHerramientaRenta } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { crearNotificacion, notificarPorRol } from './notificaciones.controller.js';
+
+/**
+ * Función auxiliar para detectar el proveedor de un artículo
+ * Prioridad:
+ * 1. Proveedor preferido en relación many-to-many (ArticuloProveedor con es_preferido=true)
+ * 2. Primer proveedor en relación many-to-many
+ * 3. Proveedor directo del artículo (proveedor_id)
+ * 4. Si es herramienta migrada, proveedor del tipo de herramienta
+ */
+async function detectarProveedorArticulo(articulo_id, transaction = null) {
+  try {
+    // Obtener artículo con todas sus relaciones de proveedores
+    const articulo = await Articulo.findByPk(articulo_id, {
+      include: [
+        {
+          model: Proveedor,
+          as: 'proveedores',
+          through: {
+            attributes: ['es_preferido']
+          },
+          required: false
+        },
+        {
+          model: Proveedor,
+          as: 'proveedor',
+          required: false
+        },
+        {
+          model: TipoHerramientaRenta,
+          as: 'tipo_herramienta_migrado',
+          required: false,
+          include: [
+            {
+              model: Proveedor,
+              as: 'proveedor',
+              required: false
+            }
+          ]
+        }
+      ],
+      transaction
+    });
+
+    if (!articulo) {
+      console.log(`⚠️ Artículo ${articulo_id} no encontrado para detectar proveedor`);
+      return null;
+    }
+
+    // 1. Buscar proveedor preferido en relación many-to-many
+    if (articulo.proveedores && articulo.proveedores.length > 0) {
+      const proveedorPreferido = articulo.proveedores.find(p => p.ArticuloProveedor?.es_preferido === true);
+      if (proveedorPreferido) {
+        console.log(`✅ Proveedor preferido detectado para artículo ${articulo_id}: ${proveedorPreferido.nombre} (ID: ${proveedorPreferido.id})`);
+        return proveedorPreferido.id;
+      }
+
+      // 2. Si no hay preferido, usar el primero de la lista
+      const primerProveedor = articulo.proveedores[0];
+      console.log(`✅ Primer proveedor detectado para artículo ${articulo_id}: ${primerProveedor.nombre} (ID: ${primerProveedor.id})`);
+      return primerProveedor.id;
+    }
+
+    // 3. Usar proveedor directo del artículo
+    if (articulo.proveedor_id) {
+      console.log(`✅ Proveedor directo detectado para artículo ${articulo_id}: ${articulo.proveedor?.nombre || 'Desconocido'} (ID: ${articulo.proveedor_id})`);
+      return articulo.proveedor_id;
+    }
+
+    // 4. Si es herramienta migrada, usar proveedor del tipo
+    if (articulo.tipo_herramienta_migrado?.proveedor_id) {
+      console.log(`✅ Proveedor de tipo herramienta detectado para artículo ${articulo_id}: ${articulo.tipo_herramienta_migrado.proveedor?.nombre || 'Desconocido'} (ID: ${articulo.tipo_herramienta_migrado.proveedor_id})`);
+      return articulo.tipo_herramienta_migrado.proveedor_id;
+    }
+
+    console.log(`⚠️ No se detectó proveedor para artículo ${articulo_id}`);
+    return null;
+  } catch (error) {
+    console.error(`❌ Error al detectar proveedor para artículo ${articulo_id}:`, error.message);
+    return null;
+  }
+}
 
 /**
  * Crear un nuevo pedido de materiales
@@ -181,6 +262,9 @@ export const crearPedido = async (req, res) => {
           // CREAR nueva solicitud: déficit + stock máximo (solo una vez)
           const cantidadTotal = deficit + stockMaximo;
 
+          // Detectar proveedor del artículo
+          const proveedor_id_detectado = await detectarProveedorArticulo(articulo.id, transaction);
+
           // Generar ticket_id para la solicitud (usando contador incremental)
           contadorSolicitudesIncremental++;
           const fechaSolicitud = new Date();
@@ -196,6 +280,7 @@ export const crearPedido = async (req, res) => {
             motivo: `Stock negativo después de pedido ${nombrePedido}. Déficit: ${deficit} ${articulo.unidad}. Se solicitan ${cantidadTotal} ${articulo.unidad} (${deficit} para cubrir déficit + ${stockMaximo} para reposición hasta stock máximo).`,
             pedido_origen_id: null, // Se asignará después de crear el pedido
             usuario_solicitante_id: usuario_id,
+            proveedor_id: proveedor_id_detectado, // Proveedor detectado automáticamente
             prioridad: 'alta', // Prioridad alta por stock negativo
             estado: 'pendiente'
           }, { transaction });
@@ -255,6 +340,9 @@ export const crearPedido = async (req, res) => {
           // CREAR nueva solicitud
           const cantidadAReponer = stockMaximo - nuevoStock;
 
+          // Detectar proveedor del artículo
+          const proveedor_id_detectado = await detectarProveedorArticulo(articulo.id, transaction);
+
           // Generar ticket_id para la solicitud (usando contador incremental)
           contadorSolicitudesIncremental++;
           const fechaSolicitud = new Date();
@@ -270,6 +358,7 @@ export const crearPedido = async (req, res) => {
             motivo: `Stock bajo mínimo después de pedido ${nombrePedido}. Stock actual: ${nuevoStock} ${articulo.unidad}. Se solicita reposición hasta stock máximo (${stockMaximo} ${articulo.unidad}).`,
             pedido_origen_id: null, // Se asignará después de crear el pedido
             usuario_solicitante_id: usuario_id,
+            proveedor_id: proveedor_id_detectado, // Proveedor detectado automáticamente
             prioridad: 'media',
             estado: 'pendiente'
           }, { transaction });

@@ -50,6 +50,15 @@ const SolicitudCompra = sequelize.define('SolicitudCompra', {
         },
         comment: 'Usuario que generó la solicitud'
     },
+    proveedor_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'proveedores',
+            key: 'id'
+        },
+        comment: 'Proveedor sugerido para esta solicitud (detectado automáticamente del artículo)'
+    },
     orden_compra_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
