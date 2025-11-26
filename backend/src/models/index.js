@@ -13,6 +13,9 @@ import DetalleOrdenCompra from './DetalleOrdenCompra.js';
 import SolicitudCompra from './SolicitudCompra.js';
 import Notificacion from './Notificacion.js';
 import Proyecto from './Proyecto.js';
+import TipoHerramientaRenta from './TipoHerramientaRenta.js';
+import UnidadHerramientaRenta from './UnidadHerramientaRenta.js';
+import HistorialAsignacionHerramienta from './HistorialAsignacionHerramienta.js';
 
 // Definir relaciones
 
@@ -290,6 +293,118 @@ Proyecto.hasMany(Movimiento, {
     as: 'movimientos'
 });
 
+// ========== RELACIONES HERRAMIENTAS DE RENTA ==========
+
+// TipoHerramientaRenta - Categoria (Muchos a Uno)
+TipoHerramientaRenta.belongsTo(Categoria, {
+    foreignKey: 'categoria_id',
+    as: 'categoria'
+});
+Categoria.hasMany(TipoHerramientaRenta, {
+    foreignKey: 'categoria_id',
+    as: 'tipos_herramienta_renta'
+});
+
+// TipoHerramientaRenta - Ubicacion (Muchos a Uno)
+TipoHerramientaRenta.belongsTo(Ubicacion, {
+    foreignKey: 'ubicacion_id',
+    as: 'ubicacion'
+});
+Ubicacion.hasMany(TipoHerramientaRenta, {
+    foreignKey: 'ubicacion_id',
+    as: 'tipos_herramienta_renta'
+});
+
+// TipoHerramientaRenta - Proveedor (Muchos a Uno)
+TipoHerramientaRenta.belongsTo(Proveedor, {
+    foreignKey: 'proveedor_id',
+    as: 'proveedor'
+});
+Proveedor.hasMany(TipoHerramientaRenta, {
+    foreignKey: 'proveedor_id',
+    as: 'tipos_herramienta_renta'
+});
+
+// TipoHerramientaRenta - Articulo (Muchos a Uno) - Artículo origen si fue migrado
+TipoHerramientaRenta.belongsTo(Articulo, {
+    foreignKey: 'articulo_origen_id',
+    as: 'articuloOrigen'
+});
+Articulo.hasOne(TipoHerramientaRenta, {
+    foreignKey: 'articulo_origen_id',
+    as: 'tipo_herramienta_migrado'
+});
+
+// UnidadHerramientaRenta - TipoHerramientaRenta (Muchos a Uno)
+UnidadHerramientaRenta.belongsTo(TipoHerramientaRenta, {
+    foreignKey: 'tipo_herramienta_id',
+    as: 'tipoHerramienta'
+});
+TipoHerramientaRenta.hasMany(UnidadHerramientaRenta, {
+    foreignKey: 'tipo_herramienta_id',
+    as: 'unidades'
+});
+
+// UnidadHerramientaRenta - Usuario (Muchos a Uno) - Usuario asignado
+UnidadHerramientaRenta.belongsTo(Usuario, {
+    foreignKey: 'usuario_asignado_id',
+    as: 'usuarioAsignado'
+});
+Usuario.hasMany(UnidadHerramientaRenta, {
+    foreignKey: 'usuario_asignado_id',
+    as: 'herramientas_asignadas'
+});
+
+// UnidadHerramientaRenta - Equipo (Muchos a Uno) - Equipo asignado
+UnidadHerramientaRenta.belongsTo(Equipo, {
+    foreignKey: 'equipo_asignado_id',
+    as: 'equipoAsignado'
+});
+Equipo.hasMany(UnidadHerramientaRenta, {
+    foreignKey: 'equipo_asignado_id',
+    as: 'herramientas_asignadas'
+});
+
+// HistorialAsignacionHerramienta - UnidadHerramientaRenta (Muchos a Uno)
+HistorialAsignacionHerramienta.belongsTo(UnidadHerramientaRenta, {
+    foreignKey: 'unidad_herramienta_id',
+    as: 'unidadHerramienta'
+});
+UnidadHerramientaRenta.hasMany(HistorialAsignacionHerramienta, {
+    foreignKey: 'unidad_herramienta_id',
+    as: 'historial'
+});
+
+// HistorialAsignacionHerramienta - Usuario (Muchos a Uno) - Usuario asignado
+HistorialAsignacionHerramienta.belongsTo(Usuario, {
+    foreignKey: 'usuario_id',
+    as: 'usuario'
+});
+Usuario.hasMany(HistorialAsignacionHerramienta, {
+    foreignKey: 'usuario_id',
+    as: 'historial_asignaciones_herramienta'
+});
+
+// HistorialAsignacionHerramienta - Equipo (Muchos a Uno) - Equipo asignado
+HistorialAsignacionHerramienta.belongsTo(Equipo, {
+    foreignKey: 'equipo_id',
+    as: 'equipo'
+});
+Equipo.hasMany(HistorialAsignacionHerramienta, {
+    foreignKey: 'equipo_id',
+    as: 'historial_asignaciones_herramienta'
+});
+
+// HistorialAsignacionHerramienta - Usuario (Muchos a Uno) - Usuario que registró
+HistorialAsignacionHerramienta.belongsTo(Usuario, {
+    foreignKey: 'registrado_por_usuario_id',
+    as: 'registradoPor'
+});
+Usuario.hasMany(HistorialAsignacionHerramienta, {
+    foreignKey: 'registrado_por_usuario_id',
+    as: 'historial_asignaciones_registradas'
+});
+
 // Exportar todos los modelos
 export {
     sequelize,
@@ -306,7 +421,10 @@ export {
     DetalleOrdenCompra,
     SolicitudCompra,
     Notificacion,
-    Proyecto
+    Proyecto,
+    TipoHerramientaRenta,
+    UnidadHerramientaRenta,
+    HistorialAsignacionHerramienta
 };
 
 export default {
@@ -324,5 +442,8 @@ export default {
     DetalleOrdenCompra,
     SolicitudCompra,
     Notificacion,
-    Proyecto
+    Proyecto,
+    TipoHerramientaRenta,
+    UnidadHerramientaRenta,
+    HistorialAsignacionHerramienta
 };

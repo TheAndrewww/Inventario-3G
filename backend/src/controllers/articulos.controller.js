@@ -837,6 +837,94 @@ export const getArticuloEtiqueta = async (req, res) => {
 };
 
 /**
+ * POST /api/articulos/etiquetas/lote-mixto
+ * Generar PDF con múltiples etiquetas (3cm x 9cm) organizadas en hojas A4
+ * Acepta tanto artículos consumibles como unidades de herramientas
+ */
+export const generarEtiquetasMixtas = async (req, res) => {
+    try {
+        const { articulos_ids = [], unidades_ids = [] } = req.body;
+
+        // Validar que se proporcionó al menos uno
+        if ((!articulos_ids || articulos_ids.length === 0) && (!unidades_ids || unidades_ids.length === 0)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Debes proporcionar al menos un artículo o unidad de herramienta'
+            });
+        }
+
+        const etiquetas = [];
+
+        // Procesar artículos consumibles
+        if (articulos_ids && articulos_ids.length > 0) {
+            const articulos = await Articulo.findAll({
+                where: {
+                    id: articulos_ids,
+                    activo: true,
+                    es_herramienta: false // Solo consumibles
+                }
+            });
+
+            articulos.forEach(a => {
+                etiquetas.push({
+                    nombre: a.nombre,
+                    codigo_ean13: a.codigo_ean13,
+                    tipo: 'articulo'
+                });
+            });
+        }
+
+        // Procesar unidades de herramientas
+        if (unidades_ids && unidades_ids.length > 0) {
+            const { UnidadHerramientaRenta, TipoHerramientaRenta } = await import('../models/index.js');
+
+            const unidades = await UnidadHerramientaRenta.findAll({
+                where: {
+                    id: unidades_ids,
+                    activo: true
+                },
+                include: [{
+                    model: TipoHerramientaRenta,
+                    as: 'tipoHerramienta',
+                    attributes: ['nombre']
+                }]
+            });
+
+            unidades.forEach(u => {
+                etiquetas.push({
+                    nombre: `${u.tipoHerramienta.nombre} - ${u.codigo_unico}`,
+                    codigo_ean13: u.codigo_ean13,
+                    tipo: 'unidad'
+                });
+            });
+        }
+
+        if (etiquetas.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No se encontraron artículos o unidades válidas'
+            });
+        }
+
+        // Generar PDF con todas las etiquetas
+        const labelGenerator = await import('../utils/label-generator.js');
+        const pdfBuffer = await labelGenerator.generarEtiquetasLote(etiquetas);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="etiquetas-lote-${etiquetas.length}-items.pdf"`);
+        res.send(pdfBuffer);
+
+    } catch (error) {
+        console.error('Error en generarEtiquetasMixtas:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al generar etiquetas',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
  * POST /api/articulos/etiquetas/lote
  * Generar PDF con múltiples etiquetas (3cm x 9cm) organizadas en hojas A4
  */

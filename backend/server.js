@@ -88,6 +88,7 @@ import ordenesCompraRoutes from './src/routes/ordenesCompra.routes.js';
 import notificacionesRoutes from './src/routes/notificaciones.routes.js';
 import proyectosRoutes from './src/routes/proyectos.routes.js';
 import calendarioRoutes from './src/routes/calendario.routes.js';
+import herramientasRentaRoutes from './src/routes/herramientasRenta.routes.js';
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -109,7 +110,8 @@ app.get('/', (req, res) => {
             solicitudesCompra: '/api/solicitudes-compra',
             notificaciones: '/api/notificaciones',
             proyectos: '/api/proyectos',
-            calendario: '/api/calendario'
+            calendario: '/api/calendario',
+            herramientasRenta: '/api/herramientas-renta'
         }
     });
 });
@@ -126,6 +128,7 @@ app.use('/api/equipos', equiposRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/proyectos', proyectosRoutes);
 app.use('/api/calendario', calendarioRoutes);
+app.use('/api/herramientas-renta', herramientasRentaRoutes);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
 

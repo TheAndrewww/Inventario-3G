@@ -11,6 +11,7 @@ import {
     getArticuloBarcodeSVG,
     getArticuloEtiqueta,
     generarEtiquetasLote,
+    generarEtiquetasMixtas,
     uploadArticuloImagen,
     deleteArticuloImagen,
     reprocessArticuloImagen,
@@ -44,6 +45,14 @@ router.get('/', verificarToken, getArticulos);
  * @access  Private
  */
 router.get('/ean13/:codigoEAN13', verificarToken, getArticuloByEAN13);
+
+/**
+ * @route   POST /api/articulos/etiquetas/lote-mixto
+ * @desc    Generar PDF con múltiples etiquetas mixtas (artículos + unidades de herramientas)
+ * @access  Private
+ * @body    { articulos_ids: [1, 2, 3, ...], unidades_ids: [1, 2, 3, ...] }
+ */
+router.post('/etiquetas/lote-mixto', verificarToken, generarEtiquetasMixtas);
 
 /**
  * @route   POST /api/articulos/etiquetas/lote

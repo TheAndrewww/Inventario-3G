@@ -1,673 +1,729 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Package, Wrench, UserCheck, RotateCcw, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
-import movimientosService from '../services/movimientos.service';
-import articulosService from '../services/articulos.service';
+import { useNavigate } from 'react-router-dom';
+import {
+    Search,
+    Plus,
+    Package,
+    Wrench,
+    ChevronDown,
+    ChevronUp,
+    UserCheck,
+    RotateCcw,
+    AlertCircle,
+    CheckCircle,
+    Clock,
+    Settings,
+    Users,
+    Printer
+} from 'lucide-react';
+import herramientasRentaService from '../services/herramientasRenta.service';
 import usuariosService from '../services/usuarios.service';
+import equiposService from '../services/equipos.service';
 import { Loader, Modal, Button } from '../components/common';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
 const RentaHerramientasPage = () => {
-  const [herramientasRentadas, setHerramientasRentadas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [modalRetiro, setModalRetiro] = useState(false);
-  const [modalDevolucion, setModalDevolucion] = useState(false);
-  const [retiroSeleccionado, setRetiroSeleccionado] = useState(null);
-  const { user } = useAuth();
+    const navigate = useNavigate();
+    const [tipos, setTipos] = useState([]);
+    const [tiposExpandidos, setTiposExpandidos] = useState({});
+    const [unidadesPorTipo, setUnidadesPorTipo] = useState({});
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [modalAsignar, setModalAsignar] = useState(false);
+    const [modalDevolver, setModalDevolver] = useState(false);
+    const [unidadSeleccionada, setUnidadSeleccionada] = useState(null);
+    const [modalNuevoTipo, setModalNuevoTipo] = useState(false);
+    const { user } = useAuth();
 
-  // Solo supervisores y administradores pueden acceder
-  const puedeGestionar = ['administrador', 'encargado'].includes(user?.rol);
+    // Solo administradores, almacenistas y encargados pueden gestionar
+    const puedeGestionar = ['administrador', 'almacenista', 'encargado'].includes(user?.rol);
 
-  useEffect(() => {
-    if (puedeGestionar) {
-      fetchHerramientasRentadas();
-    }
-  }, [puedeGestionar]);
+    useEffect(() => {
+        if (puedeGestionar) {
+            fetchTipos();
+        }
+    }, [puedeGestionar]);
 
-  const fetchHerramientasRentadas = async () => {
-    try {
-      setLoading(true);
-      // Obtener retiros que no han sido devueltos (sin devolución correspondiente)
-      const response = await movimientosService.getHistorial({ tipo: 'retiro' });
+    const fetchTipos = async () => {
+        try {
+            setLoading(true);
+            const data = await herramientasRentaService.obtenerTipos();
+            setTipos(data.tipos || []);
+        } catch (error) {
+            console.error('Error al cargar tipos de herramienta:', error);
+            toast.error('Error al cargar las herramientas');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-      // Filtrar solo los retiros de herramientas (al menos un artículo debe ser herramienta)
-      const retirosHerramientas = response.data?.movimientos?.filter(mov => {
-        // Verificar si es un retiro completado y contiene al menos una herramienta
-        if (mov.estado !== 'completado') return false;
+    const fetchUnidadesTipo = async (tipoId) => {
+        try {
+            const data = await herramientasRentaService.obtenerUnidadesPorTipo(tipoId);
+            setUnidadesPorTipo(prev => ({
+                ...prev,
+                [tipoId]: data.unidades || []
+            }));
+        } catch (error) {
+            console.error(`Error al cargar unidades del tipo ${tipoId}:`, error);
+            toast.error('Error al cargar las unidades');
+        }
+    };
 
-        // Verificar si alguno de los artículos es una herramienta
-        const tieneHerramientas = mov.detalles?.some(detalle =>
-          detalle.articulo?.es_herramienta === true
+    const toggleTipo = async (tipoId) => {
+        const estaExpandido = tiposExpandidos[tipoId];
+
+        if (!estaExpandido && !unidadesPorTipo[tipoId]) {
+            await fetchUnidadesTipo(tipoId);
+        }
+
+        setTiposExpandidos(prev => ({
+            ...prev,
+            [tipoId]: !estaExpandido
+        }));
+    };
+
+    const handleAsignar = (unidad, tipo) => {
+        setUnidadSeleccionada({ ...unidad, tipo });
+        setModalAsignar(true);
+    };
+
+    const handleDevolver = (unidad, tipo) => {
+        setUnidadSeleccionada({ ...unidad, tipo });
+        setModalDevolver(true);
+    };
+
+    const handleImprimirCodigos = (tipo) => {
+        const unidades = unidadesPorTipo[tipo.id] || [];
+        navigate('/renta-herramientas/imprimir-codigos', {
+            state: { tipo, unidades }
+        });
+    };
+
+    const tiposFiltrados = tipos.filter((tipo) => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+            tipo.nombre?.toLowerCase().includes(searchLower) ||
+            tipo.prefijo_codigo?.toLowerCase().includes(searchLower) ||
+            tipo.categoria?.nombre?.toLowerCase().includes(searchLower)
         );
-
-        return tieneHerramientas;
-      });
-
-      setHerramientasRentadas(retirosHerramientas || []);
-    } catch (error) {
-      console.error('Error al cargar herramientas rentadas:', error);
-      toast.error('Error al cargar las herramientas rentadas');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleNuevoRetiro = () => {
-    setModalRetiro(true);
-  };
-
-  const handleDevolucion = (retiro) => {
-    setRetiroSeleccionado(retiro);
-    setModalDevolucion(true);
-  };
-
-  const herramientasFiltradas = herramientasRentadas.filter((retiro) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      retiro.usuario?.nombre?.toLowerCase().includes(searchLower) ||
-      retiro.proyecto?.toLowerCase().includes(searchLower) ||
-      retiro.detalles?.some(detalle =>
-        detalle.articulo?.nombre?.toLowerCase().includes(searchLower)
-      )
-    );
-  });
-
-  // Agrupar por persona
-  const herramientasPorPersona = React.useMemo(() => {
-    const grupos = {};
-    herramientasFiltradas.forEach(retiro => {
-      const nombrePersona = retiro.usuario?.nombre || 'Desconocido';
-      if (!grupos[nombrePersona]) {
-        grupos[nombrePersona] = {
-          usuario: retiro.usuario,
-          retiros: []
-        };
-      }
-      grupos[nombrePersona].retiros.push(retiro);
     });
-    return grupos;
-  }, [herramientasFiltradas]);
 
-  if (!puedeGestionar) {
+    // Calcular estadísticas globales
+    const stats = React.useMemo(() => {
+        return tipos.reduce((acc, tipo) => {
+            acc.totalUnidades += tipo.total_unidades || 0;
+            acc.disponibles += tipo.unidades_disponibles || 0;
+            acc.asignadas += tipo.unidades_asignadas || 0;
+            return acc;
+        }, { totalUnidades: 0, disponibles: 0, asignadas: 0 });
+    }, [tipos]);
+
+    const getEstadoBadge = (estado) => {
+        const badges = {
+            disponible: { color: 'bg-green-100 text-green-800', texto: 'Disponible', icon: CheckCircle },
+            asignada: { color: 'bg-blue-100 text-blue-800', texto: 'Asignada', icon: UserCheck },
+            en_reparacion: { color: 'bg-yellow-100 text-yellow-800', texto: 'En Reparación', icon: Settings },
+            perdida: { color: 'bg-red-100 text-red-800', texto: 'Perdida', icon: AlertCircle },
+            baja: { color: 'bg-gray-100 text-gray-800', texto: 'Baja', icon: AlertCircle }
+        };
+        const badge = badges[estado] || badges.disponible;
+        const Icon = badge.icon;
+        return (
+            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
+                <Icon size={12} />
+                {badge.texto}
+            </span>
+        );
+    };
+
+    if (!puedeGestionar) {
+        return (
+            <div className="p-6">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-red-800">No tienes permisos para acceder a esta sección.</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (loading) {
+        return <Loader fullScreen />;
+    }
+
     return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">No tienes permisos para acceder a esta sección.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return <Loader fullScreen />;
-  }
-
-  return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Renta de Herramientas</h1>
-        <p className="text-gray-600">
-          Gestiona el préstamo y devolución de herramientas del inventario
-        </p>
-      </div>
-
-      {/* Barra de acciones */}
-      <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Buscar por persona, proyecto o herramienta..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-          />
-        </div>
-
-        <Button
-          onClick={handleNuevoRetiro}
-          className="bg-red-700 hover:bg-red-800 text-white"
-        >
-          <Plus size={20} />
-          Nueva Renta
-        </Button>
-      </div>
-
-      {/* Estadísticas rápidas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Herramientas Rentadas</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {herramientasRentadas.reduce((total, retiro) =>
-                  total + (retiro.detalles?.length || 0), 0
-                )}
-              </p>
-            </div>
-            <Wrench className="text-blue-500" size={32} />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Personas con Herramientas</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {Object.keys(herramientasPorPersona).length}
-              </p>
-            </div>
-            <UserCheck className="text-green-500" size={32} />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-orange-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total de Retiros</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {herramientasRentadas.length}
-              </p>
-            </div>
-            <Package className="text-orange-500" size={32} />
-          </div>
-        </div>
-      </div>
-
-      {/* Lista de herramientas por persona */}
-      {Object.keys(herramientasPorPersona).length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <Wrench size={64} className="mx-auto mb-4 text-gray-300" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            No hay herramientas rentadas
-          </h3>
-          <p className="text-gray-600 mb-6">
-            Comienza registrando el préstamo de herramientas a tu equipo
-          </p>
-          <Button onClick={handleNuevoRetiro} className="bg-red-700 hover:bg-red-800">
-            <Plus size={20} />
-            Registrar Primera Renta
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {Object.entries(herramientasPorPersona).map(([nombrePersona, data]) => {
-            const totalHerramientas = data.retiros.reduce(
-              (sum, retiro) => sum + (retiro.detalles?.length || 0), 0
-            );
-
-            return (
-              <div key={nombrePersona} className="bg-white rounded-lg shadow overflow-hidden">
-                {/* Header de la persona */}
-                <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                        <UserCheck className="text-red-700" size={24} />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{nombrePersona}</h3>
-                        <p className="text-sm text-gray-600">
-                          {data.usuario?.rol || 'Sin rol'} • {totalHerramientas} herramienta{totalHerramientas !== 1 ? 's' : ''}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Retiros de esta persona */}
-                <div className="divide-y divide-gray-200">
-                  {data.retiros.map((retiro) => (
-                    <div key={retiro.id} className="p-6 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-gray-900">{retiro.ticket_id}</span>
-                            {retiro.proyecto && (
-                              <span className="text-sm px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
-                                {retiro.proyecto}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-600">
-                            {new Date(retiro.fecha_hora).toLocaleString('es-MX', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => handleDevolucion(retiro)}
-                          variant="secondary"
-                          className="bg-green-50 hover:bg-green-100 text-green-700"
-                        >
-                          <RotateCcw size={16} />
-                          Registrar Devolución
-                        </Button>
-                      </div>
-
-                      {/* Herramientas del retiro */}
-                      <div className="space-y-2">
-                        {retiro.detalles?.map((detalle, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between bg-gray-50 rounded-lg p-3"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Wrench className="text-gray-400" size={18} />
-                              <div>
-                                <p className="font-medium text-gray-900">
-                                  {detalle.articulo?.nombre}
-                                </p>
-                                <p className="text-sm text-gray-600">
-                                  Cantidad: {detalle.cantidad} {detalle.articulo?.unidad}
-                                </p>
-                              </div>
-                            </div>
-                            {detalle.observaciones && (
-                              <div className="text-sm text-gray-600 max-w-xs">
-                                <AlertCircle size={14} className="inline mr-1" />
-                                {detalle.observaciones}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {retiro.observaciones && (
-                        <div className="mt-3 p-3 bg-yellow-50 rounded-lg">
-                          <p className="text-sm text-yellow-800">
-                            <strong>Nota:</strong> {retiro.observaciones}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Modal Nuevo Retiro */}
-      {modalRetiro && (
-        <ModalNuevoRetiro
-          isOpen={modalRetiro}
-          onClose={() => setModalRetiro(false)}
-          onSuccess={() => {
-            setModalRetiro(false);
-            fetchHerramientasRentadas();
-          }}
-        />
-      )}
-
-      {/* Modal Devolución */}
-      {modalDevolucion && retiroSeleccionado && (
-        <ModalDevolucion
-          isOpen={modalDevolucion}
-          retiro={retiroSeleccionado}
-          onClose={() => {
-            setModalDevolucion(false);
-            setRetiroSeleccionado(null);
-          }}
-          onSuccess={() => {
-            setModalDevolucion(false);
-            setRetiroSeleccionado(null);
-            fetchHerramientasRentadas();
-          }}
-        />
-      )}
-    </div>
-  );
-};
-
-// Modal para nuevo retiro
-const ModalNuevoRetiro = ({ isOpen, onClose, onSuccess }) => {
-  const [articulos, setArticulos] = useState([]);
-  const [supervisores, setSupervisores] = useState([]);
-  const [articulosSeleccionados, setArticulosSeleccionados] = useState([]);
-  const [supervisorSeleccionado, setSupervisorSeleccionado] = useState('');
-  const [proyecto, setProyecto] = useState('');
-  const [observaciones, setObservaciones] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [mostrarCatalogo, setMostrarCatalogo] = useState(false);
-
-  useEffect(() => {
-    fetchDatos();
-  }, []);
-
-  const fetchDatos = async () => {
-    try {
-      const [artData, supData] = await Promise.all([
-        articulosService.getAll(),
-        usuariosService.getSupervisores()
-      ]);
-
-      // Filtrar solo artículos marcados como herramientas
-      const herramientas = (Array.isArray(artData) ? artData : []).filter(art => art.es_herramienta === true);
-      setArticulos(herramientas);
-      setSupervisores(Array.isArray(supData) ? supData : []);
-    } catch (error) {
-      console.error('Error al cargar datos:', error);
-      toast.error('Error al cargar datos');
-    }
-  };
-
-  const articulosFiltrados = articulos.filter((art) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      art.nombre?.toLowerCase().includes(searchLower) ||
-      art.codigo_ean13?.includes(searchTerm) ||
-      art.categoria?.nombre?.toLowerCase().includes(searchLower)
-    );
-  });
-
-  const handleSeleccionarArticulo = (articulo) => {
-    const yaExiste = articulosSeleccionados.find(item => item.articulo_id === articulo.id);
-
-    if (yaExiste) {
-      toast.error('Esta herramienta ya está en la lista');
-      return;
-    }
-
-    setArticulosSeleccionados([
-      ...articulosSeleccionados,
-      {
-        articulo_id: articulo.id,
-        articulo: articulo,
-        cantidad: 1
-      }
-    ]);
-
-    setSearchTerm('');
-    setMostrarCatalogo(false);
-    toast.success(`${articulo.nombre} agregado`);
-  };
-
-  const handleRemoverArticulo = (index) => {
-    setArticulosSeleccionados(articulosSeleccionados.filter((_, i) => i !== index));
-  };
-
-  const handleCantidadChange = (index, cantidad) => {
-    const nuevosArticulos = [...articulosSeleccionados];
-    nuevosArticulos[index].cantidad = cantidad;
-    setArticulosSeleccionados(nuevosArticulos);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!supervisorSeleccionado) {
-      toast.error('Selecciona un supervisor');
-      return;
-    }
-
-    if (articulosSeleccionados.length === 0) {
-      toast.error('Debe agregar al menos una herramienta');
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const supervisor = supervisores.find(s => s.id === parseInt(supervisorSeleccionado));
-      const nombreSupervisor = supervisor?.nombre || 'Desconocido';
-
-      const movimientoData = {
-        tipo: 'retiro',
-        articulos: articulosSeleccionados.map(item => ({
-          articulo_id: item.articulo_id,
-          cantidad: parseFloat(item.cantidad),
-          observaciones: item.observaciones
-        })),
-        proyecto: `${nombreSupervisor}${proyecto ? ` - ${proyecto}` : ''}`,
-        observaciones: observaciones.trim() || undefined
-      };
-
-      await movimientosService.crearRetiro(movimientoData);
-      toast.success('Renta registrada exitosamente');
-      onSuccess();
-    } catch (error) {
-      console.error('Error al crear retiro:', error);
-      toast.error(error.message || 'Error al registrar la renta');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Nueva Renta de Herramienta">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Supervisor *
-          </label>
-          <select
-            value={supervisorSeleccionado}
-            onChange={(e) => setSupervisorSeleccionado(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            required
-          >
-            <option value="">Seleccionar supervisor...</option>
-            {supervisores.map(supervisor => (
-              <option key={supervisor.id} value={supervisor.id}>
-                {supervisor.nombre} - {supervisor.puesto || 'Supervisor'}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Proyecto/Obra (Opcional)
-          </label>
-          <input
-            type="text"
-            value={proyecto}
-            onChange={(e) => setProyecto(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            placeholder="Nombre del proyecto u obra"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Buscar y agregar herramientas
-          </label>
-
-          <div className="relative mb-4">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Buscar herramienta..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setMostrarCatalogo(e.target.value.length > 0);
-                  }}
-                  onFocus={() => setMostrarCatalogo(searchTerm.length > 0)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm('');
-                  setMostrarCatalogo(!mostrarCatalogo);
-                }}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg"
-              >
-                <Package size={18} />
-              </button>
-            </div>
-
-            {mostrarCatalogo && articulosFiltrados.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
-                {articulosFiltrados.map((articulo) => (
-                  <button
-                    key={articulo.id}
-                    type="button"
-                    onClick={() => handleSeleccionarArticulo(articulo)}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-                  >
-                    <p className="font-medium text-gray-900">{articulo.nombre}</p>
-                    <p className="text-sm text-gray-600">
-                      Stock: {articulo.stock_actual} {articulo.unidad}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {articulosSeleccionados.length > 0 && (
-            <div className="space-y-2">
-              {articulosSeleccionados.map((item, index) => (
-                <div key={index} className="bg-gray-50 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="font-medium text-gray-900">{item.articulo.nombre}</p>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoverArticulo(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <input
-                    type="number"
-                    value={item.cantidad}
-                    onChange={(e) => handleCantidadChange(index, e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    min="1"
-                    max={item.articulo.stock_actual}
-                    required
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Observaciones
-          </label>
-          <textarea
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            rows="3"
-            placeholder="Notas adicionales..."
-          />
-        </div>
-
-        <div className="flex gap-3 justify-end mt-6">
-          <Button type="button" onClick={onClose} variant="secondary" disabled={loading}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={loading || articulosSeleccionados.length === 0}>
-            {loading ? 'Registrando...' : 'Registrar Renta'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-};
-
-// Modal para devolución
-const ModalDevolucion = ({ isOpen, retiro, onClose, onSuccess }) => {
-  const [loading, setLoading] = useState(false);
-  const [observaciones, setObservaciones] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      setLoading(true);
-
-      const devolucionData = {
-        tipo: 'devolucion',
-        articulos: retiro.detalles.map(detalle => ({
-          articulo_id: detalle.articulo_id,
-          cantidad: detalle.cantidad
-        })),
-        proyecto: `Devolución de ${retiro.usuario?.nombre || 'usuario'} - ${retiro.ticket_id}`,
-        observaciones: observaciones.trim() || `Devolución del retiro ${retiro.ticket_id}`
-      };
-
-      await movimientosService.create(devolucionData);
-      toast.success('Devolución registrada exitosamente');
-      onSuccess();
-    } catch (error) {
-      console.error('Error al registrar devolución:', error);
-      toast.error(error.response?.data?.message || 'Error al registrar la devolución');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Registrar Devolución">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800 mb-2">
-            <strong>Retiro:</strong> {retiro.ticket_id}
-          </p>
-          <p className="text-sm text-blue-800">
-            <strong>Persona:</strong> {retiro.usuario?.nombre || 'Desconocido'}
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Herramientas a devolver
-          </label>
-          <div className="space-y-2">
-            {retiro.detalles?.map((detalle, index) => (
-              <div key={index} className="bg-gray-50 rounded-lg p-3">
-                <p className="font-medium text-gray-900">{detalle.articulo?.nombre}</p>
-                <p className="text-sm text-gray-600">
-                  Cantidad: {detalle.cantidad} {detalle.articulo?.unidad}
+        <div className="p-6">
+            {/* Header */}
+            <div className="mb-6">
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Herramientas de Renta</h1>
+                <p className="text-gray-600">
+                    Gestiona las herramientas de renta con seguimiento individual de cada unidad
                 </p>
-              </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Observaciones (Estado de la herramienta)
-          </label>
-          <textarea
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            rows="3"
-            placeholder="Ej: En buen estado, con desgaste normal, requiere mantenimiento, etc."
-          />
-        </div>
+            {/* Barra de acciones */}
+            <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre, prefijo o categoría..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                    />
+                </div>
 
-        <div className="flex gap-3 justify-end mt-6">
-          <Button type="button" onClick={onClose} variant="secondary" disabled={loading}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700">
-            {loading ? 'Registrando...' : 'Confirmar Devolución'}
-          </Button>
+                {(user?.rol === 'administrador' || user?.rol === 'almacenista') && (
+                    <Button
+                        onClick={() => setModalNuevoTipo(true)}
+                        className="bg-red-700 hover:bg-red-800 text-white"
+                    >
+                        <Plus size={20} />
+                        Nuevo Tipo de Herramienta
+                    </Button>
+                )}
+            </div>
+
+            {/* Estadísticas globales */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-gray-600">Tipos de Herramienta</p>
+                            <p className="text-2xl font-bold text-gray-900">{tipos.length}</p>
+                        </div>
+                        <Package className="text-purple-500" size={32} />
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-gray-600">Total de Unidades</p>
+                            <p className="text-2xl font-bold text-gray-900">{stats.totalUnidades}</p>
+                        </div>
+                        <Wrench className="text-blue-500" size={32} />
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-gray-600">Disponibles</p>
+                            <p className="text-2xl font-bold text-gray-900">{stats.disponibles}</p>
+                        </div>
+                        <CheckCircle className="text-green-500" size={32} />
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-4 border-l-4 border-orange-500">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-gray-600">Asignadas</p>
+                            <p className="text-2xl font-bold text-gray-900">{stats.asignadas}</p>
+                        </div>
+                        <UserCheck className="text-orange-500" size={32} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Lista de tipos */}
+            {tiposFiltrados.length === 0 ? (
+                <div className="bg-white rounded-lg shadow p-12 text-center">
+                    <Wrench size={64} className="mx-auto mb-4 text-gray-300" />
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                        No hay tipos de herramienta registrados
+                    </h3>
+                    <p className="text-gray-600 mb-6">
+                        Comienza creando un nuevo tipo de herramienta
+                    </p>
+                    {(user?.rol === 'administrador' || user?.rol === 'almacenista') && (
+                        <Button
+                            onClick={() => setModalNuevoTipo(true)}
+                            className="bg-red-700 hover:bg-red-800"
+                        >
+                            <Plus size={20} />
+                            Crear Primer Tipo
+                        </Button>
+                    )}
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {tiposFiltrados.map((tipo) => {
+                        const estaExpandido = tiposExpandidos[tipo.id];
+                        const unidades = unidadesPorTipo[tipo.id] || [];
+
+                        return (
+                            <div key={tipo.id} className="bg-white rounded-lg shadow overflow-hidden">
+                                {/* Header del tipo */}
+                                <div
+                                    className="bg-gray-50 px-6 py-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
+                                    onClick={() => toggleTipo(tipo.id)}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4 flex-1">
+                                            <div className="w-14 h-14 rounded-lg bg-red-100 flex items-center justify-center">
+                                                <Wrench className="text-red-700" size={28} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-1">
+                                                    <h3 className="font-bold text-lg text-gray-900">{tipo.nombre}</h3>
+                                                    <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs font-mono rounded">
+                                                        {tipo.prefijo_codigo}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-4 text-sm text-gray-600">
+                                                    <span>
+                                                        {tipo.categoria?.nombre || 'Sin categoría'}
+                                                    </span>
+                                                    <span>•</span>
+                                                    <span>
+                                                        {tipo.total_unidades} {tipo.total_unidades === 1 ? 'unidad' : 'unidades'}
+                                                    </span>
+                                                    <span>•</span>
+                                                    <span className="text-green-600 font-medium">
+                                                        {tipo.unidades_disponibles} disponibles
+                                                    </span>
+                                                    {tipo.unidades_asignadas > 0 && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span className="text-blue-600 font-medium">
+                                                                {tipo.unidades_asignadas} asignadas
+                                                            </span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button className="p-2 hover:bg-gray-200 rounded-lg transition-colors">
+                                            {estaExpandido ? (
+                                                <ChevronUp className="text-gray-600" size={24} />
+                                            ) : (
+                                                <ChevronDown className="text-gray-600" size={24} />
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Unidades (colapsable) */}
+                                {estaExpandido && (
+                                    <div className="p-6">
+                                        {/* Botón de imprimir códigos */}
+                                        {unidades.length > 0 && (user?.rol === 'administrador' || user?.rol === 'almacenista') && (
+                                            <div className="mb-4 flex justify-end">
+                                                <Button
+                                                    onClick={() => handleImprimirCodigos(tipo)}
+                                                    className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+                                                >
+                                                    <Printer size={18} />
+                                                    Imprimir Códigos de Barras
+                                                </Button>
+                                            </div>
+                                        )}
+
+                                        {unidades.length === 0 ? (
+                                            <p className="text-center text-gray-500 py-4">No hay unidades registradas</p>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                {unidades.map((unidad) => (
+                                                    <div
+                                                        key={unidad.id}
+                                                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                                                    >
+                                                        <div className="flex items-start justify-between mb-3">
+                                                            <div>
+                                                                <p className="font-mono font-bold text-gray-900">
+                                                                    {unidad.codigo_unico}
+                                                                </p>
+                                                                {unidad.numero_serie && (
+                                                                    <p className="text-xs text-gray-500 mt-1">
+                                                                        S/N: {unidad.numero_serie}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            {getEstadoBadge(unidad.estado)}
+                                                        </div>
+
+                                                        {unidad.estado === 'asignada' && (
+                                                            <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-100">
+                                                                <div className="flex items-center gap-2 text-sm">
+                                                                    {unidad.usuarioAsignado ? (
+                                                                        <>
+                                                                            <UserCheck size={14} className="text-blue-600" />
+                                                                            <span className="text-blue-900 font-medium">
+                                                                                {unidad.usuarioAsignado.nombre}
+                                                                            </span>
+                                                                        </>
+                                                                    ) : unidad.equipoAsignado ? (
+                                                                        <>
+                                                                            <Users size={14} className="text-blue-600" />
+                                                                            <span className="text-blue-900 font-medium">
+                                                                                {unidad.equipoAsignado.nombre}
+                                                                            </span>
+                                                                        </>
+                                                                    ) : null}
+                                                                </div>
+                                                                {unidad.fecha_asignacion && (
+                                                                    <p className="text-xs text-blue-700 mt-1 flex items-center gap-1">
+                                                                        <Clock size={12} />
+                                                                        {new Date(unidad.fecha_asignacion).toLocaleDateString('es-MX')}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {unidad.observaciones && (
+                                                            <p className="text-xs text-gray-600 mb-3 italic">
+                                                                {unidad.observaciones}
+                                                            </p>
+                                                        )}
+
+                                                        <div className="flex gap-2">
+                                                            {unidad.estado === 'disponible' && (
+                                                                <Button
+                                                                    onClick={() => handleAsignar(unidad, tipo)}
+                                                                    variant="secondary"
+                                                                    className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm py-2"
+                                                                >
+                                                                    <UserCheck size={14} />
+                                                                    Asignar
+                                                                </Button>
+                                                            )}
+                                                            {unidad.estado === 'asignada' && (
+                                                                <Button
+                                                                    onClick={() => handleDevolver(unidad, tipo)}
+                                                                    variant="secondary"
+                                                                    className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 text-sm py-2"
+                                                                >
+                                                                    <RotateCcw size={14} />
+                                                                    Devolver
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Modales */}
+            {modalAsignar && unidadSeleccionada && (
+                <ModalAsignar
+                    isOpen={modalAsignar}
+                    unidad={unidadSeleccionada}
+                    onClose={() => {
+                        setModalAsignar(false);
+                        setUnidadSeleccionada(null);
+                    }}
+                    onSuccess={() => {
+                        setModalAsignar(false);
+                        setUnidadSeleccionada(null);
+                        fetchTipos();
+                        if (unidadSeleccionada.tipo?.id) {
+                            fetchUnidadesTipo(unidadSeleccionada.tipo.id);
+                        }
+                    }}
+                />
+            )}
+
+            {modalDevolver && unidadSeleccionada && (
+                <ModalDevolver
+                    isOpen={modalDevolver}
+                    unidad={unidadSeleccionada}
+                    onClose={() => {
+                        setModalDevolver(false);
+                        setUnidadSeleccionada(null);
+                    }}
+                    onSuccess={() => {
+                        setModalDevolver(false);
+                        setUnidadSeleccionada(null);
+                        fetchTipos();
+                        if (unidadSeleccionada.tipo?.id) {
+                            fetchUnidadesTipo(unidadSeleccionada.tipo.id);
+                        }
+                    }}
+                />
+            )}
+
+            {modalNuevoTipo && (
+                <ModalNuevoTipo
+                    isOpen={modalNuevoTipo}
+                    onClose={() => setModalNuevoTipo(false)}
+                    onSuccess={() => {
+                        setModalNuevoTipo(false);
+                        fetchTipos();
+                    }}
+                />
+            )}
         </div>
-      </form>
-    </Modal>
-  );
+    );
+};
+
+// Modal para asignar herramienta
+const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
+    const [tipoAsignacion, setTipoAsignacion] = useState('usuario'); // 'usuario' o 'equipo'
+    const [usuarioSeleccionado, setUsuarioSeleccionado] = useState('');
+    const [equipoSeleccionado, setEquipoSeleccionado] = useState('');
+    const [observaciones, setObservaciones] = useState('');
+    const [usuarios, setUsuarios] = useState([]);
+    const [equipos, setEquipos] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        fetchDatos();
+    }, []);
+
+    const fetchDatos = async () => {
+        try {
+            const [usuariosData, equiposData] = await Promise.all([
+                usuariosService.getAll(),
+                equiposService.getAll()
+            ]);
+            setUsuarios(Array.isArray(usuariosData) ? usuariosData : []);
+            setEquipos(Array.isArray(equiposData) ? equiposData : []);
+        } catch (error) {
+            console.error('Error al cargar datos:', error);
+            toast.error('Error al cargar datos');
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        if (tipoAsignacion === 'usuario' && !usuarioSeleccionado) {
+            toast.error('Selecciona un usuario');
+            return;
+        }
+
+        if (tipoAsignacion === 'equipo' && !equipoSeleccionado) {
+            toast.error('Selecciona un equipo');
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            await herramientasRentaService.asignarHerramienta({
+                unidad_id: unidad.id,
+                usuario_id: tipoAsignacion === 'usuario' ? parseInt(usuarioSeleccionado) : undefined,
+                equipo_id: tipoAsignacion === 'equipo' ? parseInt(equipoSeleccionado) : undefined,
+                observaciones: observaciones.trim() || undefined
+            });
+
+            toast.success('Herramienta asignada exitosamente');
+            onSuccess();
+        } catch (error) {
+            console.error('Error al asignar herramienta:', error);
+            toast.error(error.message || 'Error al asignar la herramienta');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Asignar Herramienta">
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-800 mb-1">
+                        <strong>Herramienta:</strong> {unidad.tipo?.nombre}
+                    </p>
+                    <p className="text-sm text-blue-800">
+                        <strong>Código:</strong> {unidad.codigo_unico}
+                    </p>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Asignar a:
+                    </label>
+                    <div className="flex gap-4">
+                        <label className="flex items-center">
+                            <input
+                                type="radio"
+                                value="usuario"
+                                checked={tipoAsignacion === 'usuario'}
+                                onChange={(e) => setTipoAsignacion(e.target.value)}
+                                className="mr-2"
+                            />
+                            Usuario
+                        </label>
+                        <label className="flex items-center">
+                            <input
+                                type="radio"
+                                value="equipo"
+                                checked={tipoAsignacion === 'equipo'}
+                                onChange={(e) => setTipoAsignacion(e.target.value)}
+                                className="mr-2"
+                            />
+                            Equipo
+                        </label>
+                    </div>
+                </div>
+
+                {tipoAsignacion === 'usuario' ? (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Usuario *
+                        </label>
+                        <select
+                            value={usuarioSeleccionado}
+                            onChange={(e) => setUsuarioSeleccionado(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                            required
+                        >
+                            <option value="">Seleccionar usuario...</option>
+                            {usuarios.filter(u => u.activo).map(usuario => (
+                                <option key={usuario.id} value={usuario.id}>
+                                    {usuario.nombre} - {usuario.puesto || usuario.rol}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                ) : (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Equipo *
+                        </label>
+                        <select
+                            value={equipoSeleccionado}
+                            onChange={(e) => setEquipoSeleccionado(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                            required
+                        >
+                            <option value="">Seleccionar equipo...</option>
+                            {equipos.filter(e => e.activo).map(equipo => (
+                                <option key={equipo.id} value={equipo.id}>
+                                    {equipo.nombre} - {equipo.supervisor?.nombre || 'Sin encargado'}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Observaciones
+                    </label>
+                    <textarea
+                        value={observaciones}
+                        onChange={(e) => setObservaciones(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                        rows="3"
+                        placeholder="Notas adicionales sobre la asignación..."
+                    />
+                </div>
+
+                <div className="flex gap-3 justify-end mt-6">
+                    <Button type="button" onClick={onClose} variant="secondary" disabled={loading}>
+                        Cancelar
+                    </Button>
+                    <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700">
+                        {loading ? 'Asignando...' : 'Asignar Herramienta'}
+                    </Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+// Modal para devolver herramienta
+const ModalDevolver = ({ isOpen, unidad, onClose, onSuccess }) => {
+    const [loading, setLoading] = useState(false);
+    const [observaciones, setObservaciones] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        try {
+            setLoading(true);
+
+            await herramientasRentaService.devolverHerramienta(
+                unidad.id,
+                observaciones.trim()
+            );
+
+            toast.success('Herramienta devuelta exitosamente');
+            onSuccess();
+        } catch (error) {
+            console.error('Error al devolver herramienta:', error);
+            toast.error(error.message || 'Error al devolver la herramienta');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Devolver Herramienta">
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-sm text-green-800 mb-1">
+                        <strong>Herramienta:</strong> {unidad.tipo?.nombre}
+                    </p>
+                    <p className="text-sm text-green-800 mb-1">
+                        <strong>Código:</strong> {unidad.codigo_unico}
+                    </p>
+                    {unidad.usuarioAsignado && (
+                        <p className="text-sm text-green-800">
+                            <strong>Asignado a:</strong> {unidad.usuarioAsignado.nombre}
+                        </p>
+                    )}
+                    {unidad.equipoAsignado && (
+                        <p className="text-sm text-green-800">
+                            <strong>Equipo:</strong> {unidad.equipoAsignado.nombre}
+                        </p>
+                    )}
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Estado de la herramienta
+                    </label>
+                    <textarea
+                        value={observaciones}
+                        onChange={(e) => setObservaciones(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                        rows="3"
+                        placeholder="Ej: En buen estado, con desgaste normal, requiere mantenimiento, etc."
+                    />
+                </div>
+
+                <div className="flex gap-3 justify-end mt-6">
+                    <Button type="button" onClick={onClose} variant="secondary" disabled={loading}>
+                        Cancelar
+                    </Button>
+                    <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700">
+                        {loading ? 'Devolviendo...' : 'Confirmar Devolución'}
+                    </Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+// Modal para crear nuevo tipo (placeholder - se puede expandir después)
+const ModalNuevoTipo = ({ isOpen, onClose, onSuccess }) => {
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Nuevo Tipo de Herramienta">
+            <div className="p-4 text-center">
+                <p className="text-gray-600">
+                    Esta funcionalidad estará disponible próximamente.
+                    <br />
+                    Por ahora, los tipos se crean directamente desde la base de datos.
+                </p>
+                <Button onClick={onClose} className="mt-4">
+                    Entendido
+                </Button>
+            </div>
+        </Modal>
+    );
 };
 
 export default RentaHerramientasPage;

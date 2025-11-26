@@ -19,6 +19,7 @@ import PerfilPage from './pages/PerfilPage';
 import ProveedoresPage from './pages/ProveedoresPage';
 import OrdenesCompraPage from './pages/OrdenesCompraPage';
 import RentaHerramientasPage from './pages/RentaHerramientasPage';
+import ImpresionCodigosHerramientasPage from './pages/ImpresionCodigosHerramientasPage';
 import CalendarioPage from './pages/CalendarioPage';
 import ProcesamientoMasivoPage from './pages/ProcesamientoMasivoPage';
 import MonitorPedidosPage from './pages/MonitorPedidosPage';
@@ -79,6 +80,7 @@ function App() {
               <Route path="usuarios" element={<UsuariosPage />} />
               <Route path="ordenes-compra" element={<OrdenesCompraPage />} />
               <Route path="renta-herramientas" element={<RentaHerramientasPage />} />
+              <Route path="renta-herramientas/imprimir-codigos" element={<ImpresionCodigosHerramientasPage />} />
               <Route path="historial" element={<HistorialPage />} />
               <Route path="proveedores" element={<ProveedoresPage />} />
               <Route path="calendario" element={<CalendarioPage />} />

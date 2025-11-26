@@ -1,13 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, MapPin, DollarSign, Hash, Box, Edit, Sparkles } from 'lucide-react';
+import { X, Package, MapPin, DollarSign, Hash, Box, Edit, Sparkles, Eye } from 'lucide-react';
 import { Modal } from '../common';
 import BarcodeDisplay from './BarcodeDisplay';
+import UnidadHerramientaDetalleModal from './UnidadHerramientaDetalleModal';
 import { getImageUrl } from '../../utils/imageUtils';
 import articulosService from '../../services/articulos.service';
+import herramientasRentaService from '../../services/herramientasRenta.service';
 
 const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = false, onImageReprocessed }) => {
   const [imagenExpandida, setImagenExpandida] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
+
+  // Estados para herramientas de renta
+  const [unidadesHerramienta, setUnidadesHerramienta] = useState([]);
+  const [tipoHerramienta, setTipoHerramienta] = useState(null);
+  const [loadingUnidades, setLoadingUnidades] = useState(false);
+  const [unidadSeleccionada, setUnidadSeleccionada] = useState(null);
+  const [modalUnidadOpen, setModalUnidadOpen] = useState(false);
+
+  // Cargar unidades cuando es herramienta de renta
+  useEffect(() => {
+    if (isOpen && articulo?.es_herramienta) {
+      cargarUnidadesHerramienta();
+    } else {
+      // Limpiar cuando se cierra o no es herramienta
+      setUnidadesHerramienta([]);
+      setTipoHerramienta(null);
+    }
+  }, [isOpen, articulo?.id, articulo?.es_herramienta]);
 
   // Cerrar imagen expandida con tecla Escape
   useEffect(() => {
@@ -22,6 +42,30 @@ const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = fal
       return () => window.removeEventListener('keydown', handleEscape);
     }
   }, [imagenExpandida]);
+
+  // Cargar unidades de la herramienta
+  const cargarUnidadesHerramienta = async () => {
+    if (!articulo?.id) return;
+
+    try {
+      setLoadingUnidades(true);
+      const data = await herramientasRentaService.obtenerUnidadesPorArticulo(articulo.id);
+      setUnidadesHerramienta(data.unidades || []);
+      setTipoHerramienta(data.tipo || null);
+    } catch (error) {
+      console.error('Error al cargar unidades de herramienta:', error);
+      setUnidadesHerramienta([]);
+      setTipoHerramienta(null);
+    } finally {
+      setLoadingUnidades(false);
+    }
+  };
+
+  // Abrir modal de detalle de unidad
+  const handleVerUnidad = (unidad) => {
+    setUnidadSeleccionada(unidad);
+    setModalUnidadOpen(true);
+  };
 
   if (!articulo) return null;
 
@@ -116,16 +160,101 @@ const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = fal
           </div>
         </div>
 
-        {/* Código de barras */}
-        <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 mb-4 text-center">
-            Código de Barras EAN-13
-          </h3>
-          <BarcodeDisplay
-            articuloId={articulo.id}
-            codigoEAN13={articulo.codigo_ean13}
-          />
-        </div>
+        {/* Código de barras - Solo para consumibles, NO para herramientas */}
+        {!articulo.es_herramienta && (
+          <div className="bg-gray-50 p-6 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-700 mb-4 text-center">
+              Código de Barras EAN-13
+            </h3>
+            <BarcodeDisplay
+              articuloId={articulo.id}
+              codigoEAN13={articulo.codigo_ean13}
+            />
+          </div>
+        )}
+
+        {/* Lista de unidades para herramientas */}
+        {articulo.es_herramienta && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg overflow-hidden">
+            <div className="flex items-center gap-2 p-4 border-b border-orange-200 bg-orange-100">
+              <span className="text-2xl">🔧</span>
+              <div>
+                <p className="text-sm font-medium text-orange-900">
+                  Herramienta de Renta - Unidades Individuales
+                </p>
+                <p className="text-xs text-orange-700">
+                  Cada unidad tiene su propio código de barras. Haz clic en una unidad para ver sus detalles.
+                </p>
+              </div>
+            </div>
+
+            {/* Loading */}
+            {loadingUnidades && (
+              <div className="p-6 text-center">
+                <div className="animate-spin h-8 w-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-sm text-orange-700 mt-2">Cargando unidades...</p>
+              </div>
+            )}
+
+            {/* Lista de unidades */}
+            {!loadingUnidades && unidadesHerramienta.length > 0 && (
+              <div className="p-4 max-h-80 overflow-y-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {unidadesHerramienta.map((unidad) => {
+                    const estadoBadges = {
+                      disponible: { bg: 'bg-green-100', text: 'text-green-800', label: 'Disponible', icon: '✓' },
+                      asignada: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Asignada', icon: '👤' },
+                      en_reparacion: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'En Reparación', icon: '🔧' },
+                      perdida: { bg: 'bg-red-100', text: 'text-red-800', label: 'Perdida', icon: '❌' },
+                      baja: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Baja', icon: '🗑️' }
+                    };
+                    const badge = estadoBadges[unidad.estado] || estadoBadges.disponible;
+
+                    return (
+                      <button
+                        key={unidad.id}
+                        onClick={() => handleVerUnidad(unidad)}
+                        className="bg-white border-2 border-orange-200 hover:border-orange-400 rounded-lg p-3 text-left transition-all hover:shadow-md group"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono font-bold text-red-600 text-sm">
+                            {unidad.codigo_unico}
+                          </span>
+                          <Eye size={16} className="text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.bg} ${badge.text}`}>
+                            {badge.icon} {badge.label}
+                          </span>
+                        </div>
+                        {unidad.usuarioAsignado && (
+                          <p className="text-xs text-gray-600 mt-1 truncate">
+                            👤 {unidad.usuarioAsignado.nombre}
+                          </p>
+                        )}
+                        {unidad.equipoAsignado && (
+                          <p className="text-xs text-gray-600 mt-1 truncate">
+                            👥 {unidad.equipoAsignado.nombre}
+                          </p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-orange-700 mt-3 text-center">
+                  Total: {unidadesHerramienta.length} {unidadesHerramienta.length === 1 ? 'unidad' : 'unidades'}
+                </p>
+              </div>
+            )}
+
+            {/* Sin unidades */}
+            {!loadingUnidades && unidadesHerramienta.length === 0 && (
+              <div className="p-6 text-center text-orange-700">
+                <p className="text-sm">No hay unidades registradas para esta herramienta</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Información del artículo */}
         <div className="grid grid-cols-2 gap-4">
@@ -238,6 +367,19 @@ const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = fal
             </p>
           </div>
         </div>
+      )}
+
+      {/* Modal de detalle de unidad de herramienta */}
+      {modalUnidadOpen && unidadSeleccionada && (
+        <UnidadHerramientaDetalleModal
+          unidad={unidadSeleccionada}
+          tipoHerramienta={tipoHerramienta}
+          isOpen={modalUnidadOpen}
+          onClose={() => {
+            setModalUnidadOpen(false);
+            setUnidadSeleccionada(null);
+          }}
+        />
       )}
     </Modal>
   );

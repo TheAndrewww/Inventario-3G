@@ -194,6 +194,70 @@ const articulosService = {
 
   // ============ ETIQUETAS ============
 
+  // Generar PDF con múltiples etiquetas mixtas (artículos + unidades de herramientas)
+  async generarEtiquetasMixtas(articulosIds, unidadesIds) {
+    try {
+      const response = await api.post('/articulos/etiquetas/lote-mixto',
+        {
+          articulos_ids: articulosIds || [],
+          unidades_ids: unidadesIds || []
+        },
+        {
+          responseType: 'blob',
+          headers: {
+            'Accept': 'application/pdf'
+          }
+        }
+      );
+
+      // Verificar si es un Blob
+      if (!(response.data instanceof Blob)) {
+        console.error('response.data no es un Blob:', response.data);
+        throw new Error('La respuesta no es un archivo PDF válido');
+      }
+
+      // Verificar si el blob contiene JSON de error
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const errorData = JSON.parse(text);
+        throw new Error(errorData.message || 'Error al generar etiquetas');
+      }
+
+      // Crear link de descarga
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const totalItems = (articulosIds?.length || 0) + (unidadesIds?.length || 0);
+      link.setAttribute('download', `etiquetas-${totalItems}-items.pdf`);
+      document.body.appendChild(link);
+      link.click();
+
+      // Limpiar
+      setTimeout(() => {
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      }, 100);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error al generar etiquetas mixtas:', error);
+
+      // Si el error tiene un blob con JSON, intentar leerlo
+      if (error.response?.data instanceof Blob && error.response.data.type === 'application/json') {
+        try {
+          const text = await error.response.data.text();
+          const errorData = JSON.parse(text);
+          throw { message: errorData.message || 'Error al generar etiquetas' };
+        } catch (parseError) {
+          throw { message: 'Error al generar etiquetas' };
+        }
+      }
+
+      throw error.response?.data || error;
+    }
+  },
+
   // Generar PDF con múltiples etiquetas
   async generarEtiquetasLote(articulosIds) {
     try {

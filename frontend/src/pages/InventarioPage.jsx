@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X } from 'lucide-react';
+import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer } from 'lucide-react';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
 import categoriasService from '../services/categorias.service';
 import ubicacionesService from '../services/ubicaciones.service';
+import herramientasRentaService from '../services/herramientasRenta.service';
 import { Loader, Modal } from '../components/common';
 import ArticuloDetalleModal from '../components/articulos/ArticuloDetalleModal';
 import ArticuloFormModal from '../components/articulos/ArticuloFormModal';
+import UnidadHerramientaDetalleModal from '../components/articulos/UnidadHerramientaDetalleModal';
 import EAN13Scanner from '../components/scanner/EAN13Scanner';
 import toast from 'react-hot-toast';
 import { usePedido } from '../context/PedidoContext';
@@ -47,8 +49,21 @@ const InventarioPage = () => {
   // Estados para generación de etiquetas
   const [modalEtiquetasOpen, setModalEtiquetasOpen] = useState(false);
   const [articulosSeleccionadosEtiquetas, setArticulosSeleccionadosEtiquetas] = useState([]);
+  const [unidadesSeleccionadasEtiquetas, setUnidadesSeleccionadasEtiquetas] = useState([]);
   const [busquedaEtiquetas, setBusquedaEtiquetas] = useState('');
   const [loadingEtiquetas, setLoadingEtiquetas] = useState(false);
+  const [herramientasExpandidasEtiquetas, setHerramientasExpandidasEtiquetas] = useState({});
+  const [unidadesCargadasEtiquetas, setUnidadesCargadasEtiquetas] = useState({});
+
+  // Estados para expansión de herramientas y sus unidades
+  const [herramientasExpandidas, setHerramientasExpandidas] = useState({});
+  const [unidadesHerramientas, setUnidadesHerramientas] = useState({});
+  const [loadingUnidades, setLoadingUnidades] = useState({});
+
+  // Estados para modal de detalle de unidad de herramienta
+  const [unidadSeleccionada, setUnidadSeleccionada] = useState(null);
+  const [tipoHerramientaSeleccionado, setTipoHerramientaSeleccionado] = useState(null);
+  const [modalUnidadOpen, setModalUnidadOpen] = useState(false);
 
   // Estados para gestión de categorías
   const [modalCategoriaOpen, setModalCategoriaOpen] = useState(false);
@@ -172,6 +187,147 @@ const InventarioPage = () => {
   const handleVerDetalle = (articulo) => {
     setArticuloSeleccionado(articulo);
     setModalDetalleOpen(true);
+  };
+
+  // Función para expandir/colapsar unidades de herramientas
+  const handleToggleHerramienta = async (articuloId, e) => {
+    e.stopPropagation(); // Prevenir que se abra el modal de detalle
+
+    // Si ya está expandida, solo colapsarla
+    if (herramientasExpandidas[articuloId]) {
+      setHerramientasExpandidas(prev => ({
+        ...prev,
+        [articuloId]: false
+      }));
+      return;
+    }
+
+    // Si no está expandida, cargar las unidades y expandir
+    setLoadingUnidades(prev => ({ ...prev, [articuloId]: true }));
+
+    try {
+      // Llamar al nuevo endpoint que busca por articulo_id
+      const data = await herramientasRentaService.obtenerUnidadesPorArticulo(articuloId);
+
+      setUnidadesHerramientas(prev => ({
+        ...prev,
+        [articuloId]: data.unidades || []
+      }));
+
+      setHerramientasExpandidas(prev => ({
+        ...prev,
+        [articuloId]: true
+      }));
+    } catch (error) {
+      console.error('Error al cargar unidades:', error);
+      toast.error(error.message || 'Error al cargar las unidades de la herramienta');
+    } finally {
+      setLoadingUnidades(prev => ({ ...prev, [articuloId]: false }));
+    }
+  };
+
+  // Función para abrir modal de detalle de unidad
+  const handleVerDetalleUnidad = async (unidad, articuloId, e) => {
+    e.stopPropagation(); // Prevenir propagación de eventos
+
+    try {
+      // Obtener el tipo de herramienta desde las unidades cargadas
+      // Si ya tenemos las unidades cargadas, podemos obtener el tipo del artículo
+      const articulo = articulos.find(a => a.id === articuloId);
+
+      if (!articulo) {
+        toast.error('No se encontró el artículo');
+        return;
+      }
+
+      // Crear un objeto tipo herramienta simplificado desde el artículo
+      const tipoHerramienta = {
+        id: articuloId,
+        nombre: articulo.nombre,
+        descripcion: articulo.descripcion,
+        prefijo_codigo: unidad.codigo_unico.split('-')[0] // Extraer prefijo del código
+      };
+
+      setUnidadSeleccionada(unidad);
+      setTipoHerramientaSeleccionado(tipoHerramienta);
+      setModalUnidadOpen(true);
+    } catch (error) {
+      console.error('Error al abrir detalle de unidad:', error);
+      toast.error('Error al abrir el detalle de la unidad');
+    }
+  };
+
+  // Función para descargar código de barras de una unidad
+  const handleDescargarCodigoBarras = async (unidadId, codigoUnico) => {
+    try {
+      const url = herramientasRentaService.getURLCodigoBarras(unidadId);
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `codigo-barras-${codigoUnico}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+      toast.success('Código de barras descargado');
+    } catch (error) {
+      console.error('Error al descargar código de barras:', error);
+      toast.error('Error al descargar el código de barras');
+    }
+  };
+
+  // Función para imprimir código de barras de una unidad
+  const handleImprimirCodigoBarras = (unidadId, codigoUnico, nombreHerramienta) => {
+    const url = herramientasRentaService.getURLCodigoBarras(unidadId);
+    const printWindow = window.open('', '', 'width=600,height=400');
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Código de Barras - ${codigoUnico}</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 20px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              font-family: Arial, sans-serif;
+            }
+            h2 {
+              margin: 0 0 10px 0;
+              font-size: 18px;
+              color: #333;
+            }
+            .codigo {
+              font-family: monospace;
+              font-size: 24px;
+              font-weight: bold;
+              color: #dc2626;
+              margin: 10px 0;
+            }
+            img {
+              max-width: 100%;
+              height: auto;
+            }
+            @media print {
+              body {
+                padding: 10px;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h2>${nombreHerramienta}</h2>
+          <div class="codigo">${codigoUnico}</div>
+          <img src="${url}" alt="Código de barras ${codigoUnico}" onload="window.print(); window.close();" />
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   // Función para manejar escaneo desde pistola automática en Inventario
@@ -648,19 +804,72 @@ const InventarioPage = () => {
     });
   };
 
+  // Toggle expansión de herramienta en modal de etiquetas
+  const handleToggleHerramientaEtiquetas = async (articuloId) => {
+    // Si ya está expandida, solo colapsarla
+    if (herramientasExpandidasEtiquetas[articuloId]) {
+      setHerramientasExpandidasEtiquetas(prev => ({
+        ...prev,
+        [articuloId]: false
+      }));
+      return;
+    }
+
+    // Si no está expandida, cargar las unidades y expandir
+    if (!unidadesCargadasEtiquetas[articuloId]) {
+      try {
+        const data = await herramientasRentaService.obtenerUnidadesPorArticulo(articuloId);
+        setUnidadesCargadasEtiquetas(prev => ({
+          ...prev,
+          [articuloId]: data.unidades || []
+        }));
+      } catch (error) {
+        console.error('Error al cargar unidades:', error);
+        toast.error('Error al cargar las unidades de la herramienta');
+        return;
+      }
+    }
+
+    setHerramientasExpandidasEtiquetas(prev => ({
+      ...prev,
+      [articuloId]: true
+    }));
+  };
+
+  // Toggle selección de unidad
+  const handleToggleUnidadEtiqueta = (unidadId) => {
+    setUnidadesSeleccionadasEtiquetas(prev => {
+      if (prev.includes(unidadId)) {
+        return prev.filter(id => id !== unidadId);
+      } else {
+        return [...prev, unidadId];
+      }
+    });
+  };
+
   const handleGenerarEtiquetas = async () => {
-    if (articulosSeleccionadosEtiquetas.length === 0) {
-      toast.error('Debes seleccionar al menos un artículo');
+    if (articulosSeleccionadosEtiquetas.length === 0 && unidadesSeleccionadasEtiquetas.length === 0) {
+      toast.error('Debes seleccionar al menos un artículo o unidad de herramienta');
       return;
     }
 
     try {
       setLoadingEtiquetas(true);
-      console.log('Generando etiquetas para IDs:', articulosSeleccionadosEtiquetas);
-      await articulosService.generarEtiquetasLote(articulosSeleccionadosEtiquetas);
-      toast.success(`PDF con ${articulosSeleccionadosEtiquetas.length} etiquetas generado correctamente`);
+      console.log('Generando etiquetas para artículos:', articulosSeleccionadosEtiquetas);
+      console.log('Generando etiquetas para unidades:', unidadesSeleccionadasEtiquetas);
+
+      await articulosService.generarEtiquetasMixtas(
+        articulosSeleccionadosEtiquetas,
+        unidadesSeleccionadasEtiquetas
+      );
+
+      const totalItems = articulosSeleccionadosEtiquetas.length + unidadesSeleccionadasEtiquetas.length;
+      toast.success(`PDF con ${totalItems} etiquetas generado correctamente`);
       setModalEtiquetasOpen(false);
       setArticulosSeleccionadosEtiquetas([]);
+      setUnidadesSeleccionadasEtiquetas([]);
+      setHerramientasExpandidasEtiquetas({});
+      setUnidadesCargadasEtiquetas({});
     } catch (error) {
       console.error('Error completo al generar etiquetas:', error);
       const errorMsg = error.message || error.toString() || 'Error desconocido al generar las etiquetas';
@@ -1171,48 +1380,69 @@ const InventarioPage = () => {
                     // Detectar si el artículo está pendiente de revisión (creado por almacén)
                     const esPendienteRevision = item.pendiente_revision === true;
 
+                    const estaExpandida = herramientasExpandidas[item.id];
+                    const unidades = unidadesHerramientas[item.id] || [];
+                    const cargandoUnidades = loadingUnidades[item.id];
+
                     return (
-                      <tr
-                        key={item.id}
-                        onClick={() => handleVerDetalle(item)}
-                        className={`transition-colors cursor-pointer ${
-                          esPendienteRevision
-                            ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
-                            : esUbicacionRevisar
-                            ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
-                            : 'hover:bg-gray-50'
-                        }`}
-                      >
-                        {/* Artículo con imagen */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            {imagenUrl ? (
-                              <img
-                                src={imagenUrl}
-                                alt={item.nombre}
-                                className="w-10 h-10 object-cover rounded-lg"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
-                                🔧
+                      <React.Fragment key={item.id}>
+                        <tr
+                          className={`transition-colors ${
+                            esPendienteRevision
+                              ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                              : esUbicacionRevisar
+                              ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                              : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          {/* Artículo con imagen y botón expandir */}
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={(e) => handleToggleHerramienta(item.id, e)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                                disabled={cargandoUnidades}
+                              >
+                                {cargandoUnidades ? (
+                                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                                ) : estaExpandida ? (
+                                  <ChevronUp size={20} />
+                                ) : (
+                                  <ChevronDown size={20} />
+                                )}
+                              </button>
+                              <div
+                                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => handleVerDetalle(item)}
+                              >
+                                {imagenUrl ? (
+                                  <img
+                                    src={imagenUrl}
+                                    alt={item.nombre}
+                                    className="w-10 h-10 object-cover rounded-lg"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
+                                    🔧
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-medium text-gray-900">{item.nombre}</div>
+                                  <div className="text-sm text-gray-500">{item.descripcion}</div>
+                                </div>
                               </div>
-                            )}
-                            <div>
-                              <div className="font-medium text-gray-900">{item.nombre}</div>
-                              <div className="text-sm text-gray-500">{item.descripcion}</div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
                         {/* Categoría */}
-                        <td className="px-4 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                             {item.categoria?.nombre || 'Sin categoría'}
                           </span>
                         </td>
 
                         {/* Ubicación */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm cursor-pointer" onClick={() => handleVerDetalle(item)}>
                           {esUbicacionRevisar ? (
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border-2 border-yellow-400">
                               ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
@@ -1223,29 +1453,29 @@ const InventarioPage = () => {
                         </td>
 
                         {/* Stock Actual */}
-                        <td className="px-4 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
                           <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
                             {parseFloat(item.stock_actual).toFixed(2)}
                           </span>
                         </td>
 
                         {/* Stock Mínimo */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 cursor-pointer" onClick={() => handleVerDetalle(item)}>
                           {parseFloat(item.stock_minimo).toFixed(2)}
                         </td>
 
                         {/* Stock Máximo */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 cursor-pointer" onClick={() => handleVerDetalle(item)}>
                           {item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}
                         </td>
 
                         {/* Unidad */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase cursor-pointer" onClick={() => handleVerDetalle(item)}>
                           {item.unidad}
                         </td>
 
                         {/* Proveedores */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 cursor-pointer" onClick={() => handleVerDetalle(item)}>
                           {item.proveedores && item.proveedores.length > 0 ? (
                             <div className="flex flex-col gap-1">
                               {item.proveedores.map((prov, idx) => (
@@ -1260,12 +1490,12 @@ const InventarioPage = () => {
                         </td>
 
                         {/* Fecha creación */}
-                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
+                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500 cursor-pointer" onClick={() => handleVerDetalle(item)}>
                           {item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
                         </td>
 
                         {/* Fecha actualización */}
-                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
+                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500 cursor-pointer" onClick={() => handleVerDetalle(item)}>
                           {item.updated_at ? new Date(item.updated_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
                         </td>
 
@@ -1336,6 +1566,118 @@ const InventarioPage = () => {
                           </div>
                         </td>
                       </tr>
+
+                      {/* Filas de unidades expandidas */}
+                      {estaExpandida && unidades.length > 0 && unidades.map((unidad) => (
+                        <tr key={`unidad-${unidad.id}`} className="bg-gray-50">
+                          <td colSpan="11" className="px-4 py-3">
+                            <div
+                              onClick={(e) => handleVerDetalleUnidad(unidad, item.id, e)}
+                              className="ml-12 flex items-center gap-6 p-3 bg-white rounded-lg border-2 border-gray-200 hover:border-red-400 hover:shadow-md transition-all cursor-pointer group"
+                            >
+                              {/* ID de la unidad */}
+                              <div className="text-sm">
+                                <span className="text-gray-500">ID:</span>
+                                <p className="font-bold text-gray-900">#{unidad.id}</p>
+                              </div>
+
+                              {/* Código de barras */}
+                              <div className="flex items-center gap-4">
+                                {unidad.codigo_ean13 ? (
+                                  <img
+                                    src={herramientasRentaService.getURLCodigoBarras(unidad.id)}
+                                    alt={`Código de barras ${unidad.codigo_unico}`}
+                                    className="h-16"
+                                  />
+                                ) : (
+                                  <div className="w-32 h-16 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">
+                                    Sin código
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Información de la unidad */}
+                              <div className="flex-1 grid grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <span className="text-gray-500">Código Único:</span>
+                                  <p className="font-mono font-bold text-red-700">{unidad.codigo_unico}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">EAN-13:</span>
+                                  <p className="font-mono font-medium">{unidad.codigo_ean13 || 'Sin código'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Estado:</span>
+                                  <p className={`font-medium ${
+                                    unidad.estado === 'disponible' ? 'text-green-600' :
+                                    unidad.estado === 'asignada' ? 'text-blue-600' :
+                                    unidad.estado === 'en_mantenimiento' ? 'text-orange-600' :
+                                    'text-red-600'
+                                  }`}>
+                                    {unidad.estado === 'disponible' ? '✓ Disponible' :
+                                     unidad.estado === 'asignada' ? '📍 Asignada' :
+                                     unidad.estado === 'en_mantenimiento' ? '🔧 Mantenimiento' :
+                                     '❌ Fuera de servicio'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Botones de acción */}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleVerDetalleUnidad(unidad, item.id, e);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors"
+                                  title="Ver detalles completos"
+                                >
+                                  <Eye size={16} />
+                                  Ver Detalles
+                                </button>
+                                {unidad.codigo_ean13 && (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDescargarCodigoBarras(unidad.id, unidad.codigo_unico);
+                                      }}
+                                      className="inline-flex items-center gap-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                                      title="Descargar código de barras"
+                                    >
+                                      <Download size={16} />
+                                      Descargar
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleImprimirCodigoBarras(unidad.id, unidad.codigo_unico, item.nombre);
+                                      }}
+                                      className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                      title="Imprimir código de barras"
+                                    >
+                                      <Printer size={16} />
+                                      Imprimir
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+
+                      {/* Mensaje si no hay unidades */}
+                      {estaExpandida && unidades.length === 0 && (
+                        <tr className="bg-gray-50">
+                          <td colSpan="11" className="px-4 py-3">
+                            <div className="ml-12 p-4 text-center text-gray-500 bg-white rounded-lg border border-gray-200">
+                              No hay unidades registradas para esta herramienta
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     );
                   })}
                 </>
@@ -1570,42 +1912,65 @@ const InventarioPage = () => {
                 // Detectar si el artículo está pendiente de revisión (creado por almacén)
                 const esPendienteRevision = item.pendiente_revision === true;
 
+                const estaExpandida = herramientasExpandidas[item.id];
+                const unidades = unidadesHerramientas[item.id] || [];
+                const cargandoUnidades = loadingUnidades[item.id];
+
                 return (
-                  <div
-                    key={`herramienta-${item.id}`}
-                    onClick={() => handleVerDetalle(item)}
-                    className={`p-4 transition-colors cursor-pointer ${
-                      esPendienteRevision
-                        ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
-                        : esUbicacionRevisar
-                        ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex gap-3">
-                      {/* Imagen */}
-                      {imagenUrl ? (
-                        <img
-                          src={imagenUrl}
-                          alt={item.nombre}
-                          className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
-                          🔧
-                        </div>
-                      )}
+                  <React.Fragment key={`herramienta-${item.id}`}>
+                    <div
+                      className={`p-4 transition-colors ${
+                        esPendienteRevision
+                          ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                          : esUbicacionRevisar
+                          ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                          : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      {/* Botón expandir/colapsar y header */}
+                      <div className="flex items-center gap-2 mb-3">
+                        <button
+                          onClick={(e) => handleToggleHerramienta(item.id, e)}
+                          className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                          disabled={cargandoUnidades}
+                        >
+                          {cargandoUnidades ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                          ) : estaExpandida ? (
+                            <ChevronUp size={20} />
+                          ) : (
+                            <ChevronDown size={20} />
+                          )}
+                        </button>
+                        <h3
+                          className="font-medium text-gray-900 cursor-pointer hover:text-red-700 transition-colors flex-1"
+                          onClick={() => handleVerDetalle(item)}
+                        >
+                          {item.nombre}
+                        </h3>
+                        <span className="text-xs text-gray-400 font-mono">#{item.id}</span>
+                      </div>
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-gray-900">{item.nombre}</h3>
-                          <span className="text-xs text-gray-400 font-mono">#{item.id}</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mb-2">{item.descripcion}</p>
+                      <div className="flex gap-3 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                        {/* Imagen */}
+                        {imagenUrl ? (
+                          <img
+                            src={imagenUrl}
+                            alt={item.nombre}
+                            className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+                            🔧
+                          </div>
+                        )}
 
-                        {/* Badges */}
-                        <div className="flex flex-wrap gap-1 text-xs mb-2">
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-500 mb-2">{item.descripcion}</p>
+
+                          {/* Badges */}
+                          <div className="flex flex-wrap gap-1 text-xs mb-2">
                           <span className="inline-flex px-2 py-1 rounded bg-blue-100 text-blue-800 font-medium">
                             {item.categoria?.nombre || 'Sin categoría'}
                           </span>
@@ -1732,7 +2097,88 @@ const InventarioPage = () => {
                         )
                       )}
                     </div>
-                  </div>
+                    </div>
+
+                    {/* Unidades expandidas - Vista móvil */}
+                    {estaExpandida && (
+                      <div className="mt-2 ml-8 space-y-2">
+                        {unidades.length > 0 ? (
+                          unidades.map((unidad) => (
+                            <div key={`unidad-mobile-${unidad.id}`} className="bg-white rounded-lg border border-gray-200 p-3 space-y-3">
+                              {/* ID y Código de barras */}
+                              <div className="flex items-center gap-3">
+                                <div className="text-xs">
+                                  <span className="text-gray-500">ID:</span>
+                                  <span className="ml-1 font-bold text-gray-900">#{unidad.id}</span>
+                                </div>
+                                {unidad.codigo_ean13 ? (
+                                  <img
+                                    src={herramientasRentaService.getURLCodigoBarras(unidad.id)}
+                                    alt={`Código ${unidad.codigo_unico}`}
+                                    className="h-12 flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-24 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">
+                                    Sin código
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Info de la unidad */}
+                              <div className="text-xs space-y-1">
+                                <div>
+                                  <span className="text-gray-500">Código:</span>
+                                  <span className="ml-1 font-mono font-bold text-red-700">{unidad.codigo_unico}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">EAN-13:</span>
+                                  <span className="ml-1 font-mono">{unidad.codigo_ean13 || 'N/A'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Estado:</span>
+                                  <span className={`ml-1 font-medium ${
+                                    unidad.estado === 'disponible' ? 'text-green-600' :
+                                    unidad.estado === 'asignada' ? 'text-blue-600' :
+                                    unidad.estado === 'en_mantenimiento' ? 'text-orange-600' :
+                                    'text-red-600'
+                                  }`}>
+                                    {unidad.estado === 'disponible' ? '✓ Disponible' :
+                                     unidad.estado === 'asignada' ? '📍 Asignada' :
+                                     unidad.estado === 'en_mantenimiento' ? '🔧 Mantenimiento' :
+                                     '❌ Fuera de servicio'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Botones de acción */}
+                              {unidad.codigo_ean13 && (
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleDescargarCodigoBarras(unidad.id, unidad.codigo_unico)}
+                                    className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
+                                  >
+                                    <Download size={14} />
+                                    Descargar
+                                  </button>
+                                  <button
+                                    onClick={() => handleImprimirCodigoBarras(unidad.id, unidad.codigo_unico, item.nombre)}
+                                    className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors"
+                                  >
+                                    <Printer size={14} />
+                                    Imprimir
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="bg-white rounded-lg border border-gray-200 p-4 text-center text-gray-500 text-sm">
+                            No hay unidades registradas
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </>
@@ -2166,7 +2612,7 @@ const InventarioPage = () => {
           {/* Contador y botón seleccionar todos */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">
-              {articulosSeleccionadosEtiquetas.length} artículo(s) seleccionado(s)
+              {articulosSeleccionadosEtiquetas.length} artículo(s) + {unidadesSeleccionadasEtiquetas.length} unidad(es) seleccionada(s)
             </span>
             <button
               onClick={handleSeleccionarTodosEtiquetas}
@@ -2210,25 +2656,93 @@ const InventarioPage = () => {
                   );
                 }
 
-                return articulosFiltrados.map((articulo) => (
-                  <label
-                    key={articulo.id}
-                    className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={articulosSeleccionadosEtiquetas.includes(articulo.id)}
-                      onChange={() => handleToggleArticuloEtiqueta(articulo.id)}
-                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-gray-900 truncate">{articulo.nombre}</h4>
-                      <p className="text-sm text-gray-500 truncate">
-                        EAN-13: {articulo.codigo_ean13} • Stock: {articulo.stock_actual}
-                      </p>
-                    </div>
-                  </label>
-                ));
+                return articulosFiltrados.map((articulo) => {
+                  const esHerramienta = articulo.es_herramienta;
+                  const estaExpandida = herramientasExpandidasEtiquetas[articulo.id];
+                  const unidades = unidadesCargadasEtiquetas[articulo.id] || [];
+
+                  return (
+                    <React.Fragment key={articulo.id}>
+                      <div className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors">
+                        {/* Checkbox para artículos consumibles */}
+                        {!esHerramienta && (
+                          <input
+                            type="checkbox"
+                            checked={articulosSeleccionadosEtiquetas.includes(articulo.id)}
+                            onChange={() => handleToggleArticuloEtiqueta(articulo.id)}
+                            className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                        )}
+
+                        {/* Para herramientas, solo botón de expandir */}
+                        {esHerramienta && (
+                          <button
+                            onClick={() => handleToggleHerramientaEtiquetas(articulo.id)}
+                            className="w-5 h-5 flex items-center justify-center text-gray-600 hover:text-red-600"
+                          >
+                            {estaExpandida ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                          </button>
+                        )}
+
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          {esHerramienta && <span className="text-lg">🔧</span>}
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 truncate">{articulo.nombre}</h4>
+                            <p className="text-sm text-gray-500 truncate">
+                              {esHerramienta
+                                ? `Herramienta • Stock: ${articulo.stock_actual} unidades`
+                                : `EAN-13: ${articulo.codigo_ean13} • Stock: ${articulo.stock_actual}`
+                              }
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Unidades de herramientas expandidas */}
+                      {esHerramienta && estaExpandida && (
+                        <div className="bg-gray-50 border-t border-gray-200">
+                          {unidades.length > 0 ? (
+                            unidades.map((unidad) => (
+                              <label
+                                key={unidad.id}
+                                className="flex items-center gap-4 p-3 pl-12 hover:bg-gray-100 cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={unidadesSeleccionadasEtiquetas.includes(unidad.id)}
+                                  onChange={() => handleToggleUnidadEtiqueta(unidad.id)}
+                                  className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-bold text-red-600 text-sm">
+                                      {unidad.codigo_unico}
+                                    </span>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                      unidad.estado === 'disponible' ? 'bg-green-100 text-green-800' :
+                                      unidad.estado === 'asignada' ? 'bg-blue-100 text-blue-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {unidad.estado === 'disponible' ? 'Disponible' :
+                                       unidad.estado === 'asignada' ? 'Asignada' : unidad.estado}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-0.5">
+                                    EAN-13: {unidad.codigo_ean13}
+                                  </p>
+                                </div>
+                              </label>
+                            ))
+                          ) : (
+                            <div className="p-3 pl-12 text-sm text-gray-500">
+                              Cargando unidades...
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                });
               })()}
             </div>
           </div>
@@ -2244,7 +2758,7 @@ const InventarioPage = () => {
             </button>
             <button
               onClick={handleGenerarEtiquetas}
-              disabled={articulosSeleccionadosEtiquetas.length === 0 || loadingEtiquetas}
+              disabled={(articulosSeleccionadosEtiquetas.length === 0 && unidadesSeleccionadasEtiquetas.length === 0) || loadingEtiquetas}
               className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loadingEtiquetas ? (
@@ -2262,6 +2776,20 @@ const InventarioPage = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Modal de detalle de unidad de herramienta */}
+      {modalUnidadOpen && unidadSeleccionada && tipoHerramientaSeleccionado && (
+        <UnidadHerramientaDetalleModal
+          unidad={unidadSeleccionada}
+          tipoHerramienta={tipoHerramientaSeleccionado}
+          isOpen={modalUnidadOpen}
+          onClose={() => {
+            setModalUnidadOpen(false);
+            setUnidadSeleccionada(null);
+            setTipoHerramientaSeleccionado(null);
+          }}
+        />
+      )}
     </div>
   );
 };
