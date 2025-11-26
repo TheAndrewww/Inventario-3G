@@ -25,9 +25,6 @@ const OrdenesCompraPage = () => {
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
   const [solicitudesSeleccionadas, setSolicitudesSeleccionadas] = useState([]);
   const [modalCrearDesdeSeleccion, setModalCrearDesdeSeleccion] = useState(false);
-  const [filterPrioridad, setFilterPrioridad] = useState('');
-  const [filterCategoria, setFilterCategoria] = useState('');
-  const [searchSolicitudes, setSearchSolicitudes] = useState('');
   const [estadisticas, setEstadisticas] = useState(null);
   const [modalAnular, setModalAnular] = useState(false);
   const [ordenAAnular, setOrdenAAnular] = useState(null);
@@ -600,22 +597,10 @@ const OrdenesCompraPage = () => {
     return matchesSearch && matchesEstado && matchesCanceladas;
   });
 
-  // Filtrar solicitudes con filtros inteligentes
-  const filteredSolicitudes = solicitudes.filter((solicitud) => {
-    const matchesSearch =
-      solicitud.ticket_id?.toLowerCase().includes(searchSolicitudes.toLowerCase()) ||
-      solicitud.articulo?.nombre?.toLowerCase().includes(searchSolicitudes.toLowerCase()) ||
-      solicitud.articulo?.categoria?.nombre?.toLowerCase().includes(searchSolicitudes.toLowerCase()) ||
-      solicitud.solicitante?.nombre?.toLowerCase().includes(searchSolicitudes.toLowerCase()) ||
-      solicitud.motivo?.toLowerCase().includes(searchSolicitudes.toLowerCase());
+  // Mostrar todas las solicitudes sin filtros
+  const filteredSolicitudes = solicitudes;
 
-    const matchesPrioridad = !filterPrioridad || solicitud.prioridad === filterPrioridad;
-    const matchesCategoria = !filterCategoria || solicitud.articulo?.categoria?.id === parseInt(filterCategoria);
-
-    return matchesSearch && matchesPrioridad && matchesCategoria;
-  });
-
-  // Extraer categorías únicas de las solicitudes
+  // Extraer categorías únicas de las solicitudes (ya no se usa pero se mantiene por compatibilidad)
   const categoriasUnicas = React.useMemo(() => {
     const categoriasMap = new Map();
     solicitudes.forEach(solicitud => {
@@ -1053,78 +1038,6 @@ const OrdenesCompraPage = () => {
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Barra de filtros para solicitudes existentes */}
-          <div className="mb-6 bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Filtrar Solicitudes Existentes:</h3>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-              {/* Búsqueda */}
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="Buscar por ticket, artículo, categoría, solicitante..."
-                  value={searchSolicitudes}
-                  onChange={(e) => setSearchSolicitudes(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                />
-              </div>
-
-              {/* Filtro por prioridad */}
-              <select
-                value={filterPrioridad}
-                onChange={(e) => setFilterPrioridad(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              >
-                <option value="">Todas las prioridades</option>
-                <option value="baja">Baja</option>
-                <option value="media">Media</option>
-                <option value="alta">Alta</option>
-                <option value="urgente">Urgente</option>
-              </select>
-
-              {/* Filtro por categoría */}
-              <select
-                value={filterCategoria}
-                onChange={(e) => setFilterCategoria(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              >
-                <option value="">Todas las categorías</option>
-                {categoriasUnicas.map(categoria => (
-                  <option key={categoria.id} value={categoria.id}>
-                    {categoria.nombre}
-                  </option>
-                ))}
-              </select>
-
-              {/* Botón para limpiar filtros */}
-              {(searchSolicitudes || filterPrioridad || filterCategoria) && (
-                <button
-                  onClick={() => {
-                    setSearchSolicitudes('');
-                    setFilterPrioridad('');
-                    setFilterCategoria('');
-                  }}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  Limpiar filtros
-                </button>
-              )}
-            </div>
-
-            {/* Contador de resultados */}
-            <div className="mt-3 text-sm text-gray-600">
-              {filteredSolicitudes.length !== solicitudes.length ? (
-                <>
-                  Mostrando {filteredSolicitudes.length} de {solicitudes.length} solicitudes
-                </>
-              ) : (
-                <>
-                  {solicitudes.length} solicitud{solicitudes.length !== 1 ? 'es' : ''} pendiente{solicitudes.length !== 1 ? 's' : ''}
-                </>
               )}
             </div>
           </div>
