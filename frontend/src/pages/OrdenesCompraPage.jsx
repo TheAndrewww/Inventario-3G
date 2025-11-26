@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2 } from 'lucide-react';
+import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import articulosService from '../services/articulos.service';
 import proveedoresService from '../services/proveedores.service';
@@ -203,7 +203,7 @@ const OrdenesCompraPage = () => {
       setModalArticulosEncontrados(true);
 
       if (articulos.length === 0) {
-        toast.info('No se encontraron artículos');
+        toast('No se encontraron artículos', { icon: 'ℹ️' });
       }
     } catch (error) {
       console.error('Error al buscar artículos:', error);
@@ -229,7 +229,10 @@ const OrdenesCompraPage = () => {
       if (articulosBajoStock.length === 0) {
         toast.success('Todos los artículos tienen stock suficiente');
       } else {
-        toast.info(`${articulosBajoStock.length} artículos bajo stock mínimo`);
+        toast(`${articulosBajoStock.length} artículos bajo stock mínimo`, {
+          icon: '⚠️',
+          duration: 3000
+        });
       }
     } catch (error) {
       console.error('Error al cargar artículos bajo stock:', error);
