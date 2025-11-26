@@ -292,12 +292,14 @@ const OrdenesCompraPage = () => {
 
       toast.success(response.message || 'Solicitud creada exitosamente');
       setModalCrearSolicitud(false);
-      // No cerrar modalArticulosEncontrados para permitir crear más solicitudes
       setArticuloSeleccionado(null);
       setBusquedaArticulo('');
-      await fetchData(); // Recargar solicitudes
-      // Actualizar lista de bajo stock para reflejar filtros
-      if (modalArticulosEncontrados && articulosBajoStock.length > 0) {
+
+      // Recargar solicitudes primero
+      await fetchData();
+
+      // Si estamos mostrando bajo stock, actualizar la lista automáticamente
+      if (mostrandoBajoStock && modalArticulosEncontrados) {
         await handleMostrarBajoStockMinimo();
       }
     } catch (error) {
