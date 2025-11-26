@@ -188,23 +188,28 @@ const OrdenesCompraPage = () => {
     setModalCancelarSolicitud(true);
   };
 
-  // Buscar artículos por nombre o código
-  const handleBuscarArticulos = async () => {
-    if (!busquedaArticulo || busquedaArticulo.trim().length < 2) {
-      toast.error('Ingresa al menos 2 caracteres para buscar');
+  // Buscar artículos por nombre o código (en tiempo real)
+  const buscarArticulosEnTiempoReal = async (termino) => {
+    if (!termino || termino.length < 2) {
+      setArticulosBuscados([]);
       return;
     }
 
     try {
       setBuscandoArticulos(true);
-      const articulos = await articulosService.buscar({ activo: true, q: busquedaArticulo });
-      setArticulosBuscados(articulos);
-      setMostrandoBajoStock(false);
-      setModalArticulosEncontrados(true);
+      const articulos = await articulosService.getAll();
 
-      if (articulos.length === 0) {
-        toast('No se encontraron artículos', { icon: 'ℹ️' });
-      }
+      // Filtrar artículos localmente por nombre, código o categoría
+      const resultados = articulos.filter(art => {
+        const nombreMatch = art.nombre?.toLowerCase().includes(termino.toLowerCase());
+        const codigoMatch = art.codigo_ean13?.includes(termino);
+        const categoriaMatch = art.categoria?.nombre?.toLowerCase().includes(termino.toLowerCase());
+        const activoMatch = art.activo !== false;
+        return (nombreMatch || codigoMatch || categoriaMatch) && activoMatch;
+      });
+
+      setArticulosBuscados(resultados);
+      setMostrandoBajoStock(false);
     } catch (error) {
       console.error('Error al buscar artículos:', error);
       toast.error('Error al buscar artículos');
@@ -212,6 +217,15 @@ const OrdenesCompraPage = () => {
       setBuscandoArticulos(false);
     }
   };
+
+  // Debounce para la búsqueda en tiempo real
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      buscarArticulosEnTiempoReal(busquedaArticulo);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [busquedaArticulo]);
 
   // Mostrar artículos bajo stock mínimo
   const handleMostrarBajoStockMinimo = async () => {
@@ -928,41 +942,131 @@ const OrdenesCompraPage = () => {
                 Crear Nueva Solicitud de Compra
               </h3>
               <p className="text-sm text-gray-600 mt-1">
-                Busca artículos por nombre o código para crear solicitudes de compra
+                Busca artículos por nombre, código o categoría
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="Buscar artículo por nombre, código o categoría..."
-                  value={busquedaArticulo}
-                  onChange={(e) => setBusquedaArticulo(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleBuscarArticulos()}
-                  className="w-full pl-10 pr-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                />
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-3">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                  <input
+                    type="text"
+                    placeholder="Buscar artículo por nombre, código o categoría..."
+                    value={busquedaArticulo}
+                    onChange={(e) => setBusquedaArticulo(e.target.value.toUpperCase())}
+                    className="w-full pl-10 pr-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+
+                <button
+                  onClick={handleMostrarBajoStockMinimo}
+                  disabled={buscandoArticulos}
+                  className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+                  title="Ver artículos que necesitan reposición"
+                >
+                  <AlertCircle size={20} />
+                  Bajo Stock Mínimo
+                </button>
               </div>
 
-              <button
-                onClick={handleBuscarArticulos}
-                disabled={buscandoArticulos || !busquedaArticulo}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <Search size={20} />
-                {buscandoArticulos ? 'Buscando...' : 'Buscar'}
-              </button>
+              {/* Dropdown de resultados en tiempo real */}
+              {busquedaArticulo.length >= 2 && (
+                <div className="border-2 border-blue-300 rounded-lg max-h-96 overflow-y-auto bg-white">
+                  {buscandoArticulos ? (
+                    <div className="p-4 text-center text-gray-500">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="mt-2 text-sm">Buscando...</p>
+                    </div>
+                  ) : articulosBuscados.length > 0 ? (
+                    <div className="divide-y divide-gray-200">
+                      {articulosBuscados.slice(0, 10).map((articulo) => {
+                        const stockPorcentaje = (parseFloat(articulo.stock_actual) / parseFloat(articulo.stock_minimo || 1)) * 100;
+                        const stockBajo = stockPorcentaje < 100;
+                        const stockCritico = stockPorcentaje < 50;
 
-              <button
-                onClick={handleMostrarBajoStockMinimo}
-                disabled={buscandoArticulos}
-                className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
-                title="Ver artículos que necesitan reposición"
-              >
-                <AlertCircle size={20} />
-                Bajo Stock Mínimo
-              </button>
+                        return (
+                          <div
+                            key={articulo.id}
+                            className={`p-3 hover:bg-blue-50 cursor-pointer transition-colors ${
+                              stockCritico ? 'bg-red-50' : stockBajo ? 'bg-orange-50' : ''
+                            }`}
+                            onClick={() => {
+                              handleAbrirModalCrearSolicitudArticulo(articulo);
+                              setBusquedaArticulo('');
+                              setArticulosBuscados([]);
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              {articulo.imagen_url ? (
+                                <img
+                                  src={articulo.imagen_url}
+                                  alt={articulo.nombre}
+                                  className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                              ) : (
+                                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
+                                  📦
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-gray-900 text-sm">
+                                  {articulo.nombre}
+                                </h4>
+                                <p className="text-xs text-gray-600">
+                                  {articulo.codigo_ean13 && `${articulo.codigo_ean13} • `}
+                                  Stock: {articulo.stock_actual} {articulo.unidad}
+                                  {articulo.categoria && ` • ${articulo.categoria.nombre}`}
+                                </p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <button
+                                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm flex items-center gap-1 whitespace-nowrap"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAbrirModalCrearSolicitudArticulo(articulo);
+                                    setBusquedaArticulo('');
+                                    setArticulosBuscados([]);
+                                  }}
+                                >
+                                  <Plus size={14} />
+                                  Crear Solicitud
+                                </button>
+                                {stockBajo && (
+                                  <span className={`px-2 py-0.5 text-xs font-semibold rounded ${
+                                    stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
+                                  }`}>
+                                    {stockCritico ? '⚠️ Crítico' : '⚡ Bajo'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {articulosBuscados.length > 10 && (
+                        <div className="p-2 text-center text-xs text-gray-500 bg-gray-50">
+                          Mostrando 10 de {articulosBuscados.length} resultados. Refina tu búsqueda para ver más.
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center">
+                      <p className="text-gray-600 text-sm">
+                        No se encontraron artículos con "{busquedaArticulo}"
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!busquedaArticulo && (
+                <p className="text-xs text-gray-600 text-center">
+                  Escribe al menos 2 caracteres para buscar artículos
+                </p>
+              )}
             </div>
           </div>
 
