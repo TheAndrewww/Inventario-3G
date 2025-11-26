@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer } from 'lucide-react';
+import api from '../services/api';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
 import categoriasService from '../services/categorias.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import herramientasRentaService from '../services/herramientasRenta.service';
-import { Loader, Modal } from '../components/common';
+import { Loader, Modal, AuthenticatedImage } from '../components/common';
 import ArticuloDetalleModal from '../components/articulos/ArticuloDetalleModal';
 import ArticuloFormModal from '../components/articulos/ArticuloFormModal';
 import UnidadHerramientaDetalleModal from '../components/articulos/UnidadHerramientaDetalleModal';
@@ -267,9 +268,12 @@ const InventarioPage = () => {
   // Función para descargar código de barras de una unidad
   const handleDescargarCodigoBarras = async (unidadId, codigoUnico) => {
     try {
-      const url = herramientasRentaService.getURLCodigoBarras(unidadId);
-      const response = await fetch(url);
-      const blob = await response.blob();
+      // Usar axios con autenticación incluida
+      const response = await api.get(`/herramientas-renta/unidades/${unidadId}/barcode`, {
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([response.data], { type: 'image/png' });
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
@@ -286,55 +290,72 @@ const InventarioPage = () => {
   };
 
   // Función para imprimir código de barras de una unidad
-  const handleImprimirCodigoBarras = (unidadId, codigoUnico, nombreHerramienta) => {
-    const url = herramientasRentaService.getURLCodigoBarras(unidadId);
-    const printWindow = window.open('', '', 'width=600,height=400');
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Código de Barras - ${codigoUnico}</title>
-          <style>
-            body {
-              margin: 0;
-              padding: 20px;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              font-family: Arial, sans-serif;
-            }
-            h2 {
-              margin: 0 0 10px 0;
-              font-size: 18px;
-              color: #333;
-            }
-            .codigo {
-              font-family: monospace;
-              font-size: 24px;
-              font-weight: bold;
-              color: #dc2626;
-              margin: 10px 0;
-            }
-            img {
-              max-width: 100%;
-              height: auto;
-            }
-            @media print {
+  const handleImprimirCodigoBarras = async (unidadId, codigoUnico, nombreHerramienta) => {
+    try {
+      // Obtener la imagen con autenticación
+      const response = await api.get(`/herramientas-renta/unidades/${unidadId}/barcode`, {
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([response.data], { type: 'image/png' });
+      const dataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+
+      // Abrir ventana de impresión con la imagen como data URL
+      const printWindow = window.open('', '', 'width=600,height=400');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Código de Barras - ${codigoUnico}</title>
+            <style>
               body {
-                padding: 10px;
+                margin: 0;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                font-family: Arial, sans-serif;
               }
-            }
-          </style>
-        </head>
-        <body>
-          <h2>${nombreHerramienta}</h2>
-          <div class="codigo">${codigoUnico}</div>
-          <img src="${url}" alt="Código de barras ${codigoUnico}" onload="window.print(); window.close();" />
+              h2 {
+                margin: 0 0 10px 0;
+                font-size: 18px;
+                color: #333;
+              }
+              .codigo {
+                font-family: monospace;
+                font-size: 24px;
+                font-weight: bold;
+                color: #dc2626;
+                margin: 10px 0;
+              }
+              img {
+                max-width: 100%;
+                height: auto;
+              }
+              @media print {
+                body {
+                  padding: 10px;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <h2>${nombreHerramienta}</h2>
+            <div class="codigo">${codigoUnico}</div>
+            <img src="${dataUrl}" alt="Código de barras ${codigoUnico}" onload="window.print(); window.close();" />
         </body>
       </html>
     `);
-    printWindow.document.close();
+      printWindow.document.close();
+    } catch (error) {
+      console.error('Error al imprimir código de barras:', error);
+      toast.error('Error al imprimir el código de barras');
+    }
   };
 
   // Función para manejar escaneo desde pistola automática en Inventario
@@ -1597,17 +1618,11 @@ const InventarioPage = () => {
 
                               {/* Código de barras */}
                               <div className="flex items-center gap-4">
-                                <img
-                                  src={herramientasRentaService.getURLCodigoBarras(unidad.id)}
+                                <AuthenticatedImage
+                                  src={`/herramientas-renta/unidades/${unidad.id}/barcode`}
                                   alt={`Código de barras ${unidad.codigo_unico}`}
                                   className="h-16"
-                                  onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    const placeholder = document.createElement('div');
-                                    placeholder.className = 'w-32 h-16 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400';
-                                    placeholder.textContent = 'Error al cargar';
-                                    e.target.parentNode.appendChild(placeholder);
-                                  }}
+                                  placeholderClassName="w-32 h-16 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400"
                                 />
                               </div>
 
@@ -2122,17 +2137,11 @@ const InventarioPage = () => {
                                   <span className="text-gray-500">ID:</span>
                                   <span className="ml-1 font-bold text-gray-900">#{unidad.id}</span>
                                 </div>
-                                <img
-                                  src={herramientasRentaService.getURLCodigoBarras(unidad.id)}
+                                <AuthenticatedImage
+                                  src={`/herramientas-renta/unidades/${unidad.id}/barcode`}
                                   alt={`Código ${unidad.codigo_unico}`}
                                   className="h-12 flex-shrink-0"
-                                  onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    const placeholder = document.createElement('div');
-                                    placeholder.className = 'w-24 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400';
-                                    placeholder.textContent = 'Error';
-                                    e.target.parentNode.appendChild(placeholder);
-                                  }}
+                                  placeholderClassName="w-24 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400"
                                 />
                               </div>
 
