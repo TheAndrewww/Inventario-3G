@@ -6,6 +6,149 @@
 
 import { sequelize } from '../config/database.js';
 import { QueryTypes } from 'sequelize';
+import {
+    Articulo,
+    TipoHerramientaRenta,
+    UnidadHerramientaRenta
+} from '../models/index.js';
+
+/**
+ * Genera prefijo único para tipo de herramienta
+ */
+const generarPrefijo = (nombre) => {
+    const palabrasIgnoradas = ['de', 'la', 'el', 'del', 'los', 'las', 'y', 'para', 'con', 'a'];
+    const palabras = nombre
+        .split(' ')
+        .filter(p => !palabrasIgnoradas.includes(p.toLowerCase()))
+        .filter(p => p.length > 0);
+
+    if (palabras.length >= 2) {
+        return (palabras[0][0] + palabras[1][0]).toUpperCase();
+    } else if (palabras.length === 1) {
+        return palabras[0].substring(0, 2).toUpperCase();
+    }
+    return 'HR';
+};
+
+const obtenerPrefijoUnico = async (prefijoBase, transaction) => {
+    let prefijo = prefijoBase;
+    let contador = 1;
+
+    while (true) {
+        const existe = await TipoHerramientaRenta.findOne({
+            where: { prefijo_codigo: prefijo },
+            transaction
+        });
+
+        if (!existe) return prefijo;
+        prefijo = `${prefijoBase}${contador}`;
+        contador++;
+    }
+};
+
+/**
+ * Migra artículos pendientes que tienen es_herramienta = true
+ * pero no están en el nuevo sistema
+ */
+export const migrarArticulosPendientes = async () => {
+    const transaction = await sequelize.transaction();
+
+    try {
+        console.log('🔍 Buscando artículos de herramientas pendientes de migración...');
+
+        // Buscar artículos que tienen es_herramienta = true pero no tienen tipo_herramienta_renta
+        const articulosPendientes = await Articulo.findAll({
+            where: {
+                es_herramienta: true,
+                activo: true
+            },
+            transaction
+        });
+
+        if (articulosPendientes.length === 0) {
+            console.log('✅ No hay artículos pendientes de migración');
+            await transaction.rollback();
+            return { migrados: 0, mensaje: 'No hay pendientes' };
+        }
+
+        // Filtrar solo los que NO tienen tipo de herramienta
+        const sinMigrar = [];
+        for (const articulo of articulosPendientes) {
+            const tipoExiste = await TipoHerramientaRenta.findOne({
+                where: { articulo_origen_id: articulo.id },
+                transaction
+            });
+            if (!tipoExiste) {
+                sinMigrar.push(articulo);
+            }
+        }
+
+        if (sinMigrar.length === 0) {
+            console.log('✅ Todos los artículos ya están migrados');
+            await transaction.rollback();
+            return { migrados: 0, mensaje: 'Todos migrados' };
+        }
+
+        console.log(`📦 Encontrados ${sinMigrar.length} artículos para migrar`);
+
+        let totalUnidadesCreadas = 0;
+
+        for (const articulo of sinMigrar) {
+            const prefijoBase = generarPrefijo(articulo.nombre);
+            const prefijo = await obtenerPrefijoUnico(prefijoBase, transaction);
+            const cantidadUnidades = Math.max(1, Math.floor(articulo.stock_actual || 0));
+
+            // Crear tipo de herramienta
+            const nuevoTipo = await TipoHerramientaRenta.create({
+                nombre: articulo.nombre,
+                descripcion: articulo.descripcion || `Migrado automáticamente desde artículo #${articulo.id}`,
+                prefijo_codigo: prefijo,
+                categoria_id: articulo.categoria_id,
+                ubicacion_id: articulo.ubicacion_id,
+                proveedor_id: articulo.proveedor_id,
+                precio_unitario: articulo.costo_unitario || 0,
+                total_unidades: cantidadUnidades,
+                unidades_disponibles: cantidadUnidades,
+                unidades_asignadas: 0,
+                imagen_url: articulo.imagen_url,
+                activo: articulo.activo,
+                articulo_origen_id: articulo.id
+            }, { transaction });
+
+            // Crear unidades
+            for (let i = 1; i <= cantidadUnidades; i++) {
+                const codigoUnico = `${prefijo}-${i.toString().padStart(3, '0')}`;
+                await UnidadHerramientaRenta.create({
+                    tipo_herramienta_id: nuevoTipo.id,
+                    codigo_unico: codigoUnico,
+                    estado: 'disponible',
+                    activo: true
+                }, { transaction });
+                totalUnidadesCreadas++;
+            }
+
+            console.log(`  ✅ ${articulo.nombre} → ${prefijo} (${cantidadUnidades} unidades)`);
+        }
+
+        await transaction.commit();
+
+        console.log(`✨ Migración automática completada: ${sinMigrar.length} artículos, ${totalUnidadesCreadas} unidades`);
+
+        return {
+            migrados: sinMigrar.length,
+            unidades: totalUnidadesCreadas,
+            mensaje: 'Migración exitosa'
+        };
+
+    } catch (error) {
+        await transaction.rollback();
+        console.error('❌ Error en migración de artículos pendientes:', error.message);
+        return {
+            migrados: 0,
+            error: error.message
+        };
+    }
+};
 
 export const ejecutarAutoMigracion = async () => {
     try {
@@ -32,8 +175,16 @@ export const ejecutarAutoMigracion = async () => {
         const necesitaMigracion = tablas.length < 3 || campoEsHerramienta.length === 0;
 
         if (!necesitaMigracion) {
-            console.log('✅ Base de datos actualizada - No se requiere migración');
-            return { migrado: false, mensaje: 'Ya está migrado' };
+            console.log('✅ Base de datos actualizada - No se requiere migración de tablas');
+
+            // Aunque las tablas existan, verificar si hay artículos pendientes de migrar
+            const resultadoArticulos = await migrarArticulosPendientes();
+
+            return {
+                migrado: false,
+                mensaje: 'Tablas ya migradas',
+                articulosMigrados: resultadoArticulos.migrados || 0
+            };
         }
 
         console.log('🚀 Ejecutando migración automática de herramientas de renta...');
@@ -153,11 +304,16 @@ export const ejecutarAutoMigracion = async () => {
 
         console.log('  ✅ Tabla historial_asignaciones_herramienta creada');
 
-        console.log('✨ Migración automática completada exitosamente');
+        console.log('✨ Migración de tablas completada exitosamente');
+
+        // Migrar artículos pendientes después de crear las tablas
+        const resultadoArticulos = await migrarArticulosPendientes();
 
         return {
             migrado: true,
-            mensaje: 'Migración de herramientas de renta completada'
+            mensaje: 'Migración de herramientas de renta completada',
+            articulosMigrados: resultadoArticulos.migrados || 0,
+            unidadesCreadas: resultadoArticulos.unidades || 0
         };
 
     } catch (error) {
