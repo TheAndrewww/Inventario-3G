@@ -231,7 +231,8 @@ const OrdenesCompraPage = () => {
   const handleMostrarBajoStockMinimo = async () => {
     try {
       setBuscandoArticulos(true);
-      const todosArticulos = await articulosService.buscar({ activo: true });
+      // Obtener TODOS los artículos sin límite de paginación
+      const todosArticulos = await articulosService.buscar({ activo: true, limit: 99999 });
       const articulosBajoStock = todosArticulos.filter(art =>
         parseFloat(art.stock_actual) < parseFloat(art.stock_minimo)
       );
@@ -935,27 +936,19 @@ const OrdenesCompraPage = () => {
       {vistaActual === 'solicitudes' && (
         <>
           {/* Barra de búsqueda de artículos para crear solicitudes */}
-          <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-lg border-2 border-blue-200 p-6">
-            <div className="mb-4">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <PlusCircle className="text-blue-600" size={24} />
-                Crear Nueva Solicitud de Compra
-              </h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Busca artículos por nombre, código o categoría
-              </p>
-            </div>
+          <div className="mb-6 bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Crear Nueva Solicitud de Compra:</h3>
 
-            <div className="flex flex-col gap-3">
-              <div className="flex gap-3">
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <input
                     type="text"
                     placeholder="Buscar artículo por nombre, código o categoría..."
                     value={busquedaArticulo}
                     onChange={(e) => setBusquedaArticulo(e.target.value.toUpperCase())}
-                    className="w-full pl-10 pr-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 text-sm"
                     style={{ textTransform: 'uppercase' }}
                   />
                 </div>
@@ -963,21 +956,21 @@ const OrdenesCompraPage = () => {
                 <button
                   onClick={handleMostrarBajoStockMinimo}
                   disabled={buscandoArticulos}
-                  className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
                   title="Ver artículos que necesitan reposición"
                 >
-                  <AlertCircle size={20} />
+                  <AlertCircle size={18} />
                   Bajo Stock Mínimo
                 </button>
               </div>
 
               {/* Dropdown de resultados en tiempo real */}
               {busquedaArticulo.length >= 2 && (
-                <div className="border-2 border-blue-300 rounded-lg max-h-96 overflow-y-auto bg-white">
+                <div className="border border-gray-200 rounded-lg max-h-80 overflow-y-auto bg-white">
                   {buscandoArticulos ? (
-                    <div className="p-4 text-center text-gray-500">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                      <p className="mt-2 text-sm">Buscando...</p>
+                    <div className="p-3 text-center text-gray-500">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-700 mx-auto"></div>
+                      <p className="mt-2 text-xs">Buscando...</p>
                     </div>
                   ) : articulosBuscados.length > 0 ? (
                     <div className="divide-y divide-gray-200">
@@ -989,7 +982,7 @@ const OrdenesCompraPage = () => {
                         return (
                           <div
                             key={articulo.id}
-                            className={`p-3 hover:bg-blue-50 cursor-pointer transition-colors ${
+                            className={`p-2 hover:bg-gray-50 cursor-pointer transition-colors ${
                               stockCritico ? 'bg-red-50' : stockBajo ? 'bg-orange-50' : ''
                             }`}
                             onClick={() => {
@@ -998,32 +991,32 @@ const OrdenesCompraPage = () => {
                               setArticulosBuscados([]);
                             }}
                           >
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
                               {articulo.imagen_url ? (
                                 <img
                                   src={articulo.imagen_url}
                                   alt={articulo.nombre}
-                                  className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
+                                  className="w-10 h-10 object-cover rounded-lg flex-shrink-0"
                                   onError={(e) => { e.target.style.display = 'none'; }}
                                 />
                               ) : (
-                                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
+                                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg flex-shrink-0">
                                   📦
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-semibold text-gray-900 text-sm">
+                                <h4 className="font-medium text-gray-900 text-sm truncate">
                                   {articulo.nombre}
                                 </h4>
-                                <p className="text-xs text-gray-600">
+                                <p className="text-xs text-gray-500 truncate">
                                   {articulo.codigo_ean13 && `${articulo.codigo_ean13} • `}
                                   Stock: {articulo.stock_actual} {articulo.unidad}
                                   {articulo.categoria && ` • ${articulo.categoria.nombre}`}
                                 </p>
                               </div>
-                              <div className="flex flex-col items-end gap-1">
+                              <div className="flex items-center gap-1">
                                 <button
-                                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm flex items-center gap-1 whitespace-nowrap"
+                                  className="px-2 py-1 bg-red-700 text-white rounded-lg hover:bg-red-800 text-xs flex items-center gap-1"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleAbrirModalCrearSolicitudArticulo(articulo);
@@ -1031,14 +1024,14 @@ const OrdenesCompraPage = () => {
                                     setArticulosBuscados([]);
                                   }}
                                 >
-                                  <Plus size={14} />
-                                  Crear Solicitud
+                                  <Plus size={12} />
+                                  Agregar
                                 </button>
                                 {stockBajo && (
-                                  <span className={`px-2 py-0.5 text-xs font-semibold rounded ${
+                                  <span className={`px-1.5 py-0.5 text-xs font-semibold rounded ${
                                     stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
                                   }`}>
-                                    {stockCritico ? '⚠️ Crítico' : '⚡ Bajo'}
+                                    {stockCritico ? '⚠️' : '⚡'}
                                   </span>
                                 )}
                               </div>
@@ -1048,24 +1041,18 @@ const OrdenesCompraPage = () => {
                       })}
                       {articulosBuscados.length > 10 && (
                         <div className="p-2 text-center text-xs text-gray-500 bg-gray-50">
-                          Mostrando 10 de {articulosBuscados.length} resultados. Refina tu búsqueda para ver más.
+                          Mostrando 10 de {articulosBuscados.length} resultados
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="p-4 text-center">
-                      <p className="text-gray-600 text-sm">
+                    <div className="p-3 text-center">
+                      <p className="text-gray-500 text-xs">
                         No se encontraron artículos con "{busquedaArticulo}"
                       </p>
                     </div>
                   )}
                 </div>
-              )}
-
-              {!busquedaArticulo && (
-                <p className="text-xs text-gray-600 text-center">
-                  Escribe al menos 2 caracteres para buscar artículos
-                </p>
               )}
             </div>
           </div>
