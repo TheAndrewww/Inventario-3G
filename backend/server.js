@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { sequelize } from './src/config/database.js';
 import './src/models/index.js'; // Importar modelos y relaciones
 import { iniciarCronJobs } from './src/utils/cronJobs.js';
+import { ejecutarAutoMigracion } from './src/utils/autoMigrate.js';
 
 // Cargar variables de entorno solo en desarrollo
 // En producción (Railway, Heroku), las variables están en process.env directamente
@@ -223,6 +224,9 @@ const startServer = async () => {
             } else {
                 console.log('✅ Tabla image_processing_queue ya existe');
             }
+
+            // Auto-migración de herramientas de renta
+            await ejecutarAutoMigracion();
         }
 
         // Iniciar servidor
