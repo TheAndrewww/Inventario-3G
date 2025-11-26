@@ -237,7 +237,7 @@ const OrdenesCompraPage = () => {
       );
 
       // Filtrar artículos que ya tienen solicitudes pendientes
-      const articulosConSolicitudPendiente = solicitudesCompra
+      const articulosConSolicitudPendiente = solicitudes
         .filter(sol => sol.estado === 'pendiente')
         .map(sol => sol.articulo_id);
 
