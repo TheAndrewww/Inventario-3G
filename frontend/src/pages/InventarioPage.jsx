@@ -193,6 +193,13 @@ const InventarioPage = () => {
   const handleToggleHerramienta = async (articuloId, e) => {
     e.stopPropagation(); // Prevenir que se abra el modal de detalle
 
+    // Verificar que el artículo sea una herramienta
+    const articulo = articulos.find(a => a.id === articuloId);
+    if (!articulo || !articulo.es_herramienta) {
+      console.warn(`Artículo ${articuloId} no es una herramienta de renta`);
+      return;
+    }
+
     // Si ya está expandida, solo colapsarla
     if (herramientasExpandidas[articuloId]) {
       setHerramientasExpandidas(prev => ({
@@ -806,6 +813,13 @@ const InventarioPage = () => {
 
   // Toggle expansión de herramienta en modal de etiquetas
   const handleToggleHerramientaEtiquetas = async (articuloId) => {
+    // Verificar que el artículo sea una herramienta
+    const articulo = articulosSeleccionadosParaEtiquetas.find(a => a.id === articuloId);
+    if (!articulo || !articulo.es_herramienta) {
+      console.warn(`Artículo ${articuloId} no es una herramienta de renta`);
+      return;
+    }
+
     // Si ya está expandida, solo colapsarla
     if (herramientasExpandidasEtiquetas[articuloId]) {
       setHerramientasExpandidasEtiquetas(prev => ({
