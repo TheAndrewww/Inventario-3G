@@ -1597,17 +1597,18 @@ const InventarioPage = () => {
 
                               {/* Código de barras */}
                               <div className="flex items-center gap-4">
-                                {unidad.codigo_ean13 ? (
-                                  <img
-                                    src={herramientasRentaService.getURLCodigoBarras(unidad.id)}
-                                    alt={`Código de barras ${unidad.codigo_unico}`}
-                                    className="h-16"
-                                  />
-                                ) : (
-                                  <div className="w-32 h-16 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">
-                                    Sin código
-                                  </div>
-                                )}
+                                <img
+                                  src={herramientasRentaService.getURLCodigoBarras(unidad.id)}
+                                  alt={`Código de barras ${unidad.codigo_unico}`}
+                                  className="h-16"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    const placeholder = document.createElement('div');
+                                    placeholder.className = 'w-32 h-16 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400';
+                                    placeholder.textContent = 'Error al cargar';
+                                    e.target.parentNode.appendChild(placeholder);
+                                  }}
+                                />
                               </div>
 
                               {/* Información de la unidad */}
@@ -1649,32 +1650,28 @@ const InventarioPage = () => {
                                   <Eye size={16} />
                                   Ver Detalles
                                 </button>
-                                {unidad.codigo_ean13 && (
-                                  <>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDescargarCodigoBarras(unidad.id, unidad.codigo_unico);
-                                      }}
-                                      className="inline-flex items-center gap-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                                      title="Descargar código de barras"
-                                    >
-                                      <Download size={16} />
-                                      Descargar
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleImprimirCodigoBarras(unidad.id, unidad.codigo_unico, item.nombre);
-                                      }}
-                                      className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-                                      title="Imprimir código de barras"
-                                    >
-                                      <Printer size={16} />
-                                      Imprimir
-                                    </button>
-                                  </>
-                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDescargarCodigoBarras(unidad.id, unidad.codigo_unico);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                                  title="Descargar código de barras"
+                                >
+                                  <Download size={16} />
+                                  Descargar
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleImprimirCodigoBarras(unidad.id, unidad.codigo_unico, item.nombre);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                  title="Imprimir código de barras"
+                                >
+                                  <Printer size={16} />
+                                  Imprimir
+                                </button>
                               </div>
                             </div>
                           </td>
@@ -2125,17 +2122,18 @@ const InventarioPage = () => {
                                   <span className="text-gray-500">ID:</span>
                                   <span className="ml-1 font-bold text-gray-900">#{unidad.id}</span>
                                 </div>
-                                {unidad.codigo_ean13 ? (
-                                  <img
-                                    src={herramientasRentaService.getURLCodigoBarras(unidad.id)}
-                                    alt={`Código ${unidad.codigo_unico}`}
-                                    className="h-12 flex-shrink-0"
-                                  />
-                                ) : (
-                                  <div className="w-24 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400">
-                                    Sin código
-                                  </div>
-                                )}
+                                <img
+                                  src={herramientasRentaService.getURLCodigoBarras(unidad.id)}
+                                  alt={`Código ${unidad.codigo_unico}`}
+                                  className="h-12 flex-shrink-0"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    const placeholder = document.createElement('div');
+                                    placeholder.className = 'w-24 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400';
+                                    placeholder.textContent = 'Error';
+                                    e.target.parentNode.appendChild(placeholder);
+                                  }}
+                                />
                               </div>
 
                               {/* Info de la unidad */}
@@ -2165,24 +2163,22 @@ const InventarioPage = () => {
                               </div>
 
                               {/* Botones de acción */}
-                              {unidad.codigo_ean13 && (
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => handleDescargarCodigoBarras(unidad.id, unidad.codigo_unico)}
-                                    className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
-                                  >
-                                    <Download size={14} />
-                                    Descargar
-                                  </button>
-                                  <button
-                                    onClick={() => handleImprimirCodigoBarras(unidad.id, unidad.codigo_unico, item.nombre)}
-                                    className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors"
-                                  >
-                                    <Printer size={14} />
-                                    Imprimir
-                                  </button>
-                                </div>
-                              )}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleDescargarCodigoBarras(unidad.id, unidad.codigo_unico)}
+                                  className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                  <Download size={14} />
+                                  Descargar
+                                </button>
+                                <button
+                                  onClick={() => handleImprimirCodigoBarras(unidad.id, unidad.codigo_unico, item.nombre)}
+                                  className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors"
+                                >
+                                  <Printer size={14} />
+                                  Imprimir
+                                </button>
+                              </div>
                             </div>
                           ))
                         ) : (
