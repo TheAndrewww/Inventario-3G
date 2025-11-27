@@ -15,6 +15,7 @@ import { getImageUrl } from '../utils/imageUtils';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import BarcodeScannerIndicator from '../components/scanner/BarcodeScannerIndicator';
 import ScanSuccessNotification from '../components/scanner/ScanSuccessNotification';
+import { jsPDF } from 'jspdf';
 
 const PedidoPage = () => {
   const navigate = useNavigate();
@@ -118,6 +119,257 @@ const PedidoPage = () => {
     }
   };
 
+  const handleVaciarCarrito = () => {
+    if (items.length === 0) {
+      return;
+    }
+
+    const confirmar = window.confirm(
+      `¿Estás seguro que deseas vaciar el carrito?\n\nSe eliminarán ${items.length} artículo(s) con un total de ${getTotalPiezas()} pieza(s).`
+    );
+
+    if (confirmar) {
+      limpiarPedido();
+      toast.success('Carrito vaciado exitosamente');
+    }
+  };
+
+  // Función para cargar imagen desde URL y obtener base64 + dimensiones
+  const loadImageWithDimensions = async (url) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          // Crear imagen para obtener dimensiones
+          const img = new Image();
+          img.onload = () => {
+            resolve({
+              base64: reader.result,
+              width: img.width,
+              height: img.height,
+              aspectRatio: img.width / img.height
+            });
+          };
+          img.onerror = reject;
+          img.src = reader.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error cargando imagen:', error);
+      return null;
+    }
+  };
+
+  const generatePDF = async (pedido) => {
+    try {
+      const doc = new jsPDF();
+
+      // URLs de los logos
+      const logoCompletoUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1762292854/logo_completo_web_eknzcb.png';
+      const marcaAguaUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1763602391/iso_black_1_mmxd6k.png';
+
+      // Cargar imágenes con dimensiones
+      const [logoData, marcaAguaData] = await Promise.all([
+        loadImageWithDimensions(logoCompletoUrl),
+        loadImageWithDimensions(marcaAguaUrl)
+      ]);
+
+      // === HEADER ===
+      // Logo completo arriba a la izquierda (respetando relación de aspecto)
+      if (logoData) {
+        const logoWidth = 70; // Ancho deseado en mm
+        const logoHeight = logoWidth / logoData.aspectRatio; // Alto calculado
+        doc.addImage(logoData.base64, 'PNG', 15, 10, logoWidth, logoHeight);
+      }
+
+      // Información a la derecha
+      let rightX = 120;
+      let rightY = 15;
+
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('SUPERVISOR', rightX, rightY);
+      doc.setFont(undefined, 'normal');
+      doc.text(pedido.aprobadoPor?.nombre || pedido.usuario?.nombre || 'N/A', rightX, rightY + 5);
+
+      rightY += 15;
+      doc.setFont(undefined, 'bold');
+      doc.text('NOMBRE DE PROYECTO', rightX, rightY);
+      doc.setFont(undefined, 'normal');
+      doc.text(pedido.proyecto || pedido.equipo?.nombre || 'Sin proyecto', rightX, rightY + 5);
+
+      rightY += 15;
+      doc.setFont(undefined, 'bold');
+      doc.text('FECHA DE SALIDA:', rightX, rightY);
+      doc.setFont(undefined, 'normal');
+      const fechaPedido = pedido.created_at || pedido.createdAt;
+      doc.text(
+        fechaPedido ? new Date(fechaPedido).toLocaleDateString('es-MX', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        }) : 'N/A',
+        rightX,
+        rightY + 5
+      );
+
+      // === TÍTULO PRINCIPAL ===
+      let yPos = 60;
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('ORDEN DE SALIDA DE PRODUCTOS', 15, yPos);
+
+      yPos += 10;
+
+      // === ARTÍCULOS AGRUPADOS POR CATEGORÍA ===
+      const articulos = pedido.detalles || [];
+
+      // Agrupar artículos por categoría
+      const articulosPorCategoria = {};
+      articulos.forEach(detalle => {
+        const categoria = detalle.articulo?.categoria?.nombre || 'GENERAL';
+        if (!articulosPorCategoria[categoria]) {
+          articulosPorCategoria[categoria] = [];
+        }
+        articulosPorCategoria[categoria].push(detalle);
+      });
+
+      // Cargar imágenes de artículos
+      const imagenesArticulos = {};
+      for (const detalle of articulos) {
+        if (detalle.articulo?.imagen_url) {
+          try {
+            const imagenData = await loadImageWithDimensions(detalle.articulo.imagen_url);
+            if (imagenData) {
+              imagenesArticulos[detalle.articulo_id] = imagenData;
+            }
+          } catch (error) {
+            console.error(`Error cargando imagen del artículo ${detalle.articulo_id}:`, error);
+          }
+        }
+      }
+
+      // Mostrar artículos por categoría
+      doc.setFontSize(10);
+      Object.keys(articulosPorCategoria).forEach(categoria => {
+        if (yPos > 240) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        // Nombre de categoría
+        doc.setFont(undefined, 'bold');
+        doc.text(categoria.toUpperCase(), 15, yPos);
+        yPos += 6;
+
+        // Lista de artículos
+        doc.setFont(undefined, 'normal');
+        articulosPorCategoria[categoria].forEach(detalle => {
+          const articuloHeight = 20; // Altura reservada para cada artículo con imagen
+
+          if (yPos + articuloHeight > 240) {
+            doc.addPage();
+            yPos = 20;
+          }
+
+          const nombreArticulo = detalle.articulo?.nombre || `Artículo ID: ${detalle.articulo_id}`;
+          const descripcion = detalle.articulo?.descripcion || '';
+          const cantidad = detalle.cantidad;
+          const unidad = detalle.articulo?.unidad || 'uds';
+          const imagenArticulo = imagenesArticulos[detalle.articulo_id];
+
+          // Dibujar imagen del artículo si existe
+          const imgX = 15;
+          const imgY = yPos - 2;
+          const imgSize = 15; // Tamaño de la imagen en mm
+          let textX = 20; // Posición X del texto (sin imagen)
+          let textStartY = yPos + 5; // Posición Y inicial del texto (por defecto)
+
+          if (imagenArticulo) {
+            // Calcular dimensiones manteniendo aspecto
+            const imgWidth = imgSize;
+            const imgHeight = imgSize / imagenArticulo.aspectRatio;
+
+            // Dibujar borde alrededor de la imagen
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.2);
+            doc.rect(imgX, imgY, imgWidth, imgHeight);
+
+            // Agregar imagen
+            doc.addImage(imagenArticulo.base64, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+            textX = imgX + imgWidth + 3; // Ajustar posición del texto
+            textStartY = imgY + 4; // Alinear texto con el inicio de la imagen
+          }
+
+          // Bullet point con nombre y cantidad
+          doc.setFont(undefined, 'bold');
+          doc.text(`• ${nombreArticulo} - ${cantidad} ${unidad}`, textX, textStartY);
+          yPos = textStartY + 5; // Ajustar yPos para siguiente línea
+
+          // Descripción en línea separada si existe
+          if (descripcion) {
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+            const maxWidth = 180 - textX;
+            const descripcionLines = doc.splitTextToSize(`  ${descripcion}`, maxWidth);
+            doc.text(descripcionLines, textX + 2, yPos);
+            yPos += descripcionLines.length * 4.5; // Aumentar espacio entre líneas de descripción
+            doc.setFontSize(10);
+          }
+
+          yPos += imagenArticulo ? Math.max(5, imgSize - 5) : 4; // Más espacio entre artículos
+        });
+
+        yPos += 4;
+      });
+
+      // === MARCA DE AGUA ===
+      if (marcaAguaData) {
+        // Configurar opacidad para la marca de agua (efecto difuminado)
+        const gState = doc.GState({ opacity: 0.08 });
+        doc.setGState(gState);
+
+        // Calcular dimensiones respetando relación de aspecto
+        const watermarkWidth = 160; // Ancho más grande
+        const watermarkHeight = watermarkWidth / marcaAguaData.aspectRatio;
+
+        // Agregar marca de agua grande, más abajo y a la derecha (cortada)
+        doc.addImage(marcaAguaData.base64, 'PNG', 60, 180, watermarkWidth, watermarkHeight, undefined, 'NONE', 0);
+
+        // Restaurar opacidad normal
+        doc.setGState(doc.GState({ opacity: 1 }));
+      }
+
+      // === FOOTER CON BARRA ROJA ===
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+
+        // Barra roja
+        doc.setFillColor(185, 28, 28); // Rojo oscuro
+        doc.rect(0, 280, 210, 17, 'F');
+
+        // Texto en la barra
+        doc.setFontSize(10);
+        doc.setTextColor(255, 255, 255);
+        doc.text('4621302459 | admin@3gvelarias.com', 105, 289, { align: 'center' });
+      }
+
+      // Descargar PDF
+      doc.save(`Orden-Salida-${pedido.ticket_id}.pdf`);
+      toast.success('PDF descargado correctamente');
+    } catch (error) {
+      console.error('Error al generar PDF:', error);
+      toast.error('Error al generar el PDF');
+    }
+  };
+
   const handleFinalizarPedido = async () => {
     if (items.length === 0) {
       toast.error('El pedido está vacío');
@@ -171,9 +423,26 @@ const PedidoPage = () => {
       const response = await pedidosService.crear(data);
 
       if (user?.rol === 'almacen') {
-        toast.success('¡Pedido creado! Esperando aprobación del supervisor');
+        toast.success('¡Pedido creado! Esperando aprobación del encargado');
       } else {
         toast.success('¡Pedido creado exitosamente!');
+      }
+
+      // Obtener detalles completos del pedido para generar PDF
+      try {
+        const pedidoCreado = response.data.pedido;
+        if (pedidoCreado && pedidoCreado.id) {
+          // Obtener detalles completos incluyendo artículos
+          const pedidoCompleto = await pedidosService.obtenerPorId(pedidoCreado.id);
+
+          // Generar PDF automáticamente
+          // La respuesta tiene la estructura: { success: true, data: { pedido: {...} } }
+          await generatePDF(pedidoCompleto.data.pedido);
+        }
+      } catch (pdfError) {
+        console.error('Error al generar PDF:', pdfError);
+        // No bloquear el flujo si falla el PDF
+        toast.error('El pedido se creó pero hubo un error al generar el PDF');
       }
 
       limpiarPedido();
@@ -700,7 +969,7 @@ const PedidoPage = () => {
                 variant="secondary"
                 fullWidth
                 disabled={items.length === 0}
-                onClick={limpiarPedido}
+                onClick={handleVaciarCarrito}
               >
                 <span className="text-sm md:text-base">Vaciar Carrito</span>
               </Button>
