@@ -971,6 +971,7 @@ export const generarEtiquetasMixtas = async (req, res) => {
 /**
  * POST /api/articulos/etiquetas/lote
  * Generar PDF con múltiples etiquetas (3cm x 9cm) organizadas en hojas A4
+ * VERSIÓN ACTUALIZADA: Usa el nuevo generador con fotos y marca artículos como etiquetados
  */
 export const generarEtiquetasLote = async (req, res) => {
     try {
@@ -984,13 +985,13 @@ export const generarEtiquetasLote = async (req, res) => {
             });
         }
 
-        // Buscar todos los artículos
+        // Buscar todos los artículos con imagen_url
         const articulos = await Articulo.findAll({
             where: {
                 id: articulos_ids,
                 activo: true
             },
-            attributes: ['id', 'nombre', 'codigo_ean13'],
+            attributes: ['id', 'nombre', 'codigo_ean13', 'imagen_url'],
             order: [['nombre', 'ASC']]
         });
 
@@ -1001,14 +1002,30 @@ export const generarEtiquetasLote = async (req, res) => {
             });
         }
 
+        // Preparar etiquetas con fotos
+        const etiquetas = articulos.map(a => ({
+            nombre: a.nombre,
+            codigo_ean13: a.codigo_ean13,
+            imagen_url: a.imagen_url,
+            tipo: 'articulo'
+        }));
+
         // Importar generador de etiquetas
         const labelGenerator = await import('../utils/label-generator.js');
 
-        // Generar PDF con todas las etiquetas
-        const pdfBuffer = await labelGenerator.generarEtiquetasLote(articulos.map(a => ({
-            nombre: a.nombre,
-            codigo_ean13: a.codigo_ean13
-        })));
+        // Generar PDF con todas las etiquetas (NUEVA VERSIÓN CON FOTOS)
+        const pdfBuffer = await labelGenerator.generarEtiquetasLoteConFoto(etiquetas);
+
+        // Marcar artículos como etiquetados
+        await Articulo.update(
+            { etiquetado: true },
+            {
+                where: {
+                    id: articulos_ids,
+                    activo: true
+                }
+            }
+        );
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="etiquetas-lote-${articulos.length}-articulos.pdf"`);
