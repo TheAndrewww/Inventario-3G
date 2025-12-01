@@ -16,22 +16,90 @@ import fs from 'fs';
 const cmToPoints = (cm) => cm * 28.35;
 
 /**
- * Genera una imagen de código de barras EAN-13
+ * Genera una imagen de código de barras según el tipo especificado
+ * @param {string} codigo - El código a generar
+ * @param {string} tipo - Tipo de código (EAN13, QRCODE, CODE128, CODE39, etc.)
  */
-const generarCodigoBarrasBuffer = async (codigo) => {
+const generarCodigoBarrasBuffer = async (codigo, tipo = 'EAN13') => {
     try {
-        const png = await bwipjs.toBuffer({
-            bcid: 'ean13',
+        if (!codigo) {
+            console.error('⚠️  Código vacío, no se puede generar código de barras');
+            return null;
+        }
+
+        // Mapear tipos de la BD a tipos de bwip-js
+        const tipoMap = {
+            'EAN13': 'ean13',
+            'EAN8': 'ean8',
+            'QRCODE': 'qrcode',
+            'CODE128': 'code128',
+            'CODE39': 'code39',
+            'CODE93': 'code93',
+            'DATAMATRIX': 'datamatrix',
+            'PDF417': 'pdf417',
+            'UPCA': 'upca',
+            'UPCE': 'upce'
+        };
+
+        let bcid = tipoMap[tipo.toUpperCase()] || 'code128';
+
+        // Validaciones específicas por tipo
+        if (bcid === 'ean13') {
+            const cleanCode = codigo.replace(/\D/g, ''); // Solo dígitos
+            if (cleanCode.length !== 12 && cleanCode.length !== 13) {
+                console.warn(`⚠️  Código EAN-13 inválido (${codigo}), usando CODE128 como fallback`);
+                bcid = 'code128'; // Fallback a CODE128 que acepta cualquier texto
+            }
+        } else if (bcid === 'ean8') {
+            const cleanCode = codigo.replace(/\D/g, '');
+            if (cleanCode.length !== 7 && cleanCode.length !== 8) {
+                console.warn(`⚠️  Código EAN-8 inválido (${codigo}), usando CODE128 como fallback`);
+                bcid = 'code128';
+            }
+        }
+
+        // Configuración base
+        const config = {
+            bcid: bcid,
             text: codigo,
             scale: 2,
-            height: 8,
-            includetext: false, // No incluir texto porque lo pondremos manualmente
-        });
+            includetext: false
+        };
+
+        // Configuraciones específicas por tipo
+        if (bcid === 'qrcode') {
+            config.eclevel = 'M'; // Nivel de corrección de errores
+            config.width = 50;
+            config.height = 50;
+        } else if (bcid === 'datamatrix') {
+            config.width = 50;
+            config.height = 50;
+        } else {
+            // Para códigos de barras lineales
+            config.height = 8;
+        }
+
+        const png = await bwipjs.toBuffer(config);
         return png;
     } catch (error) {
-        console.error('Error generando código de barras con bwipjs:', error);
-        // Devolver null en caso de error (usaremos fallback visual)
-        return null;
+        console.error(`⚠️  Error generando código ${tipo} con bwipjs:`, error.message);
+
+        // Último intento: usar CODE128 como fallback universal
+        try {
+            const fallbackConfig = {
+                bcid: 'code128',
+                text: codigo,
+                scale: 2,
+                height: 8,
+                includetext: false
+            };
+            console.warn(`🔄 Intentando con CODE128 como fallback para: ${codigo}`);
+            const png = await bwipjs.toBuffer(fallbackConfig);
+            return png;
+        } catch (fallbackError) {
+            console.error(`❌ Fallback CODE128 también falló:`, fallbackError.message);
+            return null;
+        }
     }
 };
 
@@ -100,8 +168,11 @@ export const generarEtiquetaIndividual = async (articulo) => {
             });
             doc.on('error', reject);
 
-            // Generar código de barras
-            const barcodeBuffer = await generarCodigoBarrasBuffer(articulo.codigo_ean13);
+            // Generar código de barras según el tipo
+            const barcodeBuffer = await generarCodigoBarrasBuffer(
+                articulo.codigo_ean13,
+                articulo.codigo_tipo || 'EAN13'
+            );
 
             // LAYOUT DE LA ETIQUETA:
             // - Nombre del artículo (arriba, centrado, 2 líneas máximo, tamaño 16pt)
@@ -235,8 +306,11 @@ export const generarEtiquetasLote = async (articulos) => {
             let paginaActual = 0;
 
             for (const articulo of articulos) {
-                // Generar código de barras para este artículo
-                const barcodeBuffer = await generarCodigoBarrasBuffer(articulo.codigo_ean13);
+                // Generar código de barras para este artículo según su tipo
+                const barcodeBuffer = await generarCodigoBarrasBuffer(
+                    articulo.codigo_ean13,
+                    articulo.codigo_tipo || 'EAN13'
+                );
 
                 // Calcular posición en la página
                 const posicionEnPagina = etiquetaIndex % etiquetasPorPagina;
@@ -383,8 +457,11 @@ export const generarEtiquetasLoteConFoto = async (articulos) => {
             let paginaActual = 0;
 
             for (const articulo of articulos) {
-                // Generar código de barras para este artículo
-                const barcodeBuffer = await generarCodigoBarrasBuffer(articulo.codigo_ean13);
+                // Generar código de barras para este artículo según su tipo
+                const barcodeBuffer = await generarCodigoBarrasBuffer(
+                    articulo.codigo_ean13,
+                    articulo.codigo_tipo || 'EAN13'
+                );
 
                 // Cargar imagen del artículo si existe
                 const imagenBuffer = await cargarImagenBuffer(articulo.imagen_url);

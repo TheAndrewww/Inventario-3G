@@ -876,13 +876,14 @@ export const generarEtiquetasMixtas = async (req, res) => {
                     activo: true,
                     es_herramienta: false // Solo consumibles
                 },
-                attributes: ['id', 'nombre', 'codigo_ean13', 'imagen_url']
+                attributes: ['id', 'nombre', 'codigo_ean13', 'codigo_tipo', 'imagen_url']
             });
 
             articulos.forEach(a => {
                 etiquetas.push({
                     nombre: a.nombre,
                     codigo_ean13: a.codigo_ean13,
+                    codigo_tipo: a.codigo_tipo || 'EAN13',
                     imagen_url: a.imagen_url,
                     tipo: 'articulo'
                 });
@@ -909,6 +910,7 @@ export const generarEtiquetasMixtas = async (req, res) => {
                 etiquetas.push({
                     nombre: `${u.tipoHerramienta.nombre} - ${u.codigo_unico}`,
                     codigo_ean13: u.codigo_ean13,
+                    codigo_tipo: u.codigo_tipo || 'EAN13',
                     imagen_url: u.tipoHerramienta?.imagen_url,
                     tipo: 'unidad'
                 });
@@ -985,13 +987,13 @@ export const generarEtiquetasLote = async (req, res) => {
             });
         }
 
-        // Buscar todos los artículos con imagen_url
+        // Buscar todos los artículos con imagen_url y codigo_tipo
         const articulos = await Articulo.findAll({
             where: {
                 id: articulos_ids,
                 activo: true
             },
-            attributes: ['id', 'nombre', 'codigo_ean13', 'imagen_url'],
+            attributes: ['id', 'nombre', 'codigo_ean13', 'codigo_tipo', 'imagen_url'],
             order: [['nombre', 'ASC']]
         });
 
@@ -1006,6 +1008,7 @@ export const generarEtiquetasLote = async (req, res) => {
         const etiquetas = articulos.map(a => ({
             nombre: a.nombre,
             codigo_ean13: a.codigo_ean13,
+            codigo_tipo: a.codigo_tipo || 'EAN13',
             imagen_url: a.imagen_url,
             tipo: 'articulo'
         }));
