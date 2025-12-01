@@ -46,7 +46,12 @@ const cargarImagenBuffer = async (imageUrl) => {
 
         // Si es una URL completa (http/https)
         if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-            const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+            const response = await axios.get(imageUrl, {
+                responseType: 'arraybuffer',
+                timeout: 10000, // Timeout de 10 segundos
+                maxContentLength: 10 * 1024 * 1024, // Máximo 10MB
+                validateStatus: (status) => status === 200
+            });
             return Buffer.from(response.data);
         }
 
@@ -60,7 +65,7 @@ const cargarImagenBuffer = async (imageUrl) => {
 
         return null;
     } catch (error) {
-        console.error('Error cargando imagen:', error);
+        console.error(`⚠️  Error cargando imagen ${imageUrl}:`, error.message);
         return null;
     }
 };
@@ -430,20 +435,27 @@ export const generarEtiquetasLoteConFoto = async (articulos) => {
                     } catch (error) {
                         console.error('Error al insertar imagen en PDF:', error);
                         // Fallback: rectángulo gris
+                        doc.save();
                         doc.rect(imagenX, imagenY, imagenSize, imagenSize).fillAndStroke('#F0F0F0', '#CCCCCC');
+                        doc.restore();
                     }
                 } else {
                     // Placeholder: rectángulo con emoji
+                    doc.save();
                     doc.rect(imagenX, imagenY, imagenSize, imagenSize).fillAndStroke('#F0F0F0', '#CCCCCC');
                     doc.fontSize(24);
                     const emoji = articulo.tipo === 'unidad' ? '🔧' : '📦';
                     const emojiWidth = doc.widthOfString(emoji);
                     doc.fillColor('#666666');
                     doc.text(emoji, imagenX + (imagenSize - emojiWidth) / 2, imagenY + imagenSize / 2 - 12);
-                    doc.fillColor('#000000'); // Reset color
+                    doc.restore();
                 }
 
                 // 2. NOMBRE DEL ARTÍCULO (arriba derecha, adaptable a 1-2 líneas)
+                // Resetear estilo completamente para asegurar texto negro
+                doc.fillColor('#000000');
+                doc.strokeColor('#000000');
+
                 let yPos = y + paddingEtiqueta;
                 doc.fontSize(11);
                 doc.font('Helvetica-Bold');
