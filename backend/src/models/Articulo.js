@@ -117,6 +117,12 @@ const Articulo = sequelize.define('Articulo', {
         defaultValue: false,
         allowNull: false,
         comment: 'Indica si el artículo fue creado por almacén y está pendiente de revisión por admin'
+    },
+    etiquetado: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Indica si el artículo tiene etiquetas generadas'
     }
 }, {
     tableName: 'articulos',

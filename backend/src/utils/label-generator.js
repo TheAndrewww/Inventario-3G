@@ -6,6 +6,9 @@
 import pkg from 'pdfkit';
 const PDFDocument = pkg;
 import bwipjs from 'bwip-js';
+import axios from 'axios';
+import path from 'path';
+import fs from 'fs';
 
 /**
  * Convierte cm a puntos (1 cm = 28.35 puntos)
@@ -28,6 +31,36 @@ const generarCodigoBarrasBuffer = async (codigo) => {
     } catch (error) {
         console.error('Error generando código de barras con bwipjs:', error);
         // Devolver null en caso de error (usaremos fallback visual)
+        return null;
+    }
+};
+
+/**
+ * Carga una imagen desde una URL o ruta local
+ * @param {string} imageUrl - URL de la imagen o ruta relativa
+ * @returns {Promise<Buffer|null>} - Buffer de la imagen o null si hay error
+ */
+const cargarImagenBuffer = async (imageUrl) => {
+    try {
+        if (!imageUrl) return null;
+
+        // Si es una URL completa (http/https)
+        if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+            const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+            return Buffer.from(response.data);
+        }
+
+        // Si es una ruta local relativa
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'articulos');
+        const imagePath = path.join(uploadsDir, imageUrl);
+
+        if (fs.existsSync(imagePath)) {
+            return fs.readFileSync(imagePath);
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error cargando imagen:', error);
         return null;
     }
 };
@@ -296,7 +329,183 @@ export const generarEtiquetasLote = async (articulos) => {
     });
 };
 
+/**
+ * Genera un PDF con múltiples etiquetas organizadas en hojas A4 CON FOTOS
+ * Layout: Foto a la izquierda, nombre arriba y código de barras más alto a la derecha
+ * @param {Array} articulos - Array de objetos con información de artículos (incluye imagen_url)
+ * @returns {Promise<Buffer>} - Buffer con PDF completo
+ */
+export const generarEtiquetasLoteConFoto = async (articulos) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // Crear documento PDF A4
+            const doc = new PDFDocument({
+                size: 'A4',
+                margins: {
+                    top: 10,
+                    bottom: 10,
+                    left: 10,
+                    right: 10
+                }
+            });
+
+            const buffers = [];
+            doc.on('data', buffers.push.bind(buffers));
+            doc.on('end', () => {
+                const pdfData = Buffer.concat(buffers);
+                resolve(pdfData);
+            });
+            doc.on('error', reject);
+
+            // Dimensiones de etiqueta
+            const anchoEtiqueta = cmToPoints(9);
+            const altoEtiqueta = cmToPoints(3);
+
+            // Dimensiones de página A4 en puntos (595 x 842)
+            const anchoPagina = 595;
+            const altoPagina = 842;
+
+            // Calcular cuántas etiquetas caben por página
+            const margen = 10;
+            const espacioHorizontal = 5;
+            const espacioVertical = 5;
+
+            const etiquetasPorFila = Math.floor((anchoPagina - 2 * margen + espacioHorizontal) / (anchoEtiqueta + espacioHorizontal));
+            const etiquetasPorColumna = Math.floor((altoPagina - 2 * margen + espacioVertical) / (altoEtiqueta + espacioVertical));
+            const etiquetasPorPagina = etiquetasPorFila * etiquetasPorColumna;
+
+            let etiquetaIndex = 0;
+            let paginaActual = 0;
+
+            for (const articulo of articulos) {
+                // Generar código de barras para este artículo
+                const barcodeBuffer = await generarCodigoBarrasBuffer(articulo.codigo_ean13);
+
+                // Cargar imagen del artículo si existe
+                const imagenBuffer = await cargarImagenBuffer(articulo.imagen_url);
+
+                // Calcular posición en la página
+                const posicionEnPagina = etiquetaIndex % etiquetasPorPagina;
+
+                // Si necesitamos nueva página
+                if (etiquetaIndex > 0 && posicionEnPagina === 0) {
+                    doc.addPage();
+                    paginaActual++;
+                }
+
+                const fila = Math.floor(posicionEnPagina / etiquetasPorFila);
+                const columna = posicionEnPagina % etiquetasPorFila;
+
+                const x = margen + columna * (anchoEtiqueta + espacioHorizontal);
+                const y = margen + fila * (altoEtiqueta + espacioVertical);
+
+                // Dibujar borde de etiqueta (opcional, para guía de corte)
+                doc.rect(x, y, anchoEtiqueta, altoEtiqueta).stroke('#CCCCCC');
+
+                // LAYOUT CON FOTO:
+                // +------------------+
+                // | [IMG] Nombre     |
+                // | [IMG] |||||||||| |
+                // +------------------+
+
+                const paddingEtiqueta = 5;
+                const imagenSize = altoEtiqueta - (2 * paddingEtiqueta); // Imagen cuadrada que ocupa todo el alto
+                const imagenX = x + paddingEtiqueta;
+                const imagenY = y + paddingEtiqueta;
+
+                // Área disponible para texto y código de barras (a la derecha de la imagen)
+                const areaDerechaX = imagenX + imagenSize + 5;
+                const areaDerechaAncho = anchoEtiqueta - imagenSize - (3 * paddingEtiqueta);
+
+                // 1. IMAGEN DEL ARTÍCULO (izquierda)
+                if (imagenBuffer) {
+                    try {
+                        doc.image(imagenBuffer, imagenX, imagenY, {
+                            width: imagenSize,
+                            height: imagenSize,
+                            fit: [imagenSize, imagenSize],
+                            align: 'center',
+                            valign: 'center'
+                        });
+                    } catch (error) {
+                        console.error('Error al insertar imagen en PDF:', error);
+                        // Fallback: rectángulo gris
+                        doc.rect(imagenX, imagenY, imagenSize, imagenSize).fillAndStroke('#F0F0F0', '#CCCCCC');
+                    }
+                } else {
+                    // Placeholder: rectángulo con emoji
+                    doc.rect(imagenX, imagenY, imagenSize, imagenSize).fillAndStroke('#F0F0F0', '#CCCCCC');
+                    doc.fontSize(24);
+                    const emoji = articulo.tipo === 'unidad' ? '🔧' : '📦';
+                    const emojiWidth = doc.widthOfString(emoji);
+                    doc.fillColor('#666666');
+                    doc.text(emoji, imagenX + (imagenSize - emojiWidth) / 2, imagenY + imagenSize / 2 - 12);
+                    doc.fillColor('#000000'); // Reset color
+                }
+
+                // 2. NOMBRE DEL ARTÍCULO (arriba derecha, adaptable a 1-2 líneas)
+                let yPos = y + paddingEtiqueta;
+                doc.fontSize(11);
+                doc.font('Helvetica-Bold');
+
+                const nombre = articulo.nombre || 'Sin nombre';
+
+                // Calcular cuántas líneas necesita el nombre
+                const heightOfText = doc.heightOfString(nombre, {
+                    width: areaDerechaAncho,
+                    align: 'left'
+                });
+
+                doc.text(nombre, areaDerechaX, yPos, {
+                    width: areaDerechaAncho,
+                    align: 'left'
+                });
+
+                // Avanzar según el alto real del texto
+                yPos += heightOfText + 3; // 3 puntos de separación
+
+                // 3. CÓDIGO DE BARRAS (altura dinámica según espacio disponible)
+                const barcodeWidth = areaDerechaAncho - 5;
+                // Calcular altura restante desde yPos hasta el final de la etiqueta
+                const espacioDisponible = (y + altoEtiqueta) - yPos - paddingEtiqueta;
+                const barcodeHeight = Math.max(espacioDisponible, 15); // Mínimo 15 puntos
+                const xBarcode = areaDerechaX;
+
+                if (barcodeBuffer) {
+                    try {
+                        doc.image(barcodeBuffer, xBarcode, yPos, {
+                            width: barcodeWidth,
+                            height: barcodeHeight,
+                            fit: [barcodeWidth, barcodeHeight]
+                        });
+                    } catch (error) {
+                        console.error('Error al insertar código de barras:', error);
+                        // Fallback
+                        doc.rect(xBarcode, yPos, barcodeWidth, barcodeHeight).stroke('#CCCCCC');
+                    }
+                } else {
+                    // Fallback: rectángulo placeholder
+                    doc.rect(xBarcode, yPos, barcodeWidth, barcodeHeight).stroke('#CCCCCC');
+                    doc.fontSize(8);
+                    doc.font('Helvetica');
+                    const placeholder = 'CÓDIGO';
+                    const xPlaceholder = xBarcode + (barcodeWidth - doc.widthOfString(placeholder)) / 2;
+                    doc.text(placeholder, xPlaceholder, yPos + barcodeHeight / 2);
+                }
+
+                etiquetaIndex++;
+            }
+
+            doc.end();
+
+        } catch (error) {
+            reject(error);
+        }
+    });
+};
+
 export default {
     generarEtiquetaIndividual,
-    generarEtiquetasLote
+    generarEtiquetasLote,
+    generarEtiquetasLoteConFoto
 };

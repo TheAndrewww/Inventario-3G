@@ -875,13 +875,15 @@ export const generarEtiquetasMixtas = async (req, res) => {
                     id: articulos_ids,
                     activo: true,
                     es_herramienta: false // Solo consumibles
-                }
+                },
+                attributes: ['id', 'nombre', 'codigo_ean13', 'imagen_url']
             });
 
             articulos.forEach(a => {
                 etiquetas.push({
                     nombre: a.nombre,
                     codigo_ean13: a.codigo_ean13,
+                    imagen_url: a.imagen_url,
                     tipo: 'articulo'
                 });
             });
@@ -899,7 +901,7 @@ export const generarEtiquetasMixtas = async (req, res) => {
                 include: [{
                     model: TipoHerramientaRenta,
                     as: 'tipoHerramienta',
-                    attributes: ['nombre']
+                    attributes: ['nombre', 'imagen_url']
                 }]
             });
 
@@ -907,6 +909,7 @@ export const generarEtiquetasMixtas = async (req, res) => {
                 etiquetas.push({
                     nombre: `${u.tipoHerramienta.nombre} - ${u.codigo_unico}`,
                     codigo_ean13: u.codigo_ean13,
+                    imagen_url: u.tipoHerramienta?.imagen_url,
                     tipo: 'unidad'
                 });
             });
@@ -919,9 +922,37 @@ export const generarEtiquetasMixtas = async (req, res) => {
             });
         }
 
-        // Generar PDF con todas las etiquetas
+        // Generar PDF con todas las etiquetas (nueva versión con fotos)
         const labelGenerator = await import('../utils/label-generator.js');
-        const pdfBuffer = await labelGenerator.generarEtiquetasLote(etiquetas);
+        const pdfBuffer = await labelGenerator.generarEtiquetasLoteConFoto(etiquetas);
+
+        // Marcar artículos como etiquetados
+        if (articulos_ids && articulos_ids.length > 0) {
+            await Articulo.update(
+                { etiquetado: true },
+                {
+                    where: {
+                        id: articulos_ids,
+                        activo: true,
+                        es_herramienta: false
+                    }
+                }
+            );
+        }
+
+        // Marcar unidades de herramientas como etiquetadas
+        if (unidades_ids && unidades_ids.length > 0) {
+            const { UnidadHerramientaRenta } = await import('../models/index.js');
+            await UnidadHerramientaRenta.update(
+                { etiquetado: true },
+                {
+                    where: {
+                        id: unidades_ids,
+                        activo: true
+                    }
+                }
+            );
+        }
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="etiquetas-lote-${etiquetas.length}-items.pdf"`);

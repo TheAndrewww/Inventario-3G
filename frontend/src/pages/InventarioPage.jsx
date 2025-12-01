@@ -900,6 +900,10 @@ const InventarioPage = () => {
 
       const totalItems = articulosSeleccionadosEtiquetas.length + unidadesSeleccionadasEtiquetas.length;
       toast.success(`PDF con ${totalItems} etiquetas generado correctamente`);
+
+      // Recargar artículos para actualizar el estado de etiquetado
+      await fetchArticulos();
+
       setModalEtiquetasOpen(false);
       setArticulosSeleccionadosEtiquetas([]);
       setUnidadesSeleccionadasEtiquetas([]);
@@ -2680,9 +2684,27 @@ const InventarioPage = () => {
                   const estaExpandida = herramientasExpandidasEtiquetas[articulo.id];
                   const unidades = unidadesCargadasEtiquetas[articulo.id] || [];
 
+                  // Detectar si la ubicación es "REVISAR"
+                  const esUbicacionRevisar = articulo.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
+                                             articulo.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
+
+                  // Detectar si el artículo está pendiente de revisión (creado por almacén)
+                  const esPendienteRevision = articulo.pendiente_revision === true;
+
+                  // Obtener URL de la imagen
+                  const imagenUrl = articulo.imagen_url
+                    ? getImageUrl(articulo.imagen_url)
+                    : null;
+
                   return (
                     <React.Fragment key={articulo.id}>
-                      <div className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors">
+                      <div className={`flex items-center gap-4 p-4 transition-colors ${
+                        esPendienteRevision
+                          ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                          : esUbicacionRevisar
+                          ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                          : 'hover:bg-gray-50'
+                      }`}>
                         {/* Checkbox para artículos consumibles */}
                         {!esHerramienta && (
                           <input
@@ -2703,17 +2725,44 @@ const InventarioPage = () => {
                           </button>
                         )}
 
-                        <div className="flex-1 min-w-0 flex items-center gap-2">
-                          {esHerramienta && <span className="text-lg">🔧</span>}
-                          <div className="flex-1">
-                            <h4 className="font-medium text-gray-900 truncate">{articulo.nombre}</h4>
-                            <p className="text-sm text-gray-500 truncate">
-                              {esHerramienta
-                                ? `Herramienta • Stock: ${articulo.stock_actual} unidades`
-                                : `EAN-13: ${articulo.codigo_ean13} • Stock: ${articulo.stock_actual}`
-                              }
-                            </p>
+                        {/* Imagen del artículo */}
+                        {imagenUrl ? (
+                          <img
+                            src={imagenUrl}
+                            alt={articulo.nombre}
+                            className="w-10 h-10 object-cover rounded-lg flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+                            {esHerramienta ? '🔧' : '📦'}
                           </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-medium text-gray-900 truncate">{articulo.nombre}</h4>
+                            {articulo.etiquetado && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 text-xs font-semibold rounded border border-green-300">
+                                ✓ Etiquetado
+                              </span>
+                            )}
+                            {esPendienteRevision && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-200 text-orange-900 text-xs font-bold rounded">
+                                🔔 Pendiente de Revisión
+                              </span>
+                            )}
+                            {esUbicacionRevisar && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-200 text-yellow-900 text-xs font-bold rounded border border-yellow-400">
+                                ⚠️ REVISAR
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500 truncate mt-1">
+                            {esHerramienta
+                              ? `Herramienta • Stock: ${articulo.stock_actual} unidades`
+                              : `EAN-13: ${articulo.codigo_ean13} • Stock: ${articulo.stock_actual}`
+                            }
+                          </p>
                         </div>
                       </div>
 
@@ -2733,10 +2782,15 @@ const InventarioPage = () => {
                                   className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-mono font-bold text-red-600 text-sm">
                                       {unidad.codigo_unico}
                                     </span>
+                                    {unidad.etiquetado && (
+                                      <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 font-semibold rounded border border-green-300">
+                                        ✓ Etiquetado
+                                      </span>
+                                    )}
                                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                                       unidad.estado === 'disponible' ? 'bg-green-100 text-green-800' :
                                       unidad.estado === 'asignada' ? 'bg-blue-100 text-blue-800' :

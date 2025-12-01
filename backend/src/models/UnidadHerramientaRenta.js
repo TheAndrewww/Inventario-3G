@@ -71,6 +71,12 @@ const UnidadHerramientaRenta = sequelize.define('UnidadHerramientaRenta', {
         type: DataTypes.BOOLEAN,
         defaultValue: true
     },
+    etiquetado: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Indica si la unidad tiene etiqueta generada'
+    },
     created_at: {
         type: DataTypes.DATE,
         allowNull: false,
