@@ -1384,6 +1384,142 @@ export const cleanProcessingQueue = async (req, res) => {
     }
 };
 
+/**
+ * POST /api/articulos/diagnosticar-imagenes
+ * Diagnosticar problemas con las URLs de imágenes de artículos
+ * Útil para identificar qué artículos tienen problemas antes de generar etiquetas
+ */
+export const diagnosticarImagenes = async (req, res) => {
+    try {
+        const { articulos_ids } = req.body;
+
+        if (!articulos_ids || !Array.isArray(articulos_ids) || articulos_ids.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Debes proporcionar un array de IDs de artículos'
+            });
+        }
+
+        // Buscar artículos
+        const articulos = await Articulo.findAll({
+            where: {
+                id: articulos_ids,
+                activo: true
+            },
+            attributes: ['id', 'nombre', 'imagen_url'],
+            order: [['nombre', 'ASC']]
+        });
+
+        const axios = (await import('axios')).default;
+        const resultados = [];
+
+        // Verificar cada imagen
+        for (const articulo of articulos) {
+            const resultado = {
+                id: articulo.id,
+                nombre: articulo.nombre,
+                imagen_url: articulo.imagen_url,
+                estado: 'sin_imagen',
+                mensaje: '',
+                detalles: {}
+            };
+
+            if (!articulo.imagen_url) {
+                resultado.estado = 'sin_imagen';
+                resultado.mensaje = 'No tiene imagen_url definida';
+                resultados.push(resultado);
+                continue;
+            }
+
+            // Verificar si es URL HTTP/HTTPS
+            if (articulo.imagen_url.startsWith('http://') || articulo.imagen_url.startsWith('https://')) {
+                try {
+                    const startTime = Date.now();
+                    const response = await axios.head(articulo.imagen_url, {
+                        timeout: 10000,
+                        validateStatus: (status) => status < 500 // Acepta cualquier status < 500
+                    });
+                    const loadTime = Date.now() - startTime;
+
+                    if (response.status >= 200 && response.status < 300) {
+                        resultado.estado = 'ok';
+                        resultado.mensaje = `Imagen accesible (${loadTime}ms)`;
+                        resultado.detalles = {
+                            status: response.status,
+                            contentType: response.headers['content-type'],
+                            contentLength: response.headers['content-length'],
+                            loadTime: `${loadTime}ms`
+                        };
+                    } else {
+                        resultado.estado = 'error_http';
+                        resultado.mensaje = `HTTP ${response.status} - ${response.statusText}`;
+                        resultado.detalles = {
+                            status: response.status,
+                            statusText: response.statusText
+                        };
+                    }
+                } catch (error) {
+                    resultado.estado = 'error_descarga';
+                    resultado.mensaje = error.message;
+                    resultado.detalles = {
+                        tipo: error.name,
+                        codigo: error.code,
+                        timeout: error.code === 'ECONNABORTED'
+                    };
+                }
+            } else {
+                // Es una ruta local
+                const path = (await import('path')).default;
+                const fs = (await import('fs')).default;
+                const uploadsDir = path.join(process.cwd(), 'uploads', 'articulos');
+                const imagePath = path.join(uploadsDir, articulo.imagen_url);
+
+                if (fs.existsSync(imagePath)) {
+                    const stats = fs.statSync(imagePath);
+                    resultado.estado = 'ok';
+                    resultado.mensaje = 'Archivo local encontrado';
+                    resultado.detalles = {
+                        size: stats.size,
+                        path: imagePath
+                    };
+                } else {
+                    resultado.estado = 'error_archivo';
+                    resultado.mensaje = 'Archivo local no encontrado';
+                    resultado.detalles = {
+                        path: imagePath
+                    };
+                }
+            }
+
+            resultados.push(resultado);
+        }
+
+        // Generar resumen
+        const resumen = {
+            total: resultados.length,
+            ok: resultados.filter(r => r.estado === 'ok').length,
+            sin_imagen: resultados.filter(r => r.estado === 'sin_imagen').length,
+            errores: resultados.filter(r => r.estado.startsWith('error_')).length
+        };
+
+        res.json({
+            success: true,
+            data: {
+                resumen,
+                resultados
+            }
+        });
+
+    } catch (error) {
+        console.error('Error en diagnosticarImagenes:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al diagnosticar imágenes',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
 export default {
     getArticulos,
     getArticuloById,
@@ -1402,5 +1538,6 @@ export default {
     getProcessingQueueStatus,
     getProcessingQueueHistory,
     retryQueueItem,
-    cleanProcessingQueue
+    cleanProcessingQueue,
+    diagnosticarImagenes
 };

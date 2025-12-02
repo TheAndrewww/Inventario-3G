@@ -19,7 +19,8 @@ import {
     getProcessingQueueStatus,
     getProcessingQueueHistory,
     retryQueueItem,
-    cleanProcessingQueue
+    cleanProcessingQueue,
+    diagnosticarImagenes
 } from '../controllers/articulos.controller.js';
 import {
     verificarToken,
@@ -61,6 +62,14 @@ router.post('/etiquetas/lote-mixto', verificarToken, generarEtiquetasMixtas);
  * @body    { articulos_ids: [1, 2, 3, ...] }
  */
 router.post('/etiquetas/lote', verificarToken, generarEtiquetasLote);
+
+/**
+ * @route   POST /api/articulos/diagnosticar-imagenes
+ * @desc    Diagnosticar problemas con las URLs de imágenes de artículos
+ * @access  Private
+ * @body    { articulos_ids: [1, 2, 3, ...] }
+ */
+router.post('/diagnosticar-imagenes', verificarToken, diagnosticarImagenes);
 
 /**
  * @route   POST /api/articulos/batch-process-images

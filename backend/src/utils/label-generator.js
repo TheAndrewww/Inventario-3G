@@ -9,6 +9,7 @@ import bwipjs from 'bwip-js';
 import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
+import sharp from 'sharp';
 
 /**
  * Convierte cm a puntos (1 cm = 28.35 puntos)
@@ -104,36 +105,80 @@ const generarCodigoBarrasBuffer = async (codigo, tipo = 'EAN13') => {
 };
 
 /**
- * Carga una imagen desde una URL o ruta local
+ * Carga una imagen desde una URL o ruta local y la convierte a PNG para compatibilidad con PDFKit
  * @param {string} imageUrl - URL de la imagen o ruta relativa
- * @returns {Promise<Buffer|null>} - Buffer de la imagen o null si hay error
+ * @param {string} nombreArticulo - Nombre del artículo (para logging)
+ * @returns {Promise<Buffer|null>} - Buffer de la imagen en formato PNG o null si hay error
  */
-const cargarImagenBuffer = async (imageUrl) => {
+const cargarImagenBuffer = async (imageUrl, nombreArticulo = '') => {
     try {
-        if (!imageUrl) return null;
+        if (!imageUrl) {
+            console.log(`⚠️  [${nombreArticulo}] No tiene imagen_url definida`);
+            return null;
+        }
+
+        console.log(`📥 [${nombreArticulo}] Intentando cargar imagen: ${imageUrl.substring(0, 80)}...`);
+
+        let rawBuffer;
 
         // Si es una URL completa (http/https)
         if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
             const response = await axios.get(imageUrl, {
                 responseType: 'arraybuffer',
-                timeout: 10000, // Timeout de 10 segundos
+                timeout: 30000, // Timeout de 30 segundos
                 maxContentLength: 10 * 1024 * 1024, // Máximo 10MB
-                validateStatus: (status) => status === 200
+                validateStatus: (status) => status >= 200 && status < 300 // Aceptar cualquier 2xx
             });
-            return Buffer.from(response.data);
+
+            rawBuffer = Buffer.from(response.data);
+            console.log(`✅ [${nombreArticulo}] Imagen descargada (${rawBuffer.length} bytes)`);
+        } else {
+            // Si es una ruta local relativa
+            const uploadsDir = path.join(process.cwd(), 'uploads', 'articulos');
+            const imagePath = path.join(uploadsDir, imageUrl);
+
+            if (!fs.existsSync(imagePath)) {
+                console.warn(`⚠️  [${nombreArticulo}] Archivo local no encontrado: ${imagePath}`);
+                return null;
+            }
+
+            rawBuffer = fs.readFileSync(imagePath);
+            console.log(`✅ [${nombreArticulo}] Imagen local cargada (${rawBuffer.length} bytes)`);
         }
 
-        // Si es una ruta local relativa
-        const uploadsDir = path.join(process.cwd(), 'uploads', 'articulos');
-        const imagePath = path.join(uploadsDir, imageUrl);
+        // Usar sharp para detectar formato y convertir a PNG si es necesario
+        try {
+            const metadata = await sharp(rawBuffer).metadata();
+            console.log(`📋 [${nombreArticulo}] Formato detectado: ${metadata.format} (${metadata.width}x${metadata.height})`);
 
-        if (fs.existsSync(imagePath)) {
-            return fs.readFileSync(imagePath);
+            // Convertir a PNG para garantizar compatibilidad con PDFKit
+            // PDFKit solo soporta JPEG y PNG nativamente
+            const pngBuffer = await sharp(rawBuffer)
+                .png({
+                    quality: 90,
+                    compressionLevel: 6
+                })
+                .toBuffer();
+
+            console.log(`✅ [${nombreArticulo}] Imagen convertida a PNG (${pngBuffer.length} bytes)`);
+            return pngBuffer;
+
+        } catch (sharpError) {
+            console.error(`❌ [${nombreArticulo}] Error procesando imagen con Sharp:`, sharpError.message);
+            return null;
         }
 
-        return null;
     } catch (error) {
-        console.error(`⚠️  Error cargando imagen ${imageUrl}:`, error.message);
+        console.error(`❌ [${nombreArticulo}] Error cargando imagen ${imageUrl}:`);
+        console.error(`   Tipo: ${error.name}`);
+        console.error(`   Mensaje: ${error.message}`);
+        if (error.response) {
+            console.error(`   HTTP Status: ${error.response.status}`);
+            console.error(`   HTTP StatusText: ${error.response.statusText}`);
+        }
+        if (error.code) {
+            console.error(`   Código: ${error.code}`);
+        }
         return null;
     }
 };
@@ -464,7 +509,7 @@ export const generarEtiquetasLoteConFoto = async (articulos) => {
                 );
 
                 // Cargar imagen del artículo si existe
-                const imagenBuffer = await cargarImagenBuffer(articulo.imagen_url);
+                const imagenBuffer = await cargarImagenBuffer(articulo.imagen_url, articulo.nombre);
 
                 // Calcular posición en la página
                 const posicionEnPagina = etiquetaIndex % etiquetasPorPagina;
