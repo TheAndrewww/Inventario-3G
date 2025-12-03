@@ -88,7 +88,7 @@ export const crearUbicacion = async (req, res) => {
 export const actualizarUbicacion = async (req, res) => {
     try {
         const { id } = req.params;
-        const { codigo, almacen, pasillo, estante, nivel, descripcion } = req.body;
+        const { codigo, almacen, pasillo, estante, nivel, descripcion, activo } = req.body;
 
         // Buscar la ubicación
         const ubicacion = await Ubicacion.findByPk(id);
@@ -128,7 +128,8 @@ export const actualizarUbicacion = async (req, res) => {
             pasillo: pasillo !== undefined ? (pasillo ? pasillo.trim() : null) : ubicacion.pasillo,
             estante: estante !== undefined ? (estante ? estante.trim() : null) : ubicacion.estante,
             nivel: nivel !== undefined ? nivel : ubicacion.nivel,
-            descripcion: descripcion !== undefined ? (descripcion ? descripcion.trim() : null) : ubicacion.descripcion
+            descripcion: descripcion !== undefined ? (descripcion ? descripcion.trim() : null) : ubicacion.descripcion,
+            activo: activo !== undefined ? activo : ubicacion.activo
         });
 
         res.status(200).json({
