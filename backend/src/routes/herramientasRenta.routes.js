@@ -5,6 +5,7 @@ import {
     crearTipo,
     obtenerUnidadesPorTipo,
     obtenerUnidadesPorArticulo,
+    obtenerTodasLasUnidades,
     obtenerHistorialUnidad,
     asignarHerramienta,
     devolverHerramienta,
@@ -61,6 +62,14 @@ router.get('/tipos/:id', obtenerTipoPorId);
 router.post('/tipos', verificarRol('administrador', 'almacenista'), crearTipo);
 
 // ========== RUTAS DE UNIDADES ==========
+
+/**
+ * GET /api/herramientas-renta/unidades-todas
+ * Obtener todas las unidades de herramientas (para pruebas y etiquetado)
+ * Query params: activo=true/false/all, limit=100
+ * Acceso: Todos los usuarios autenticados
+ */
+router.get('/unidades-todas', obtenerTodasLasUnidades);
 
 /**
  * GET /api/herramientas-renta/unidades/:tipoId

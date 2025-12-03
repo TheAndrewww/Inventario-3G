@@ -1,10 +1,12 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { X, Download, Printer, Package, Hash } from 'lucide-react';
 import { Modal } from '../common';
 import herramientasRentaService from '../../services/herramientasRenta.service';
 
 const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClose }) => {
   const barcodeRef = useRef(null);
+  const [qrImageUrl, setQrImageUrl] = useState(null);
+  const [loadingQr, setLoadingQr] = useState(true);
 
   if (!unidad || !tipoHerramienta) return null;
 
@@ -12,27 +14,76 @@ const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClos
   const barcodeUrl = herramientasRentaService.getURLCodigoBarras(unidad.id);
   const barcodeSvgUrl = herramientasRentaService.getURLCodigoBarrasSVG(unidad.id);
 
-  // Función para descargar el código de barras
+  // Cargar imagen QR con autenticación
+  useEffect(() => {
+    let isMounted = true;
+    const cargarQR = async () => {
+      try {
+        setLoadingQr(true);
+        const response = await fetch(barcodeUrl, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Error al cargar QR');
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+
+        if (isMounted) {
+          setQrImageUrl(url);
+        }
+      } catch (error) {
+        console.error('Error al cargar código QR:', error);
+      } finally {
+        if (isMounted) {
+          setLoadingQr(false);
+        }
+      }
+    };
+
+    if (isOpen && unidad?.id) {
+      cargarQR();
+    }
+
+    return () => {
+      isMounted = false;
+      if (qrImageUrl) {
+        URL.revokeObjectURL(qrImageUrl);
+      }
+    };
+  }, [isOpen, unidad?.id, barcodeUrl]);
+
+  // Función para descargar el código QR
   const handleDescargar = async () => {
+    if (!qrImageUrl) {
+      alert('El código QR aún no ha cargado. Por favor, espera un momento.');
+      return;
+    }
+
     try {
-      const response = await fetch(barcodeUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `${unidad.codigo_unico}-barcode.png`;
+      a.href = qrImageUrl;
+      a.download = `${unidad.codigo_unico}-qr.png`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Error al descargar código de barras:', error);
-      alert('Error al descargar el código de barras');
+      console.error('Error al descargar código QR:', error);
+      alert('Error al descargar el código QR');
     }
   };
 
   // Función para imprimir el código de barras
   const handleImprimir = () => {
+    if (!qrImageUrl) {
+      alert('El código QR aún no ha cargado. Por favor, espera un momento.');
+      return;
+    }
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert('Por favor, permite las ventanas emergentes para imprimir');
@@ -43,7 +94,7 @@ const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClos
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Código de Barras - ${unidad.codigo_unico}</title>
+          <title>Código QR - ${unidad.codigo_unico}</title>
           <style>
             @media print {
               @page {
@@ -100,9 +151,9 @@ const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClos
             <div class="title">${tipoHerramienta.nombre}</div>
             <div class="codigo">${unidad.codigo_unico}</div>
             <div class="barcode-container">
-              <img src="${barcodeUrl}" alt="Código de barras" />
+              <img src="${qrImageUrl}" alt="Código QR" />
             </div>
-            <div class="info">ID: ${unidad.id} | EAN-13: ${unidad.codigo_ean13}</div>
+            <div class="info">ID: ${unidad.id} | Código: ${unidad.codigo_unico}</div>
           </div>
           <script>
             window.onload = function() {
@@ -171,16 +222,6 @@ const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClos
             </div>
           </div>
 
-          {/* Código EAN-13 */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Package size={18} className="text-gray-400" />
-              <span className="text-sm font-medium text-gray-600">Código EAN-13</span>
-            </div>
-            <div className="text-lg font-mono font-bold text-gray-900">
-              {unidad.codigo_ean13}
-            </div>
-          </div>
         </div>
 
         {/* Información adicional si está asignada */}
@@ -209,26 +250,36 @@ const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClos
           </div>
         )}
 
-        {/* Código de barras */}
+        {/* Código QR */}
         <div className="bg-gray-50 p-6 rounded-lg">
           <h3 className="text-sm font-medium text-gray-700 mb-4 text-center">
-            Código de Barras EAN-13
+            Código QR
           </h3>
-          <div ref={barcodeRef} className="bg-white p-4 rounded-lg border-2 border-gray-300 flex flex-col items-center justify-center">
-            <img
-              src={barcodeUrl}
-              alt={`Código de barras ${unidad.codigo_unico}`}
-              className="max-w-full h-auto"
-              style={{ maxHeight: '120px' }}
-            />
-            <div className="mt-2 text-center">
-              <p className="text-sm font-mono font-semibold text-gray-700">
-                {unidad.codigo_unico}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {unidad.codigo_ean13}
-              </p>
-            </div>
+          <div ref={barcodeRef} className="bg-white p-4 rounded-lg border-2 border-gray-300 flex flex-col items-center justify-center" style={{ minHeight: '250px' }}>
+            {loadingQr ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-700 mb-3"></div>
+                <p className="text-sm text-gray-500">Cargando código QR...</p>
+              </div>
+            ) : qrImageUrl ? (
+              <>
+                <img
+                  src={qrImageUrl}
+                  alt={`Código QR ${unidad.codigo_unico}`}
+                  className="max-w-full h-auto"
+                  style={{ maxHeight: '200px' }}
+                />
+                <div className="mt-2 text-center">
+                  <p className="text-sm font-mono font-semibold text-gray-700">
+                    {unidad.codigo_unico}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-red-600">Error al cargar código QR</p>
+              </div>
+            )}
           </div>
         </div>
 

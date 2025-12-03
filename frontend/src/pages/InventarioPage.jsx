@@ -1637,10 +1637,6 @@ const InventarioPage = () => {
                                   <p className="font-mono font-bold text-red-700">{unidad.codigo_unico}</p>
                                 </div>
                                 <div>
-                                  <span className="text-gray-500">EAN-13:</span>
-                                  <p className="font-mono font-medium">{unidad.codigo_ean13 || 'Sin código'}</p>
-                                </div>
-                                <div>
                                   <span className="text-gray-500">Estado:</span>
                                   <p className={`font-medium ${
                                     unidad.estado === 'disponible' ? 'text-green-600' :
@@ -2154,10 +2150,6 @@ const InventarioPage = () => {
                                 <div>
                                   <span className="text-gray-500">Código:</span>
                                   <span className="ml-1 font-mono font-bold text-red-700">{unidad.codigo_unico}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-500">EAN-13:</span>
-                                  <span className="ml-1 font-mono">{unidad.codigo_ean13 || 'N/A'}</span>
                                 </div>
                                 <div>
                                   <span className="text-gray-500">Estado:</span>
@@ -2801,7 +2793,7 @@ const InventarioPage = () => {
                                     </span>
                                   </div>
                                   <p className="text-xs text-gray-500 mt-0.5">
-                                    EAN-13: {unidad.codigo_ean13}
+                                    ID: #{unidad.id}
                                   </p>
                                 </div>
                               </label>

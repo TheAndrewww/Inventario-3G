@@ -907,10 +907,13 @@ export const generarEtiquetasMixtas = async (req, res) => {
             });
 
             unidades.forEach(u => {
+                // Para herramientas usamos código QR con el código único
+                const codigoQR = u.codigo_unico; // Ej: PP-001, CP-005
+
                 etiquetas.push({
                     nombre: `${u.tipoHerramienta.nombre} - ${u.codigo_unico}`,
-                    codigo_ean13: u.codigo_ean13,
-                    codigo_tipo: u.codigo_tipo || 'EAN13',
+                    codigo_ean13: codigoQR, // Usamos codigo_unico para el QR
+                    codigo_tipo: 'QRCODE', // Cambiado de EAN13 a QRCODE
                     imagen_url: u.tipoHerramienta?.imagen_url,
                     tipo: 'unidad'
                 });

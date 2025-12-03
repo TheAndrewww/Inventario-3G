@@ -69,15 +69,17 @@ const generarCodigoBarrasBuffer = async (codigo, tipo = 'EAN13') => {
 
         // Configuraciones específicas por tipo
         if (bcid === 'qrcode') {
-            config.eclevel = 'M'; // Nivel de corrección de errores
-            config.width = 50;
-            config.height = 50;
+            config.eclevel = 'M'; // Nivel de corrección de errores (L=7%, M=15%, Q=25%, H=30%)
+            config.width = 60; // Aumentado para mejor escaneo
+            config.height = 60; // QR cuadrado más grande
+            console.log(`📱 Generando QR code para: ${codigo.substring(0, 30)}...`);
         } else if (bcid === 'datamatrix') {
             config.width = 50;
             config.height = 50;
         } else {
             // Para códigos de barras lineales
             config.height = 8;
+            console.log(`📊 Generando código de barras ${tipo} para: ${codigo.substring(0, 30)}...`);
         }
 
         const png = await bwipjs.toBuffer(config);

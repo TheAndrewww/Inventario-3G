@@ -80,7 +80,7 @@ const ImpresionCodigosHerramientasPage = () => {
                             className="bg-blue-600 hover:bg-blue-700 flex items-center gap-2"
                         >
                             <Barcode size={20} />
-                            {generandoCodigos ? 'Generando...' : 'Generar Códigos EAN-13'}
+                            {generandoCodigos ? 'Generando...' : 'Generar Códigos QR'}
                         </Button>
                         <Button
                             onClick={handleImprimir}
@@ -141,7 +141,7 @@ const ImpresionCodigosHerramientasPage = () => {
                                 ) : (
                                     <div className="text-center py-4">
                                         <p className="text-sm text-gray-500">
-                                            Sin código EAN-13
+                                            Sin código QR
                                         </p>
                                         <p className="text-xs text-gray-400 mt-1">
                                             Genera códigos masivos

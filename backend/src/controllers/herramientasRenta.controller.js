@@ -872,8 +872,9 @@ export const generarCodigosMasivos = async (req, res) => {
 };
 
 /**
- * Obtener imagen PNG del código de barras de una unidad
+ * Obtener imagen PNG del código QR de una unidad de herramienta
  * GET /api/herramientas-renta/unidades/:unidadId/barcode
+ * CAMBIADO: Ahora genera código QR en lugar de código de barras EAN13
  */
 export const obtenerCodigoBarras = async (req, res) => {
     try {
@@ -894,34 +895,29 @@ export const obtenerCodigoBarras = async (req, res) => {
             });
         }
 
-        // Si no tiene código EAN-13, generarlo automáticamente
-        if (!unidad.codigo_ean13) {
-            const codigoEAN13 = generarCodigoEAN13(unidad.id);
-            await unidad.update({ codigo_ean13: codigoEAN13 });
-            unidad.codigo_ean13 = codigoEAN13;
-        }
-
-        // Generar imagen del código de barras
-        const imagenBuffer = await generarImagenCodigoBarras(unidad.codigo_ean13, 'EAN13');
+        // Generar código QR con el código único de la unidad (ej: PP-001, AT-002)
+        // En lugar de usar EAN13, usamos el codigo_unico que es más descriptivo
+        const imagenBuffer = await generarImagenCodigoBarras(unidad.codigo_unico, 'QRCODE');
 
         // Configurar headers para imagen PNG
         res.setHeader('Content-Type', 'image/png');
-        res.setHeader('Content-Disposition', `inline; filename="barcode-${unidad.codigo_unico}.png"`);
+        res.setHeader('Content-Disposition', `inline; filename="qrcode-${unidad.codigo_unico}.png"`);
         res.send(imagenBuffer);
 
     } catch (error) {
-        console.error('Error al generar código de barras:', error);
+        console.error('Error al generar código QR:', error);
         res.status(500).json({
             success: false,
-            message: 'Error al generar código de barras',
+            message: 'Error al generar código QR',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };
 
 /**
- * Obtener imagen SVG del código de barras de una unidad
+ * Obtener imagen SVG del código QR de una unidad de herramienta
  * GET /api/herramientas-renta/unidades/:unidadId/barcode-svg
+ * CAMBIADO: Ahora genera código QR en lugar de código de barras EAN13
  */
 export const obtenerCodigoBarrasSVG = async (req, res) => {
     try {
@@ -936,26 +932,19 @@ export const obtenerCodigoBarrasSVG = async (req, res) => {
             });
         }
 
-        // Si no tiene código EAN-13, generarlo automáticamente
-        if (!unidad.codigo_ean13) {
-            const codigoEAN13 = generarCodigoEAN13(unidad.id);
-            await unidad.update({ codigo_ean13: codigoEAN13 });
-            unidad.codigo_ean13 = codigoEAN13;
-        }
-
-        // Generar SVG del código de barras
-        const svg = await generarSVGCodigoBarras(unidad.codigo_ean13, 'EAN13');
+        // Generar SVG del código QR con el código único (ej: PP-001, AT-002)
+        const svg = await generarSVGCodigoBarras(unidad.codigo_unico, 'QRCODE');
 
         // Configurar headers para SVG
         res.setHeader('Content-Type', 'image/svg+xml');
-        res.setHeader('Content-Disposition', `inline; filename="barcode-${unidad.codigo_unico}.svg"`);
+        res.setHeader('Content-Disposition', `inline; filename="qrcode-${unidad.codigo_unico}.svg"`);
         res.send(svg);
 
     } catch (error) {
-        console.error('Error al generar código de barras SVG:', error);
+        console.error('Error al generar código QR SVG:', error);
         res.status(500).json({
             success: false,
-            message: 'Error al generar código de barras SVG',
+            message: 'Error al generar código QR SVG',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
@@ -995,6 +984,48 @@ export const ejecutarMigracionManual = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al ejecutar migración manual',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * GET /api/herramientas-renta/unidades-todas
+ * Obtener todas las unidades de herramientas (para pruebas y etiquetado)
+ */
+export const obtenerTodasLasUnidades = async (req, res) => {
+    try {
+        const { activo = 'true', limit = 100 } = req.query;
+
+        const whereClause = {};
+        if (activo !== 'all') {
+            whereClause.activo = activo === 'true';
+        }
+
+        const unidades = await UnidadHerramientaRenta.findAll({
+            where: whereClause,
+            include: [{
+                model: TipoHerramientaRenta,
+                as: 'tipoHerramienta',
+                attributes: ['id', 'nombre', 'descripcion', 'imagen_url', 'prefijo_codigo']
+            }],
+            limit: parseInt(limit),
+            order: [['codigo_unico', 'ASC']]
+        });
+
+        res.json({
+            success: true,
+            data: {
+                unidades,
+                total: unidades.length
+            }
+        });
+
+    } catch (error) {
+        console.error('Error al obtener todas las unidades:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener unidades',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
