@@ -136,9 +136,10 @@ const InventarioPage = () => {
     }
   };
 
-  // Obtener lista única de almacenes desde las ubicaciones
+  // Obtener lista única de almacenes desde las ubicaciones ACTIVAS
   const almacenesDisponibles = React.useMemo(() => {
     const almacenes = ubicaciones
+      .filter(u => u.activo !== false) // Solo ubicaciones activas
       .map(u => u.almacen)
       .filter(a => a && a.trim() !== '');
     return [...new Set(almacenes)].sort();
