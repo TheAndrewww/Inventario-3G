@@ -26,6 +26,8 @@ const InventarioPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState(null);
+  const [almacenSeleccionado, setAlmacenSeleccionado] = useState('todos'); // Nuevo: filtro de almacén
+  const [tabActivo, setTabActivo] = useState('consumibles'); // Nuevo: 'consumibles' o 'herramientas'
   const [mostrarCategorias, setMostrarCategorias] = useState(false);
   const [mostrarUbicaciones, setMostrarUbicaciones] = useState(false);
   const [mostrarDesactivados, setMostrarDesactivados] = useState(false);
@@ -134,6 +136,14 @@ const InventarioPage = () => {
     }
   };
 
+  // Obtener lista única de almacenes desde las ubicaciones
+  const almacenesDisponibles = React.useMemo(() => {
+    const almacenes = ubicaciones
+      .map(u => u.almacen)
+      .filter(a => a && a.trim() !== '');
+    return [...new Set(almacenes)].sort();
+  }, [ubicaciones]);
+
   const filteredArticulos = articulos
     .filter((item) => {
       // Filtrar por estado activo/desactivado
@@ -148,7 +158,16 @@ const InventarioPage = () => {
       const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
       const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
 
-      return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion;
+      // Filtrar por almacén
+      const matchesAlmacen = almacenSeleccionado === 'todos' ||
+        (item.ubicacion && item.ubicacion.almacen === almacenSeleccionado);
+
+      // Filtrar por tipo según el tab activo
+      const estaEnTabCorrecto = tabActivo === 'consumibles'
+        ? !item.es_herramienta  // Consumibles: artículos que NO son herramientas
+        : item.es_herramienta;  // Herramientas: artículos que SÍ son herramientas
+
+      return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && estaEnTabCorrecto;
     })
     .sort((a, b) => {
       // Ordenar según la opción seleccionada
@@ -948,6 +967,49 @@ const InventarioPage = () => {
             <QrCode size={18} />
             <span className="font-medium hidden sm:inline">Escanear</span>
           </button>
+        </div>
+
+        {/* Selector de Almacén y Tabs */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Selector de Almacén */}
+          <div className="flex-shrink-0">
+            <select
+              value={almacenSeleccionado}
+              onChange={(e) => setAlmacenSeleccionado(e.target.value)}
+              className="w-full sm:w-auto px-4 py-2.5 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 bg-white cursor-pointer hover:bg-gray-50"
+            >
+              <option value="todos">📦 Todos los almacenes</option>
+              {almacenesDisponibles.map((almacen) => (
+                <option key={almacen} value={almacen}>
+                  🏢 {almacen}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Tabs: Consumibles / Herramientas */}
+          <div className="flex bg-gray-100 rounded-lg p-1 flex-1 sm:flex-initial">
+            <button
+              onClick={() => setTabActivo('consumibles')}
+              className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${
+                tabActivo === 'consumibles'
+                  ? 'bg-white text-red-700 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              📦 Consumibles
+            </button>
+            <button
+              onClick={() => setTabActivo('herramientas')}
+              className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${
+                tabActivo === 'herramientas'
+                  ? 'bg-white text-red-700 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🔧 Herramientas
+            </button>
+          </div>
         </div>
 
         {/* Botones de acción - wrapeables en móvil */}
