@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer } from 'lucide-react';
+import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer, Wrench } from 'lucide-react';
 import api from '../services/api';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
@@ -54,6 +54,7 @@ const InventarioPage = () => {
   const [articulosSeleccionadosEtiquetas, setArticulosSeleccionadosEtiquetas] = useState([]);
   const [unidadesSeleccionadasEtiquetas, setUnidadesSeleccionadasEtiquetas] = useState([]);
   const [busquedaEtiquetas, setBusquedaEtiquetas] = useState('');
+  const [filtroTipoEtiquetas, setFiltroTipoEtiquetas] = useState('todos'); // 'todos', 'consumibles', 'herramientas'
   const [loadingEtiquetas, setLoadingEtiquetas] = useState(false);
   const [herramientasExpandidasEtiquetas, setHerramientasExpandidasEtiquetas] = useState({});
   const [unidadesCargadasEtiquetas, setUnidadesCargadasEtiquetas] = useState({});
@@ -84,6 +85,12 @@ const InventarioPage = () => {
   const [nivelUbicacion, setNivelUbicacion] = useState('');
   const [descripcionUbicacion, setDescripcionUbicacion] = useState('');
   const [loadingUbicacion, setLoadingUbicacion] = useState(false);
+
+  // Estados para gestión de almacenes
+  const [modalAlmacenesOpen, setModalAlmacenesOpen] = useState(false);
+  const [almacenEditando, setAlmacenEditando] = useState(null);
+  const [nuevoNombreAlmacen, setNuevoNombreAlmacen] = useState('');
+  const [loadingAlmacenes, setLoadingAlmacenes] = useState(false);
 
   const { agregarArticulo } = usePedido();
   const { user } = useAuth();
@@ -814,8 +821,128 @@ const InventarioPage = () => {
     setBusquedaEtiquetas('');
   };
 
+  // ========== GESTIÓN DE ALMACENES ==========
+
+  const handleCrearAlmacen = async () => {
+    if (!nuevoNombreAlmacen.trim()) {
+      toast.error('El nombre del almacén no puede estar vacío');
+      return;
+    }
+
+    // Verificar si ya existe
+    if (almacenesDisponibles.includes(nuevoNombreAlmacen.trim())) {
+      toast.error('Ya existe un almacén con ese nombre');
+      return;
+    }
+
+    try {
+      setLoadingAlmacenes(true);
+
+      // Crear una ubicación genérica con este almacén
+      await ubicacionesService.create({
+        codigo: `${nuevoNombreAlmacen.trim().toUpperCase().replace(/\s+/g, '-')}-GRAL`,
+        almacen: nuevoNombreAlmacen.trim(),
+        pasillo: null,
+        estante: null,
+        nivel: null,
+        descripcion: `Ubicación general del almacén ${nuevoNombreAlmacen.trim()}`
+      });
+
+      toast.success(`Almacén "${nuevoNombreAlmacen.trim()}" creado exitosamente`);
+      setNuevoNombreAlmacen('');
+      await fetchUbicaciones(); // Recargar ubicaciones
+    } catch (error) {
+      console.error('Error al crear almacén:', error);
+      toast.error(error.message || 'Error al crear el almacén');
+    } finally {
+      setLoadingAlmacenes(false);
+    }
+  };
+
+  const handleRenombrarAlmacen = async (almacenActual) => {
+    if (!nuevoNombreAlmacen.trim()) {
+      toast.error('El nombre del almacén no puede estar vacío');
+      return;
+    }
+
+    if (almacenActual === nuevoNombreAlmacen.trim()) {
+      toast.error('El nuevo nombre es igual al actual');
+      return;
+    }
+
+    // Verificar si el nuevo nombre ya existe
+    if (almacenesDisponibles.includes(nuevoNombreAlmacen.trim())) {
+      toast.error('Ya existe un almacén con ese nombre');
+      return;
+    }
+
+    try {
+      setLoadingAlmacenes(true);
+
+      // Obtener todas las ubicaciones de este almacén
+      const ubicacionesDelAlmacen = ubicaciones.filter(u => u.almacen === almacenActual);
+
+      // Actualizar cada ubicación
+      for (const ubicacion of ubicacionesDelAlmacen) {
+        await ubicacionesService.update(ubicacion.id, {
+          ...ubicacion,
+          almacen: nuevoNombreAlmacen.trim()
+        });
+      }
+
+      toast.success(`Almacén renombrado de "${almacenActual}" a "${nuevoNombreAlmacen.trim()}"`);
+      setAlmacenEditando(null);
+      setNuevoNombreAlmacen('');
+      await fetchUbicaciones(); // Recargar ubicaciones
+    } catch (error) {
+      console.error('Error al renombrar almacén:', error);
+      toast.error(error.message || 'Error al renombrar el almacén');
+    } finally {
+      setLoadingAlmacenes(false);
+    }
+  };
+
+  const handleEliminarAlmacen = async (nombreAlmacen) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar el almacén "${nombreAlmacen}"?\n\nEsto desactivará todas las ubicaciones de este almacén.`)) {
+      return;
+    }
+
+    try {
+      setLoadingAlmacenes(true);
+
+      // Obtener todas las ubicaciones de este almacén
+      const ubicacionesDelAlmacen = ubicaciones.filter(u => u.almacen === nombreAlmacen);
+
+      // Desactivar cada ubicación
+      for (const ubicacion of ubicacionesDelAlmacen) {
+        await ubicacionesService.update(ubicacion.id, {
+          ...ubicacion,
+          activo: false
+        });
+      }
+
+      toast.success(`Almacén "${nombreAlmacen}" eliminado exitosamente`);
+      await fetchUbicaciones(); // Recargar ubicaciones
+    } catch (error) {
+      console.error('Error al eliminar almacén:', error);
+      toast.error(error.message || 'Error al eliminar el almacén');
+    } finally {
+      setLoadingAlmacenes(false);
+    }
+  };
+
   const handleSeleccionarTodosEtiquetas = () => {
-    const articulosActivos = articulos.filter(a => a.activo);
+    // Filtrar artículos activos
+    let articulosActivos = articulos.filter(a => a.activo);
+
+    // Aplicar filtro de tipo
+    if (filtroTipoEtiquetas === 'consumibles') {
+      articulosActivos = articulosActivos.filter(a => !a.es_herramienta);
+    } else if (filtroTipoEtiquetas === 'herramientas') {
+      articulosActivos = articulosActivos.filter(a => a.es_herramienta);
+    }
+
+    // Aplicar filtro de búsqueda
     const articulosFiltrados = busquedaEtiquetas.length > 0
       ? articulosActivos.filter(a =>
           a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
@@ -855,7 +982,7 @@ const InventarioPage = () => {
   // Toggle expansión de herramienta en modal de etiquetas
   const handleToggleHerramientaEtiquetas = async (articuloId) => {
     // Verificar que el artículo sea una herramienta
-    const articulo = articulosSeleccionadosParaEtiquetas.find(a => a.id === articuloId);
+    const articulo = articulos.find(a => a.id === articuloId);
     if (!articulo || !articulo.es_herramienta) {
       console.warn(`Artículo ${articuloId} no es una herramienta de renta`);
       return;
@@ -972,12 +1099,12 @@ const InventarioPage = () => {
 
         {/* Selector de Almacén y Tabs */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Selector de Almacén */}
-          <div className="flex-shrink-0">
+          {/* Selector de Almacén con botón de gestión */}
+          <div className="flex gap-2 flex-shrink-0">
             <select
               value={almacenSeleccionado}
               onChange={(e) => setAlmacenSeleccionado(e.target.value)}
-              className="w-full sm:w-auto px-4 py-2.5 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 bg-white cursor-pointer hover:bg-gray-50"
+              className="flex-1 sm:w-auto px-4 py-2.5 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 bg-white cursor-pointer hover:bg-gray-50"
             >
               <option value="todos">📦 Todos los almacenes</option>
               {almacenesDisponibles.map((almacen) => (
@@ -986,6 +1113,16 @@ const InventarioPage = () => {
                 </option>
               ))}
             </select>
+            {esAdministrador && (
+              <button
+                onClick={() => setModalAlmacenesOpen(true)}
+                className="px-3 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                title="Gestionar almacenes"
+              >
+                <Plus size={18} />
+                <span className="hidden md:inline text-sm">Gestionar</span>
+              </button>
+            )}
           </div>
 
           {/* Tabs: Consumibles / Herramientas */}
@@ -2687,6 +2824,42 @@ const InventarioPage = () => {
             />
           </div>
 
+          {/* Filtro de tipo de artículo */}
+          <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setFiltroTipoEtiquetas('todos')}
+              className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-all ${
+                filtroTipoEtiquetas === 'todos'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFiltroTipoEtiquetas('consumibles')}
+              className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-1.5 ${
+                filtroTipoEtiquetas === 'consumibles'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Package size={16} />
+              Consumibles
+            </button>
+            <button
+              onClick={() => setFiltroTipoEtiquetas('herramientas')}
+              className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-1.5 ${
+                filtroTipoEtiquetas === 'herramientas'
+                  ? 'bg-white text-red-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Wrench size={16} />
+              Herramientas
+            </button>
+          </div>
+
           {/* Contador y botón seleccionar todos */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">
@@ -2697,7 +2870,17 @@ const InventarioPage = () => {
               className="text-sm text-blue-600 hover:text-blue-800 font-medium"
             >
               {(() => {
-                const articulosActivos = articulos.filter(a => a.activo);
+                // Filtrar artículos activos
+                let articulosActivos = articulos.filter(a => a.activo);
+
+                // Aplicar filtro de tipo
+                if (filtroTipoEtiquetas === 'consumibles') {
+                  articulosActivos = articulosActivos.filter(a => !a.es_herramienta);
+                } else if (filtroTipoEtiquetas === 'herramientas') {
+                  articulosActivos = articulosActivos.filter(a => a.es_herramienta);
+                }
+
+                // Aplicar filtro de búsqueda
                 const articulosFiltrados = busquedaEtiquetas.length > 0
                   ? articulosActivos.filter(a =>
                       a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
@@ -2717,7 +2900,17 @@ const InventarioPage = () => {
           <div className="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
             <div className="divide-y divide-gray-200">
               {(() => {
-                const articulosActivos = articulos.filter(a => a.activo);
+                // Filtrar artículos activos
+                let articulosActivos = articulos.filter(a => a.activo);
+
+                // Aplicar filtro de tipo
+                if (filtroTipoEtiquetas === 'consumibles') {
+                  articulosActivos = articulosActivos.filter(a => !a.es_herramienta);
+                } else if (filtroTipoEtiquetas === 'herramientas') {
+                  articulosActivos = articulosActivos.filter(a => a.es_herramienta);
+                }
+
+                // Aplicar filtro de búsqueda
                 const articulosFiltrados = busquedaEtiquetas.length > 0
                   ? articulosActivos.filter(a =>
                       a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
@@ -2918,6 +3111,156 @@ const InventarioPage = () => {
           }}
         />
       )}
+
+      {/* Modal de gestión de almacenes */}
+      <Modal
+        isOpen={modalAlmacenesOpen}
+        onClose={() => {
+          setModalAlmacenesOpen(false);
+          setAlmacenEditando(null);
+          setNuevoNombreAlmacen('');
+        }}
+        title="Gestionar Almacenes"
+        size="lg"
+      >
+        <div className="space-y-6">
+          {/* Crear nuevo almacén */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <h3 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
+              <Plus size={18} />
+              Crear Nuevo Almacén
+            </h3>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={nuevoNombreAlmacen}
+                onChange={(e) => setNuevoNombreAlmacen(e.target.value)}
+                placeholder="Nombre del almacén..."
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !almacenEditando) {
+                    handleCrearAlmacen();
+                  }
+                }}
+              />
+              <button
+                onClick={handleCrearAlmacen}
+                disabled={loadingAlmacenes || !nuevoNombreAlmacen.trim()}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loadingAlmacenes ? 'Creando...' : 'Crear'}
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de almacenes existentes */}
+          <div>
+            <h3 className="font-semibold text-gray-900 mb-3">Almacenes Existentes ({almacenesDisponibles.length})</h3>
+            {almacenesDisponibles.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No hay almacenes registrados</p>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {almacenesDisponibles.map((almacen) => {
+                  const ubicacionesCount = ubicaciones.filter(u => u.almacen === almacen && u.activo !== false).length;
+                  const estaEditando = almacenEditando === almacen;
+
+                  return (
+                    <div
+                      key={almacen}
+                      className={`border rounded-lg p-4 transition-all ${
+                        estaEditando ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      {estaEditando ? (
+                        // Modo edición
+                        <div className="space-y-3">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={nuevoNombreAlmacen}
+                              onChange={(e) => setNuevoNombreAlmacen(e.target.value)}
+                              placeholder="Nuevo nombre..."
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleRenombrarAlmacen(almacen);
+                                }
+                              }}
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleRenombrarAlmacen(almacen)}
+                              disabled={loadingAlmacenes || !nuevoNombreAlmacen.trim()}
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                            >
+                              {loadingAlmacenes ? 'Guardando...' : 'Guardar'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setAlmacenEditando(null);
+                                setNuevoNombreAlmacen('');
+                              }}
+                              disabled={loadingAlmacenes}
+                              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        // Modo vista
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-semibold text-gray-900">🏢 {almacen}</h4>
+                            <p className="text-sm text-gray-500">{ubicacionesCount} ubicaciones</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setAlmacenEditando(almacen);
+                                setNuevoNombreAlmacen(almacen);
+                              }}
+                              disabled={loadingAlmacenes}
+                              className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center gap-1"
+                              title="Renombrar almacén"
+                            >
+                              <Edit2 size={14} />
+                              Renombrar
+                            </button>
+                            <button
+                              onClick={() => handleEliminarAlmacen(almacen)}
+                              disabled={loadingAlmacenes}
+                              className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1"
+                              title="Eliminar almacén"
+                            >
+                              <Trash2 size={14} />
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Botón cerrar */}
+          <div className="flex justify-end pt-4 border-t">
+            <button
+              onClick={() => {
+                setModalAlmacenesOpen(false);
+                setAlmacenEditando(null);
+                setNuevoNombreAlmacen('');
+              }}
+              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
