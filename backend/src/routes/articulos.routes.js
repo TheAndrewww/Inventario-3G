@@ -3,6 +3,7 @@ import {
     getArticulos,
     getArticuloById,
     getArticuloByEAN13,
+    buscarPorCodigoHerramienta,
     createArticulo,
     updateArticulo,
     deleteArticulo,
@@ -46,6 +47,13 @@ router.get('/', verificarToken, getArticulos);
  * @access  Private
  */
 router.get('/ean13/:codigoEAN13', verificarToken, getArticuloByEAN13);
+
+/**
+ * @route   GET /api/articulos/buscar-herramienta/:codigo
+ * @desc    Buscar herramienta por código único (ej: AT-001, CC-002)
+ * @access  Private
+ */
+router.get('/buscar-herramienta/:codigo', verificarToken, buscarPorCodigoHerramienta);
 
 /**
  * @route   POST /api/articulos/etiquetas/lote-mixto

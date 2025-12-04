@@ -640,8 +640,142 @@ export const generarEtiquetasLoteConFoto = async (articulos) => {
     });
 };
 
+/**
+ * Genera un PDF con etiquetas SIMPLES para herramientas (solo código y QR)
+ * Layout: Código único arriba (grande y centrado) + QR abajo (centrado)
+ * Sin imágenes, sin información adicional
+ * @param {Array} herramientas - Array de objetos con información de unidades de herramientas
+ * @returns {Promise<Buffer>} - Buffer con PDF completo
+ */
+export const generarEtiquetasHerramientasSimple = async (herramientas) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // Crear documento PDF A4
+            const doc = new PDFDocument({
+                size: 'A4',
+                margins: {
+                    top: 10,
+                    bottom: 10,
+                    left: 10,
+                    right: 10
+                }
+            });
+
+            const buffers = [];
+            doc.on('data', buffers.push.bind(buffers));
+            doc.on('end', () => {
+                const pdfData = Buffer.concat(buffers);
+                resolve(pdfData);
+            });
+            doc.on('error', reject);
+
+            // Dimensiones de etiqueta
+            const anchoEtiqueta = cmToPoints(9);
+            const altoEtiqueta = cmToPoints(3);
+
+            // Dimensiones de página A4 en puntos (595 x 842)
+            const anchoPagina = 595;
+            const altoPagina = 842;
+
+            // Calcular cuántas etiquetas caben por página
+            const margen = 10;
+            const espacioHorizontal = 5;
+            const espacioVertical = 5;
+
+            const etiquetasPorFila = Math.floor((anchoPagina - 2 * margen + espacioHorizontal) / (anchoEtiqueta + espacioHorizontal));
+            const etiquetasPorColumna = Math.floor((altoPagina - 2 * margen + espacioVertical) / (altoEtiqueta + espacioVertical));
+            const etiquetasPorPagina = etiquetasPorFila * etiquetasPorColumna;
+
+            let etiquetaIndex = 0;
+            let paginaActual = 0;
+
+            for (const herramienta of herramientas) {
+                // Generar QR con el código único
+                const qrBuffer = await generarCodigoBarrasBuffer(
+                    herramienta.codigo_unico,
+                    'QRCODE'
+                );
+
+                // Calcular posición en la página
+                const posicionEnPagina = etiquetaIndex % etiquetasPorPagina;
+
+                // Si necesitamos nueva página
+                if (etiquetaIndex > 0 && posicionEnPagina === 0) {
+                    doc.addPage();
+                    paginaActual++;
+                }
+
+                const fila = Math.floor(posicionEnPagina / etiquetasPorFila);
+                const columna = posicionEnPagina % etiquetasPorFila;
+
+                const x = margen + columna * (anchoEtiqueta + espacioHorizontal);
+                const y = margen + fila * (altoEtiqueta + espacioVertical);
+
+                // Dibujar borde de etiqueta (para guía de corte)
+                doc.rect(x, y, anchoEtiqueta, altoEtiqueta).stroke('#CCCCCC');
+
+                // LAYOUT SIMPLE PARA HERRAMIENTAS:
+                // +------------------+
+                // |     AD-003       | <- Código único grande y centrado
+                // |                  |
+                // |      [QR]        | <- QR centrado
+                // +------------------+
+
+                let yPos = y + 8;
+
+                // 1. CÓDIGO ÚNICO (arriba, grande, centrado, negrita)
+                doc.fontSize(22);
+                doc.font('Helvetica-Bold');
+                doc.fillColor('#000000');
+
+                const codigoUnico = herramienta.codigo_unico || 'SIN-CODIGO';
+                const anchoCodigo = doc.widthOfString(codigoUnico);
+                const xCodigo = x + (anchoEtiqueta - anchoCodigo) / 2;
+
+                doc.text(codigoUnico, xCodigo, yPos);
+                yPos += 30;
+
+                // 2. QR CODE (abajo, centrado)
+                if (qrBuffer) {
+                    const qrSize = 50; // QR más grande para mejor escaneo
+                    const xQR = x + (anchoEtiqueta - qrSize) / 2;
+
+                    try {
+                        doc.image(qrBuffer, xQR, yPos, {
+                            width: qrSize,
+                            height: qrSize
+                        });
+                    } catch (error) {
+                        console.error('Error al insertar QR:', error);
+                        // Fallback: rectángulo placeholder
+                        doc.rect(xQR, yPos, qrSize, qrSize).stroke('#CCCCCC');
+                    }
+                } else {
+                    // Fallback: mensaje de error
+                    const qrSize = 50;
+                    const xQR = x + (anchoEtiqueta - qrSize) / 2;
+                    doc.rect(xQR, yPos, qrSize, qrSize).stroke('#CCCCCC');
+                    doc.fontSize(8);
+                    doc.font('Helvetica');
+                    const placeholder = 'QR ERROR';
+                    const xPlaceholder = xQR + (qrSize - doc.widthOfString(placeholder)) / 2;
+                    doc.text(placeholder, xPlaceholder, yPos + qrSize / 2);
+                }
+
+                etiquetaIndex++;
+            }
+
+            doc.end();
+
+        } catch (error) {
+            reject(error);
+        }
+    });
+};
+
 export default {
     generarEtiquetaIndividual,
     generarEtiquetasLote,
-    generarEtiquetasLoteConFoto
+    generarEtiquetasLoteConFoto,
+    generarEtiquetasHerramientasSimple
 };

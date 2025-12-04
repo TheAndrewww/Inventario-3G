@@ -25,10 +25,12 @@ export const getArticulos = async (req, res) => {
         // Construir filtros
         const where = {};
 
+        // Búsqueda global: incluir codigo_ean13
         if (search) {
             where[Op.or] = [
                 { nombre: { [Op.iLike]: `%${search}%` } },
                 { descripcion: { [Op.iLike]: `%${search}%` } },
+                { codigo_ean13: { [Op.iLike]: `%${search}%` } },
                 { id: { [Op.iLike]: `%${search}%` } }
             ];
         }
@@ -107,6 +109,212 @@ export const getArticulos = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al obtener artículos',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * GET /api/articulos/buscar-codigo-herramienta/:codigo
+ * Buscar herramienta por código único (ej: AT-001, CC-002)
+ * Devuelve el artículo padre y la unidad específica
+ */
+export const buscarPorCodigoHerramienta = async (req, res) => {
+    try {
+        const { codigo } = req.params;
+        const { partial } = req.query; // Búsqueda parcial?
+
+        // Importar modelos necesarios
+        const { UnidadHerramientaRenta, TipoHerramientaRenta } = await import('../models/index.js');
+
+        // Si es búsqueda parcial, buscar todas las coincidencias
+        if (partial === 'true') {
+            // Buscar todas las unidades que empiecen con el código
+            const unidades = await UnidadHerramientaRenta.findAll({
+                where: {
+                    codigo_unico: {
+                        [Op.iLike]: `${codigo.trim()}%`
+                    },
+                    activo: true
+                },
+                include: [{
+                    model: TipoHerramientaRenta,
+                    as: 'tipoHerramienta',
+                    attributes: ['id', 'articulo_origen_id', 'nombre', 'imagen_url'],
+                    include: [{
+                        model: Articulo,
+                        as: 'articuloOrigen',
+                        attributes: ['id', 'nombre', 'codigo_ean13', 'es_herramienta', 'imagen_url', 'descripcion'],
+                        include: [
+                            {
+                                model: Categoria,
+                                as: 'categoria',
+                                attributes: ['id', 'nombre', 'color', 'icono']
+                            },
+                            {
+                                model: Ubicacion,
+                                as: 'ubicacion',
+                                attributes: ['id', 'codigo', 'almacen', 'descripcion']
+                            }
+                        ]
+                    }]
+                }],
+                order: [['codigo_unico', 'ASC']]
+            });
+
+            if (!unidades || unidades.length === 0) {
+                return res.status(200).json({
+                    success: true,
+                    data: {
+                        articulos: []
+                    }
+                });
+            }
+
+            // Agrupar por artículo origen y calcular stock
+            const articulosMap = new Map();
+
+            for (const unidad of unidades) {
+                if (!unidad.tipoHerramienta || !unidad.tipoHerramienta.articuloOrigen) continue;
+
+                const articulo = unidad.tipoHerramienta.articuloOrigen;
+                const articuloId = articulo.id;
+
+                if (!articulosMap.has(articuloId)) {
+                    // Contar todas las unidades de este tipo
+                    const todasLasUnidades = await UnidadHerramientaRenta.count({
+                        where: {
+                            tipo_herramienta_id: unidad.tipo_herramienta_id,
+                            activo: true
+                        }
+                    });
+
+                    // Contar unidades disponibles
+                    const unidadesDisponibles = await UnidadHerramientaRenta.count({
+                        where: {
+                            tipo_herramienta_id: unidad.tipo_herramienta_id,
+                            activo: true,
+                            estado: 'disponible'
+                        }
+                    });
+
+                    articulosMap.set(articuloId, {
+                        ...articulo.toJSON(),
+                        stock_actual: unidadesDisponibles,
+                        stock_total: todasLasUnidades,
+                        unidades_coincidentes: []
+                    });
+                }
+
+                // Agregar la unidad a la lista de coincidentes
+                articulosMap.get(articuloId).unidades_coincidentes.push({
+                    id: unidad.id,
+                    codigo_unico: unidad.codigo_unico,
+                    estado: unidad.estado
+                });
+            }
+
+            // Convertir el Map a array
+            const articulos = Array.from(articulosMap.values());
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    articulos,
+                    total: articulos.length
+                }
+            });
+        }
+
+        // Búsqueda exacta (comportamiento original)
+        const unidad = await UnidadHerramientaRenta.findOne({
+            where: {
+                codigo_unico: {
+                    [Op.iLike]: codigo.trim()
+                },
+                activo: true
+            },
+            include: [{
+                model: TipoHerramientaRenta,
+                as: 'tipoHerramienta',
+                attributes: ['id', 'articulo_origen_id', 'nombre', 'imagen_url'],
+                include: [{
+                    model: Articulo,
+                    as: 'articuloOrigen',
+                    attributes: ['id', 'nombre', 'codigo_ean13', 'es_herramienta'],
+                    include: [
+                        {
+                            model: Categoria,
+                            as: 'categoria',
+                            attributes: ['id', 'nombre', 'color', 'icono']
+                        },
+                        {
+                            model: Ubicacion,
+                            as: 'ubicacion',
+                            attributes: ['id', 'codigo', 'almacen', 'descripcion']
+                        }
+                    ]
+                }]
+            }]
+        });
+
+        if (!unidad || !unidad.tipoHerramienta || !unidad.tipoHerramienta.articuloOrigen) {
+            return res.status(404).json({
+                success: false,
+                message: 'No se encontró ninguna herramienta con ese código'
+            });
+        }
+
+        // El artículo ya está incluido en el resultado
+        const articulo = unidad.tipoHerramienta.articuloOrigen;
+
+        // Validar que sea un artículo de herramienta activo
+        if (!articulo || !articulo.es_herramienta) {
+            return res.status(404).json({
+                success: false,
+                message: 'El artículo asociado no es una herramienta válida'
+            });
+        }
+
+        // Obtener todas las unidades del mismo tipo para mostrar stock
+        const todasLasUnidades = await UnidadHerramientaRenta.count({
+            where: {
+                tipo_herramienta_id: unidad.tipo_herramienta_id,
+                activo: true
+            }
+        });
+
+        // Contar unidades disponibles
+        const unidadesDisponibles = await UnidadHerramientaRenta.count({
+            where: {
+                tipo_herramienta_id: unidad.tipo_herramienta_id,
+                activo: true,
+                estado: 'disponible'
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                articulo: {
+                    ...articulo.toJSON(),
+                    stock_actual: unidadesDisponibles,
+                    stock_total: todasLasUnidades
+                },
+                unidad: {
+                    id: unidad.id,
+                    codigo_unico: unidad.codigo_unico,
+                    estado: unidad.estado,
+                    tipo_herramienta: unidad.tipoHerramienta
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error en buscarPorCodigoHerramienta:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al buscar herramienta',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
@@ -891,6 +1099,7 @@ export const generarEtiquetasMixtas = async (req, res) => {
         }
 
         // Procesar unidades de herramientas
+        const herramientas = [];
         if (unidades_ids && unidades_ids.length > 0) {
             const { UnidadHerramientaRenta, TipoHerramientaRenta } = await import('../models/index.js');
 
@@ -907,29 +1116,41 @@ export const generarEtiquetasMixtas = async (req, res) => {
             });
 
             unidades.forEach(u => {
-                // Para herramientas usamos código QR con el código único
-                const codigoQR = u.codigo_unico; // Ej: PP-001, CP-005
-
-                etiquetas.push({
-                    nombre: `${u.tipoHerramienta.nombre} - ${u.codigo_unico}`,
-                    codigo_ean13: codigoQR, // Usamos codigo_unico para el QR
-                    codigo_tipo: 'QRCODE', // Cambiado de EAN13 a QRCODE
-                    imagen_url: u.tipoHerramienta?.imagen_url,
-                    tipo: 'unidad'
+                // Para herramientas: formato simple (código + QR)
+                herramientas.push({
+                    codigo_unico: u.codigo_unico // Ej: PP-001, AD-003
                 });
             });
         }
 
-        if (etiquetas.length === 0) {
+        if (etiquetas.length === 0 && herramientas.length === 0) {
             return res.status(404).json({
                 success: false,
                 message: 'No se encontraron artículos o unidades válidas'
             });
         }
 
-        // Generar PDF con todas las etiquetas (nueva versión con fotos)
+        // Generar PDF según el tipo de etiquetas
         const labelGenerator = await import('../utils/label-generator.js');
-        const pdfBuffer = await labelGenerator.generarEtiquetasLoteConFoto(etiquetas);
+        let pdfBuffer;
+
+        // Si SOLO hay herramientas -> usar formato simple
+        if (herramientas.length > 0 && etiquetas.length === 0) {
+            console.log('📦 Generando etiquetas SIMPLES para herramientas...');
+            pdfBuffer = await labelGenerator.generarEtiquetasHerramientasSimple(herramientas);
+        }
+        // Si SOLO hay consumibles -> usar formato con foto
+        else if (etiquetas.length > 0 && herramientas.length === 0) {
+            console.log('📦 Generando etiquetas CON FOTO para consumibles...');
+            pdfBuffer = await labelGenerator.generarEtiquetasLoteConFoto(etiquetas);
+        }
+        // Si hay AMBOS -> generar solo herramientas con formato simple (consumibles se ignoran por ahora)
+        else {
+            console.log('📦 Generando etiquetas MIXTAS (herramientas simples + consumibles con foto)...');
+            // Por ahora, generar solo herramientas si hay ambos
+            // TODO: En el futuro se podría combinar PDFs
+            pdfBuffer = await labelGenerator.generarEtiquetasHerramientasSimple(herramientas);
+        }
 
         // Marcar artículos como etiquetados
         if (articulos_ids && articulos_ids.length > 0) {

@@ -24,6 +24,8 @@ const InventarioPage = () => {
   const [ubicaciones, setUbicaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [articuloEncontradoPorCodigo, setArticuloEncontradoPorCodigo] = useState(null); // Guardar artículo encontrado por código
+  const [herramientasEncontradasPorCodigo, setHerramientasEncontradasPorCodigo] = useState([]); // Herramientas encontradas por búsqueda parcial
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState(null);
   const [almacenSeleccionado, setAlmacenSeleccionado] = useState('todos'); // Nuevo: filtro de almacén
@@ -152,60 +154,187 @@ const InventarioPage = () => {
     return [...new Set(almacenes)].sort();
   }, [ubicaciones]);
 
-  const filteredArticulos = articulos
-    .filter((item) => {
-      // Filtrar por estado activo/desactivado
-      const isActive = item.activo !== false;
-      const matchesActiveFilter = mostrarDesactivados ? !isActive : isActive;
+  // Buscar herramienta por código único cuando se detecta el patrón
+  useEffect(() => {
+    const buscarHerramientaPorCodigo = async () => {
+      // Detectar si el searchTerm tiene formato de código de herramienta
+      const patronCodigoCompleto = /^[A-Z]{2,3}-\d{1,4}$/i;
+      const patronCodigoParcial = /^[A-Z]{2,3}-/i;
 
-      const matchesSearch =
-        item.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.codigo_ean13?.includes(searchTerm) ||
-        item.categoria?.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
+      const codigo = searchTerm.trim().toUpperCase();
 
-      const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
-      const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
-
-      // Filtrar por almacén
-      const matchesAlmacen = almacenSeleccionado === 'todos' ||
-        (item.ubicacion && item.ubicacion.almacen === almacenSeleccionado);
-
-      // Filtrar por tipo según el tab activo
-      const estaEnTabCorrecto = tabActivo === 'consumibles'
-        ? !item.es_herramienta  // Consumibles: artículos que NO son herramientas
-        : item.es_herramienta;  // Herramientas: artículos que SÍ son herramientas
-
-      return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && estaEnTabCorrecto;
-    })
-    .sort((a, b) => {
-      // Ordenar según la opción seleccionada
-      switch (ordenamiento) {
-        case 'nombre-asc':
-          return a.nombre.localeCompare(b.nombre);
-        case 'nombre-desc':
-          return b.nombre.localeCompare(a.nombre);
-        case 'stock-bajo':
-          // Calcular si está bajo stock (stock_actual <= stock_minimo)
-          const aBajoStock = parseFloat(a.stock_actual) <= parseFloat(a.stock_minimo);
-          const bBajoStock = parseFloat(b.stock_actual) <= parseFloat(b.stock_minimo);
-          if (aBajoStock && !bBajoStock) return -1;
-          if (!aBajoStock && bBajoStock) return 1;
-          // Si ambos están bajos o ambos están bien, ordenar por cantidad de stock (menor primero)
-          return parseFloat(a.stock_actual) - parseFloat(b.stock_actual);
-        case 'stock-asc':
-          return parseFloat(a.stock_actual) - parseFloat(b.stock_actual);
-        case 'stock-desc':
-          return parseFloat(b.stock_actual) - parseFloat(a.stock_actual);
-        case 'costo-asc':
-          return parseFloat(a.costo_unitario) - parseFloat(b.costo_unitario);
-        case 'costo-desc':
-          return parseFloat(b.costo_unitario) - parseFloat(a.costo_unitario);
-        case 'categoria':
-          return a.categoria?.nombre.localeCompare(b.categoria?.nombre);
-        default:
-          return 0;
+      // Si no es un código de herramienta, limpiar resultados
+      if (!codigo || !patronCodigoParcial.test(codigo)) {
+        setHerramientasEncontradasPorCodigo([]);
+        setArticuloEncontradoPorCodigo(null);
+        return;
       }
-    });
+
+      // Cambiar al tab de herramientas cuando detecta el patrón
+      if (tabActivo !== 'herramientas') {
+        setTabActivo('herramientas');
+      }
+
+      // Hacer búsqueda parcial mientras el usuario escribe
+      try {
+        const response = await api.get(`/articulos/buscar-herramienta/${codigo}?partial=true`);
+
+        if (response.data.success && response.data.data.articulos) {
+          const articulosEncontrados = response.data.data.articulos;
+
+          // Guardar los artículos encontrados
+          setHerramientasEncontradasPorCodigo(articulosEncontrados);
+
+          // Si el código está completo y solo hay 1 resultado, resaltarlo
+          if (patronCodigoCompleto.test(codigo) && articulosEncontrados.length > 0) {
+            // Buscar la coincidencia exacta
+            const coincidenciaExacta = articulosEncontrados.find(art =>
+              art.unidades_coincidentes?.some(u => u.codigo_unico.toUpperCase() === codigo)
+            );
+
+            if (coincidenciaExacta) {
+              setArticuloEncontradoPorCodigo(coincidenciaExacta.id);
+              const unidadExacta = coincidenciaExacta.unidades_coincidentes.find(
+                u => u.codigo_unico.toUpperCase() === codigo
+              );
+              toast.success(
+                `Herramienta encontrada: ${unidadExacta.codigo_unico} - ${coincidenciaExacta.nombre} (${unidadExacta.estado})`
+              );
+            }
+          }
+        }
+      } catch (error) {
+        console.log('Error en búsqueda parcial:', error);
+        setHerramientasEncontradasPorCodigo([]);
+      }
+    };
+
+    // Debounce para no hacer búsquedas en cada tecla
+    const timer = setTimeout(() => {
+      buscarHerramientaPorCodigo();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, tabActivo]);
+
+  // Limpiar artículo encontrado cuando se cambian filtros
+  useEffect(() => {
+    setArticuloEncontradoPorCodigo(null);
+  }, [categoriaSeleccionada, ubicacionSeleccionada, almacenSeleccionado]);
+
+  // Limpiar resaltado después de 5 segundos
+  useEffect(() => {
+    if (articuloEncontradoPorCodigo) {
+      const timer = setTimeout(() => {
+        setArticuloEncontradoPorCodigo(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [articuloEncontradoPorCodigo]);
+
+  const filteredArticulos = (() => {
+    // Si hay búsqueda por código de herramienta, usar solo esos resultados
+    const patronCodigoParcial = /^[A-Z]{2,3}-/i;
+    const codigo = searchTerm.trim().toUpperCase();
+
+    if (codigo && patronCodigoParcial.test(codigo) && herramientasEncontradasPorCodigo.length > 0) {
+      // Filtrar las herramientas encontradas por los demás filtros
+      return herramientasEncontradasPorCodigo
+        .filter((item) => {
+          const isActive = item.activo !== false;
+          const matchesActiveFilter = mostrarDesactivados ? !isActive : isActive;
+          const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
+          const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
+          const matchesAlmacen = almacenSeleccionado === 'todos' ||
+            (item.ubicacion && item.ubicacion.almacen === almacenSeleccionado);
+
+          return matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen;
+        })
+        .sort((a, b) => {
+          // Ordenar según la opción seleccionada
+          switch (ordenamiento) {
+            case 'nombre-asc':
+              return a.nombre.localeCompare(b.nombre);
+            case 'nombre-desc':
+              return b.nombre.localeCompare(a.nombre);
+            case 'stock-bajo':
+              const aBajoStock = parseFloat(a.stock_actual) <= parseFloat(a.stock_minimo);
+              const bBajoStock = parseFloat(b.stock_actual) <= parseFloat(b.stock_minimo);
+              if (aBajoStock && !bBajoStock) return -1;
+              if (!aBajoStock && bBajoStock) return 1;
+              return parseFloat(a.stock_actual) - parseFloat(b.stock_actual);
+            case 'stock-asc':
+              return parseFloat(a.stock_actual) - parseFloat(b.stock_actual);
+            case 'stock-desc':
+              return parseFloat(b.stock_actual) - parseFloat(a.stock_actual);
+            case 'costo-asc':
+              return parseFloat(a.costo_unitario || 0) - parseFloat(b.costo_unitario || 0);
+            case 'costo-desc':
+              return parseFloat(b.costo_unitario || 0) - parseFloat(a.costo_unitario || 0);
+            case 'categoria':
+              return (a.categoria?.nombre || '').localeCompare(b.categoria?.nombre || '');
+            default:
+              return 0;
+          }
+        });
+    }
+
+    // Búsqueda normal
+    return articulos
+      .filter((item) => {
+        // Filtrar por estado activo/desactivado
+        const isActive = item.activo !== false;
+        const matchesActiveFilter = mostrarDesactivados ? !isActive : isActive;
+
+        const matchesSearch =
+          item.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.codigo_ean13?.includes(searchTerm) ||
+          item.categoria?.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
+        const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
+
+        // Filtrar por almacén
+        const matchesAlmacen = almacenSeleccionado === 'todos' ||
+          (item.ubicacion && item.ubicacion.almacen === almacenSeleccionado);
+
+        // Filtrar por tipo según el tab activo
+        const estaEnTabCorrecto = tabActivo === 'consumibles'
+          ? !item.es_herramienta  // Consumibles: artículos que NO son herramientas
+          : item.es_herramienta;  // Herramientas: artículos que SÍ son herramientas
+
+        return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && estaEnTabCorrecto;
+      })
+      .sort((a, b) => {
+        // Ordenar según la opción seleccionada
+        switch (ordenamiento) {
+          case 'nombre-asc':
+            return a.nombre.localeCompare(b.nombre);
+          case 'nombre-desc':
+            return b.nombre.localeCompare(a.nombre);
+          case 'stock-bajo':
+            // Calcular si está bajo stock (stock_actual <= stock_minimo)
+            const aBajoStock = parseFloat(a.stock_actual) <= parseFloat(a.stock_minimo);
+            const bBajoStock = parseFloat(b.stock_actual) <= parseFloat(b.stock_minimo);
+            if (aBajoStock && !bBajoStock) return -1;
+            if (!aBajoStock && bBajoStock) return 1;
+            // Si ambos están bajos o ambos están bien, ordenar por cantidad de stock (menor primero)
+            return parseFloat(a.stock_actual) - parseFloat(b.stock_actual);
+          case 'stock-asc':
+            return parseFloat(a.stock_actual) - parseFloat(b.stock_actual);
+          case 'stock-desc':
+            return parseFloat(b.stock_actual) - parseFloat(a.stock_actual);
+          case 'costo-asc':
+            return parseFloat(a.costo_unitario) - parseFloat(b.costo_unitario);
+          case 'costo-desc':
+            return parseFloat(b.costo_unitario) - parseFloat(a.costo_unitario);
+          case 'categoria':
+            return a.categoria?.nombre.localeCompare(b.categoria?.nombre);
+          default:
+            return 0;
+        }
+      });
+  })();
 
   const handleAgregarAlPedido = (articulo) => {
     agregarArticulo(articulo, 1);
@@ -1623,11 +1752,16 @@ const InventarioPage = () => {
                     const unidades = unidadesHerramientas[item.id] || [];
                     const cargandoUnidades = loadingUnidades[item.id];
 
+                    // Detectar si es el artículo encontrado por código
+                    const esArticuloEncontrado = articuloEncontradoPorCodigo === item.id;
+
                     return (
                       <React.Fragment key={item.id}>
                         <tr
                           className={`transition-colors ${
-                            esPendienteRevision
+                            esArticuloEncontrado
+                              ? 'bg-green-100 hover:bg-green-200 border-l-4 border-green-600 shadow-lg'
+                              : esPendienteRevision
                               ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
                               : esUbicacionRevisar
                               ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
@@ -2142,11 +2276,16 @@ const InventarioPage = () => {
                 const unidades = unidadesHerramientas[item.id] || [];
                 const cargandoUnidades = loadingUnidades[item.id];
 
+                // Detectar si es el artículo encontrado por código
+                const esArticuloEncontrado = articuloEncontradoPorCodigo === item.id;
+
                 return (
                   <React.Fragment key={`herramienta-${item.id}`}>
                     <div
                       className={`p-4 transition-colors ${
-                        esPendienteRevision
+                        esArticuloEncontrado
+                          ? 'bg-green-100 hover:bg-green-200 border-l-4 border-green-600 shadow-lg'
+                          : esPendienteRevision
                           ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
                           : esUbicacionRevisar
                           ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
