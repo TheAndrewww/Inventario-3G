@@ -12,6 +12,7 @@ import OrdenCompra from './OrdenCompra.js';
 import DetalleOrdenCompra from './DetalleOrdenCompra.js';
 import SolicitudCompra from './SolicitudCompra.js';
 import Notificacion from './Notificacion.js';
+import FCMToken from './FCMToken.js';
 import Proyecto from './Proyecto.js';
 import TipoHerramientaRenta from './TipoHerramientaRenta.js';
 import UnidadHerramientaRenta from './UnidadHerramientaRenta.js';
@@ -283,6 +284,16 @@ Usuario.hasMany(Notificacion, {
     as: 'notificaciones'
 });
 
+// FCMToken - Usuario (Muchos a Uno)
+FCMToken.belongsTo(Usuario, {
+    foreignKey: 'usuario_id',
+    as: 'usuario'
+});
+Usuario.hasMany(FCMToken, {
+    foreignKey: 'usuario_id',
+    as: 'fcmTokens'
+});
+
 // Proyecto - Usuario (Muchos a Uno) - Supervisor del proyecto
 Proyecto.belongsTo(Usuario, {
     foreignKey: 'supervisor_id',
@@ -431,6 +442,7 @@ export {
     DetalleOrdenCompra,
     SolicitudCompra,
     Notificacion,
+    FCMToken,
     Proyecto,
     TipoHerramientaRenta,
     UnidadHerramientaRenta,
@@ -452,6 +464,7 @@ export default {
     DetalleOrdenCompra,
     SolicitudCompra,
     Notificacion,
+    FCMToken,
     Proyecto,
     TipoHerramientaRenta,
     UnidadHerramientaRenta,

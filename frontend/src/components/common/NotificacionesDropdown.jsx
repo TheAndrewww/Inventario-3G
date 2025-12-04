@@ -33,7 +33,9 @@ const NotificacionesDropdown = () => {
     eliminarNotificacion,
     pushPermission,
     pushSupported,
-    requestPushPermission,
+    fcmSupported,
+    fcmToken,
+    activarNotificacionesFCM,
     setSoundEnabled: setGlobalSoundEnabled
   } = useNotificaciones();
 
@@ -125,11 +127,14 @@ const NotificacionesDropdown = () => {
 
   const handleRequestPushPermission = async () => {
     try {
-      const permission = await requestPushPermission();
+      // Usar FCM si está soportado, sino usar el sistema legacy
+      const token = fcmSupported
+        ? await activarNotificacionesFCM()
+        : await requestPushPermission();
 
-      if (permission === 'granted') {
+      if (token || pushPermission === 'granted') {
         toast.success('¡Notificaciones push activadas! 🔔');
-      } else if (permission === 'denied') {
+      } else {
         toast.error('Permiso de notificaciones denegado. Puedes habilitarlo desde la configuración de tu navegador.');
       }
     } catch (error) {
@@ -209,6 +214,32 @@ const NotificacionesDropdown = () => {
                   >
                     <BellRing size={16} />
                     Activar notificaciones
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FCM Token - Activar/Reactivar cuando hay permiso pero no hay token */}
+          {pushPermission === 'granted' && fcmSupported && !fcmToken && (
+            <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-blue-600 text-white rounded-lg flex-shrink-0">
+                  <BellRing size={20} />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-sm text-gray-900 mb-1">
+                    Activar notificaciones push FCM
+                  </h4>
+                  <p className="text-xs text-gray-600 mb-2">
+                    Haz clic para registrar tu dispositivo y recibir notificaciones push en tiempo real.
+                  </p>
+                  <button
+                    onClick={handleRequestPushPermission}
+                    className="w-full bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <BellRing size={16} />
+                    Activar notificaciones push
                   </button>
                 </div>
               </div>

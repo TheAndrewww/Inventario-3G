@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import notificacionesService from '../services/notificaciones.service';
 import pushNotificationService from '../services/push-notifications.service';
+import fcmNotificationService from '../services/fcm-notifications.service';
 
 const NotificacionesContext = createContext();
 
@@ -19,6 +20,8 @@ export const NotificacionesProvider = ({ children }) => {
   const [pushPermission, setPushPermission] = useState('default');
   const [pushSupported, setPushSupported] = useState(false);
   const [lastNotificationCount, setLastNotificationCount] = useState(0);
+  const [fcmToken, setFcmToken] = useState(null);
+  const [fcmSupported, setFcmSupported] = useState(false);
 
   // Ref para evitar inicialización duplicada en StrictMode
   const initialized = useRef(false);
@@ -118,14 +121,55 @@ export const NotificacionesProvider = ({ children }) => {
     }
   };
 
-  // Inicializar notificaciones push
+  // Inicializar notificaciones push y FCM
   useEffect(() => {
+    console.log('🔧 Iniciando configuración de notificaciones FCM...');
+
     const supported = pushNotificationService.isNotificationSupported();
     const permission = pushNotificationService.checkPermission();
+    const fcmSupportedCheck = fcmNotificationService.isNotificationSupported();
+
+    console.log('📊 Estado de notificaciones:', {
+      supported,
+      permission,
+      fcmSupportedCheck
+    });
 
     setPushSupported(supported);
     setPushPermission(permission);
-  }, []);
+    setFcmSupported(fcmSupportedCheck);
+
+    // Verificar si ya hay un token FCM guardado
+    const savedToken = fcmNotificationService.getCurrentToken();
+    console.log('🔑 Token guardado:', savedToken ? savedToken.substring(0, 20) + '...' : 'No');
+
+    if (savedToken && permission === 'granted') {
+      console.log('✅ Token FCM ya existe, configurando listeners...');
+      setFcmToken(savedToken);
+
+      // Configurar listeners para mensajes en foreground
+      console.log('🎧 Configurando onMessageListener...');
+      fcmNotificationService.onMessageListener((payload) => {
+        console.log('📩 ¡MENSAJE FCM RECIBIDO EN CONTEXT!', payload);
+        console.log('📦 Payload data:', payload.data);
+        console.log('📦 Payload notification:', payload.notification);
+
+        // Actualizar contador y lista
+        console.log('🔄 Actualizando contador y lista de notificaciones...');
+        fetchCount();
+        fetchNotificaciones();
+      });
+      console.log('✅ onMessageListener configurado correctamente');
+    } else {
+      console.warn('⚠️ No se configuró listener:', {
+        hasSavedToken: !!savedToken,
+        permission
+      });
+    }
+
+    console.log('🔔 FCM Supported:', fcmSupportedCheck);
+    console.log('🔔 Token guardado:', savedToken ? 'Sí' : 'No');
+  }, [fetchCount, fetchNotificaciones]);
 
   // Función para solicitar permiso de notificaciones push
   const requestPushPermission = useCallback(async () => {
@@ -138,6 +182,34 @@ export const NotificacionesProvider = ({ children }) => {
   const setSoundEnabled = useCallback((enabled) => {
     pushNotificationService.setSoundEnabled(enabled);
   }, []);
+
+  // Función para activar notificaciones FCM
+  const activarNotificacionesFCM = useCallback(async () => {
+    try {
+      const token = await fcmNotificationService.requestPermissionAndGetToken();
+
+      if (token) {
+        setFcmToken(token);
+        setPushPermission('granted');
+
+        // Escuchar mensajes en foreground
+        fcmNotificationService.onMessageListener((payload) => {
+          console.log('📩 Nueva notificación FCM:', payload);
+          // Actualizar el contador y lista
+          fetchCount();
+          fetchNotificaciones();
+        });
+
+        return token;
+      } else {
+        setPushPermission('denied');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error al activar notificaciones FCM:', error);
+      return null;
+    }
+  }, [fetchCount, fetchNotificaciones]);
 
   // Cargar notificaciones y conteo al montar el componente
   useEffect(() => {
@@ -167,13 +239,16 @@ export const NotificacionesProvider = ({ children }) => {
     loading,
     pushPermission,
     pushSupported,
+    fcmToken,
+    fcmSupported,
     fetchNotificaciones,
     fetchCount,
     marcarComoLeida,
     marcarTodasComoLeidas,
     eliminarNotificacion,
     requestPushPermission,
-    setSoundEnabled
+    setSoundEnabled,
+    activarNotificacionesFCM
   };
 
   return (
