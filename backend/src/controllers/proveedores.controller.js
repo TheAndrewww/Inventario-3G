@@ -249,13 +249,22 @@ export const actualizarProveedor = async (req, res) => {
 };
 
 /**
- * Eliminar (desactivar) un proveedor
+ * Eliminar un proveedor completamente
  */
 export const eliminarProveedor = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const proveedor = await Proveedor.findByPk(id);
+        const proveedor = await Proveedor.findByPk(id, {
+            include: [
+                {
+                    model: Articulo,
+                    as: 'articulos',
+                    attributes: ['id'],
+                    required: false
+                }
+            ]
+        });
 
         if (!proveedor) {
             return res.status(404).json({
@@ -264,13 +273,20 @@ export const eliminarProveedor = async (req, res) => {
             });
         }
 
-        // Desactivar en lugar de eliminar
-        await proveedor.update({ activo: false });
+        // Verificar si hay artículos asociados
+        if (proveedor.articulos && proveedor.articulos.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `No se puede eliminar el proveedor porque tiene ${proveedor.articulos.length} artículo(s) asociado(s). Primero debe reasignar o eliminar los artículos.`
+            });
+        }
+
+        // Eliminar el proveedor de forma permanente
+        await proveedor.destroy();
 
         res.json({
             success: true,
-            message: 'Proveedor desactivado exitosamente',
-            data: proveedor
+            message: 'Proveedor eliminado exitosamente'
         });
     } catch (error) {
         console.error('Error al eliminar proveedor:', error);
