@@ -14,9 +14,9 @@ const Movimiento = sequelize.define('Movimiento', {
         comment: 'ID único del ticket (formato: DDMMYY-HHMM-NN)'
     },
     tipo: {
-        type: DataTypes.ENUM('retiro', 'devolucion', 'ajuste_entrada', 'ajuste_salida', 'transferencia', 'pedido'),
+        type: DataTypes.ENUM('retiro', 'devolucion', 'ajuste_entrada', 'ajuste_salida', 'transferencia', 'pedido', 'entrada_orden_compra'),
         allowNull: false,
-        comment: 'Tipo de movimiento. pedido = solicitud de materiales por diseñador'
+        comment: 'Tipo de movimiento. pedido = solicitud de materiales por diseñador, entrada_orden_compra = recepción de mercancía desde orden de compra'
     },
     fecha_hora: {
         type: DataTypes.DATE,
@@ -125,6 +125,15 @@ const Movimiento = sequelize.define('Movimiento', {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment: 'Total de piezas en el movimiento'
+    },
+    orden_compra_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'ordenes_compra',
+            key: 'id'
+        },
+        comment: 'ID de la orden de compra asociada (para entradas desde órdenes de compra)'
     }
 }, {
     tableName: 'movimientos',

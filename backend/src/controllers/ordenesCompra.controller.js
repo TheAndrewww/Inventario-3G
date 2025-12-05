@@ -1648,3 +1648,582 @@ export const crearSolicitudCompraManual = async (req, res) => {
     });
   }
 };
+
+/**
+ * Recibir mercancía de una orden de compra
+ * - Crea un movimiento tipo 'entrada_orden_compra'
+ * - Actualiza cantidad_recibida en DetalleOrdenCompra
+ * - Actualiza stock de artículos
+ * - Actualiza estado de la orden (parcial/recibida)
+ * - Permite recepciones parciales múltiples
+ */
+export const recibirMercancia = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+    const { articulos, observaciones_generales, fecha_recepcion } = req.body;
+    const usuario_id = req.usuario.id;
+
+    // Validaciones
+    if (!articulos || !Array.isArray(articulos) || articulos.length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar al menos un artículo para recibir'
+      });
+    }
+
+    // Obtener la orden con sus detalles
+    const orden = await OrdenCompra.findByPk(id, {
+      include: [
+        {
+          model: Usuario,
+          as: 'creador',
+          attributes: ['id', 'nombre', 'email', 'rol']
+        },
+        {
+          model: Proveedor,
+          as: 'proveedor',
+          attributes: ['id', 'nombre']
+        },
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalles',
+          include: [
+            {
+              model: Articulo,
+              as: 'articulo',
+              include: [
+                { model: Categoria, as: 'categoria' },
+                { model: Ubicacion, as: 'ubicacion' }
+              ]
+            }
+          ]
+        }
+      ],
+      transaction
+    });
+
+    if (!orden) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Orden de compra no encontrada'
+      });
+    }
+
+    // Validar que la orden esté en un estado válido para recibir
+    if (!['enviada', 'parcial'].includes(orden.estado)) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `No se puede recibir mercancía de una orden en estado '${orden.estado}'. Solo se pueden recibir órdenes en estado 'enviada' o 'parcial'`
+      });
+    }
+
+    // Validar que todos los detalles existen y que las cantidades son válidas
+    const detallesMap = {};
+    orden.detalles.forEach(det => {
+      detallesMap[det.id] = det;
+    });
+
+    const articulosRecibidos = [];
+    const errores = [];
+
+    for (const item of articulos) {
+      const detalle = detallesMap[item.detalle_id];
+
+      if (!detalle) {
+        errores.push(`Detalle ${item.detalle_id} no encontrado en la orden`);
+        continue;
+      }
+
+      const cantidadRecibida = parseFloat(item.cantidad_recibida);
+      const cantidadYaRecibida = parseFloat(detalle.cantidad_recibida) || 0;
+      const cantidadSolicitada = parseFloat(detalle.cantidad_solicitada);
+      const cantidadPendiente = cantidadSolicitada - cantidadYaRecibida;
+
+      if (cantidadRecibida <= 0) {
+        errores.push(`${detalle.articulo.nombre}: La cantidad debe ser mayor a 0`);
+        continue;
+      }
+
+      if (cantidadRecibida > cantidadPendiente) {
+        errores.push(`${detalle.articulo.nombre}: Se intenta recibir ${cantidadRecibida} pero solo quedan ${cantidadPendiente} pendientes`);
+        continue;
+      }
+
+      articulosRecibidos.push({
+        detalle,
+        cantidad_recibida: cantidadRecibida,
+        observaciones: item.observaciones || null
+      });
+    }
+
+    if (errores.length > 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Errores de validación',
+        errores
+      });
+    }
+
+    if (articulosRecibidos.length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'No hay artículos válidos para recibir'
+      });
+    }
+
+    // Generar ticket_id para el movimiento
+    const fecha = fecha_recepcion ? new Date(fecha_recepcion) : new Date();
+    const ddmmyy = fecha.toISOString().slice(2, 10).replace(/-/g, '').match(/.{2}/g).reverse().join('');
+    const hhmm = fecha.toTimeString().slice(0, 5).replace(':', '');
+
+    const inicioDelDia = new Date(fecha.setHours(0, 0, 0, 0));
+    const finDelDia = new Date(fecha.setHours(23, 59, 59, 999));
+
+    const contadorHoy = await Movimiento.count({
+      where: {
+        created_at: {
+          [Op.between]: [inicioDelDia, finDelDia]
+        }
+      },
+      transaction
+    });
+
+    const nn = String(contadorHoy + 1).padStart(2, '0');
+    const ticket_id = `MOV-${ddmmyy}-${hhmm}-${nn}`;
+
+    // Crear movimiento de entrada
+    const movimiento = await Movimiento.create({
+      ticket_id,
+      tipo: 'entrada_orden_compra',
+      usuario_id: usuario_id,
+      orden_compra_id: orden.id,
+      estado: 'completado',
+      observaciones: observaciones_generales || `Recepción de mercancía de orden ${orden.ticket_id}`,
+      fecha_hora: fecha_recepcion || new Date()
+    }, { transaction });
+
+    // Procesar cada artículo recibido
+    let totalPiezas = 0;
+    const detallesMovimiento = [];
+    const actualizacionesStock = [];
+
+    for (const item of articulosRecibidos) {
+      const detalle = item.detalle;
+      const articulo = detalle.articulo;
+      const cantidad = item.cantidad_recibida;
+
+      // Actualizar cantidad_recibida en DetalleOrdenCompra
+      const nuevaCantidadRecibida = parseFloat(detalle.cantidad_recibida) + cantidad;
+      await detalle.update({
+        cantidad_recibida: nuevaCantidadRecibida
+      }, { transaction });
+
+      // Actualizar stock del artículo
+      const stockAntes = parseFloat(articulo.stock_actual);
+      const stockDespues = stockAntes + cantidad;
+
+      await articulo.update({
+        stock_actual: stockDespues
+      }, { transaction });
+
+      // Crear detalle del movimiento
+      detallesMovimiento.push({
+        movimiento_id: movimiento.id,
+        articulo_id: articulo.id,
+        cantidad: cantidad,
+        stock_antes: stockAntes,
+        stock_despues: stockDespues,
+        observaciones: item.observaciones
+      });
+
+      actualizacionesStock.push({
+        articulo_id: articulo.id,
+        nombre: articulo.nombre,
+        cantidad_recibida: cantidad,
+        stock_antes: stockAntes,
+        stock_despues: stockDespues,
+        cantidad_total_recibida: nuevaCantidadRecibida,
+        cantidad_solicitada: parseFloat(detalle.cantidad_solicitada),
+        completo: nuevaCantidadRecibida >= parseFloat(detalle.cantidad_solicitada)
+      });
+
+      totalPiezas += cantidad;
+    }
+
+    // Crear detalles del movimiento
+    await DetalleMovimiento.bulkCreate(detallesMovimiento, { transaction });
+
+    // Actualizar total_piezas en el movimiento
+    await movimiento.update({ total_piezas: totalPiezas }, { transaction });
+
+    // Determinar nuevo estado de la orden
+    const todosLosDetalles = await DetalleOrdenCompra.findAll({
+      where: { orden_compra_id: orden.id },
+      transaction
+    });
+
+    let todosCompletos = true;
+    let algunoRecibido = false;
+
+    for (const det of todosLosDetalles) {
+      const recibida = parseFloat(det.cantidad_recibida) || 0;
+      const solicitada = parseFloat(det.cantidad_solicitada);
+
+      if (recibida > 0) algunoRecibido = true;
+      if (recibida < solicitada) todosCompletos = false;
+    }
+
+    let nuevoEstado = orden.estado;
+    let fechaRecepcionFinal = orden.fecha_recepcion;
+
+    if (todosCompletos) {
+      nuevoEstado = 'recibida';
+      fechaRecepcionFinal = fecha_recepcion || new Date();
+    } else if (algunoRecibido) {
+      nuevoEstado = 'parcial';
+    }
+
+    // Actualizar estado de la orden
+    await orden.update({
+      estado: nuevoEstado,
+      fecha_recepcion: fechaRecepcionFinal
+    }, { transaction });
+
+    await transaction.commit();
+
+    // Recargar orden con relaciones actualizadas
+    const ordenActualizada = await OrdenCompra.findByPk(orden.id, {
+      include: [
+        {
+          model: Usuario,
+          as: 'creador'
+        },
+        {
+          model: Proveedor,
+          as: 'proveedor'
+        },
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalles',
+          include: [
+            {
+              model: Articulo,
+              as: 'articulo'
+            }
+          ]
+        }
+      ]
+    });
+
+    // Calcular progreso
+    const articulosCompletos = actualizacionesStock.filter(a => a.completo).length;
+    const articulosPendientes = actualizacionesStock.filter(a => !a.completo).length;
+    const porcentajeTotal = Math.round(
+      (actualizacionesStock.reduce((sum, a) => sum + a.cantidad_total_recibida, 0) /
+        actualizacionesStock.reduce((sum, a) => sum + a.cantidad_solicitada, 0)) * 100
+    );
+
+    // Notificar a usuarios relevantes
+    try {
+      const mensaje = nuevoEstado === 'recibida'
+        ? `Se completó la recepción de la orden ${orden.ticket_id}`
+        : `Se recibió mercancía parcial de la orden ${orden.ticket_id} (${porcentajeTotal}% completo)`;
+
+      await notificarPorRol({
+        roles: ['compras', 'almacen', 'administrador'],
+        tipo: nuevoEstado === 'recibida' ? 'orden_recibida_completa' : 'orden_recibida_parcial',
+        titulo: nuevoEstado === 'recibida' ? 'Orden completada' : 'Recepción parcial',
+        mensaje,
+        url: `/ordenes-compra`,
+        datos_adicionales: {
+          orden_id: orden.id,
+          ticket_id: orden.ticket_id,
+          movimiento_id: movimiento.id,
+          movimiento_ticket_id: movimiento.ticket_id,
+          estado_nuevo: nuevoEstado,
+          articulos_recibidos: articulosRecibidos.length,
+          progreso: porcentajeTotal
+        }
+      });
+    } catch (notifError) {
+      console.error('Error al enviar notificación:', notifError);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: nuevoEstado === 'recibida'
+        ? 'Orden recibida completamente'
+        : `Recepción parcial registrada (${porcentajeTotal}% completo)`,
+      data: {
+        orden: ordenActualizada,
+        movimiento: {
+          id: movimiento.id,
+          ticket_id: movimiento.ticket_id,
+          fecha_hora: movimiento.fecha_hora
+        },
+        articulos_recibidos: actualizacionesStock,
+        estado_nuevo: nuevoEstado,
+        progreso: {
+          articulos_completos: articulosCompletos,
+          articulos_pendientes: articulosPendientes,
+          porcentaje_total: porcentajeTotal
+        }
+      }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al recibir mercancía:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al recibir la mercancía',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Obtener historial de recepciones de una orden de compra
+ */
+export const obtenerHistorialRecepciones = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar que la orden existe
+    const orden = await OrdenCompra.findByPk(id);
+
+    if (!orden) {
+      return res.status(404).json({
+        success: false,
+        message: 'Orden de compra no encontrada'
+      });
+    }
+
+    // Obtener todos los movimientos de tipo entrada_orden_compra para esta orden
+    const recepciones = await Movimiento.findAll({
+      where: {
+        orden_compra_id: id,
+        tipo: 'entrada_orden_compra'
+      },
+      include: [
+        {
+          model: Usuario,
+          as: 'usuario',
+          attributes: ['id', 'nombre', 'email', 'rol']
+        },
+        {
+          model: DetalleMovimiento,
+          as: 'detalles',
+          include: [
+            {
+              model: Articulo,
+              as: 'articulo',
+              attributes: ['id', 'nombre', 'unidad']
+            }
+          ]
+        }
+      ],
+      order: [['fecha_hora', 'ASC']]
+    });
+
+    // Construir resumen
+    const resumen = {
+      total_recepciones: recepciones.length,
+      primera_recepcion: recepciones.length > 0 ? recepciones[0].fecha_hora : null,
+      ultima_recepcion: recepciones.length > 0 ? recepciones[recepciones.length - 1].fecha_hora : null
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        recepciones,
+        resumen
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al obtener historial de recepciones:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener el historial de recepciones',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Obtener progreso de recepción de una orden de compra
+ */
+export const obtenerProgresoRecepcion = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const orden = await OrdenCompra.findByPk(id, {
+      include: [
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalles',
+          include: [
+            {
+              model: Articulo,
+              as: 'articulo',
+              attributes: ['id', 'nombre', 'unidad']
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!orden) {
+      return res.status(404).json({
+        success: false,
+        message: 'Orden de compra no encontrada'
+      });
+    }
+
+    // Calcular progreso por artículo
+    const articulos = orden.detalles.map(detalle => {
+      const cantidadSolicitada = parseFloat(detalle.cantidad_solicitada);
+      const cantidadRecibida = parseFloat(detalle.cantidad_recibida) || 0;
+      const pendiente = cantidadSolicitada - cantidadRecibida;
+      const porcentaje = Math.round((cantidadRecibida / cantidadSolicitada) * 100);
+      const completo = cantidadRecibida >= cantidadSolicitada;
+
+      return {
+        detalle_id: detalle.id,
+        articulo_id: detalle.articulo.id,
+        articulo: detalle.articulo.nombre,
+        unidad: detalle.articulo.unidad,
+        cantidad_solicitada: cantidadSolicitada,
+        cantidad_recibida: cantidadRecibida,
+        pendiente,
+        porcentaje,
+        completo
+      };
+    });
+
+    // Calcular resumen general
+    const totalArticulos = articulos.length;
+    const articulosCompletos = articulos.filter(a => a.completo).length;
+    const articulosPendientes = totalArticulos - articulosCompletos;
+    const porcentajeTotal = Math.round(
+      (articulos.reduce((sum, a) => sum + a.cantidad_recibida, 0) /
+        articulos.reduce((sum, a) => sum + a.cantidad_solicitada, 0)) * 100
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        orden_id: orden.id,
+        ticket_id: orden.ticket_id,
+        estado: orden.estado,
+        articulos,
+        resumen: {
+          total_articulos: totalArticulos,
+          articulos_completos: articulosCompletos,
+          articulos_pendientes: articulosPendientes,
+          porcentaje_total: porcentajeTotal
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al obtener progreso de recepción:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener el progreso de recepción',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Completar orden manualmente
+ * - Para casos donde no llegará toda la mercancía
+ * - Cambia estado a 'recibida' aunque no esté 100% completado
+ */
+export const completarOrdenManualmente = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body;
+
+    if (!motivo || motivo.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar un motivo de al menos 10 caracteres'
+      });
+    }
+
+    const orden = await OrdenCompra.findByPk(id);
+
+    if (!orden) {
+      return res.status(404).json({
+        success: false,
+        message: 'Orden de compra no encontrada'
+      });
+    }
+
+    if (orden.estado === 'recibida') {
+      return res.status(400).json({
+        success: false,
+        message: 'Esta orden ya está completada'
+      });
+    }
+
+    if (!['enviada', 'parcial'].includes(orden.estado)) {
+      return res.status(400).json({
+        success: false,
+        message: `No se puede completar una orden en estado '${orden.estado}'`
+      });
+    }
+
+    // Actualizar orden
+    await orden.update({
+      estado: 'recibida',
+      fecha_recepcion: new Date(),
+      observaciones: orden.observaciones
+        ? `${orden.observaciones}\n\n[COMPLETADA MANUALMENTE] ${new Date().toLocaleString('es-MX')}: ${motivo}`
+        : `[COMPLETADA MANUALMENTE] ${new Date().toLocaleString('es-MX')}: ${motivo}`
+    });
+
+    // Notificar
+    try {
+      await notificarPorRol({
+        roles: ['compras', 'administrador'],
+        tipo: 'orden_completada_manual',
+        titulo: 'Orden completada manualmente',
+        mensaje: `La orden ${orden.ticket_id} fue completada manualmente por ${req.usuario.nombre}. Motivo: ${motivo}`,
+        url: `/ordenes-compra`,
+        datos_adicionales: {
+          orden_id: orden.id,
+          ticket_id: orden.ticket_id,
+          completado_por: req.usuario.nombre,
+          motivo
+        }
+      });
+    } catch (notifError) {
+      console.error('Error al enviar notificación:', notifError);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Orden completada exitosamente',
+      data: { orden }
+    });
+
+  } catch (error) {
+    console.error('Error al completar orden:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al completar la orden',
+      error: error.message
+    });
+  }
+};

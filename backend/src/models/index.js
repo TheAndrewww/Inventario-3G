@@ -274,6 +274,16 @@ OrdenCompra.hasMany(SolicitudCompra, {
     as: 'solicitudes_origen'
 });
 
+// Movimiento - OrdenCompra (Muchos a Uno) - Movimientos de recepción de mercancía
+Movimiento.belongsTo(OrdenCompra, {
+    foreignKey: 'orden_compra_id',
+    as: 'ordenCompra'
+});
+OrdenCompra.hasMany(Movimiento, {
+    foreignKey: 'orden_compra_id',
+    as: 'recepciones'
+});
+
 // Notificacion - Usuario (Muchos a Uno)
 Notificacion.belongsTo(Usuario, {
     foreignKey: 'usuario_id',

@@ -11,7 +11,11 @@ import {
   obtenerHistorialTrazabilidad,
   anularOrdenCompra,
   cancelarSolicitudCompra,
-  crearSolicitudCompraManual
+  crearSolicitudCompraManual,
+  recibirMercancia,
+  obtenerHistorialRecepciones,
+  obtenerProgresoRecepcion,
+  completarOrdenManualmente
 } from '../controllers/ordenesCompra.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -33,6 +37,20 @@ router.put(
   '/ordenes-compra/:id/anular',
   verificarRol('compras', 'almacen', 'administrador'),
   anularOrdenCompra
+);
+
+// Rutas de recepción de mercancía
+router.post(
+  '/ordenes-compra/:id/recibir',
+  verificarRol('compras', 'almacen', 'administrador'),
+  recibirMercancia
+);
+router.get('/ordenes-compra/:id/recepciones', obtenerHistorialRecepciones);
+router.get('/ordenes-compra/:id/progreso', obtenerProgresoRecepcion);
+router.put(
+  '/ordenes-compra/:id/completar',
+  verificarRol('compras', 'almacen', 'administrador'),
+  completarOrdenManualmente
 );
 
 // Rutas de solicitudes de compra
