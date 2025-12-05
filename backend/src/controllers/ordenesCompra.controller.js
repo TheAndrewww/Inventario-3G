@@ -8,6 +8,7 @@ import {
   Categoria,
   Ubicacion,
   Movimiento,
+  DetalleMovimiento,
   TipoHerramientaRenta
 } from '../models/index.js';
 import { Op } from 'sequelize';
