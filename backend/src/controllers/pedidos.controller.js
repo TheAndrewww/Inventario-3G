@@ -2,6 +2,7 @@ import { Movimiento, DetalleMovimiento, Articulo, Usuario, Categoria, Ubicacion,
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { crearNotificacion, notificarPorRol } from './notificaciones.controller.js';
+import admin from 'firebase-admin';
 
 /**
  * Función auxiliar para detectar el proveedor de un artículo
@@ -517,6 +518,47 @@ export const crearPedido = async (req, res) => {
 
     // Limpiar solicitudes para enviar al frontend (remover solicitud_obj)
     const solicitudesLimpias = solicitudesCreadas.map(({ solicitud_obj, ...rest }) => rest);
+
+    // --- INTEGRACIÓN IMPRESIÓN AUTOMÁTICA ---
+    try {
+      if (admin.apps.length > 0) {
+        const db = admin.firestore();
+
+        // Preparar datos del pedido para el agente de impresión
+        const datosPedido = {
+          ticket_id: ticket_id,
+          tipo: 'pedido',
+          fecha: new Date().toISOString(),
+          proyecto: proyecto || (equipo ? equipo.nombre : 'Sin proyecto'),
+          creador: req.usuario.nombre,
+          ubicacion_destino: pedidoCompleto.ubicacionDestino?.codigo || 'N/A',
+          observaciones: observaciones || '',
+          articulos: pedidoCompleto.detalles.map(d => ({
+            nombre: d.articulo?.nombre || 'Artículo',
+            cantidad: d.cantidad,
+            unidad: d.articulo?.unidad || 'pz',
+            categoria: d.articulo?.categoria?.nombre || 'Sin categoría',
+            ubicacion: d.articulo?.ubicacion?.codigo || 'N/A'
+          })),
+          total_piezas: articulos.reduce((sum, art) => sum + art.cantidad, 0)
+        };
+
+        await db.collection('cola_impresion').add({
+          tipo: 'pedido',
+          datos: datosPedido,
+          pedido_id: pedido.id,
+          ticket_id: ticket_id,
+          estado: 'pendiente',
+          created_at: new Date(),
+          printer: 'TicketPrinter'
+        });
+        console.log(`🖨️ Solicitud de impresión enviada a Firebase para pedido ${ticket_id}`);
+      }
+    } catch (printError) {
+      console.error('❌ Error al enviar a cola de impresión:', printError);
+      // No bloqueamos la respuesta si falla la impresión
+    }
+    // ----------------------------------------
 
     res.status(201).json({
       success: true,
@@ -2224,7 +2266,7 @@ export const rechazarPedidoListoParaEntrega = async (req, res) => {
 
     // Desmarcar todos los detalles como no dispersados
     await DetalleMovimiento.update(
-      { 
+      {
         dispersado: false,
         dispersado_por_id: null,
         fecha_dispersado: null
@@ -2237,7 +2279,7 @@ export const rechazarPedidoListoParaEntrega = async (req, res) => {
 
     // Volver a estado pendiente o aprobado según el tipo
     const nuevoEstado = pedido.tipo_pedido === 'equipo' ? 'aprobado' : 'pendiente';
-    
+
     await pedido.update({
       estado: nuevoEstado,
       supervisor_id: null,

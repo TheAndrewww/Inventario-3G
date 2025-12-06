@@ -176,6 +176,146 @@ function generarPDFOrdenCompra(datos) {
   });
 }
 
+// ===== GENERADOR DE PDF PARA PEDIDOS =====
+
+function generarPDFPedido(datos) {
+  return new Promise((resolve, reject) => {
+    try {
+      const anchoTicket = 227;
+
+      const doc = new PDFDocument({
+        size: [anchoTicket, 700],
+        margin: 10
+      });
+
+      const chunks = [];
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const margen = 10;
+      let y = 20;
+
+      // === HEADER ===
+      doc.fontSize(14).font('Helvetica-Bold');
+      doc.text('3G ARQUITECTURA TEXTIL', margen, y, {
+        width: anchoTicket - (margen * 2),
+        align: 'center'
+      });
+      y += 20;
+
+      doc.fontSize(10).font('Helvetica-Bold');
+      doc.text('ORDEN DE SALIDA', margen, y, {
+        width: anchoTicket - (margen * 2),
+        align: 'center'
+      });
+      y += 18;
+
+      // Línea divisoria
+      doc.moveTo(margen, y).lineTo(anchoTicket - margen, y).stroke();
+      y += 10;
+
+      // === DATOS DEL PEDIDO ===
+      doc.fontSize(9).font('Helvetica-Bold');
+      doc.text(`TICKET: ${datos.ticket_id}`, margen, y);
+      y += 14;
+
+      doc.fontSize(8).font('Helvetica');
+      const fecha = new Date(datos.fecha).toLocaleString('es-MX', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      doc.text(`Fecha: ${fecha}`, margen, y);
+      y += 12;
+
+      doc.text(`Proyecto: ${datos.proyecto}`, margen, y);
+      y += 12;
+
+      doc.text(`Solicitado por: ${datos.creador}`, margen, y);
+      y += 12;
+
+      if (datos.ubicacion_destino && datos.ubicacion_destino !== 'N/A') {
+        doc.text(`Destino: ${datos.ubicacion_destino}`, margen, y);
+        y += 12;
+      }
+      y += 5;
+
+      // Línea divisoria
+      doc.moveTo(margen, y).lineTo(anchoTicket - margen, y).stroke();
+      y += 10;
+
+      // === ARTÍCULOS ===
+      doc.fontSize(8).font('Helvetica-Bold');
+      doc.text('ARTÍCULOS A DISPERSAR', margen, y);
+      y += 12;
+
+      doc.fontSize(7).font('Helvetica');
+      for (const art of datos.articulos) {
+        // Checkbox visual + nombre del artículo
+        doc.font('Helvetica-Bold');
+        doc.text(`☐ ${art.nombre}`, margen, y, { width: anchoTicket - (margen * 2) });
+        y += doc.heightOfString(art.nombre, { width: anchoTicket - (margen * 2) }) + 2;
+
+        // Cantidad y ubicación
+        doc.font('Helvetica');
+        let detalle = `  Cant: ${art.cantidad} ${art.unidad}`;
+        if (art.ubicacion && art.ubicacion !== 'N/A') {
+          detalle += ` | Ubic: ${art.ubicacion}`;
+        }
+        doc.text(detalle, margen, y);
+        y += 10;
+      }
+      y += 5;
+
+      // Línea divisoria
+      doc.moveTo(margen, y).lineTo(anchoTicket - margen, y).stroke();
+      y += 10;
+
+      // === TOTAL ===
+      doc.fontSize(10).font('Helvetica-Bold');
+      doc.text(`TOTAL: ${datos.total_piezas} piezas`, margen, y, {
+        width: anchoTicket - (margen * 2),
+        align: 'right'
+      });
+      y += 18;
+
+      // === OBSERVACIONES ===
+      if (datos.observaciones) {
+        doc.fontSize(7).font('Helvetica');
+        doc.text(`Obs: ${datos.observaciones}`, margen, y, {
+          width: anchoTicket - (margen * 2)
+        });
+        y += doc.heightOfString(datos.observaciones, { width: anchoTicket - (margen * 2) }) + 5;
+      }
+
+      // === FIRMAS ===
+      y += 15;
+      doc.fontSize(7).font('Helvetica');
+      doc.text('_____________________', margen, y);
+      doc.text('_____________________', anchoTicket / 2 + 5, y);
+      y += 10;
+      doc.text('Entregó (Almacén)', margen, y);
+      doc.text('Recibió', anchoTicket / 2 + 5, y);
+      y += 20;
+
+      // === FOOTER ===
+      doc.fontSize(6).font('Helvetica');
+      doc.text('Sistema de Inventario 3G', margen, y, {
+        width: anchoTicket - (margen * 2),
+        align: 'center'
+      });
+      y += 20;
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
 // ===== FUNCIÓN DE IMPRESIÓN =====
 
 function imprimirArchivo(filePath) {
@@ -205,9 +345,13 @@ async function procesarTrabajo(jobId, job) {
     let pdfBuffer;
 
     if (job.tipo === 'orden_compra' && job.datos) {
-      // Generar PDF desde los datos
-      console.log('   📄 Generando PDF...');
+      // Generar PDF de orden de compra
+      console.log('   📄 Generando PDF de Orden de Compra...');
       pdfBuffer = await generarPDFOrdenCompra(job.datos);
+    } else if (job.tipo === 'pedido' && job.datos) {
+      // Generar PDF de pedido/orden de salida
+      console.log('   📄 Generando PDF de Orden de Salida...');
+      pdfBuffer = await generarPDFPedido(job.datos);
     } else if (job.tipo === 'texto' && job.contenido) {
       // Generar PDF de texto simple (para pruebas)
       const doc = new PDFDocument({ size: [227, 200], margin: 10 });
