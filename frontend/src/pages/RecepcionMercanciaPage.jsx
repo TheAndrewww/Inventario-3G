@@ -96,7 +96,6 @@ const RecepcionMercanciaPage = () => {
   };
 
   // Verificar permisos
-  console.log('DEBUG ROL:', usuario?.rol, 'Usuario completo:', usuario);
   const puedeRecibir = ['administrador', 'admin', 'almacen', 'compras'].includes(usuario?.rol);
 
   if (loading) {

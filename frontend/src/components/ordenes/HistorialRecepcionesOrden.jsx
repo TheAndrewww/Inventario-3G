@@ -20,16 +20,12 @@ const HistorialRecepcionesOrden = ({ isOpen, onClose, orden }) => {
   const cargarDatos = async () => {
     try {
       setLoading(true);
-      console.log('DEBUG: Cargando historial para orden:', orden?.id);
 
       // Cargar historial de recepciones y progreso en paralelo
       const [historialRes, progresoRes] = await Promise.all([
         ordenesCompraService.obtenerHistorialRecepciones(orden.id),
         ordenesCompraService.obtenerProgresoRecepcion(orden.id)
       ]);
-
-      console.log('DEBUG: Historial:', historialRes);
-      console.log('DEBUG: Progreso:', progresoRes);
 
       setRecepciones(historialRes.data.recepciones || []);
       setProgreso(progresoRes.data);
