@@ -176,15 +176,60 @@ function generarPDFOrdenCompra(datos) {
   });
 }
 
-// ===== GENERADOR DE PDF PARA PEDIDOS =====
+// ===== DESCARGAR IMAGEN DE URL =====
 
-function generarPDFPedido(datos) {
-  return new Promise((resolve, reject) => {
+async function descargarImagen(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    console.error('Error descargando imagen:', error.message);
+    return null;
+  }
+}
+
+// ===== GENERADOR DE PDF PARA PEDIDOS (ESTILO FRONTEND) =====
+
+async function generarPDFPedido(datos) {
+  return new Promise(async (resolve, reject) => {
     try {
+      // URLs de logos (mismas que el frontend)
+      const logoUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1762292854/logo_completo_web_eknzcb.png';
+
+      // Descargar logo
+      const logoBuffer = await descargarImagen(logoUrl);
+
+      // Calcular altura dinámica según artículos
+      const articulos = datos.articulos || [];
+      let alturaEstimada = 150; // Base (header + info)
+
+      // Agrupar por categoría
+      const articulosPorCategoria = {};
+      articulos.forEach(art => {
+        const categoria = art.categoria || 'GENERAL';
+        if (!articulosPorCategoria[categoria]) {
+          articulosPorCategoria[categoria] = [];
+        }
+        articulosPorCategoria[categoria].push(art);
+      });
+
+      // Calcular altura por artículos
+      Object.keys(articulosPorCategoria).forEach(cat => {
+        alturaEstimada += 15; // Título de categoría
+        articulosPorCategoria[cat].forEach(art => {
+          alturaEstimada += 18; // Por artículo
+        });
+      });
+      alturaEstimada += 60; // Footer y firmas
+
+      // Crear documento (80mm de ancho = 227 puntos aprox)
       const anchoTicket = 227;
+      const altoTicket = Math.max(350, alturaEstimada);
 
       const doc = new PDFDocument({
-        size: [anchoTicket, 700],
+        size: [anchoTicket, altoTicket],
         margin: 10
       });
 
@@ -194,120 +239,121 @@ function generarPDFPedido(datos) {
       doc.on('error', reject);
 
       const margen = 10;
-      let y = 20;
+      const anchoUtil = anchoTicket - (margen * 2);
+      let y = 8;
 
-      // === HEADER ===
-      doc.fontSize(14).font('Helvetica-Bold');
-      doc.text('3G ARQUITECTURA TEXTIL', margen, y, {
-        width: anchoTicket - (margen * 2),
-        align: 'center'
-      });
-      y += 20;
+      // === LOGO ===
+      if (logoBuffer) {
+        try {
+          const logoWidth = 180;
+          const logoHeight = 45; // Aproximado
+          const logoX = (anchoTicket - logoWidth) / 2;
+          doc.image(logoBuffer, logoX, y, { width: logoWidth });
+          y += logoHeight + 8;
+        } catch (e) {
+          console.error('Error insertando logo:', e.message);
+          // Fallback: texto
+          doc.fontSize(12).font('Helvetica-Bold');
+          doc.text('3G ARQUITECTURA TEXTIL', margen, y, { width: anchoUtil, align: 'center' });
+          y += 20;
+        }
+      } else {
+        // Fallback sin logo
+        doc.fontSize(12).font('Helvetica-Bold');
+        doc.text('3G ARQUITECTURA TEXTIL', margen, y, { width: anchoUtil, align: 'center' });
+        y += 20;
+      }
 
-      doc.fontSize(10).font('Helvetica-Bold');
-      doc.text('ORDEN DE SALIDA', margen, y, {
-        width: anchoTicket - (margen * 2),
-        align: 'center'
-      });
-      y += 18;
+      // === INFORMACIÓN CENTRADA (ESTILO FRONTEND) ===
+      doc.fontSize(7);
 
-      // Línea divisoria
-      doc.moveTo(margen, y).lineTo(anchoTicket - margen, y).stroke();
+      // Supervisor
+      doc.font('Helvetica-Bold');
+      doc.text('SUPERVISOR', margen, y, { width: anchoUtil, align: 'center' });
       y += 10;
+      doc.font('Helvetica');
+      doc.text(datos.creador || 'N/A', margen, y, { width: anchoUtil, align: 'center' });
+      y += 12;
 
-      // === DATOS DEL PEDIDO ===
-      doc.fontSize(9).font('Helvetica-Bold');
-      doc.text(`TICKET: ${datos.ticket_id}`, margen, y);
-      y += 14;
+      // Proyecto
+      doc.font('Helvetica-Bold');
+      doc.text('PROYECTO', margen, y, { width: anchoUtil, align: 'center' });
+      y += 10;
+      doc.font('Helvetica');
+      const proyecto = datos.proyecto || 'Sin proyecto';
+      doc.text(proyecto, margen, y, { width: anchoUtil, align: 'center' });
+      y += 12;
 
-      doc.fontSize(8).font('Helvetica');
-      const fecha = new Date(datos.fecha).toLocaleString('es-MX', {
+      // Fecha
+      doc.font('Helvetica-Bold');
+      doc.text('FECHA DE SALIDA', margen, y, { width: anchoUtil, align: 'center' });
+      y += 10;
+      doc.font('Helvetica');
+      const fecha = new Date(datos.fecha).toLocaleDateString('es-MX', {
         day: '2-digit',
         month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        year: 'numeric'
       });
-      doc.text(`Fecha: ${fecha}`, margen, y);
-      y += 12;
+      doc.text(fecha, margen, y, { width: anchoUtil, align: 'center' });
+      y += 15;
 
-      doc.text(`Proyecto: ${datos.proyecto}`, margen, y);
-      y += 12;
-
-      doc.text(`Solicitado por: ${datos.creador}`, margen, y);
-      y += 12;
-
-      if (datos.ubicacion_destino && datos.ubicacion_destino !== 'N/A') {
-        doc.text(`Destino: ${datos.ubicacion_destino}`, margen, y);
-        y += 12;
-      }
-      y += 5;
+      // === TÍTULO PRINCIPAL ===
+      doc.fontSize(10).font('Helvetica-Bold');
+      doc.text('ORDEN DE SALIDA', margen, y, { width: anchoUtil, align: 'center' });
+      y += 15;
 
       // Línea divisoria
+      doc.strokeColor('#cccccc').lineWidth(0.5);
       doc.moveTo(margen, y).lineTo(anchoTicket - margen, y).stroke();
-      y += 10;
+      y += 8;
 
-      // === ARTÍCULOS ===
-      doc.fontSize(8).font('Helvetica-Bold');
-      doc.text('ARTÍCULOS A DISPERSAR', margen, y);
-      y += 12;
+      // === ARTÍCULOS AGRUPADOS POR CATEGORÍA ===
+      doc.fontSize(7);
 
-      doc.fontSize(7).font('Helvetica');
-      for (const art of datos.articulos) {
-        // Checkbox visual + nombre del artículo
-        doc.font('Helvetica-Bold');
-        doc.text(`☐ ${art.nombre}`, margen, y, { width: anchoTicket - (margen * 2) });
-        y += doc.heightOfString(art.nombre, { width: anchoTicket - (margen * 2) }) + 2;
+      Object.keys(articulosPorCategoria).forEach(categoria => {
+        // Nombre de categoría
+        doc.font('Helvetica-Bold').fontSize(8);
+        doc.text(categoria.toUpperCase(), margen, y);
+        y += 12;
 
-        // Cantidad y ubicación
-        doc.font('Helvetica');
-        let detalle = `  Cant: ${art.cantidad} ${art.unidad}`;
-        if (art.ubicacion && art.ubicacion !== 'N/A') {
-          detalle += ` | Ubic: ${art.ubicacion}`;
-        }
-        doc.text(detalle, margen, y);
-        y += 10;
-      }
-      y += 5;
+        // Lista de artículos
+        doc.font('Helvetica').fontSize(7);
+        articulosPorCategoria[categoria].forEach(art => {
+          const texto = `• ${art.nombre} - ${art.cantidad} ${art.unidad || 'pz'}`;
+          doc.font('Helvetica-Bold');
+          doc.text(texto, margen, y, { width: anchoUtil });
+          y += doc.heightOfString(texto, { width: anchoUtil }) + 4;
+        });
+
+        y += 5; // Espacio entre categorías
+      });
 
       // Línea divisoria
+      doc.strokeColor('#cccccc').lineWidth(0.5);
       doc.moveTo(margen, y).lineTo(anchoTicket - margen, y).stroke();
       y += 10;
 
       // === TOTAL ===
-      doc.fontSize(10).font('Helvetica-Bold');
-      doc.text(`TOTAL: ${datos.total_piezas} piezas`, margen, y, {
-        width: anchoTicket - (margen * 2),
+      doc.fontSize(9).font('Helvetica-Bold');
+      doc.text(`TOTAL: ${datos.total_piezas || articulos.length} piezas`, margen, y, {
+        width: anchoUtil,
         align: 'right'
       });
       y += 18;
 
-      // === OBSERVACIONES ===
-      if (datos.observaciones) {
-        doc.fontSize(7).font('Helvetica');
-        doc.text(`Obs: ${datos.observaciones}`, margen, y, {
-          width: anchoTicket - (margen * 2)
-        });
-        y += doc.heightOfString(datos.observaciones, { width: anchoTicket - (margen * 2) }) + 5;
-      }
-
       // === FIRMAS ===
-      y += 15;
-      doc.fontSize(7).font('Helvetica');
+      y += 5;
+      doc.fontSize(6).font('Helvetica');
       doc.text('_____________________', margen, y);
       doc.text('_____________________', anchoTicket / 2 + 5, y);
       y += 10;
       doc.text('Entregó (Almacén)', margen, y);
       doc.text('Recibió', anchoTicket / 2 + 5, y);
-      y += 20;
+      y += 15;
 
-      // === FOOTER ===
-      doc.fontSize(6).font('Helvetica');
-      doc.text('Sistema de Inventario 3G', margen, y, {
-        width: anchoTicket - (margen * 2),
-        align: 'center'
-      });
-      y += 20;
+      // === TICKET ID ===
+      doc.fontSize(5).font('Helvetica');
+      doc.text(`Ticket: ${datos.ticket_id}`, margen, y, { width: anchoUtil, align: 'center' });
 
       doc.end();
     } catch (error) {
@@ -400,38 +446,59 @@ async function procesarTrabajo(jobId, job) {
   }
 }
 
-// ===== LISTENER DE FIREBASE =====
+// ===== POLLING DE FIREBASE (más confiable que listeners) =====
 
-const unsubscribe = db.collection('cola_impresion')
-  .where('estado', '==', 'pendiente')
-  .onSnapshot(
-    snapshot => {
-      snapshot.docChanges().forEach(change => {
-        if (change.type === 'added') {
-          const job = change.doc.data();
-          const jobId = change.doc.id;
-          procesarTrabajo(jobId, job);
-        }
-      });
-    },
-    error => {
-      console.error('❌ Error en listener de Firebase:', error);
+const POLL_INTERVAL = 10000; // 10 segundos
+let isProcessing = false;
+
+async function verificarTrabajosPendientes() {
+  if (isProcessing) return;
+
+  try {
+    isProcessing = true;
+
+    const snapshot = await db.collection('cola_impresion')
+      .where('estado', '==', 'pendiente')
+      .get();
+
+    if (!snapshot.empty) {
+      console.log(`📋 Encontrados ${snapshot.size} trabajo(s) pendiente(s)`);
+
+      for (const doc of snapshot.docs) {
+        const job = doc.data();
+        const jobId = doc.id;
+        await procesarTrabajo(jobId, job);
+      }
     }
-  );
+  } catch (error) {
+    console.error('❌ Error al verificar trabajos:', error.message);
+  } finally {
+    isProcessing = false;
+  }
+}
+
+// Iniciar polling
+const pollInterval = setInterval(verificarTrabajosPendientes, POLL_INTERVAL);
+
+// Verificar inmediatamente al inicio
+verificarTrabajosPendientes();
+
+console.log(`⏱️  Verificando trabajos cada ${POLL_INTERVAL / 1000} segundos`);
 
 // ===== MANEJO DE CIERRE =====
 
 process.on('SIGINT', () => {
   console.log('\n👋 Cerrando agente de impresión...');
-  unsubscribe();
+  clearInterval(pollInterval);
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   console.log('\n👋 Cerrando agente de impresión...');
-  unsubscribe();
+  clearInterval(pollInterval);
   process.exit(0);
 });
 
 console.log('✅ Agente de impresión iniciado');
 console.log('   Presiona Ctrl+C para detener\n');
+
