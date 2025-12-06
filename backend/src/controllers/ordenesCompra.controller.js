@@ -14,6 +14,7 @@ import {
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { notificarPorRol } from './notificaciones.controller.js';
+import admin from '../config/firebase-admin.js'; // Importar Firebase Admin
 
 /**
  * Crear una nueva orden de compra
@@ -183,6 +184,43 @@ export const crearOrdenCompra = async (req, res) => {
       console.error('Error al enviar notificación:', notifError);
       // No fallar la creación de la orden si falla la notificación
     }
+
+    // --- INTEGRACIÓN IMPRESIÓN AUTOMÁTICA ---
+    try {
+      const db = admin.firestore();
+
+      // Preparar datos de la orden para el agente de impresión
+      const datosOrden = {
+        ticket_id: ticket_id,
+        fecha: new Date().toISOString(),
+        proveedor: ordenCompleta.proveedor?.nombre || 'Sin proveedor',
+        creador: ordenCompleta.creador?.nombre || 'Sistema',
+        total_estimado: totalEstimado,
+        observaciones: observaciones || '',
+        articulos: ordenCompleta.detalles.map(d => ({
+          nombre: d.articulo?.nombre || 'Artículo',
+          cantidad: d.cantidad_solicitada,
+          unidad: d.articulo?.unidad || 'pz',
+          costo_unitario: d.costo_unitario,
+          subtotal: d.subtotal
+        }))
+      };
+
+      await db.collection('cola_impresion').add({
+        tipo: 'orden_compra',
+        datos: datosOrden,
+        orden_id: ordenCompra.id,
+        ticket_id: ticket_id,
+        estado: 'pendiente',
+        created_at: new Date(),
+        printer: 'TicketPrinter'
+      });
+      console.log(`🖨️ Solicitud de impresión enviada a Firebase para orden ${ticket_id}`);
+    } catch (printError) {
+      console.error('❌ Error al enviar a cola de impresión:', printError);
+      // No bloqueamos la respuesta si falla la impresión
+    }
+    // ----------------------------------------
 
     res.status(201).json({
       success: true,
@@ -397,12 +435,6 @@ export const listarSolicitudesCompra = async (req, res) => {
           ]
         },
         {
-          model: Proveedor,
-          as: 'proveedor',
-          required: false,
-          attributes: ['id', 'nombre', 'contacto', 'telefono', 'email']
-        },
-        {
           model: Usuario,
           as: 'solicitante',
           attributes: ['id', 'nombre', 'email', 'rol']
@@ -557,6 +589,167 @@ export const actualizarEstadoOrden = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al actualizar el estado',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Actualizar una orden de compra existente
+ * - Solo se pueden actualizar órdenes en estado 'borrador'
+ * - Permite actualizar proveedor, observaciones, fecha estimada y artículos
+ * - Recalcula el total estimado
+ */
+export const actualizarOrdenCompra = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+    const { articulos, proveedor_id, observaciones, fecha_llegada_estimada } = req.body;
+    const usuario_rol = req.usuario.rol;
+
+    // Validar permisos
+    if (!['compras', 'almacen', 'administrador'].includes(usuario_rol)) {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        message: 'No tiene permisos para actualizar órdenes de compra'
+      });
+    }
+
+    // Buscar la orden
+    const orden = await OrdenCompra.findByPk(id, {
+      include: [
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalles',
+          include: [{ model: Articulo, as: 'articulo' }]
+        }
+      ]
+    });
+
+    if (!orden) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Orden de compra no encontrada'
+      });
+    }
+
+    // Verificar que la orden está en estado 'borrador'
+    if (orden.estado !== 'borrador') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Solo se pueden editar órdenes en estado borrador'
+      });
+    }
+
+    // Validaciones de artículos si se proporcionan
+    if (articulos && Array.isArray(articulos) && articulos.length > 0) {
+      // Validar que los artículos existen
+      const articuloIds = articulos.map(a => a.articulo_id);
+      const articulosDB = await Articulo.findAll({
+        where: { id: articuloIds, activo: true }
+      });
+
+      if (articulosDB.length !== articuloIds.length) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Uno o más artículos no existen o están inactivos'
+        });
+      }
+
+      // Crear mapa de artículos por ID
+      const articulosMap = {};
+      articulosDB.forEach(art => {
+        articulosMap[art.id] = art;
+      });
+
+      // Eliminar detalles existentes
+      await DetalleOrdenCompra.destroy({
+        where: { orden_compra_id: id },
+        transaction
+      });
+
+      // Crear nuevos detalles
+      let total_estimado = 0;
+
+      for (const item of articulos) {
+        const articulo = articulosMap[item.articulo_id];
+        const cantidad = parseFloat(item.cantidad);
+        const costo_unitario = parseFloat(item.costo_unitario || articulo.costo_unitario || 0);
+        const subtotal = cantidad * costo_unitario;
+
+        await DetalleOrdenCompra.create({
+          orden_compra_id: orden.id,
+          articulo_id: item.articulo_id,
+          cantidad_solicitada: cantidad,
+          costo_unitario: costo_unitario,
+          subtotal: subtotal,
+          cantidad_recibida: 0
+        }, { transaction });
+
+        total_estimado += subtotal;
+      }
+
+      // Actualizar total estimado
+      orden.total_estimado = total_estimado;
+    }
+
+    // Actualizar campos de la orden
+    if (proveedor_id !== undefined) {
+      orden.proveedor_id = proveedor_id;
+    }
+
+    if (observaciones !== undefined) {
+      orden.observaciones = observaciones;
+    }
+
+    if (fecha_llegada_estimada !== undefined) {
+      orden.fecha_llegada_estimada = fecha_llegada_estimada;
+    }
+
+    await orden.save({ transaction });
+
+    // Commit de la transacción
+    await transaction.commit();
+
+    // Obtener la orden actualizada con todas las relaciones
+    const ordenActualizada = await OrdenCompra.findByPk(id, {
+      include: [
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalles',
+          include: [
+            {
+              model: Articulo,
+              as: 'articulo',
+              include: [
+                { model: Categoria, as: 'categoria' },
+                { model: Ubicacion, as: 'ubicacion' }
+              ]
+            }
+          ]
+        },
+        { model: Proveedor, as: 'proveedor' },
+        { model: Usuario, as: 'usuarioCreador', attributes: ['id', 'nombre', 'email'] }
+      ]
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Orden de compra actualizada exitosamente',
+      data: { orden: ordenActualizada }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al actualizar orden de compra:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar la orden de compra',
       error: error.message
     });
   }
