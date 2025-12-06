@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X } from 'lucide-react';
+import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import articulosService from '../services/articulos.service';
 import proveedoresService from '../services/proveedores.service';
@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import EAN13ScannerOrdenesCompra from '../components/scanner/EAN13ScannerOrdenesCompra';
 import { jsPDF } from 'jspdf';
 import AnularOrdenCompraModal from '../components/ordenes-compra/AnularOrdenCompraModal';
+import EditarOrdenModal from '../components/ordenes/EditarOrdenModal';
 
 const OrdenesCompraPage = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -18,7 +19,7 @@ const OrdenesCompraPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
-  const [mostrarCanceladas, setMostrarCanceladas] = useState(false);
+  const [vistaOrdenes, setVistaOrdenes] = useState('activas'); // 'activas', 'completadas', 'canceladas'
   const [vistaActual, setVistaActual] = useState('solicitudes'); // 'solicitudes' o 'ordenes'
   const [modalNuevaOrden, setModalNuevaOrden] = useState(false);
   const [modalDetalle, setModalDetalle] = useState(false);
@@ -31,6 +32,10 @@ const OrdenesCompraPage = () => {
   const [modalCancelarSolicitud, setModalCancelarSolicitud] = useState(false);
   const [solicitudACancelar, setSolicitudACancelar] = useState(null);
   const [cantidadesSolicitudesEditadas, setCantidadesSolicitudesEditadas] = useState({});
+
+  // Estados para edición de orden
+  const [modalEditarOrden, setModalEditarOrden] = useState(false);
+  const [ordenAEditar, setOrdenAEditar] = useState(null);
 
   // Estados para búsqueda y creación de solicitudes
   const [busquedaArticulo, setBusquedaArticulo] = useState('');
@@ -157,7 +162,15 @@ const OrdenesCompraPage = () => {
     try {
       await ordenesCompraService.enviarOrden(ordenId);
       toast.success('Orden enviada al proveedor');
-      fetchData();
+
+      // Recargar la lista de órdenes
+      await fetchData();
+
+      // Si hay una orden seleccionada en el modal, actualizarla
+      if (ordenSeleccionada && ordenSeleccionada.id === ordenId) {
+        const data = await ordenesCompraService.obtenerOrden(ordenId);
+        setOrdenSeleccionada(data.data?.orden);
+      }
     } catch (error) {
       toast.error('Error al enviar la orden');
     }
@@ -189,6 +202,31 @@ const OrdenesCompraPage = () => {
     setOrdenSeleccionada(null);
     return response;
   };
+
+
+  const handleAbrirModalEditar = (orden) => {
+    setOrdenAEditar(orden);
+    setModalEditarOrden(true);
+    setModalDetalle(false); // Cerrar el modal de detalle
+  };
+
+  const handleEdicionExitosa = async (ordenActualizada) => {
+    // Recargar datos
+    await fetchData();
+    await fetchEstadisticas();
+
+    // Cerrar modal de edición
+    setModalEditarOrden(false);
+    setOrdenAEditar(null);
+
+    // Abrir modal de detalle con la orden actualizada
+    if (ordenActualizada) {
+      const data = await ordenesCompraService.obtenerOrden(ordenActualizada.id);
+      setOrdenSeleccionada(data.data?.orden);
+      setModalDetalle(true);
+    }
+  };
+
 
   const handleAbrirModalCancelarSolicitud = (solicitud, e) => {
     e.stopPropagation(); // Evitar que se abra el modal de crear orden
@@ -637,10 +675,20 @@ const OrdenesCompraPage = () => {
 
     const matchesEstado = !filterEstado || orden.estado === filterEstado;
 
-    // Ocultar órdenes canceladas por defecto (a menos que se active el toggle)
-    const matchesCanceladas = mostrarCanceladas || orden.estado !== 'cancelada';
+    // Filtrar según la vista seleccionada
+    let matchesVista = true;
+    if (vistaOrdenes === 'activas') {
+      // Vista activas: mostrar solo borrador, enviada, parcial (excluir recibida y cancelada)
+      matchesVista = orden.estado !== 'recibida' && orden.estado !== 'cancelada';
+    } else if (vistaOrdenes === 'completadas') {
+      // Vista completadas: mostrar SOLO recibida
+      matchesVista = orden.estado === 'recibida';
+    } else if (vistaOrdenes === 'canceladas') {
+      // Vista canceladas: mostrar SOLO cancelada
+      matchesVista = orden.estado === 'cancelada';
+    }
 
-    return matchesSearch && matchesEstado && matchesCanceladas;
+    return matchesSearch && matchesEstado && matchesVista;
   });
 
   // Mostrar todas las solicitudes sin filtros
@@ -848,15 +896,39 @@ const OrdenesCompraPage = () => {
               <option value="cancelada">Cancelada</option>
             </select>
 
-            <label className="flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-              <input
-                type="checkbox"
-                checked={mostrarCanceladas}
-                onChange={(e) => setMostrarCanceladas(e.target.checked)}
-                className="w-4 h-4 text-red-700 rounded focus:ring-red-700 focus:ring-2"
-              />
-              <span className="text-sm text-gray-700 whitespace-nowrap">Mostrar canceladas</span>
-            </label>
+            {/* Botones de vista */}
+            <div className="flex items-center gap-2 border border-gray-300 rounded-lg p-1 bg-gray-50">
+              <button
+                onClick={() => setVistaOrdenes('activas')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  vistaOrdenes === 'activas'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Activas
+              </button>
+              <button
+                onClick={() => setVistaOrdenes('completadas')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  vistaOrdenes === 'completadas'
+                    ? 'bg-green-600 text-white shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Completadas
+              </button>
+              <button
+                onClick={() => setVistaOrdenes('canceladas')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  vistaOrdenes === 'canceladas'
+                    ? 'bg-red-600 text-white shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Canceladas
+              </button>
+            </div>
 
             {puedeCrearOrdenes && (
               <Button
@@ -1233,6 +1305,8 @@ const OrdenesCompraPage = () => {
           onActualizarEstado={handleActualizarEstado}
           puedeAnularOrdenes={puedeAnularOrdenes}
           onAbrirModalAnular={handleAbrirModalAnular}
+          onEnviarOrden={handleEnviarOrden}
+          onEditarOrden={handleAbrirModalEditar}
         />
       )}
 
@@ -1275,6 +1349,19 @@ const OrdenesCompraPage = () => {
           }}
           solicitud={solicitudACancelar}
           onCancelar={handleCancelarSolicitud}
+        />
+      )}
+
+      {/* Modal Editar Orden */}
+      {modalEditarOrden && ordenAEditar && (
+        <EditarOrdenModal
+          isOpen={modalEditarOrden}
+          onClose={() => {
+            setModalEditarOrden(false);
+            setOrdenAEditar(null);
+          }}
+          orden={ordenAEditar}
+          onSuccess={handleEdicionExitosa}
         />
       )}
 
@@ -1910,8 +1997,9 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
 };
 
 // Modal para ver detalle de orden con trazabilidad
-const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, onAbrirModalAnular }) => {
+const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, onAbrirModalAnular, onEnviarOrden, onEditarOrden }) => {
   const [tabActual, setTabActual] = React.useState('detalle'); // 'detalle' o 'historial'
+  const esBorrador = orden && orden.estado === 'borrador';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Orden ${orden.ticket_id}`} size="xl">
@@ -2023,40 +2111,86 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
             </div>
           )}
 
-          <div className="flex gap-3 justify-end mt-6">
-            {puedeAnularOrdenes && orden.estado !== 'cancelada' && (
-              <Button
-                onClick={() => onAbrirModalAnular(orden)}
-                variant="danger"
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                <RotateCcw size={16} />
-                Anular Orden
+          <div className="flex gap-3 justify-between mt-6">
+            <div className="flex gap-3">
+              {esBorrador && onEditarOrden && (
+                <Button
+                  onClick={() => onEditarOrden(orden)}
+                  variant="secondary"
+                  className="bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
+                >
+                  <Edit size={16} />
+                  Editar
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-3">
+              {esBorrador && onEnviarOrden && (
+                <button
+                  onClick={() => onEnviarOrden(orden.id)}
+                  className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Send size={16} />
+                  Enviar Orden
+                </button>
+              )}
+              {puedeAnularOrdenes && orden.estado !== 'cancelada' && (
+                <Button
+                  onClick={() => onAbrirModalAnular(orden)}
+                  variant="danger"
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <RotateCcw size={16} />
+                  Anular Orden
+                </Button>
+              )}
+              <Button onClick={onClose} variant="secondary">
+                Cerrar
               </Button>
-            )}
-            <Button onClick={onClose} variant="secondary">
-              Cerrar
-            </Button>
+            </div>
           </div>
         </div>
       ) : (
         <div>
           <TimelineHistorial ordenId={orden.id} />
 
-          <div className="flex gap-3 justify-end mt-6">
-            {puedeAnularOrdenes && orden.estado !== 'cancelada' && (
-              <Button
-                onClick={() => onAbrirModalAnular(orden)}
-                variant="danger"
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                <RotateCcw size={16} />
-                Anular Orden
+          <div className="flex gap-3 justify-between mt-6">
+            <div className="flex gap-3">
+              {esBorrador && onEditarOrden && (
+                <Button
+                  onClick={() => onEditarOrden(orden)}
+                  variant="secondary"
+                  className="bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
+                >
+                  <Edit size={16} />
+                  Editar
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-3">
+              {esBorrador && onEnviarOrden && (
+                <button
+                  onClick={() => onEnviarOrden(orden.id)}
+                  className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Send size={16} />
+                  Enviar Orden
+                </button>
+              )}
+              {puedeAnularOrdenes && orden.estado !== 'cancelada' && (
+                <Button
+                  onClick={() => onAbrirModalAnular(orden)}
+                  variant="danger"
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <RotateCcw size={16} />
+                  Anular Orden
+                </Button>
+              )}
+              <Button onClick={onClose} variant="secondary">
+                Cerrar
               </Button>
-            )}
-            <Button onClick={onClose} variant="secondary">
-              Cerrar
-            </Button>
+            </div>
           </div>
         </div>
       )}

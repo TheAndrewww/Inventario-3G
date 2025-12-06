@@ -6,6 +6,7 @@ import {
   listarSolicitudesCompra,
   enviarOrdenCompra,
   actualizarEstadoOrden,
+  actualizarOrdenCompra,
   crearOrdenDesdeSolicitudes,
   obtenerEstadisticas,
   obtenerHistorialTrazabilidad,
@@ -31,6 +32,11 @@ router.post('/ordenes-compra/desde-solicitudes', crearOrdenDesdeSolicitudes);
 router.get('/ordenes-compra', listarOrdenesCompra);
 router.get('/ordenes-compra/:id', obtenerOrdenCompra);
 router.get('/ordenes-compra/:id/historial', obtenerHistorialTrazabilidad);
+router.put(
+  '/ordenes-compra/:id',
+  verificarRol('compras', 'almacen', 'administrador'),
+  actualizarOrdenCompra
+);
 router.put('/ordenes-compra/:id/enviar', enviarOrdenCompra);
 router.put('/ordenes-compra/:id/estado', actualizarEstadoOrden);
 router.put(

@@ -8,7 +8,7 @@ import PrivateRoute from './components/auth/PrivateRoute';
 import DashboardLayout from './components/layout/DashboardLayout';
 import LoginPage from './pages/LoginPage';
 import InventarioPage from './pages/InventarioPage';
-import EntradaInventarioPage from './pages/EntradaInventarioPage';
+import RecepcionMercanciaPage from './pages/RecepcionMercanciaPage';
 import PedidoPage from './pages/PedidoPage';
 import PedidosPendientesPage from './pages/PedidosPendientesPage';
 import RecibirPedidosPage from './pages/RecibirPedidosPage';
@@ -74,7 +74,7 @@ function App() {
             >
               <Route index element={<Navigate to="/inventario" replace />} />
               <Route path="inventario" element={<InventarioPage />} />
-              <Route path="entrada-inventario" element={<EntradaInventarioPage />} />
+              <Route path="recepcion-mercancia" element={<RecepcionMercanciaPage />} />
               <Route path="pedido" element={<PedidoPage />} />
               <Route path="pedidos-pendientes" element={<PedidosPendientesPage />} />
               <Route path="recibir-pedidos" element={<RecibirPedidosPage />} />

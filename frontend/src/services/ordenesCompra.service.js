@@ -20,6 +20,12 @@ const ordenesCompraService = {
     return response.data;
   },
 
+  // Actualizar orden de compra (solo en estado borrador)
+  actualizarOrden: async (id, ordenData) => {
+    const response = await api.put(`/ordenes-compra/${id}`, ordenData);
+    return response.data;
+  },
+
   // Enviar orden al proveedor
   enviarOrden: async (id) => {
     const response = await api.put(`/ordenes-compra/${id}/enviar`);
@@ -83,6 +89,34 @@ const ordenesCompraService = {
       prioridad,
       motivo
     });
+    return response.data;
+  },
+
+  // ============================================
+  // NUEVOS MÉTODOS: RECEPCIÓN DE MERCANCÍA
+  // ============================================
+
+  // Recibir mercancía de una orden de compra (parcial o total)
+  recibirMercancia: async (id, data) => {
+    const response = await api.post(`/ordenes-compra/${id}/recibir`, data);
+    return response.data;
+  },
+
+  // Obtener historial de recepciones de una orden
+  obtenerHistorialRecepciones: async (id) => {
+    const response = await api.get(`/ordenes-compra/${id}/recepciones`);
+    return response.data;
+  },
+
+  // Obtener progreso de recepción por artículo
+  obtenerProgresoRecepcion: async (id) => {
+    const response = await api.get(`/ordenes-compra/${id}/progreso`);
+    return response.data;
+  },
+
+  // Completar orden manualmente (cuando el proveedor no enviará el resto)
+  completarManualmente: async (id, motivo) => {
+    const response = await api.put(`/ordenes-compra/${id}/completar`, { motivo });
     return response.data;
   }
 };

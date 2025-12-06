@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackagePlus, Calendar, Wand2 } from 'lucide-react';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -16,10 +16,10 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       roles: ['administrador', 'diseñador', 'almacen', 'ventas']
     },
     {
-      path: '/entrada-inventario',
-      icon: PackagePlus,
-      label: 'Entrada Inventario',
-      roles: ['administrador', 'almacen', 'ventas']
+      path: '/recepcion-mercancia',
+      icon: PackageCheck,
+      label: 'Recepción Mercancía',
+      roles: ['administrador', 'almacen', 'compras']
     },
     {
       path: '/procesamiento-masivo',
