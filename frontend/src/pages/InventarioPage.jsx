@@ -1165,6 +1165,26 @@ const InventarioPage = () => {
     });
   };
 
+  // Seleccionar/deseleccionar todas las unidades de una herramienta
+  const handleSeleccionarTodasUnidades = (articuloId) => {
+    const unidades = unidadesCargadasEtiquetas[articuloId] || [];
+    if (unidades.length === 0) return;
+
+    const idsUnidades = unidades.map(u => u.id);
+    const todasSeleccionadas = idsUnidades.every(id => unidadesSeleccionadasEtiquetas.includes(id));
+
+    if (todasSeleccionadas) {
+      // Deseleccionar todas
+      setUnidadesSeleccionadasEtiquetas(prev => prev.filter(id => !idsUnidades.includes(id)));
+    } else {
+      // Seleccionar todas
+      setUnidadesSeleccionadasEtiquetas(prev => {
+        const conjunto = new Set([...prev, ...idsUnidades]);
+        return Array.from(conjunto);
+      });
+    }
+  };
+
   const handleGenerarEtiquetas = async () => {
     if (articulosSeleccionadosEtiquetas.length === 0 && unidadesSeleccionadasEtiquetas.length === 0) {
       toast.error('Debes seleccionar al menos un artículo o unidad de herramienta');
@@ -3172,41 +3192,60 @@ const InventarioPage = () => {
                       {esHerramienta && estaExpandida && (
                         <div className="bg-gray-50 border-t border-gray-200">
                           {unidades.length > 0 ? (
-                            unidades.map((unidad) => (
-                              <label
-                                key={unidad.id}
-                                className="flex items-center gap-4 p-3 pl-12 hover:bg-gray-100 cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={unidadesSeleccionadasEtiquetas.includes(unidad.id)}
-                                  onChange={() => handleToggleUnidadEtiqueta(unidad.id)}
-                                  className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-mono font-bold text-red-600 text-sm">
-                                      {unidad.codigo_unico}
-                                    </span>
-                                    {unidad.etiquetado && (
-                                      <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 font-semibold rounded border border-green-300">
-                                        ✓ Etiquetado
+                            <>
+                              {/* Header con botón Seleccionar Todas */}
+                              <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b border-gray-200">
+                                <span className="text-xs text-gray-600 font-medium">
+                                  {unidades.length} unidad(es) • {unidades.filter(u => unidadesSeleccionadasEtiquetas.includes(u.id)).length} seleccionada(s)
+                                </span>
+                                <button
+                                  onClick={() => handleSeleccionarTodasUnidades(articulo.id)}
+                                  className={`text-xs font-semibold px-3 py-1 rounded transition-colors ${unidades.every(u => unidadesSeleccionadasEtiquetas.includes(u.id))
+                                    ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                    }`}
+                                >
+                                  {unidades.every(u => unidadesSeleccionadasEtiquetas.includes(u.id))
+                                    ? '✓ Deseleccionar todas'
+                                    : 'Seleccionar todas'}
+                                </button>
+                              </div>
+                              {unidades.map((unidad) => (
+                                <label
+                                  key={unidad.id}
+                                  className="flex items-center gap-4 p-3 pl-12 hover:bg-gray-100 cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={unidadesSeleccionadasEtiquetas.includes(unidad.id)}
+                                    onChange={() => handleToggleUnidadEtiqueta(unidad.id)}
+                                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-mono font-bold text-red-600 text-sm">
+                                        {unidad.codigo_unico}
                                       </span>
-                                    )}
-                                    <span className={`text-xs px-2 py-0.5 rounded-full ${unidad.estado === 'disponible' ? 'bg-green-100 text-green-800' :
-                                      unidad.estado === 'asignada' ? 'bg-blue-100 text-blue-800' :
-                                        'bg-gray-100 text-gray-800'
-                                      }`}>
-                                      {unidad.estado === 'disponible' ? 'Disponible' :
-                                        unidad.estado === 'asignada' ? 'Asignada' : unidad.estado}
-                                    </span>
+                                      {unidad.etiquetado && (
+                                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 font-semibold rounded border border-green-300">
+                                          ✓ Etiquetado
+                                        </span>
+                                      )}
+                                      <span className={`text-xs px-2 py-0.5 rounded-full ${unidad.estado === 'disponible' ? 'bg-green-100 text-green-800' :
+                                        unidad.estado === 'asignada' ? 'bg-blue-100 text-blue-800' :
+                                          'bg-gray-100 text-gray-800'
+                                        }`}>
+                                        {unidad.estado === 'disponible' ? 'Disponible' :
+                                          unidad.estado === 'asignada' ? 'Asignada' : unidad.estado}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                      ID: #{unidad.id}
+                                    </p>
                                   </div>
-                                  <p className="text-xs text-gray-500 mt-0.5">
-                                    ID: #{unidad.id}
-                                  </p>
-                                </div>
-                              </label>
-                            ))
+                                </label>
+                              ))}
+                            </>
                           ) : (
                             <div className="p-3 pl-12 text-sm text-gray-500">
                               Cargando unidades...
