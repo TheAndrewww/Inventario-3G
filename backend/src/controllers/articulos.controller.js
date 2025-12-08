@@ -827,10 +827,14 @@ export const updateArticulo = async (req, res) => {
                             const numeroActual = numeroInicial + i;
                             const codigoUnico = `${prefijo}-${numeroActual.toString().padStart(3, '0')}`;
 
+                            // Generar EAN13 temporal de 13 dígitos basado en timestamp
+                            const timestamp = Date.now().toString().slice(-10);
+                            const codigoEAN13Temp = `999${timestamp}`.slice(0, 13);
+
                             await UnidadHerramientaRenta.create({
                                 tipo_herramienta_id: tipoHerramienta.id,
                                 codigo_unico: codigoUnico,
-                                codigo_ean13: `TEMP-${Date.now()}-${i}`,
+                                codigo_ean13: codigoEAN13Temp,
                                 estado: 'disponible',
                                 activo: true
                             });
