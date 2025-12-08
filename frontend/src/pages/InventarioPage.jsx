@@ -60,6 +60,7 @@ const InventarioPage = () => {
   const [loadingEtiquetas, setLoadingEtiquetas] = useState(false);
   const [herramientasExpandidasEtiquetas, setHerramientasExpandidasEtiquetas] = useState({});
   const [unidadesCargadasEtiquetas, setUnidadesCargadasEtiquetas] = useState({});
+  const [filtroUbicacionEtiquetas, setFiltroUbicacionEtiquetas] = useState('todos'); // Nuevo: filtro por ubicación
 
   // Estados para expansión de herramientas y sus unidades
   const [herramientasExpandidas, setHerramientasExpandidas] = useState({});
@@ -948,6 +949,7 @@ const InventarioPage = () => {
     setModalEtiquetasOpen(true);
     setArticulosSeleccionadosEtiquetas([]);
     setBusquedaEtiquetas('');
+    setFiltroUbicacionEtiquetas('todos'); // Reset filtro de ubicación
   };
 
   // ========== GESTIÓN DE ALMACENES ==========
@@ -1071,12 +1073,17 @@ const InventarioPage = () => {
       articulosActivos = articulosActivos.filter(a => a.es_herramienta);
     }
 
+    // Aplicar filtro de ubicación
+    if (filtroUbicacionEtiquetas !== 'todos') {
+      articulosActivos = articulosActivos.filter(a => a.ubicacion_id === parseInt(filtroUbicacionEtiquetas));
+    }
+
     // Aplicar filtro de búsqueda
     const articulosFiltrados = busquedaEtiquetas.length > 0
       ? articulosActivos.filter(a =>
-          a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
-          a.codigo_ean13?.toLowerCase().includes(busquedaEtiquetas.toLowerCase())
-        )
+        a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
+        a.codigo_ean13?.toLowerCase().includes(busquedaEtiquetas.toLowerCase())
+      )
       : articulosActivos;
 
     const todosSeleccionados = articulosFiltrados.every(a =>
@@ -1258,21 +1265,19 @@ const InventarioPage = () => {
           <div className="flex bg-gray-100 rounded-lg p-1 flex-1 sm:flex-initial">
             <button
               onClick={() => setTabActivo('consumibles')}
-              className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${
-                tabActivo === 'consumibles'
-                  ? 'bg-white text-red-700 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${tabActivo === 'consumibles'
+                ? 'bg-white text-red-700 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
               📦 Consumibles
             </button>
             <button
               onClick={() => setTabActivo('herramientas')}
-              className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${
-                tabActivo === 'herramientas'
-                  ? 'bg-white text-red-700 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${tabActivo === 'herramientas'
+                ? 'bg-white text-red-700 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
               🔧 Herramientas
             </button>
@@ -1302,22 +1307,20 @@ const InventarioPage = () => {
 
           <button
             onClick={() => setMostrarCategorias(!mostrarCategorias)}
-            className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border rounded-lg transition-colors ${
-              mostrarCategorias
-                ? 'bg-red-700 text-white border-red-700 hover:bg-red-800'
-                : 'border-gray-300 hover:bg-gray-50'
-            }`}
+            className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border rounded-lg transition-colors ${mostrarCategorias
+              ? 'bg-red-700 text-white border-red-700 hover:bg-red-800'
+              : 'border-gray-300 hover:bg-gray-50'
+              }`}
           >
             <Package size={18} />
             <span className="hidden sm:inline">Categorías</span>
           </button>
           <button
             onClick={() => setMostrarUbicaciones(!mostrarUbicaciones)}
-            className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border rounded-lg transition-colors ${
-              mostrarUbicaciones
-                ? 'bg-red-700 text-white border-red-700 hover:bg-red-800'
-                : 'border-gray-300 hover:bg-gray-50'
-            }`}
+            className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border rounded-lg transition-colors ${mostrarUbicaciones
+              ? 'bg-red-700 text-white border-red-700 hover:bg-red-800'
+              : 'border-gray-300 hover:bg-gray-50'
+              }`}
           >
             <MapPin size={18} />
             <span className="hidden sm:inline">Ubicaciones</span>
@@ -1326,11 +1329,10 @@ const InventarioPage = () => {
             <>
               <button
                 onClick={() => setMostrarDesactivados(!mostrarDesactivados)}
-                className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base rounded-lg transition-colors ${
-                  mostrarDesactivados
-                    ? 'bg-orange-600 text-white hover:bg-orange-700'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base rounded-lg transition-colors ${mostrarDesactivados
+                  ? 'bg-orange-600 text-white hover:bg-orange-700'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
                 title={mostrarDesactivados ? 'Ver artículos activos' : 'Ver artículos desactivados'}
               >
                 <Trash2 size={18} />
@@ -1376,11 +1378,10 @@ const InventarioPage = () => {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setCategoriaSeleccionada(null)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  categoriaSeleccionada === null
-                    ? 'bg-red-700 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${categoriaSeleccionada === null
+                  ? 'bg-red-700 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
               >
                 Todas
               </button>
@@ -1388,11 +1389,10 @@ const InventarioPage = () => {
                 <div key={categoria.id} className="relative group">
                   <button
                     onClick={() => setCategoriaSeleccionada(categoria.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      categoriaSeleccionada === categoria.id
-                        ? 'bg-red-700 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    } ${puedeCrearArticulos ? 'pr-8' : ''}`}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${categoriaSeleccionada === categoria.id
+                      ? 'bg-red-700 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      } ${puedeCrearArticulos ? 'pr-8' : ''}`}
                   >
                     {categoria.nombre}
                   </button>
@@ -1447,11 +1447,10 @@ const InventarioPage = () => {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setUbicacionSeleccionada(null)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  ubicacionSeleccionada === null
-                    ? 'bg-red-700 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${ubicacionSeleccionada === null
+                  ? 'bg-red-700 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
               >
                 Todas
               </button>
@@ -1459,11 +1458,10 @@ const InventarioPage = () => {
                 <div key={ubicacion.id} className="relative group">
                   <button
                     onClick={() => setUbicacionSeleccionada(ubicacion.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      ubicacionSeleccionada === ubicacion.id
-                        ? 'bg-red-700 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    } ${puedeCrearArticulos ? 'pr-8' : ''}`}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${ubicacionSeleccionada === ubicacion.id
+                      ? 'bg-red-700 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      } ${puedeCrearArticulos ? 'pr-8' : ''}`}
                   >
                     {ubicacion.codigo || ubicacion.nombre}
                   </button>
@@ -1542,280 +1540,58 @@ const InventarioPage = () => {
                     </td>
                   </tr>
                   {filteredArticulos.filter(item => !item.es_herramienta).map((item) => {
-                  const imagenUrl = item.imagen_url
-                    ? getImageUrl(item.imagen_url)
-                    : null;
-
-                  // Detectar si la ubicación es "REVISAR"
-                  const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
-                                             item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
-
-                  // Detectar si el artículo está pendiente de revisión (creado por almacén)
-                  const esPendienteRevision = item.pendiente_revision === true;
-
-                  return (
-                    <tr
-                      key={item.id}
-                      onClick={() => handleVerDetalle(item)}
-                      className={`transition-colors cursor-pointer ${
-                        esPendienteRevision
-                          ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
-                          : esUbicacionRevisar
-                          ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
-                          : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      {/* Artículo con imagen */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          {imagenUrl ? (
-                            <img
-                              src={imagenUrl}
-                              alt={item.nombre}
-                              className="w-10 h-10 object-cover rounded-lg"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
-                              📦
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-medium text-gray-900">{item.nombre}</div>
-                            <div className="text-sm text-gray-500">{item.descripcion}</div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Categoría */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {item.categoria?.nombre || 'Sin categoría'}
-                        </span>
-                      </td>
-
-                      {/* Ubicación */}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm">
-                        {esUbicacionRevisar ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border-2 border-yellow-400">
-                            ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
-                          </span>
-                        ) : (
-                          <span className="text-gray-500">{item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}</span>
-                        )}
-                      </td>
-
-                      {/* Stock Actual */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                          {parseFloat(item.stock_actual).toFixed(2)}
-                        </span>
-                      </td>
-
-                      {/* Stock Mínimo */}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {parseFloat(item.stock_minimo).toFixed(2)}
-                      </td>
-
-                      {/* Stock Máximo */}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}
-                      </td>
-
-                      {/* Unidad */}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase">
-                        {item.unidad}
-                      </td>
-
-                      {/* Proveedores */}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {item.proveedores && item.proveedores.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            {item.proveedores.map((prov, idx) => (
-                              <span key={idx} className={`text-xs ${prov.ArticuloProveedor?.es_preferido ? 'font-semibold text-green-700' : 'text-gray-600'}`}>
-                                {prov.nombre}{prov.ArticuloProveedor?.es_preferido ? ' ⭐' : ''}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          'N/A'
-                        )}
-                      </td>
-
-                      {/* Fecha creación */}
-                      <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
-                        {item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
-                      </td>
-
-                      {/* Fecha actualización */}
-                      <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
-                        {item.updated_at ? new Date(item.updated_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
-                      </td>
-
-                      {/* Acciones */}
-                      <td className="px-4 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                          {puedeGestionarInventario && (
-                            <button
-                              onClick={() => handleAbrirEntrada(item)}
-                              className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                              title="Registrar entrada de inventario"
-                            >
-                              <PackagePlus size={16} />
-                              Entrada
-                            </button>
-                          )}
-                          {puedeRegistrarSalida && (
-                            <button
-                              onClick={() => handleAbrirSalida(item)}
-                              className="inline-flex items-center gap-1 px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700"
-                              title="Registrar salida de inventario"
-                            >
-                              <PackageMinus size={16} />
-                              Salida
-                            </button>
-                          )}
-                          {puedeAgregarAlPedido && (
-                            <button
-                              onClick={() => handleAgregarAlPedido(item)}
-                              className="inline-flex items-center gap-1 px-3 py-2 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800"
-                            >
-                              <Plus size={16} />
-                              Agregar
-                            </button>
-                          )}
-                          {puedeEditarArticulos && (
-                            mostrarDesactivados ? (
-                              <>
-                                <button
-                                  onClick={() => handleReactivar(item)}
-                                  className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                                  title="Reactivar artículo"
-                                >
-                                  <Plus size={16} />
-                                  Reactivar
-                                </button>
-                                {esAdministrador && (
-                                  <button
-                                    onClick={() => handleEliminarPermanente(item)}
-                                    className="inline-flex items-center gap-1 px-3 py-2 bg-red-800 text-white text-sm rounded-lg hover:bg-red-900"
-                                    title="Eliminar permanentemente"
-                                  >
-                                    <Trash2 size={16} />
-                                    Eliminar
-                                  </button>
-                                )}
-                              </>
-                            ) : (
-                              <button
-                                onClick={() => handleEliminar(item)}
-                                className="inline-flex items-center gap-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                                title="Desactivar artículo"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            )
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                </>
-              )}
-
-              {/* Sección: Herramientas */}
-              {filteredArticulos.filter(item => item.es_herramienta).length > 0 && (
-                <>
-                  <tr className="bg-orange-50 sticky top-[49px] z-20 border-b border-orange-200 shadow-sm">
-                    <td colSpan="11" className="px-6 py-3">
-                      <div className="flex items-center gap-2 font-semibold text-orange-900">
-                        🔧 Herramientas
-                        <span className="text-xs font-normal text-orange-700">
-                          ({filteredArticulos.filter(item => item.es_herramienta).length})
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                  {filteredArticulos.filter(item => item.es_herramienta).map((item) => {
                     const imagenUrl = item.imagen_url
                       ? getImageUrl(item.imagen_url)
                       : null;
 
                     // Detectar si la ubicación es "REVISAR"
                     const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
-                                               item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
+                      item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
 
                     // Detectar si el artículo está pendiente de revisión (creado por almacén)
                     const esPendienteRevision = item.pendiente_revision === true;
 
-                    const estaExpandida = herramientasExpandidas[item.id];
-                    const unidades = unidadesHerramientas[item.id] || [];
-                    const cargandoUnidades = loadingUnidades[item.id];
-
-                    // Detectar si es el artículo encontrado por código
-                    const esArticuloEncontrado = articuloEncontradoPorCodigo === item.id;
-
                     return (
-                      <React.Fragment key={item.id}>
-                        <tr
-                          className={`transition-colors ${
-                            esArticuloEncontrado
-                              ? 'bg-green-100 hover:bg-green-200 border-l-4 border-green-600 shadow-lg'
-                              : esPendienteRevision
-                              ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
-                              : esUbicacionRevisar
-                              ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
-                              : 'hover:bg-gray-50'
+                      <tr
+                        key={item.id}
+                        onClick={() => handleVerDetalle(item)}
+                        className={`transition-colors cursor-pointer ${esPendienteRevision
+                          ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                          : esUbicacionRevisar
+                            ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                            : 'hover:bg-gray-50'
                           }`}
-                        >
-                          {/* Artículo con imagen y botón expandir */}
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
-                              <button
-                                onClick={(e) => handleToggleHerramienta(item.id, e)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                                disabled={cargandoUnidades}
-                              >
-                                {cargandoUnidades ? (
-                                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
-                                ) : estaExpandida ? (
-                                  <ChevronUp size={20} />
-                                ) : (
-                                  <ChevronDown size={20} />
-                                )}
-                              </button>
-                              <div
-                                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => handleVerDetalle(item)}
-                              >
-                                {imagenUrl ? (
-                                  <img
-                                    src={imagenUrl}
-                                    alt={item.nombre}
-                                    className="w-10 h-10 object-cover rounded-lg"
-                                  />
-                                ) : (
-                                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
-                                    🔧
-                                  </div>
-                                )}
-                                <div>
-                                  <div className="font-medium text-gray-900">{item.nombre}</div>
-                                  <div className="text-sm text-gray-500">{item.descripcion}</div>
-                                </div>
+                      >
+                        {/* Artículo con imagen */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            {imagenUrl ? (
+                              <img
+                                src={imagenUrl}
+                                alt={item.nombre}
+                                className="w-10 h-10 object-cover rounded-lg"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
+                                📦
                               </div>
+                            )}
+                            <div>
+                              <div className="font-medium text-gray-900">{item.nombre}</div>
+                              <div className="text-sm text-gray-500">{item.descripcion}</div>
                             </div>
-                          </td>
+                          </div>
+                        </td>
 
                         {/* Categoría */}
-                        <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                             {item.categoria?.nombre || 'Sin categoría'}
                           </span>
                         </td>
 
                         {/* Ubicación */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm">
                           {esUbicacionRevisar ? (
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border-2 border-yellow-400">
                               ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
@@ -1826,29 +1602,29 @@ const InventarioPage = () => {
                         </td>
 
                         {/* Stock Actual */}
-                        <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
                             {parseFloat(item.stock_actual).toFixed(2)}
                           </span>
                         </td>
 
                         {/* Stock Mínimo */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                           {parseFloat(item.stock_minimo).toFixed(2)}
                         </td>
 
                         {/* Stock Máximo */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                           {item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}
                         </td>
 
                         {/* Unidad */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase">
                           {item.unidad}
                         </td>
 
                         {/* Proveedores */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                           {item.proveedores && item.proveedores.length > 0 ? (
                             <div className="flex flex-col gap-1">
                               {item.proveedores.map((prov, idx) => (
@@ -1863,12 +1639,12 @@ const InventarioPage = () => {
                         </td>
 
                         {/* Fecha creación */}
-                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
                           {item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
                         </td>
 
                         {/* Fecha actualización */}
-                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
                           {item.updated_at ? new Date(item.updated_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
                         </td>
 
@@ -1939,104 +1715,323 @@ const InventarioPage = () => {
                           </div>
                         </td>
                       </tr>
+                    );
+                  })}
+                </>
+              )}
 
-                      {/* Filas de unidades expandidas */}
-                      {estaExpandida && unidades.length > 0 && unidades.map((unidad) => (
-                        <tr key={`unidad-${unidad.id}`} className="bg-gray-50">
-                          <td colSpan="11" className="px-4 py-3">
-                            <div
-                              onClick={(e) => handleVerDetalleUnidad(unidad, item.id, e)}
-                              className="ml-12 flex items-center gap-6 p-3 bg-white rounded-lg border-2 border-gray-200 hover:border-red-400 hover:shadow-md transition-all cursor-pointer group"
-                            >
-                              {/* ID de la unidad */}
-                              <div className="text-sm">
-                                <span className="text-gray-500">ID:</span>
-                                <p className="font-bold text-gray-900">#{unidad.id}</p>
-                              </div>
+              {/* Sección: Herramientas */}
+              {filteredArticulos.filter(item => item.es_herramienta).length > 0 && (
+                <>
+                  <tr className="bg-orange-50 sticky top-[49px] z-20 border-b border-orange-200 shadow-sm">
+                    <td colSpan="11" className="px-6 py-3">
+                      <div className="flex items-center gap-2 font-semibold text-orange-900">
+                        🔧 Herramientas
+                        <span className="text-xs font-normal text-orange-700">
+                          ({filteredArticulos.filter(item => item.es_herramienta).length})
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                  {filteredArticulos.filter(item => item.es_herramienta).map((item) => {
+                    const imagenUrl = item.imagen_url
+                      ? getImageUrl(item.imagen_url)
+                      : null;
 
-                              {/* Código de barras */}
-                              <div className="flex items-center gap-4">
-                                <AuthenticatedImage
-                                  src={`/herramientas-renta/unidades/${unidad.id}/barcode`}
-                                  alt={`Código de barras ${unidad.codigo_unico}`}
-                                  className="h-16"
-                                  placeholderClassName="w-32 h-16 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400"
-                                />
-                              </div>
+                    // Detectar si la ubicación es "REVISAR"
+                    const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
+                      item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
 
-                              {/* Información de la unidad */}
-                              <div className="flex-1 grid grid-cols-3 gap-4 text-sm">
+                    // Detectar si el artículo está pendiente de revisión (creado por almacén)
+                    const esPendienteRevision = item.pendiente_revision === true;
+
+                    const estaExpandida = herramientasExpandidas[item.id];
+                    const unidades = unidadesHerramientas[item.id] || [];
+                    const cargandoUnidades = loadingUnidades[item.id];
+
+                    // Detectar si es el artículo encontrado por código
+                    const esArticuloEncontrado = articuloEncontradoPorCodigo === item.id;
+
+                    return (
+                      <React.Fragment key={item.id}>
+                        <tr
+                          className={`transition-colors ${esArticuloEncontrado
+                            ? 'bg-green-100 hover:bg-green-200 border-l-4 border-green-600 shadow-lg'
+                            : esPendienteRevision
+                              ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                              : esUbicacionRevisar
+                                ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                                : 'hover:bg-gray-50'
+                            }`}
+                        >
+                          {/* Artículo con imagen y botón expandir */}
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={(e) => handleToggleHerramienta(item.id, e)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                                disabled={cargandoUnidades}
+                              >
+                                {cargandoUnidades ? (
+                                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                                ) : estaExpandida ? (
+                                  <ChevronUp size={20} />
+                                ) : (
+                                  <ChevronDown size={20} />
+                                )}
+                              </button>
+                              <div
+                                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => handleVerDetalle(item)}
+                              >
+                                {imagenUrl ? (
+                                  <img
+                                    src={imagenUrl}
+                                    alt={item.nombre}
+                                    className="w-10 h-10 object-cover rounded-lg"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
+                                    🔧
+                                  </div>
+                                )}
                                 <div>
-                                  <span className="text-gray-500">Código Único:</span>
-                                  <p className="font-mono font-bold text-red-700">{unidad.codigo_unico}</p>
+                                  <div className="font-medium text-gray-900">{item.nombre}</div>
+                                  <div className="text-sm text-gray-500">{item.descripcion}</div>
                                 </div>
-                                <div>
-                                  <span className="text-gray-500">Estado:</span>
-                                  <p className={`font-medium ${
-                                    unidad.estado === 'disponible' ? 'text-green-600' :
-                                    unidad.estado === 'asignada' ? 'text-blue-600' :
-                                    unidad.estado === 'en_mantenimiento' ? 'text-orange-600' :
-                                    'text-red-600'
-                                  }`}>
-                                    {unidad.estado === 'disponible' ? '✓ Disponible' :
-                                     unidad.estado === 'asignada' ? '📍 Asignada' :
-                                     unidad.estado === 'en_mantenimiento' ? '🔧 Mantenimiento' :
-                                     '❌ Fuera de servicio'}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Botones de acción */}
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleVerDetalleUnidad(unidad, item.id, e);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-3 py-2 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors"
-                                  title="Ver detalles completos"
-                                >
-                                  <Eye size={16} />
-                                  Ver Detalles
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDescargarCodigoBarras(unidad.id, unidad.codigo_unico);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                                  title="Descargar código de barras"
-                                >
-                                  <Download size={16} />
-                                  Descargar
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleImprimirCodigoBarras(unidad.id, unidad.codigo_unico, item.nombre);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-                                  title="Imprimir código de barras"
-                                >
-                                  <Printer size={16} />
-                                  Imprimir
-                                </button>
                               </div>
                             </div>
                           </td>
-                        </tr>
-                      ))}
 
-                      {/* Mensaje si no hay unidades */}
-                      {estaExpandida && unidades.length === 0 && (
-                        <tr className="bg-gray-50">
-                          <td colSpan="11" className="px-4 py-3">
-                            <div className="ml-12 p-4 text-center text-gray-500 bg-white rounded-lg border border-gray-200">
-                              No hay unidades registradas para esta herramienta
+                          {/* Categoría */}
+                          <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                              {item.categoria?.nombre || 'Sin categoría'}
+                            </span>
+                          </td>
+
+                          {/* Ubicación */}
+                          <td className="px-4 py-4 whitespace-nowrap text-sm cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                            {esUbicacionRevisar ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border-2 border-yellow-400">
+                                ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">{item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}</span>
+                            )}
+                          </td>
+
+                          {/* Stock Actual */}
+                          <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                            <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                              {parseFloat(item.stock_actual).toFixed(2)}
+                            </span>
+                          </td>
+
+                          {/* Stock Mínimo */}
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                            {parseFloat(item.stock_minimo).toFixed(2)}
+                          </td>
+
+                          {/* Stock Máximo */}
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                            {item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}
+                          </td>
+
+                          {/* Unidad */}
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                            {item.unidad}
+                          </td>
+
+                          {/* Proveedores */}
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                            {item.proveedores && item.proveedores.length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                {item.proveedores.map((prov, idx) => (
+                                  <span key={idx} className={`text-xs ${prov.ArticuloProveedor?.es_preferido ? 'font-semibold text-green-700' : 'text-gray-600'}`}>
+                                    {prov.nombre}{prov.ArticuloProveedor?.es_preferido ? ' ⭐' : ''}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              'N/A'
+                            )}
+                          </td>
+
+                          {/* Fecha creación */}
+                          <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                            {item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                          </td>
+
+                          {/* Fecha actualización */}
+                          <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                            {item.updated_at ? new Date(item.updated_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                          </td>
+
+                          {/* Acciones */}
+                          <td className="px-4 py-4 whitespace-nowrap text-right">
+                            <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                              {puedeGestionarInventario && (
+                                <button
+                                  onClick={() => handleAbrirEntrada(item)}
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                                  title="Registrar entrada de inventario"
+                                >
+                                  <PackagePlus size={16} />
+                                  Entrada
+                                </button>
+                              )}
+                              {puedeRegistrarSalida && (
+                                <button
+                                  onClick={() => handleAbrirSalida(item)}
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700"
+                                  title="Registrar salida de inventario"
+                                >
+                                  <PackageMinus size={16} />
+                                  Salida
+                                </button>
+                              )}
+                              {puedeAgregarAlPedido && (
+                                <button
+                                  onClick={() => handleAgregarAlPedido(item)}
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800"
+                                >
+                                  <Plus size={16} />
+                                  Agregar
+                                </button>
+                              )}
+                              {puedeEditarArticulos && (
+                                mostrarDesactivados ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleReactivar(item)}
+                                      className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                                      title="Reactivar artículo"
+                                    >
+                                      <Plus size={16} />
+                                      Reactivar
+                                    </button>
+                                    {esAdministrador && (
+                                      <button
+                                        onClick={() => handleEliminarPermanente(item)}
+                                        className="inline-flex items-center gap-1 px-3 py-2 bg-red-800 text-white text-sm rounded-lg hover:bg-red-900"
+                                        title="Eliminar permanentemente"
+                                      >
+                                        <Trash2 size={16} />
+                                        Eliminar
+                                      </button>
+                                    )}
+                                  </>
+                                ) : (
+                                  <button
+                                    onClick={() => handleEliminar(item)}
+                                    className="inline-flex items-center gap-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                                    title="Desactivar artículo"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                )
+                              )}
                             </div>
                           </td>
                         </tr>
-                      )}
+
+                        {/* Filas de unidades expandidas */}
+                        {estaExpandida && unidades.length > 0 && unidades.map((unidad) => (
+                          <tr key={`unidad-${unidad.id}`} className="bg-gray-50">
+                            <td colSpan="11" className="px-4 py-3">
+                              <div
+                                onClick={(e) => handleVerDetalleUnidad(unidad, item.id, e)}
+                                className="ml-12 flex items-center gap-6 p-3 bg-white rounded-lg border-2 border-gray-200 hover:border-red-400 hover:shadow-md transition-all cursor-pointer group"
+                              >
+                                {/* ID de la unidad */}
+                                <div className="text-sm">
+                                  <span className="text-gray-500">ID:</span>
+                                  <p className="font-bold text-gray-900">#{unidad.id}</p>
+                                </div>
+
+                                {/* Código de barras */}
+                                <div className="flex items-center gap-4">
+                                  <AuthenticatedImage
+                                    src={`/herramientas-renta/unidades/${unidad.id}/barcode`}
+                                    alt={`Código de barras ${unidad.codigo_unico}`}
+                                    className="h-16"
+                                    placeholderClassName="w-32 h-16 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400"
+                                  />
+                                </div>
+
+                                {/* Información de la unidad */}
+                                <div className="flex-1 grid grid-cols-3 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-gray-500">Código Único:</span>
+                                    <p className="font-mono font-bold text-red-700">{unidad.codigo_unico}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Estado:</span>
+                                    <p className={`font-medium ${unidad.estado === 'disponible' ? 'text-green-600' :
+                                      unidad.estado === 'asignada' ? 'text-blue-600' :
+                                        unidad.estado === 'en_mantenimiento' ? 'text-orange-600' :
+                                          'text-red-600'
+                                      }`}>
+                                      {unidad.estado === 'disponible' ? '✓ Disponible' :
+                                        unidad.estado === 'asignada' ? '📍 Asignada' :
+                                          unidad.estado === 'en_mantenimiento' ? '🔧 Mantenimiento' :
+                                            '❌ Fuera de servicio'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Botones de acción */}
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleVerDetalleUnidad(unidad, item.id, e);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-3 py-2 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors"
+                                    title="Ver detalles completos"
+                                  >
+                                    <Eye size={16} />
+                                    Ver Detalles
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDescargarCodigoBarras(unidad.id, unidad.codigo_unico);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                                    title="Descargar código de barras"
+                                  >
+                                    <Download size={16} />
+                                    Descargar
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleImprimirCodigoBarras(unidad.id, unidad.codigo_unico, item.nombre);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                    title="Imprimir código de barras"
+                                  >
+                                    <Printer size={16} />
+                                    Imprimir
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+
+                        {/* Mensaje si no hay unidades */}
+                        {estaExpandida && unidades.length === 0 && (
+                          <tr className="bg-gray-50">
+                            <td colSpan="11" className="px-4 py-3">
+                              <div className="ml-12 p-4 text-center text-gray-500 bg-white rounded-lg border border-gray-200">
+                                No hay unidades registradas para esta herramienta
+                              </div>
+                            </td>
+                          </tr>
+                        )}
                       </React.Fragment>
                     );
                   })}
@@ -2075,7 +2070,7 @@ const InventarioPage = () => {
 
                 // Detectar si la ubicación es "REVISAR"
                 const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
-                                           item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
+                  item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
 
                 // Detectar si el artículo está pendiente de revisión (creado por almacén)
                 const esPendienteRevision = item.pendiente_revision === true;
@@ -2084,13 +2079,12 @@ const InventarioPage = () => {
                   <div
                     key={`consumible-${item.id}`}
                     onClick={() => handleVerDetalle(item)}
-                    className={`p-4 transition-colors cursor-pointer ${
-                      esPendienteRevision
-                        ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
-                        : esUbicacionRevisar
+                    className={`p-4 transition-colors cursor-pointer ${esPendienteRevision
+                      ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                      : esUbicacionRevisar
                         ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
                         : 'hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <div className="flex gap-3">
                       {/* Imagen */}
@@ -2267,7 +2261,7 @@ const InventarioPage = () => {
 
                 // Detectar si la ubicación es "REVISAR"
                 const esUbicacionRevisar = item.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
-                                           item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
+                  item.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
 
                 // Detectar si el artículo está pendiente de revisión (creado por almacén)
                 const esPendienteRevision = item.pendiente_revision === true;
@@ -2282,15 +2276,14 @@ const InventarioPage = () => {
                 return (
                   <React.Fragment key={`herramienta-${item.id}`}>
                     <div
-                      className={`p-4 transition-colors ${
-                        esArticuloEncontrado
-                          ? 'bg-green-100 hover:bg-green-200 border-l-4 border-green-600 shadow-lg'
-                          : esPendienteRevision
+                      className={`p-4 transition-colors ${esArticuloEncontrado
+                        ? 'bg-green-100 hover:bg-green-200 border-l-4 border-green-600 shadow-lg'
+                        : esPendienteRevision
                           ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
                           : esUbicacionRevisar
-                          ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
-                          : 'hover:bg-gray-50'
-                      }`}
+                            ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                            : 'hover:bg-gray-50'
+                        }`}
                     >
                       {/* Botón expandir/colapsar y header */}
                       <div className="flex items-center gap-2 mb-3">
@@ -2336,132 +2329,132 @@ const InventarioPage = () => {
 
                           {/* Badges */}
                           <div className="flex flex-wrap gap-1 text-xs mb-2">
-                          <span className="inline-flex px-2 py-1 rounded bg-blue-100 text-blue-800 font-medium">
-                            {item.categoria?.nombre || 'Sin categoría'}
-                          </span>
-                          <span className={`inline-flex px-2 py-1 rounded font-medium ${item.es_herramienta ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
-                            {item.es_herramienta ? '🔧' : '📦'}
-                          </span>
-                          <span className={`inline-flex px-2 py-1 rounded font-medium ${item.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {item.activo ? '✓' : '✗'}
-                          </span>
-                        </div>
-
-                        {/* Detalles principales */}
-                        <div className="text-xs text-gray-600 space-y-1 mb-2">
-                          <div><span className="font-semibold">Código:</span> <span className="font-mono">{item.codigo_ean13 || 'N/A'}</span></div>
-                          {item.codigo_tipo && <div><span className="font-semibold">Tipo:</span> {item.codigo_tipo}</div>}
-                          {item.sku && <div><span className="font-semibold">SKU:</span> <span className="font-mono">{item.sku}</span></div>}
-                          <div>
-                            <span className="font-semibold">Ubicación:</span>{' '}
-                            {esUbicacionRevisar ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border border-yellow-400 text-[10px]">
-                                ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
-                              </span>
-                            ) : (
-                              <span>{item.ubicacion?.codigo || 'N/A'}</span>
-                            )}
+                            <span className="inline-flex px-2 py-1 rounded bg-blue-100 text-blue-800 font-medium">
+                              {item.categoria?.nombre || 'Sin categoría'}
+                            </span>
+                            <span className={`inline-flex px-2 py-1 rounded font-medium ${item.es_herramienta ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+                              {item.es_herramienta ? '🔧' : '📦'}
+                            </span>
+                            <span className={`inline-flex px-2 py-1 rounded font-medium ${item.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                              {item.activo ? '✓' : '✗'}
+                            </span>
                           </div>
-                        </div>
 
-                        {/* Stock info */}
-                        <div className="bg-gray-50 rounded p-2 mb-2">
-                          <div className="grid grid-cols-3 gap-2 text-xs">
+                          {/* Detalles principales */}
+                          <div className="text-xs text-gray-600 space-y-1 mb-2">
+                            <div><span className="font-semibold">Código:</span> <span className="font-mono">{item.codigo_ean13 || 'N/A'}</span></div>
+                            {item.codigo_tipo && <div><span className="font-semibold">Tipo:</span> {item.codigo_tipo}</div>}
+                            {item.sku && <div><span className="font-semibold">SKU:</span> <span className="font-mono">{item.sku}</span></div>}
                             <div>
-                              <div className="text-gray-500">Stock</div>
-                              <div className={`font-semibold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                                {parseFloat(item.stock_actual).toFixed(2)}
+                              <span className="font-semibold">Ubicación:</span>{' '}
+                              {esUbicacionRevisar ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border border-yellow-400 text-[10px]">
+                                  ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
+                                </span>
+                              ) : (
+                                <span>{item.ubicacion?.codigo || 'N/A'}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Stock info */}
+                          <div className="bg-gray-50 rounded p-2 mb-2">
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div>
+                                <div className="text-gray-500">Stock</div>
+                                <div className={`font-semibold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                                  {parseFloat(item.stock_actual).toFixed(2)}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-gray-500">Mín</div>
+                                <div className="font-semibold text-gray-700">{parseFloat(item.stock_minimo).toFixed(2)}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-500">Máx</div>
+                                <div className="font-semibold text-gray-700">{item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}</div>
                               </div>
                             </div>
-                            <div>
-                              <div className="text-gray-500">Mín</div>
-                              <div className="font-semibold text-gray-700">{parseFloat(item.stock_minimo).toFixed(2)}</div>
-                            </div>
-                            <div>
-                              <div className="text-gray-500">Máx</div>
-                              <div className="font-semibold text-gray-700">{item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}</div>
-                            </div>
+                            <div className="text-xs text-gray-500 mt-1">Unidad: <span className="uppercase font-medium">{item.unidad}</span></div>
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">Unidad: <span className="uppercase font-medium">{item.unidad}</span></div>
-                        </div>
 
-                        {/* Costo y proveedores */}
-                        <div className="text-xs space-y-1">
-                          <div><span className="font-semibold">Costo:</span> <span className="text-green-700 font-bold">${parseFloat(item.costo_unitario || 0).toFixed(2)}</span></div>
-                          {item.proveedores && item.proveedores.length > 0 && (
-                            <div>
-                              <span className="font-semibold">Proveedores:</span> {item.proveedores.map(p => `${p.nombre}${p.ArticuloProveedor?.es_preferido ? '⭐' : ''}`).join(', ')}
-                            </div>
-                          )}
-                        </div>
+                          {/* Costo y proveedores */}
+                          <div className="text-xs space-y-1">
+                            <div><span className="font-semibold">Costo:</span> <span className="text-green-700 font-bold">${parseFloat(item.costo_unitario || 0).toFixed(2)}</span></div>
+                            {item.proveedores && item.proveedores.length > 0 && (
+                              <div>
+                                <span className="font-semibold">Proveedores:</span> {item.proveedores.map(p => `${p.nombre}${p.ArticuloProveedor?.es_preferido ? '⭐' : ''}`).join(', ')}
+                              </div>
+                            )}
+                          </div>
 
-                        {/* Fechas */}
-                        <div className="text-[10px] text-gray-400 mt-2 space-x-2">
-                          {item.created_at && <span>Creado: {new Date(item.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
-                          {item.updated_at && <span>Act: {new Date(item.updated_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
+                          {/* Fechas */}
+                          <div className="text-[10px] text-gray-400 mt-2 space-x-2">
+                            {item.created_at && <span>Creado: {new Date(item.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
+                            {item.updated_at && <span>Act: {new Date(item.updated_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Botones de acción */}
-                    <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
-                      {puedeGestionarInventario && (
-                        <button
-                          onClick={() => handleAbrirEntrada(item)}
-                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
-                        >
-                          <PackagePlus size={14} />
-                          Entrada
-                        </button>
-                      )}
-                      {puedeRegistrarSalida && (
-                        <button
-                          onClick={() => handleAbrirSalida(item)}
-                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-700"
-                        >
-                          <PackageMinus size={14} />
-                          Salida
-                        </button>
-                      )}
-                      {puedeAgregarAlPedido && (
-                        <button
-                          onClick={() => handleAgregarAlPedido(item)}
-                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-700 text-white text-xs rounded-lg hover:bg-red-800"
-                        >
-                          <Plus size={14} />
-                          Agregar
-                        </button>
-                      )}
-                      {puedeEditarArticulos && (
-                        mostrarDesactivados ? (
-                          <>
-                            <button
-                              onClick={() => handleReactivar(item)}
-                              className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
-                            >
-                              <Plus size={14} />
-                              Reactivar
-                            </button>
-                            {esAdministrador && (
-                              <button
-                                onClick={() => handleEliminarPermanente(item)}
-                                className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-800 text-white text-xs rounded-lg hover:bg-red-900"
-                              >
-                                <Trash2 size={14} />
-                                Eliminar
-                              </button>
-                            )}
-                          </>
-                        ) : (
+                      {/* Botones de acción */}
+                      <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                        {puedeGestionarInventario && (
                           <button
-                            onClick={() => handleEliminar(item)}
-                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700"
+                            onClick={() => handleAbrirEntrada(item)}
+                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
                           >
-                            <Trash2 size={14} />
+                            <PackagePlus size={14} />
+                            Entrada
                           </button>
-                        )
-                      )}
-                    </div>
+                        )}
+                        {puedeRegistrarSalida && (
+                          <button
+                            onClick={() => handleAbrirSalida(item)}
+                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-700"
+                          >
+                            <PackageMinus size={14} />
+                            Salida
+                          </button>
+                        )}
+                        {puedeAgregarAlPedido && (
+                          <button
+                            onClick={() => handleAgregarAlPedido(item)}
+                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-700 text-white text-xs rounded-lg hover:bg-red-800"
+                          >
+                            <Plus size={14} />
+                            Agregar
+                          </button>
+                        )}
+                        {puedeEditarArticulos && (
+                          mostrarDesactivados ? (
+                            <>
+                              <button
+                                onClick={() => handleReactivar(item)}
+                                className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
+                              >
+                                <Plus size={14} />
+                                Reactivar
+                              </button>
+                              {esAdministrador && (
+                                <button
+                                  onClick={() => handleEliminarPermanente(item)}
+                                  className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-800 text-white text-xs rounded-lg hover:bg-red-900"
+                                >
+                                  <Trash2 size={14} />
+                                  Eliminar
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => handleEliminar(item)}
+                              className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )
+                        )}
+                      </div>
                     </div>
 
                     {/* Unidades expandidas - Vista móvil */}
@@ -2492,16 +2485,15 @@ const InventarioPage = () => {
                                 </div>
                                 <div>
                                   <span className="text-gray-500">Estado:</span>
-                                  <span className={`ml-1 font-medium ${
-                                    unidad.estado === 'disponible' ? 'text-green-600' :
+                                  <span className={`ml-1 font-medium ${unidad.estado === 'disponible' ? 'text-green-600' :
                                     unidad.estado === 'asignada' ? 'text-blue-600' :
-                                    unidad.estado === 'en_mantenimiento' ? 'text-orange-600' :
-                                    'text-red-600'
-                                  }`}>
+                                      unidad.estado === 'en_mantenimiento' ? 'text-orange-600' :
+                                        'text-red-600'
+                                    }`}>
                                     {unidad.estado === 'disponible' ? '✓ Disponible' :
-                                     unidad.estado === 'asignada' ? '📍 Asignada' :
-                                     unidad.estado === 'en_mantenimiento' ? '🔧 Mantenimiento' :
-                                     '❌ Fuera de servicio'}
+                                      unidad.estado === 'asignada' ? '📍 Asignada' :
+                                        unidad.estado === 'en_mantenimiento' ? '🔧 Mantenimiento' :
+                                          '❌ Fuera de servicio'}
                                   </span>
                                 </div>
                               </div>
@@ -2967,36 +2959,50 @@ const InventarioPage = () => {
           <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setFiltroTipoEtiquetas('todos')}
-              className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-all ${
-                filtroTipoEtiquetas === 'todos'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-all ${filtroTipoEtiquetas === 'todos'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
               Todos
             </button>
             <button
               onClick={() => setFiltroTipoEtiquetas('consumibles')}
-              className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-1.5 ${
-                filtroTipoEtiquetas === 'consumibles'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-1.5 ${filtroTipoEtiquetas === 'consumibles'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
               <Package size={16} />
               Consumibles
             </button>
             <button
               onClick={() => setFiltroTipoEtiquetas('herramientas')}
-              className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-1.5 ${
-                filtroTipoEtiquetas === 'herramientas'
-                  ? 'bg-white text-red-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-1.5 ${filtroTipoEtiquetas === 'herramientas'
+                ? 'bg-white text-red-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
               <Wrench size={16} />
               Herramientas
             </button>
+          </div>
+
+          {/* Filtro por ubicación */}
+          <div className="flex items-center gap-2">
+            <MapPin size={18} className="text-gray-400" />
+            <select
+              value={filtroUbicacionEtiquetas}
+              onChange={(e) => setFiltroUbicacionEtiquetas(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+            >
+              <option value="todos">Todas las ubicaciones</option>
+              {ubicaciones.filter(u => u.activo !== false).map(ubicacion => (
+                <option key={ubicacion.id} value={ubicacion.id}>
+                  {ubicacion.codigo} - {ubicacion.almacen}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Contador y botón seleccionar todos */}
@@ -3019,12 +3025,17 @@ const InventarioPage = () => {
                   articulosActivos = articulosActivos.filter(a => a.es_herramienta);
                 }
 
+                // Aplicar filtro de ubicación
+                if (filtroUbicacionEtiquetas !== 'todos') {
+                  articulosActivos = articulosActivos.filter(a => a.ubicacion_id === parseInt(filtroUbicacionEtiquetas));
+                }
+
                 // Aplicar filtro de búsqueda
                 const articulosFiltrados = busquedaEtiquetas.length > 0
                   ? articulosActivos.filter(a =>
-                      a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
-                      a.codigo_ean13?.toLowerCase().includes(busquedaEtiquetas.toLowerCase())
-                    )
+                    a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
+                    a.codigo_ean13?.toLowerCase().includes(busquedaEtiquetas.toLowerCase())
+                  )
                   : articulosActivos;
 
                 const todosSeleccionados = articulosFiltrados.length > 0 &&
@@ -3049,12 +3060,17 @@ const InventarioPage = () => {
                   articulosActivos = articulosActivos.filter(a => a.es_herramienta);
                 }
 
+                // Aplicar filtro de ubicación
+                if (filtroUbicacionEtiquetas !== 'todos') {
+                  articulosActivos = articulosActivos.filter(a => a.ubicacion_id === parseInt(filtroUbicacionEtiquetas));
+                }
+
                 // Aplicar filtro de búsqueda
                 const articulosFiltrados = busquedaEtiquetas.length > 0
                   ? articulosActivos.filter(a =>
-                      a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
-                      a.codigo_ean13?.toLowerCase().includes(busquedaEtiquetas.toLowerCase())
-                    )
+                    a.nombre.toLowerCase().includes(busquedaEtiquetas.toLowerCase()) ||
+                    a.codigo_ean13?.toLowerCase().includes(busquedaEtiquetas.toLowerCase())
+                  )
                   : articulosActivos;
 
                 if (articulosFiltrados.length === 0) {
@@ -3073,7 +3089,7 @@ const InventarioPage = () => {
 
                   // Detectar si la ubicación es "REVISAR"
                   const esUbicacionRevisar = articulo.ubicacion?.codigo?.toUpperCase() === 'REVISAR' ||
-                                             articulo.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
+                    articulo.ubicacion?.nombre?.toUpperCase() === 'REVISAR';
 
                   // Detectar si el artículo está pendiente de revisión (creado por almacén)
                   const esPendienteRevision = articulo.pendiente_revision === true;
@@ -3085,13 +3101,12 @@ const InventarioPage = () => {
 
                   return (
                     <React.Fragment key={articulo.id}>
-                      <div className={`flex items-center gap-4 p-4 transition-colors ${
-                        esPendienteRevision
-                          ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
-                          : esUbicacionRevisar
+                      <div className={`flex items-center gap-4 p-4 transition-colors ${esPendienteRevision
+                        ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                        : esUbicacionRevisar
                           ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
                           : 'hover:bg-gray-50'
-                      }`}>
+                        }`}>
                         {/* Checkbox para artículos consumibles */}
                         {!esHerramienta && (
                           <input
@@ -3178,13 +3193,12 @@ const InventarioPage = () => {
                                         ✓ Etiquetado
                                       </span>
                                     )}
-                                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                      unidad.estado === 'disponible' ? 'bg-green-100 text-green-800' :
+                                    <span className={`text-xs px-2 py-0.5 rounded-full ${unidad.estado === 'disponible' ? 'bg-green-100 text-green-800' :
                                       unidad.estado === 'asignada' ? 'bg-blue-100 text-blue-800' :
-                                      'bg-gray-100 text-gray-800'
-                                    }`}>
+                                        'bg-gray-100 text-gray-800'
+                                      }`}>
                                       {unidad.estado === 'disponible' ? 'Disponible' :
-                                       unidad.estado === 'asignada' ? 'Asignada' : unidad.estado}
+                                        unidad.estado === 'asignada' ? 'Asignada' : unidad.estado}
                                     </span>
                                   </div>
                                   <p className="text-xs text-gray-500 mt-0.5">
@@ -3306,9 +3320,8 @@ const InventarioPage = () => {
                   return (
                     <div
                       key={almacen}
-                      className={`border rounded-lg p-4 transition-all ${
-                        estaEditando ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                      className={`border rounded-lg p-4 transition-all ${estaEditando ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'
+                        }`}
                     >
                       {estaEditando ? (
                         // Modo edición
