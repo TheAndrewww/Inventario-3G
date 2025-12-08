@@ -774,14 +774,22 @@ export const updateArticulo = async (req, res) => {
         }
 
         // 🔧 SINCRONIZAR UNIDADES: Si es herramienta y cambió el stock, crear nuevas unidades
-        if (articulo.es_herramienta && stock_actual !== undefined) {
+        // Recargar el artículo para obtener el valor actualizado de es_herramienta
+        await articulo.reload();
+        const esHerramientaActual = articulo.es_herramienta;
+
+        console.log(`🔍 Verificando sincronización: artículo ${id}, es_herramienta=${esHerramientaActual}, stock_actual=${stock_actual}`);
+
+        if (esHerramientaActual && stock_actual !== undefined) {
             try {
                 const { TipoHerramientaRenta, UnidadHerramientaRenta } = await import('../models/index.js');
 
                 // Buscar el tipo de herramienta asociado a este artículo
                 const tipoHerramienta = await TipoHerramientaRenta.findOne({
-                    where: { articulo_origen_id: id, activo: true }
+                    where: { articulo_origen_id: parseInt(id), activo: true }
                 });
+
+                console.log(`🔍 TipoHerramienta encontrado: ${tipoHerramienta ? tipoHerramienta.nombre : 'NO ENCONTRADO'}`);
 
                 if (tipoHerramienta) {
                     // Contar unidades actuales
