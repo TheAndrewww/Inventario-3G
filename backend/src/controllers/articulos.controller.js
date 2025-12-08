@@ -773,6 +773,79 @@ export const updateArticulo = async (req, res) => {
             }
         }
 
+        // 🔧 SINCRONIZAR UNIDADES: Si es herramienta y cambió el stock, crear nuevas unidades
+        if (articulo.es_herramienta && stock_actual !== undefined) {
+            try {
+                const { TipoHerramientaRenta, UnidadHerramientaRenta } = await import('../models/index.js');
+
+                // Buscar el tipo de herramienta asociado a este artículo
+                const tipoHerramienta = await TipoHerramientaRenta.findOne({
+                    where: { articulo_origen_id: id, activo: true }
+                });
+
+                if (tipoHerramienta) {
+                    // Contar unidades actuales
+                    const unidadesActuales = await UnidadHerramientaRenta.count({
+                        where: { tipo_herramienta_id: tipoHerramienta.id, activo: true }
+                    });
+
+                    const nuevoStock = parseInt(stock_actual);
+                    const diferencia = nuevoStock - unidadesActuales;
+
+                    console.log(`🔄 Sincronizando unidades: Stock=${nuevoStock}, Unidades actuales=${unidadesActuales}, Diferencia=${diferencia}`);
+
+                    if (diferencia > 0) {
+                        // Hay que crear nuevas unidades
+                        const prefijo = tipoHerramienta.prefijo_codigo;
+
+                        // Obtener el último número usado
+                        const ultimaUnidad = await UnidadHerramientaRenta.findOne({
+                            where: {
+                                codigo_unico: { [Op.like]: `${prefijo}-%` }
+                            },
+                            order: [['codigo_unico', 'DESC']]
+                        });
+
+                        let numeroInicial = 1;
+                        if (ultimaUnidad) {
+                            const match = ultimaUnidad.codigo_unico.match(/-(\d+)$/);
+                            if (match) {
+                                numeroInicial = parseInt(match[1]) + 1;
+                            }
+                        }
+
+                        // Crear las nuevas unidades
+                        for (let i = 0; i < diferencia; i++) {
+                            const numeroActual = numeroInicial + i;
+                            const codigoUnico = `${prefijo}-${numeroActual.toString().padStart(3, '0')}`;
+
+                            await UnidadHerramientaRenta.create({
+                                tipo_herramienta_id: tipoHerramienta.id,
+                                codigo_unico: codigoUnico,
+                                codigo_ean13: `TEMP-${Date.now()}-${i}`,
+                                estado: 'disponible',
+                                activo: true
+                            });
+
+                            console.log(`   ✅ Creada unidad: ${codigoUnico}`);
+                        }
+
+                        // Actualizar contadores del tipo
+                        await tipoHerramienta.update({
+                            total_unidades: nuevoStock,
+                            unidades_disponibles: tipoHerramienta.unidades_disponibles + diferencia
+                        });
+
+                        console.log(`✅ Se crearon ${diferencia} nuevas unidades para ${articulo.nombre}`);
+                    }
+                    // Si diferencia < 0, NO eliminamos unidades automáticamente (seguridad)
+                }
+            } catch (syncError) {
+                console.error('⚠️ Error sincronizando unidades de herramienta:', syncError.message);
+                // No fallar la actualización del artículo
+            }
+        }
+
         // Obtener artículo actualizado con relaciones
         const articuloActualizado = await Articulo.findByPk(id, {
             include: [
