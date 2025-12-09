@@ -124,6 +124,8 @@ export const buscarPorCodigoHerramienta = async (req, res) => {
         const { codigo } = req.params;
         const { partial } = req.query; // Búsqueda parcial?
 
+        console.log(`🔍 Buscando herramienta: código="${codigo}", partial=${partial}`);
+
         // Importar modelos necesarios
         const { UnidadHerramientaRenta, TipoHerramientaRenta } = await import('../models/index.js');
 
@@ -161,6 +163,11 @@ export const buscarPorCodigoHerramienta = async (req, res) => {
                 }],
                 order: [['codigo_unico', 'ASC']]
             });
+
+            console.log(`🔍 Unidades encontradas: ${unidades?.length || 0}`);
+            if (unidades?.length > 0) {
+                console.log(`   → Códigos: ${unidades.map(u => u.codigo_unico).join(', ')}`);
+            }
 
             if (!unidades || unidades.length === 0) {
                 return res.status(200).json({
