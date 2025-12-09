@@ -170,6 +170,15 @@ export const buscarPorCodigoHerramienta = async (req, res) => {
             }
 
             if (!unidades || unidades.length === 0) {
+                // Debug: mostrar qué prefijos SÍ existen
+                const prefijosExistentes = await UnidadHerramientaRenta.findAll({
+                    attributes: ['codigo_unico'],
+                    where: { activo: true },
+                    limit: 20,
+                    order: [['codigo_unico', 'ASC']]
+                });
+                console.log(`   → Prefijos disponibles: ${prefijosExistentes.map(u => u.codigo_unico).join(', ')}`);
+
                 return res.status(200).json({
                     success: true,
                     data: {
