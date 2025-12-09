@@ -639,14 +639,26 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       }
 
       // Subir imagen si se seleccionó una nueva
+      console.log('📷 Debug subida imagen:', {
+        selectedImage: selectedImage,
+        selectedImageType: selectedImage?.type,
+        selectedImageSize: selectedImage?.size,
+        articuloId: articuloId,
+        isEdit: isEdit
+      });
+
       if (selectedImage) {
         try {
+          console.log('📤 Iniciando subida de imagen...');
           await articulosService.uploadImagen(articuloId, selectedImage);
           toast.success('Imagen subida exitosamente');
+          console.log('✅ Imagen subida correctamente');
         } catch (error) {
-          console.error('Error al subir imagen:', error);
+          console.error('❌ Error al subir imagen:', error);
           toast.error('Artículo guardado, pero hubo un error al subir la imagen');
         }
+      } else {
+        console.log('⚠️ No hay selectedImage, no se sube nada');
       }
 
       // Limpiar formulario
@@ -914,467 +926,467 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
               />
             </div>
 
-        {/* Imagen del artículo */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Fotografía del Artículo
-          </label>
-          <ImageUpload
-            currentImage={currentImageUrl}
-            onImageSelect={handleImageSelect}
-            onImageRemove={handleImageRemove}
-            disabled={loading}
-          />
-        </div>
-
-        {/* Categoría - Solo visible para admin y encargado */}
-        {!esAlmacen && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Categoría <span className="text-red-600">*</span>
-          </label>
-
-          {!showNuevaCategoria ? (
-            <select
-              key={`categoria-select-${categorias.length}`}
-              name="categoria_id"
-              value={formData.categoria_id}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              disabled={loading}
-              required={!esAlmacen}
-            >
-              <option value="">Seleccionar...</option>
-              {categorias.map(cat => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.nombre}
-                </option>
-              ))}
-              <option value="nueva_categoria" className="text-red-700 font-medium">
-                + Crear nueva categoría
-              </option>
-            </select>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={nuevaCategoriaData.nombre}
-                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, nombre: e.target.value }))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (nuevaCategoriaData.nombre.trim() && nuevaCategoriaData.descripcion.trim()) {
-                        handleCrearCategoriaRapido();
-                      }
-                    }
-                    if (e.key === 'Escape') {
-                      handleCancelarNuevaCategoria();
-                    }
-                  }}
-                  placeholder="NOMBRE (EJ: TORNILLERÍA)"
-                  className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
-                  style={{ textTransform: 'uppercase' }}
-                  autoFocus
-                  disabled={creandoCategoria}
-                />
-                <input
-                  type="text"
-                  value={nuevaCategoriaData.descripcion}
-                  onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, descripcion: e.target.value }))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (nuevaCategoriaData.nombre.trim()) {
-                        handleCrearCategoriaRapido();
-                      }
-                    }
-                    if (e.key === 'Escape') {
-                      handleCancelarNuevaCategoria();
-                    }
-                  }}
-                  placeholder="DESCRIPCIÓN (OPCIONAL)"
-                  className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
-                  style={{ textTransform: 'uppercase' }}
-                  disabled={creandoCategoria}
-                />
-                <button
-                  type="button"
-                  onClick={handleCrearCategoriaRapido}
-                  disabled={creandoCategoria}
-                  className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
-                  title="Guardar categoría"
-                >
-                  {creandoCategoria ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <Check size={18} />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelarNuevaCategoria}
-                  disabled={creandoCategoria}
-                  className="px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                  title="Cancelar"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              {showNuevaCategoria && (
-                <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-xs text-yellow-800">
-                    ⚠️ <strong>Categoría pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        )}
-
-        {/* Ubicación - Solo visible para admin y encargado */}
-        {!esAlmacen && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Ubicación <span className="text-red-600">*</span>
-          </label>
-
-          {!showNuevaUbicacion ? (
-              <select
-                key={`ubicacion-select-${ubicaciones.length}`}
-                name="ubicacion_id"
-                value={formData.ubicacion_id}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+            {/* Imagen del artículo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Fotografía del Artículo
+              </label>
+              <ImageUpload
+                currentImage={currentImageUrl}
+                onImageSelect={handleImageSelect}
+                onImageRemove={handleImageRemove}
                 disabled={loading}
-                required={!esAlmacen}
-              >
-                <option value="">Seleccionar...</option>
-                {ubicaciones.map(ub => (
-                  <option key={ub.id} value={ub.id}>
-                    {ub.codigo} - {ub.descripcion}
-                  </option>
-                ))}
-                <option value="nueva_ubicacion" className="text-red-700 font-medium">
-                  + Crear nueva ubicación
-                </option>
-              </select>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={nuevaUbicacionData.codigo}
-                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, codigo: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (nuevaUbicacionData.codigo.trim() && nuevaUbicacionData.descripcion.trim()) {
-                          handleCrearUbicacionRapido();
-                        }
-                      }
-                      if (e.key === 'Escape') {
-                        handleCancelarNuevaUbicacion();
-                      }
-                    }}
-                    placeholder="CÓDIGO (EJ: A-01)"
-                    className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
-                    style={{ textTransform: 'uppercase' }}
-                    autoFocus
-                    disabled={creandoUbicacion}
-                  />
-                  <input
-                    type="text"
-                    value={nuevaUbicacionData.descripcion}
-                    onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, descripcion: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (nuevaUbicacionData.codigo.trim()) {
-                          handleCrearUbicacionRapido();
-                        }
-                      }
-                      if (e.key === 'Escape') {
-                        handleCancelarNuevaUbicacion();
-                      }
-                    }}
-                    placeholder="DESCRIPCIÓN (OPCIONAL)"
-                    className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
-                    style={{ textTransform: 'uppercase' }}
-                    disabled={creandoUbicacion}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCrearUbicacionRapido}
-                    disabled={creandoUbicacion}
-                    className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
-                    title="Guardar ubicación"
+              />
+            </div>
+
+            {/* Categoría - Solo visible para admin y encargado */}
+            {!esAlmacen && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Categoría <span className="text-red-600">*</span>
+                </label>
+
+                {!showNuevaCategoria ? (
+                  <select
+                    key={`categoria-select-${categorias.length}`}
+                    name="categoria_id"
+                    value={formData.categoria_id}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                    disabled={loading}
+                    required={!esAlmacen}
                   >
-                    {creandoUbicacion ? (
-                      <Loader2 size={18} className="animate-spin" />
-                    ) : (
-                      <Check size={18} />
+                    <option value="">Seleccionar...</option>
+                    {categorias.map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.nombre}
+                      </option>
+                    ))}
+                    <option value="nueva_categoria" className="text-red-700 font-medium">
+                      + Crear nueva categoría
+                    </option>
+                  </select>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={nuevaCategoriaData.nombre}
+                        onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, nombre: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (nuevaCategoriaData.nombre.trim() && nuevaCategoriaData.descripcion.trim()) {
+                              handleCrearCategoriaRapido();
+                            }
+                          }
+                          if (e.key === 'Escape') {
+                            handleCancelarNuevaCategoria();
+                          }
+                        }}
+                        placeholder="NOMBRE (EJ: TORNILLERÍA)"
+                        className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                        style={{ textTransform: 'uppercase' }}
+                        autoFocus
+                        disabled={creandoCategoria}
+                      />
+                      <input
+                        type="text"
+                        value={nuevaCategoriaData.descripcion}
+                        onChange={(e) => setNuevaCategoriaData(prev => ({ ...prev, descripcion: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (nuevaCategoriaData.nombre.trim()) {
+                              handleCrearCategoriaRapido();
+                            }
+                          }
+                          if (e.key === 'Escape') {
+                            handleCancelarNuevaCategoria();
+                          }
+                        }}
+                        placeholder="DESCRIPCIÓN (OPCIONAL)"
+                        className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                        style={{ textTransform: 'uppercase' }}
+                        disabled={creandoCategoria}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCrearCategoriaRapido}
+                        disabled={creandoCategoria}
+                        className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                        title="Guardar categoría"
+                      >
+                        {creandoCategoria ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <Check size={18} />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelarNuevaCategoria}
+                        disabled={creandoCategoria}
+                        className="px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                        title="Cancelar"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                    {showNuevaCategoria && (
+                      <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-xs text-yellow-800">
+                          ⚠️ <strong>Categoría pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
+                        </p>
+                      </div>
                     )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancelarNuevaUbicacion}
-                    disabled={creandoUbicacion}
-                    className="px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                    title="Cancelar"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-                {showNuevaUbicacion && (
-                  <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-xs text-yellow-800">
-                      ⚠️ <strong>Ubicación pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
-                    </p>
                   </div>
                 )}
               </div>
             )}
-        </div>
-        )}
 
-        {/* Proveedores Múltiples */}
-        {!esAlmacen && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Proveedores
-            </label>
-            <button
-              type="button"
-              onClick={handleAgregarProveedor}
-              className="text-sm text-red-700 hover:text-red-800 font-medium flex items-center gap-1"
-            >
-              <span className="text-lg">+</span> Agregar Proveedor
-            </button>
-          </div>
+            {/* Ubicación - Solo visible para admin y encargado */}
+            {!esAlmacen && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Ubicación <span className="text-red-600">*</span>
+                </label>
 
-          {proveedoresSeleccionados.length === 0 ? (
-            <div className="p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg text-center">
-              <p className="text-sm text-gray-500">
-                No hay proveedores seleccionados. Haz clic en "Agregar Proveedor" para comenzar.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {proveedoresSeleccionados.map((provSel, index) => (
-                <div key={index} className="flex gap-2 items-start p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex-1 space-y-2">
+                {!showNuevaUbicacion ? (
+                  <select
+                    key={`ubicacion-select-${ubicaciones.length}`}
+                    name="ubicacion_id"
+                    value={formData.ubicacion_id}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                    disabled={loading}
+                    required={!esAlmacen}
+                  >
+                    <option value="">Seleccionar...</option>
+                    {ubicaciones.map(ub => (
+                      <option key={ub.id} value={ub.id}>
+                        {ub.codigo} - {ub.descripcion}
+                      </option>
+                    ))}
+                    <option value="nueva_ubicacion" className="text-red-700 font-medium">
+                      + Crear nueva ubicación
+                    </option>
+                  </select>
+                ) : (
+                  <div className="space-y-2">
                     <div className="flex gap-2">
-                      <select
-                        value={provSel.proveedor_id}
-                        onChange={(e) => handleProveedorChange(index, 'proveedor_id', e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 text-sm"
-                        required
+                      <input
+                        type="text"
+                        value={nuevaUbicacionData.codigo}
+                        onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, codigo: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (nuevaUbicacionData.codigo.trim() && nuevaUbicacionData.descripcion.trim()) {
+                              handleCrearUbicacionRapido();
+                            }
+                          }
+                          if (e.key === 'Escape') {
+                            handleCancelarNuevaUbicacion();
+                          }
+                        }}
+                        placeholder="CÓDIGO (EJ: A-01)"
+                        className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                        style={{ textTransform: 'uppercase' }}
+                        autoFocus
+                        disabled={creandoUbicacion}
+                      />
+                      <input
+                        type="text"
+                        value={nuevaUbicacionData.descripcion}
+                        onChange={(e) => setNuevaUbicacionData(prev => ({ ...prev, descripcion: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (nuevaUbicacionData.codigo.trim()) {
+                              handleCrearUbicacionRapido();
+                            }
+                          }
+                          if (e.key === 'Escape') {
+                            handleCancelarNuevaUbicacion();
+                          }
+                        }}
+                        placeholder="DESCRIPCIÓN (OPCIONAL)"
+                        className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                        style={{ textTransform: 'uppercase' }}
+                        disabled={creandoUbicacion}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCrearUbicacionRapido}
+                        disabled={creandoUbicacion}
+                        className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                        title="Guardar ubicación"
                       >
-                        <option value="">Seleccionar proveedor...</option>
-                        {proveedores.map(prov => (
-                          <option key={prov.id} value={prov.id}>
-                            {prov.nombre}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        value={provSel.costo_unitario}
-                        onChange={(e) => handleProveedorChange(index, 'costo_unitario', e.target.value)}
-                        placeholder="Costo"
-                        min="0"
-                        step="0.01"
-                        className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 text-sm"
-                      />
+                        {creandoUbicacion ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <Check size={18} />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelarNuevaUbicacion}
+                        disabled={creandoUbicacion}
+                        className="px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                        title="Cancelar"
+                      >
+                        <X size={18} />
+                      </button>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id={`preferido-${index}`}
-                        checked={provSel.es_preferido}
-                        onChange={() => handleMarcarPreferido(index)}
-                        className="w-4 h-4 text-red-700 bg-gray-100 border-gray-300 rounded focus:ring-red-700 focus:ring-2"
-                      />
-                      <label htmlFor={`preferido-${index}`} className="text-xs text-gray-600 cursor-pointer">
-                        Proveedor preferido
-                      </label>
-                    </div>
+                    {showNuevaUbicacion && (
+                      <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-xs text-yellow-800">
+                          ⚠️ <strong>Ubicación pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
+                        </p>
+                      </div>
+                    )}
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Proveedores Múltiples */}
+            {!esAlmacen && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Proveedores
+                  </label>
                   <button
                     type="button"
-                    onClick={() => handleEliminarProveedor(index)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Eliminar proveedor"
+                    onClick={handleAgregarProveedor}
+                    className="text-sm text-red-700 hover:text-red-800 font-medium flex items-center gap-1"
                   >
-                    <X size={16} />
+                    <span className="text-lg">+</span> Agregar Proveedor
                   </button>
                 </div>
-              ))}
-            </div>
-          )}
 
-          {showNuevoProveedor && (
-            <div className="mt-2">
-              <div className="flex gap-2">
+                {proveedoresSeleccionados.length === 0 ? (
+                  <div className="p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg text-center">
+                    <p className="text-sm text-gray-500">
+                      No hay proveedores seleccionados. Haz clic en "Agregar Proveedor" para comenzar.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {proveedoresSeleccionados.map((provSel, index) => (
+                      <div key={index} className="flex gap-2 items-start p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex gap-2">
+                            <select
+                              value={provSel.proveedor_id}
+                              onChange={(e) => handleProveedorChange(index, 'proveedor_id', e.target.value)}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 text-sm"
+                              required
+                            >
+                              <option value="">Seleccionar proveedor...</option>
+                              {proveedores.map(prov => (
+                                <option key={prov.id} value={prov.id}>
+                                  {prov.nombre}
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              type="number"
+                              value={provSel.costo_unitario}
+                              onChange={(e) => handleProveedorChange(index, 'costo_unitario', e.target.value)}
+                              placeholder="Costo"
+                              min="0"
+                              step="0.01"
+                              className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 text-sm"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`preferido-${index}`}
+                              checked={provSel.es_preferido}
+                              onChange={() => handleMarcarPreferido(index)}
+                              className="w-4 h-4 text-red-700 bg-gray-100 border-gray-300 rounded focus:ring-red-700 focus:ring-2"
+                            />
+                            <label htmlFor={`preferido-${index}`} className="text-xs text-gray-600 cursor-pointer">
+                              Proveedor preferido
+                            </label>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarProveedor(index)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Eliminar proveedor"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {showNuevoProveedor && (
+                  <div className="mt-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={nuevoProveedorNombre}
+                        onChange={(e) => setNuevoProveedorNombre(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleCrearProveedorRapido();
+                          }
+                          if (e.key === 'Escape') {
+                            handleCancelarNuevoProveedor();
+                          }
+                        }}
+                        placeholder="NOMBRE DEL NUEVO PROVEEDOR"
+                        className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
+                        style={{ textTransform: 'uppercase' }}
+                        autoFocus
+                        disabled={creandoProveedor}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCrearProveedorRapido}
+                        disabled={creandoProveedor}
+                        className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                        title="Guardar proveedor"
+                      >
+                        {creandoProveedor ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <Check size={18} />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelarNuevoProveedor}
+                        disabled={creandoProveedor}
+                        className="px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                        title="Cancelar"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-xs text-yellow-800">
+                        ⚠️ <strong>Proveedor pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {puedeCrearProveedores && !showNuevoProveedor && (
+                  <button
+                    type="button"
+                    onClick={() => setShowNuevoProveedor(true)}
+                    className="mt-2 text-sm text-red-700 hover:text-red-800 font-medium"
+                  >
+                    + Crear nuevo proveedor
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Stock Actual, Mínimo y Máximo */}
+            <div className={`grid ${esAlmacen ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Stock Actual <span className="text-red-600">*</span>
+                </label>
                 <input
-                  type="text"
-                  value={nuevoProveedorNombre}
-                  onChange={(e) => setNuevoProveedorNombre(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleCrearProveedorRapido();
-                    }
-                    if (e.key === 'Escape') {
-                      handleCancelarNuevoProveedor();
-                    }
-                  }}
-                  placeholder="NOMBRE DEL NUEVO PROVEEDOR"
-                  className="flex-1 px-3 py-2 border-2 border-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 animate-pulse"
-                  style={{ textTransform: 'uppercase' }}
-                  autoFocus
-                  disabled={creandoProveedor}
+                  type="number"
+                  name="stock_actual"
+                  value={formData.stock_actual}
+                  onChange={handleChange}
+                  min="0"
+                  step={formData.unidad === 'piezas' ? '1' : '0.01'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                  placeholder="100"
+                  required
                 />
-                <button
-                  type="button"
-                  onClick={handleCrearProveedorRapido}
-                  disabled={creandoProveedor}
-                  className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
-                  title="Guardar proveedor"
-                >
-                  {creandoProveedor ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <Check size={18} />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelarNuevoProveedor}
-                  disabled={creandoProveedor}
-                  className="px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                  title="Cancelar"
-                >
-                  <X size={18} />
-                </button>
               </div>
-              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-xs text-yellow-800">
-                  ⚠️ <strong>Proveedor pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
-                </p>
-              </div>
+
+              {!esAlmacen && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Stock Mínimo <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="stock_minimo"
+                    value={formData.stock_minimo}
+                    onChange={handleChange}
+                    min="0"
+                    step={formData.unidad === 'piezas' ? '1' : '0.01'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                    placeholder="20"
+                    required={!esAlmacen}
+                  />
+                </div>
+              )}
+
+              {!esAlmacen && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Stock Máximo
+                  </label>
+                  <input
+                    type="number"
+                    name="stock_maximo"
+                    value={formData.stock_maximo}
+                    onChange={handleChange}
+                    min="0"
+                    step={formData.unidad === 'piezas' ? '1' : '0.01'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                    placeholder="500"
+                  />
+                </div>
+              )}
             </div>
-          )}
 
-          {puedeCrearProveedores && !showNuevoProveedor && (
-            <button
-              type="button"
-              onClick={() => setShowNuevoProveedor(true)}
-              className="mt-2 text-sm text-red-700 hover:text-red-800 font-medium"
-            >
-              + Crear nuevo proveedor
-            </button>
-          )}
-        </div>
-        )}
+            {/* Unidad y Costo */}
+            <div className={`grid ${esAlmacen ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unidad
+                </label>
+                <select
+                  name="unidad"
+                  value={formData.unidad}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                >
+                  <option value="piezas">Piezas</option>
+                  <option value="kg">Kilogramos</option>
+                  <option value="litros">Litros</option>
+                  <option value="metros">Metros</option>
+                </select>
+              </div>
 
-        {/* Stock Actual, Mínimo y Máximo */}
-        <div className={`grid ${esAlmacen ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Stock Actual <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="number"
-              name="stock_actual"
-              value={formData.stock_actual}
-              onChange={handleChange}
-              min="0"
-              step={formData.unidad === 'piezas' ? '1' : '0.01'}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              placeholder="100"
-              required
-            />
-          </div>
-
-          {!esAlmacen && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Stock Mínimo <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="number"
-              name="stock_minimo"
-              value={formData.stock_minimo}
-              onChange={handleChange}
-              min="0"
-              step={formData.unidad === 'piezas' ? '1' : '0.01'}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              placeholder="20"
-              required={!esAlmacen}
-            />
-          </div>
-          )}
-
-          {!esAlmacen && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Stock Máximo
-            </label>
-            <input
-              type="number"
-              name="stock_maximo"
-              value={formData.stock_maximo}
-              onChange={handleChange}
-              min="0"
-              step={formData.unidad === 'piezas' ? '1' : '0.01'}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              placeholder="500"
-            />
-          </div>
-          )}
-        </div>
-
-        {/* Unidad y Costo */}
-        <div className={`grid ${esAlmacen ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Unidad
-            </label>
-            <select
-              name="unidad"
-              value={formData.unidad}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            >
-              <option value="piezas">Piezas</option>
-              <option value="kg">Kilogramos</option>
-              <option value="litros">Litros</option>
-              <option value="metros">Metros</option>
-            </select>
-          </div>
-
-          {!esAlmacen && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Costo Unitario
-            </label>
-            <input
-              type="number"
-              name="costo_unitario"
-              value={formData.costo_unitario}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              placeholder="0.00"
-            />
-          </div>
-          )}
-        </div>
+              {!esAlmacen && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Costo Unitario
+                  </label>
+                  <input
+                    type="number"
+                    name="costo_unitario"
+                    value={formData.costo_unitario}
+                    onChange={handleChange}
+                    min="0"
+                    step="0.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
+            </div>
 
             {/* Toggle Es Herramienta */}
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -1422,11 +1434,10 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
           <button
             type="submit"
             disabled={loading}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 ${
-              modoIngreso
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 ${modoIngreso
                 ? 'bg-blue-600 hover:bg-blue-700'
                 : 'bg-red-700 hover:bg-red-800'
-            } text-white rounded-lg transition-colors disabled:opacity-50`}
+              } text-white rounded-lg transition-colors disabled:opacity-50`}
           >
             {loading ? (
               <>
