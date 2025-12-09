@@ -163,7 +163,9 @@ const InventarioPage = () => {
       const patronCodigoCompleto = /^[A-Z0-9]{2,4}-\d{1,4}$/i;
       const patronCodigoParcial = /^[A-Z0-9]{2,4}-/i;
 
-      const codigo = searchTerm.trim().toUpperCase();
+      // Normalizar el código: convertir apóstrofes y caracteres similares a guión
+      // El lector QR a veces lee ' en lugar de -
+      const codigo = searchTerm.trim().toUpperCase().replace(/['`´]/g, '-');
 
       // Si no es un código de herramienta, limpiar resultados
       if (!codigo || !patronCodigoParcial.test(codigo)) {
@@ -238,7 +240,8 @@ const InventarioPage = () => {
     // Si hay búsqueda por código de herramienta, usar solo esos resultados
     // Ahora acepta prefijos alfanuméricos como PP2-, AD1-, LL-, LC-, etc.
     const patronCodigoParcial = /^[A-Z0-9]{2,4}-/i;
-    const codigo = searchTerm.trim().toUpperCase();
+    // Normalizar: convertir apóstrofes a guión (el lector QR a veces lee ' en lugar de -)
+    const codigo = searchTerm.trim().toUpperCase().replace(/['`´]/g, '-');
 
     if (codigo && patronCodigoParcial.test(codigo) && herramientasEncontradasPorCodigo.length > 0) {
       // Filtrar las herramientas encontradas por los demás filtros
