@@ -236,7 +236,8 @@ const InventarioPage = () => {
 
   const filteredArticulos = (() => {
     // Si hay búsqueda por código de herramienta, usar solo esos resultados
-    const patronCodigoParcial = /^[A-Z]{2,3}-/i;
+    // Ahora acepta prefijos alfanuméricos como PP2-, AD1-, LL-, LC-, etc.
+    const patronCodigoParcial = /^[A-Z0-9]{2,4}-/i;
     const codigo = searchTerm.trim().toUpperCase();
 
     if (codigo && patronCodigoParcial.test(codigo) && herramientasEncontradasPorCodigo.length > 0) {
