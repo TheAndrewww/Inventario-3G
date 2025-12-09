@@ -159,8 +159,9 @@ const InventarioPage = () => {
   useEffect(() => {
     const buscarHerramientaPorCodigo = async () => {
       // Detectar si el searchTerm tiene formato de código de herramienta
-      const patronCodigoCompleto = /^[A-Z]{2,3}-\d{1,4}$/i;
-      const patronCodigoParcial = /^[A-Z]{2,3}-/i;
+      // Ahora acepta prefijos alfanuméricos como PP2-, AD1-, LL-, LC-, etc.
+      const patronCodigoCompleto = /^[A-Z0-9]{2,4}-\d{1,4}$/i;
+      const patronCodigoParcial = /^[A-Z0-9]{2,4}-/i;
 
       const codigo = searchTerm.trim().toUpperCase();
 
