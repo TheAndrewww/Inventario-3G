@@ -1374,18 +1374,28 @@ export const uploadArticuloImagen = async (req, res) => {
     try {
         const { id } = req.params;
 
+        console.log(`📷 uploadArticuloImagen: Iniciando para artículo ${id}`);
+        console.log(`   → req.file presente: ${!!req.file}`);
+        if (req.file) {
+            console.log(`   → Tipo: ${req.file.mimetype}, Tamaño: ${req.file.size} bytes`);
+        }
+
         // Verificar que el artículo existe
         const articulo = await Articulo.findByPk(id);
 
         if (!articulo) {
+            console.log(`   ❌ Artículo ${id} no encontrado`);
             return res.status(404).json({
                 success: false,
                 message: 'Artículo no encontrado'
             });
         }
 
+        console.log(`   → Artículo encontrado: ${articulo.nombre}`);
+
         // Verificar que se subió un archivo
         if (!req.file) {
+            console.log(`   ❌ No se proporcionó imagen`);
             return res.status(400).json({
                 success: false,
                 message: 'No se proporcionó ninguna imagen'
