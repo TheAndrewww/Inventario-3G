@@ -60,7 +60,8 @@ const InventarioPage = () => {
   const [loadingEtiquetas, setLoadingEtiquetas] = useState(false);
   const [herramientasExpandidasEtiquetas, setHerramientasExpandidasEtiquetas] = useState({});
   const [unidadesCargadasEtiquetas, setUnidadesCargadasEtiquetas] = useState({});
-  const [filtroUbicacionEtiquetas, setFiltroUbicacionEtiquetas] = useState('todos'); // Nuevo: filtro por ubicación
+  const [filtroUbicacionEtiquetas, setFiltroUbicacionEtiquetas] = useState('todos'); // Filtro por ubicación
+  const [filtroEstadoEtiquetado, setFiltroEstadoEtiquetado] = useState('todos'); // 'todos', 'etiquetados', 'sin_etiquetar'
 
   // Estados para expansión de herramientas y sus unidades
   const [herramientasExpandidas, setHerramientasExpandidas] = useState({});
@@ -1081,6 +1082,13 @@ const InventarioPage = () => {
     // Aplicar filtro de ubicación
     if (filtroUbicacionEtiquetas !== 'todos') {
       articulosActivos = articulosActivos.filter(a => a.ubicacion_id === parseInt(filtroUbicacionEtiquetas));
+    }
+
+    // Aplicar filtro de estado etiquetado
+    if (filtroEstadoEtiquetado === 'etiquetados') {
+      articulosActivos = articulosActivos.filter(a => a.etiquetado === true);
+    } else if (filtroEstadoEtiquetado === 'sin_etiquetar') {
+      articulosActivos = articulosActivos.filter(a => !a.etiquetado);
     }
 
     // Aplicar filtro de búsqueda
@@ -3030,6 +3038,37 @@ const InventarioPage = () => {
             </select>
           </div>
 
+          {/* Filtro por estado de etiquetado */}
+          <div className="flex items-center gap-2 bg-yellow-50 rounded-lg p-1 border border-yellow-200">
+            <button
+              onClick={() => setFiltroEstadoEtiquetado('todos')}
+              className={`flex-1 px-3 py-1.5 rounded-md font-medium text-xs transition-all ${filtroEstadoEtiquetado === 'todos'
+                ? 'bg-white text-yellow-700 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFiltroEstadoEtiquetado('sin_etiquetar')}
+              className={`flex-1 px-3 py-1.5 rounded-md font-medium text-xs transition-all ${filtroEstadoEtiquetado === 'sin_etiquetar'
+                ? 'bg-white text-red-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
+            >
+              🏷️ Sin etiquetar
+            </button>
+            <button
+              onClick={() => setFiltroEstadoEtiquetado('etiquetados')}
+              className={`flex-1 px-3 py-1.5 rounded-md font-medium text-xs transition-all ${filtroEstadoEtiquetado === 'etiquetados'
+                ? 'bg-white text-green-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
+            >
+              ✓ Ya etiquetados
+            </button>
+          </div>
+
           {/* Contador y botón seleccionar todos */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">
@@ -3088,6 +3127,13 @@ const InventarioPage = () => {
                 // Aplicar filtro de ubicación
                 if (filtroUbicacionEtiquetas !== 'todos') {
                   articulosActivos = articulosActivos.filter(a => a.ubicacion_id === parseInt(filtroUbicacionEtiquetas));
+                }
+
+                // Aplicar filtro de estado etiquetado
+                if (filtroEstadoEtiquetado === 'etiquetados') {
+                  articulosActivos = articulosActivos.filter(a => a.etiquetado === true);
+                } else if (filtroEstadoEtiquetado === 'sin_etiquetar') {
+                  articulosActivos = articulosActivos.filter(a => !a.etiquetado);
                 }
 
                 // Aplicar filtro de búsqueda
