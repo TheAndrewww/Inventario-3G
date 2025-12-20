@@ -69,7 +69,7 @@ export const getMovimientos = async (req, res) => {
                         {
                             model: Articulo,
                             as: 'articulo',
-                            attributes: ['id', 'nombre', 'unidad'],
+                            attributes: ['id', 'nombre', 'unidad', 'descripcion', 'imagen_url'],
                             include: [
                                 {
                                     model: Categoria,
@@ -136,7 +136,7 @@ export const getMovimientoById = async (req, res) => {
                         {
                             model: Articulo,
                             as: 'articulo',
-                            attributes: ['id', 'nombre', 'descripcion', 'unidad', 'costo_unitario'],
+                            attributes: ['id', 'nombre', 'descripcion', 'unidad', 'costo_unitario', 'imagen_url'],
                             include: [
                                 {
                                     model: Categoria,

@@ -623,7 +623,7 @@ export const listarPedidos = async (req, res) => {
             {
               model: Articulo,
               as: 'articulo',
-              attributes: ['id', 'codigo_ean13', 'nombre', 'unidad']
+              attributes: ['id', 'codigo_ean13', 'nombre', 'unidad', 'descripcion', 'imagen_url']
             },
             {
               model: Usuario,
