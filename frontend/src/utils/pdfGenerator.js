@@ -42,9 +42,6 @@ const loadImageWithDimensions = async (url) => {
  */
 export const generateTicketPDF = async (pedido) => {
   try {
-    console.log('📄 Generando PDF para pedido:', pedido.ticket_id);
-    console.log('📦 Total de detalles:', pedido.detalles?.length || 0);
-
     // URLs de los logos
     const logoCompletoUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1762292854/logo_completo_web_eknzcb.png';
     const marcaAguaUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1763602391/iso_black_1_mmxd6k.png';
@@ -69,35 +66,22 @@ export const generateTicketPDF = async (pedido) => {
     });
 
     // Cargar imágenes de artículos
-    console.log('🖼️ Cargando imágenes de artículos...');
     const imagenesArticulos = {};
     for (const detalle of articulos) {
       const imagenUrlOriginal = detalle.articulo?.imagen_url;
       const imagenUrlCompleta = getImageUrl(imagenUrlOriginal);
-
-      console.log(`  Artículo ${detalle.articulo_id}: ${detalle.articulo?.nombre}`, {
-        tieneImagenUrl: !!imagenUrlOriginal,
-        imagen_url_original: imagenUrlOriginal,
-        imagen_url_completa: imagenUrlCompleta
-      });
 
       if (imagenUrlCompleta) {
         try {
           const imagenData = await loadImageWithDimensions(imagenUrlCompleta);
           if (imagenData) {
             imagenesArticulos[detalle.articulo_id] = imagenData;
-            console.log(`  ✅ Imagen cargada para artículo ${detalle.articulo_id}`);
-          } else {
-            console.log(`  ❌ No se pudo cargar imagen para artículo ${detalle.articulo_id}`);
           }
         } catch (error) {
-          console.error(`  ❌ Error cargando imagen del artículo ${detalle.articulo_id}:`, error);
+          console.error(`Error cargando imagen del artículo ${detalle.articulo_id}:`, error);
         }
       }
     }
-
-    console.log(`📊 Total de imágenes cargadas: ${Object.keys(imagenesArticulos).length}/${articulos.length}`);
-    console.log('Imágenes cargadas por artículo_id:', Object.keys(imagenesArticulos));
 
     // Calcular altura aproximada necesaria
     let alturaEstimada = 100; // Header inicial
