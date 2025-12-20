@@ -11,7 +11,7 @@ import {
   ZoomIn,
   ZoomOut
 } from 'lucide-react';
-import { obtenerCalendarioMes, obtenerDistribucionEquipos } from '../services/calendario.service';
+import { obtenerCalendarioMesPublico, obtenerDistribucionEquiposPublico } from '../services/calendario.service';
 import { toast, Toaster } from 'react-hot-toast';
 
 const MESES = [
@@ -75,9 +75,9 @@ const CalendarioPublicoPage = () => {
       const mesSiguiente = MESES[indiceSiguiente];
 
       const [calendarioData, calendarioSiguienteData, distribucionData] = await Promise.all([
-        obtenerCalendarioMes(mesActual),
-        obtenerCalendarioMes(mesSiguiente),
-        obtenerDistribucionEquipos(mesActual)
+        obtenerCalendarioMesPublico(mesActual),
+        obtenerCalendarioMesPublico(mesSiguiente),
+        obtenerDistribucionEquiposPublico(mesActual)
       ]);
 
       setCalendario(calendarioData.data);
