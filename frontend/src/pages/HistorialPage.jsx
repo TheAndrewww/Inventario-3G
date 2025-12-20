@@ -59,67 +59,17 @@ const HistorialPage = () => {
 
   const generatePDF = async (movimiento) => {
     try {
-      const doc = new jsPDF();
-
       // URLs de los logos
       const logoCompletoUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1762292854/logo_completo_web_eknzcb.png';
       const marcaAguaUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1763602391/iso_black_1_mmxd6k.png';
 
-      // Cargar imágenes con dimensiones
+      // Cargar imágenes
       const [logoData, marcaAguaData] = await Promise.all([
         loadImageWithDimensions(logoCompletoUrl),
         loadImageWithDimensions(marcaAguaUrl)
       ]);
 
-      // === HEADER ===
-      // Logo completo arriba a la izquierda (respetando relación de aspecto)
-      if (logoData) {
-        const logoWidth = 70; // Ancho deseado en mm
-        const logoHeight = logoWidth / logoData.aspectRatio; // Alto calculado
-        doc.addImage(logoData.base64, 'PNG', 15, 10, logoWidth, logoHeight);
-      }
-
-      // Información a la derecha
-      let rightX = 120;
-      let rightY = 15;
-
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'bold');
-      doc.text('SUPERVISOR', rightX, rightY);
-      doc.setFont(undefined, 'normal');
-      doc.text(movimiento.aprobadoPor?.nombre || movimiento.usuario?.nombre || 'N/A', rightX, rightY + 5);
-
-      rightY += 15;
-      doc.setFont(undefined, 'bold');
-      doc.text('NOMBRE DE PROYECTO', rightX, rightY);
-      doc.setFont(undefined, 'normal');
-      doc.text(movimiento.proyecto || movimiento.equipo?.nombre || 'Sin proyecto', rightX, rightY + 5);
-
-      rightY += 15;
-      doc.setFont(undefined, 'bold');
-      doc.text('FECHA DE SALIDA:', rightX, rightY);
-      doc.setFont(undefined, 'normal');
-      const fechaMovimiento = movimiento.created_at || movimiento.createdAt;
-      doc.text(
-        fechaMovimiento ? new Date(fechaMovimiento).toLocaleDateString('es-MX', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        }) : 'N/A',
-        rightX,
-        rightY + 5
-      );
-
-      // === TÍTULO PRINCIPAL ===
-      let yPos = 60;
-      doc.setFontSize(12);
-      doc.setFont(undefined, 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('ORDEN DE SALIDA DE PRODUCTOS', 15, yPos);
-
-      yPos += 10;
-
-      // === ARTÍCULOS AGRUPADOS POR CATEGORÍA ===
+      // === CALCULAR ALTURA NECESARIA DEL DOCUMENTO ===
       const articulos = movimiento.detalles || [];
 
       // Agrupar artículos por categoría
@@ -147,29 +97,115 @@ const HistorialPage = () => {
         }
       }
 
-      // Mostrar artículos por categoría
-      doc.setFontSize(10);
+      // Calcular altura aproximada necesaria
+      let alturaEstimada = 100; // Header inicial
       Object.keys(articulosPorCategoria).forEach(categoria => {
-        if (yPos > 240) {
-          doc.addPage();
-          yPos = 20;
-        }
+        alturaEstimada += 8; // Título de categoría
+        articulosPorCategoria[categoria].forEach(detalle => {
+          alturaEstimada += 20; // Espacio por artículo con imagen
+          const descripcion = detalle.articulo?.descripcion || '';
+          if (descripcion) {
+            const lineasDesc = Math.ceil(descripcion.length / 50);
+            alturaEstimada += lineasDesc * 4;
+          }
+        });
+        alturaEstimada += 5; // Espacio entre categorías
+      });
+      alturaEstimada += 10; // Margen final
 
+      // Crear documento con formato ticket (80mm de ancho, altura dinámica)
+      const anchoTicket = 80; // mm
+      const altoTicket = Math.max(200, alturaEstimada); // Mínimo 200mm
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [anchoTicket, altoTicket]
+      });
+
+      let yPos = 5;
+      const margen = 5;
+      const anchoUtil = anchoTicket - (margen * 2);
+
+      // === HEADER ===
+      // Logo completo centrado
+      if (logoData) {
+        const logoWidth = 60;
+        const logoHeight = logoWidth / logoData.aspectRatio;
+        const logoX = (anchoTicket - logoWidth) / 2;
+        doc.addImage(logoData.base64, 'PNG', logoX, yPos, logoWidth, logoHeight);
+        yPos += logoHeight + 5;
+      }
+
+      // Información del pedido (centrada)
+      doc.setFontSize(8);
+
+      // Supervisor
+      doc.setFont(undefined, 'bold');
+      doc.text('SUPERVISOR', anchoTicket / 2, yPos, { align: 'center' });
+      yPos += 4;
+      doc.setFont(undefined, 'normal');
+      const supervisor = movimiento.aprobadoPor?.nombre || movimiento.usuario?.nombre || 'N/A';
+      const supervisorLines = doc.splitTextToSize(supervisor, anchoUtil);
+      supervisorLines.forEach(line => {
+        doc.text(line, anchoTicket / 2, yPos, { align: 'center' });
+        yPos += 3.5;
+      });
+      yPos += 2;
+
+      // Proyecto
+      doc.setFont(undefined, 'bold');
+      doc.text('PROYECTO', anchoTicket / 2, yPos, { align: 'center' });
+      yPos += 4;
+      doc.setFont(undefined, 'normal');
+      const proyecto = movimiento.proyecto || movimiento.equipo?.nombre || 'Sin proyecto';
+      const proyectoLines = doc.splitTextToSize(proyecto, anchoUtil);
+      proyectoLines.forEach(line => {
+        doc.text(line, anchoTicket / 2, yPos, { align: 'center' });
+        yPos += 3.5;
+      });
+      yPos += 2;
+
+      // Fecha
+      doc.setFont(undefined, 'bold');
+      doc.text('FECHA DE SALIDA', anchoTicket / 2, yPos, { align: 'center' });
+      yPos += 4;
+      doc.setFont(undefined, 'normal');
+      const fechaMovimiento = movimiento.created_at || movimiento.createdAt;
+      doc.text(
+        fechaMovimiento ? new Date(fechaMovimiento).toLocaleDateString('es-MX', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        }) : 'N/A',
+        anchoTicket / 2,
+        yPos,
+        { align: 'center' }
+      );
+      yPos += 6;
+
+      // === TÍTULO PRINCIPAL ===
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('ORDEN DE SALIDA', anchoTicket / 2, yPos, { align: 'center' });
+      yPos += 6;
+
+      // Línea divisoria
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(margen, yPos, anchoTicket - margen, yPos);
+      yPos += 5;
+
+      // === ARTÍCULOS AGRUPADOS POR CATEGORÍA ===
+      doc.setFontSize(8);
+      Object.keys(articulosPorCategoria).forEach(categoria => {
         // Nombre de categoría
         doc.setFont(undefined, 'bold');
-        doc.text(categoria.toUpperCase(), 15, yPos);
-        yPos += 6;
+        doc.text(categoria.toUpperCase(), margen, yPos);
+        yPos += 4;
 
         // Lista de artículos
         doc.setFont(undefined, 'normal');
         articulosPorCategoria[categoria].forEach(detalle => {
-          const articuloHeight = 20; // Altura reservada para cada artículo con imagen
-
-          if (yPos + articuloHeight > 240) {
-            doc.addPage();
-            yPos = 20;
-          }
-
           const nombreArticulo = detalle.articulo?.nombre || `Artículo ID: ${detalle.articulo_id}`;
           const descripcion = detalle.articulo?.descripcion || '';
           const cantidad = detalle.cantidad;
@@ -177,85 +213,70 @@ const HistorialPage = () => {
           const imagenArticulo = imagenesArticulos[detalle.articulo_id];
 
           // Dibujar imagen del artículo si existe
-          const imgX = 15;
-          const imgY = yPos - 2;
-          const imgSize = 15; // Tamaño de la imagen en mm
-          let textX = 20; // Posición X del texto (sin imagen)
-          let textStartY = yPos + 5; // Posición Y inicial del texto (por defecto)
+          const imgSize = 12; // Tamaño de imagen en mm
+          let textX = margen;
+          let textStartY = yPos;
 
           if (imagenArticulo) {
-            // Calcular dimensiones manteniendo aspecto
             const imgWidth = imgSize;
             const imgHeight = imgSize / imagenArticulo.aspectRatio;
 
-            // Dibujar borde alrededor de la imagen
+            // Borde de imagen
             doc.setDrawColor(200, 200, 200);
             doc.setLineWidth(0.2);
-            doc.rect(imgX, imgY, imgWidth, imgHeight);
+            doc.rect(margen, yPos, imgWidth, imgHeight);
 
             // Agregar imagen
-            doc.addImage(imagenArticulo.base64, 'JPEG', imgX, imgY, imgWidth, imgHeight);
-            textX = imgX + imgWidth + 3; // Ajustar posición del texto
-            textStartY = imgY + 4; // Alinear texto con el inicio de la imagen
+            doc.addImage(imagenArticulo.base64, 'JPEG', margen, yPos, imgWidth, imgHeight);
+            textX = margen + imgWidth + 2;
+            textStartY = yPos + 3;
+            yPos = Math.max(yPos + imgHeight, textStartY);
+          } else {
+            textStartY = yPos + 3;
           }
 
-          // Bullet point con nombre y cantidad
+          // Nombre y cantidad en negrita
           doc.setFont(undefined, 'bold');
-          doc.text(`• ${nombreArticulo} - ${cantidad} ${unidad}`, textX, textStartY);
-          yPos = textStartY + 5; // Ajustar yPos para siguiente línea
+          const texto = `• ${nombreArticulo} - ${cantidad} ${unidad}`;
+          const textoLines = doc.splitTextToSize(texto, anchoUtil - (imagenArticulo ? imgSize + 2 : 0));
+          doc.text(textoLines, textX, textStartY);
+          const altoTexto = textoLines.length * 3.5;
 
-          // Descripción en línea separada si existe
+          // Descripción si existe
           if (descripcion) {
             doc.setFont(undefined, 'normal');
-            doc.setFontSize(9);
-            const maxWidth = 180 - textX;
-            const descripcionLines = doc.splitTextToSize(`  ${descripcion}`, maxWidth);
-            doc.text(descripcionLines, textX + 2, yPos);
-            yPos += descripcionLines.length * 4.5; // Aumentar espacio entre líneas de descripción
-            doc.setFontSize(10);
+            doc.setFontSize(7);
+            const descLines = doc.splitTextToSize(`  ${descripcion}`, anchoUtil - (imagenArticulo ? imgSize + 2 : 0));
+            doc.text(descLines, textX, textStartY + altoTexto);
+            yPos = Math.max(yPos, textStartY + altoTexto + (descLines.length * 3));
+            doc.setFontSize(8);
+          } else {
+            yPos = Math.max(yPos, textStartY + altoTexto);
           }
 
-          yPos += imagenArticulo ? Math.max(5, imgSize - 5) : 4; // Más espacio entre artículos
+          yPos += 3;
         });
 
-        yPos += 4;
+        yPos += 3; // Espacio entre categorías
       });
 
       // === MARCA DE AGUA ===
       if (marcaAguaData) {
-        // Configurar opacidad para la marca de agua (efecto difuminado)
-        const gState = doc.GState({ opacity: 0.08 });
+        const gState = doc.GState({ opacity: 0.05 });
         doc.setGState(gState);
 
-        // Calcular dimensiones respetando relación de aspecto
-        const watermarkWidth = 160; // Ancho más grande
+        const watermarkWidth = 60;
         const watermarkHeight = watermarkWidth / marcaAguaData.aspectRatio;
+        const watermarkX = (anchoTicket - watermarkWidth) / 2;
+        const watermarkY = altoTicket / 2 - watermarkHeight / 2;
 
-        // Agregar marca de agua grande, más abajo y a la derecha (cortada)
-        doc.addImage(marcaAguaData.base64, 'PNG', 60, 180, watermarkWidth, watermarkHeight, undefined, 'NONE', 0);
-
-        // Restaurar opacidad normal
+        doc.addImage(marcaAguaData.base64, 'PNG', watermarkX, watermarkY, watermarkWidth, watermarkHeight, undefined, 'NONE', 0);
         doc.setGState(doc.GState({ opacity: 1 }));
       }
 
-      // === FOOTER CON BARRA ROJA ===
-      const pageCount = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-
-        // Barra roja
-        doc.setFillColor(185, 28, 28); // Rojo oscuro
-        doc.rect(0, 280, 210, 17, 'F');
-
-        // Texto en la barra
-        doc.setFontSize(10);
-        doc.setTextColor(255, 255, 255);
-        doc.text('4621302459 | admin@3gvelarias.com', 105, 289, { align: 'center' });
-      }
-
       // Descargar PDF
-      doc.save(`Orden-Salida-${movimiento.ticket_id}.pdf`);
-      toast.success('PDF descargado correctamente');
+      doc.save(`Ticket-${movimiento.ticket_id}.pdf`);
+      toast.success('Ticket descargado correctamente');
     } catch (error) {
       console.error('Error al generar PDF:', error);
       toast.error('Error al generar el PDF');
