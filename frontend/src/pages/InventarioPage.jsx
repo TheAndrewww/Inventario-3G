@@ -1549,12 +1549,7 @@ const InventarioPage = () => {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Actual</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Mín</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Máx</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedores</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creado</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actualizado</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
@@ -1563,7 +1558,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => !item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-blue-50 sticky top-[49px] z-20 border-b border-blue-200 shadow-sm">
-                    <td colSpan="11" className="px-6 py-3">
+                    <td colSpan="6" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-blue-900">
                         📦 Consumibles
                         <span className="text-xs font-normal text-blue-700">
@@ -1641,44 +1636,9 @@ const InventarioPage = () => {
                           </span>
                         </td>
 
-                        {/* Stock Mínimo */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {parseFloat(item.stock_minimo).toFixed(2)}
-                        </td>
-
-                        {/* Stock Máximo */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}
-                        </td>
-
                         {/* Unidad */}
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase">
                           {item.unidad}
-                        </td>
-
-                        {/* Proveedores */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {item.proveedores && item.proveedores.length > 0 ? (
-                            <div className="flex flex-col gap-1">
-                              {item.proveedores.map((prov, idx) => (
-                                <span key={idx} className={`text-xs ${prov.ArticuloProveedor?.es_preferido ? 'font-semibold text-green-700' : 'text-gray-600'}`}>
-                                  {prov.nombre}{prov.ArticuloProveedor?.es_preferido ? ' ⭐' : ''}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            'N/A'
-                          )}
-                        </td>
-
-                        {/* Fecha creación */}
-                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
-                          {item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
-                        </td>
-
-                        {/* Fecha actualización */}
-                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500">
-                          {item.updated_at ? new Date(item.updated_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
                         </td>
 
                         {/* Acciones */}
@@ -1757,7 +1717,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-orange-50 sticky top-[49px] z-20 border-b border-orange-200 shadow-sm">
-                    <td colSpan="11" className="px-6 py-3">
+                    <td colSpan="6" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-orange-900">
                         🔧 Herramientas
                         <span className="text-xs font-normal text-orange-700">
@@ -1861,44 +1821,9 @@ const InventarioPage = () => {
                             </span>
                           </td>
 
-                          {/* Stock Mínimo */}
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 cursor-pointer" onClick={() => handleVerDetalle(item)}>
-                            {parseFloat(item.stock_minimo).toFixed(2)}
-                          </td>
-
-                          {/* Stock Máximo */}
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 cursor-pointer" onClick={() => handleVerDetalle(item)}>
-                            {item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}
-                          </td>
-
                           {/* Unidad */}
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase cursor-pointer" onClick={() => handleVerDetalle(item)}>
                             {item.unidad}
-                          </td>
-
-                          {/* Proveedores */}
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 cursor-pointer" onClick={() => handleVerDetalle(item)}>
-                            {item.proveedores && item.proveedores.length > 0 ? (
-                              <div className="flex flex-col gap-1">
-                                {item.proveedores.map((prov, idx) => (
-                                  <span key={idx} className={`text-xs ${prov.ArticuloProveedor?.es_preferido ? 'font-semibold text-green-700' : 'text-gray-600'}`}>
-                                    {prov.nombre}{prov.ArticuloProveedor?.es_preferido ? ' ⭐' : ''}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              'N/A'
-                            )}
-                          </td>
-
-                          {/* Fecha creación */}
-                          <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500 cursor-pointer" onClick={() => handleVerDetalle(item)}>
-                            {item.created_at ? new Date(item.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
-                          </td>
-
-                          {/* Fecha actualización */}
-                          <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-500 cursor-pointer" onClick={() => handleVerDetalle(item)}>
-                            {item.updated_at ? new Date(item.updated_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
                           </td>
 
                           {/* Acciones */}
@@ -1972,7 +1897,7 @@ const InventarioPage = () => {
                         {/* Filas de unidades expandidas */}
                         {estaExpandida && unidades.length > 0 && unidades.map((unidad) => (
                           <tr key={`unidad-${unidad.id}`} className="bg-gray-50">
-                            <td colSpan="11" className="px-4 py-3">
+                            <td colSpan="6" className="px-4 py-3">
                               <div
                                 onClick={(e) => handleVerDetalleUnidad(unidad, item.id, e)}
                                 className="ml-12 flex items-center gap-6 p-3 bg-white rounded-lg border-2 border-gray-200 hover:border-red-400 hover:shadow-md transition-all cursor-pointer group"
