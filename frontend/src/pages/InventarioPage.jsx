@@ -2112,7 +2112,7 @@ const InventarioPage = () => {
                   <div
                     key={`consumible-${item.id}`}
                     onClick={() => handleVerDetalle(item)}
-                    className={`p-4 transition-colors cursor-pointer ${esPendienteRevision
+                    className={`p-3 transition-colors cursor-pointer ${esPendienteRevision
                       ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
                       : esUbicacionRevisar
                         ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
@@ -2125,87 +2125,45 @@ const InventarioPage = () => {
                         <img
                           src={imagenUrl}
                           alt={item.nombre}
-                          className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                          className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
                         />
                       ) : (
-                        <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+                        <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
                           📦
                         </div>
                       )}
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-gray-900">{item.nombre}</h3>
-                          <span className="text-xs text-gray-400 font-mono">#{item.id}</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mb-2">{item.descripcion}</p>
+                        <h3 className="font-semibold text-gray-900 text-sm mb-0.5 line-clamp-1">{item.nombre}</h3>
+                        <p className="text-xs text-gray-500 mb-2 line-clamp-2">{item.descripcion}</p>
 
-                        {/* Badges */}
-                        <div className="flex flex-wrap gap-1 text-xs mb-2">
-                          <span className="inline-flex px-2 py-1 rounded bg-blue-100 text-blue-800 font-medium">
+                        {/* Badge de categoría */}
+                        <div className="mb-2">
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
                             {item.categoria?.nombre || 'Sin categoría'}
                           </span>
-                          <span className={`inline-flex px-2 py-1 rounded font-medium ${item.es_herramienta ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
-                            {item.es_herramienta ? '🔧' : '📦'}
-                          </span>
-                          <span className={`inline-flex px-2 py-1 rounded font-medium ${item.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {item.activo ? '✓' : '✗'}
-                          </span>
                         </div>
 
-                        {/* Detalles principales */}
-                        <div className="text-xs text-gray-600 space-y-1 mb-2">
-                          <div><span className="font-semibold">Código:</span> <span className="font-mono">{item.codigo_ean13 || 'N/A'}</span></div>
-                          {item.codigo_tipo && <div><span className="font-semibold">Tipo:</span> {item.codigo_tipo}</div>}
-                          {item.sku && <div><span className="font-semibold">SKU:</span> <span className="font-mono">{item.sku}</span></div>}
-                          <div>
-                            <span className="font-semibold">Ubicación:</span>{' '}
+                        {/* Ubicación y Stock en una línea */}
+                        <div className="flex items-center gap-3 text-xs mb-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-500">📍</span>
                             {esUbicacionRevisar ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border border-yellow-400 text-[10px]">
+                              <span className="text-yellow-900 font-bold">
                                 ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
                               </span>
                             ) : (
-                              <span>{item.ubicacion?.codigo || 'N/A'}</span>
+                              <span className="text-gray-700 font-medium">{item.ubicacion?.codigo || 'N/A'}</span>
                             )}
                           </div>
-                        </div>
-
-                        {/* Stock info */}
-                        <div className="bg-gray-50 rounded p-2 mb-2">
-                          <div className="grid grid-cols-3 gap-2 text-xs">
-                            <div>
-                              <div className="text-gray-500">Stock</div>
-                              <div className={`font-semibold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                                {parseFloat(item.stock_actual).toFixed(2)}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-gray-500">Mín</div>
-                              <div className="font-semibold text-gray-700">{parseFloat(item.stock_minimo).toFixed(2)}</div>
-                            </div>
-                            <div>
-                              <div className="text-gray-500">Máx</div>
-                              <div className="font-semibold text-gray-700">{item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}</div>
-                            </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-500">📦</span>
+                            <span className={`font-bold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                              {parseFloat(item.stock_actual).toFixed(2)}
+                            </span>
+                            <span className="text-gray-400 text-[10px] uppercase">{item.unidad}</span>
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">Unidad: <span className="uppercase font-medium">{item.unidad}</span></div>
-                        </div>
-
-                        {/* Costo y proveedores */}
-                        <div className="text-xs space-y-1">
-                          <div><span className="font-semibold">Costo:</span> <span className="text-green-700 font-bold">${parseFloat(item.costo_unitario || 0).toFixed(2)}</span></div>
-                          {item.proveedores && item.proveedores.length > 0 && (
-                            <div>
-                              <span className="font-semibold">Proveedores:</span> {item.proveedores.map(p => `${p.nombre}${p.ArticuloProveedor?.es_preferido ? '⭐' : ''}`).join(', ')}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Fechas */}
-                        <div className="text-[10px] text-gray-400 mt-2 space-x-2">
-                          {item.created_at && <span>Creado: {new Date(item.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
-                          {item.updated_at && <span>Act: {new Date(item.updated_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
                         </div>
                       </div>
                     </div>
@@ -2309,7 +2267,7 @@ const InventarioPage = () => {
                 return (
                   <React.Fragment key={`herramienta-${item.id}`}>
                     <div
-                      className={`p-4 transition-colors ${esArticuloEncontrado
+                      className={`p-3 transition-colors ${esArticuloEncontrado
                         ? 'bg-green-100 hover:bg-green-200 border-l-4 border-green-600 shadow-lg'
                         : esPendienteRevision
                           ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
@@ -2318,113 +2276,73 @@ const InventarioPage = () => {
                             : 'hover:bg-gray-50'
                         }`}
                     >
-                      {/* Botón expandir/colapsar y header */}
-                      <div className="flex items-center gap-2 mb-3">
+                      {/* Header con botón expandir */}
+                      <div className="flex items-center gap-2 mb-2">
                         <button
                           onClick={(e) => handleToggleHerramienta(item.id, e)}
-                          className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                          className="text-gray-400 hover:text-gray-600 transition-colors p-1 flex-shrink-0"
                           disabled={cargandoUnidades}
                         >
                           {cargandoUnidades ? (
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
                           ) : estaExpandida ? (
-                            <ChevronUp size={20} />
+                            <ChevronUp size={18} />
                           ) : (
-                            <ChevronDown size={20} />
+                            <ChevronDown size={18} />
                           )}
                         </button>
                         <h3
-                          className="font-medium text-gray-900 cursor-pointer hover:text-red-700 transition-colors flex-1"
+                          className="font-semibold text-gray-900 text-sm cursor-pointer hover:text-red-700 transition-colors flex-1 line-clamp-1"
                           onClick={() => handleVerDetalle(item)}
                         >
                           {item.nombre}
                         </h3>
-                        <span className="text-xs text-gray-400 font-mono">#{item.id}</span>
                       </div>
 
-                      <div className="flex gap-3 cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                      <div className="flex gap-3 cursor-pointer ml-7" onClick={() => handleVerDetalle(item)}>
                         {/* Imagen */}
                         {imagenUrl ? (
                           <img
                             src={imagenUrl}
                             alt={item.nombre}
-                            className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                            className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
                           />
                         ) : (
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+                          <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
                             🔧
                           </div>
                         )}
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-gray-500 mb-2">{item.descripcion}</p>
+                          <p className="text-xs text-gray-500 mb-2 line-clamp-2">{item.descripcion}</p>
 
-                          {/* Badges */}
-                          <div className="flex flex-wrap gap-1 text-xs mb-2">
-                            <span className="inline-flex px-2 py-1 rounded bg-blue-100 text-blue-800 font-medium">
+                          {/* Badge de categoría */}
+                          <div className="mb-2">
+                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
                               {item.categoria?.nombre || 'Sin categoría'}
-                            </span>
-                            <span className={`inline-flex px-2 py-1 rounded font-medium ${item.es_herramienta ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
-                              {item.es_herramienta ? '🔧' : '📦'}
-                            </span>
-                            <span className={`inline-flex px-2 py-1 rounded font-medium ${item.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                              {item.activo ? '✓' : '✗'}
                             </span>
                           </div>
 
-                          {/* Detalles principales */}
-                          <div className="text-xs text-gray-600 space-y-1 mb-2">
-                            <div><span className="font-semibold">Código:</span> <span className="font-mono">{item.codigo_ean13 || 'N/A'}</span></div>
-                            {item.codigo_tipo && <div><span className="font-semibold">Tipo:</span> {item.codigo_tipo}</div>}
-                            {item.sku && <div><span className="font-semibold">SKU:</span> <span className="font-mono">{item.sku}</span></div>}
-                            <div>
-                              <span className="font-semibold">Ubicación:</span>{' '}
+                          {/* Ubicación y Stock en una línea */}
+                          <div className="flex items-center gap-3 text-xs mb-2">
+                            <div className="flex items-center gap-1">
+                              <span className="text-gray-500">📍</span>
                               {esUbicacionRevisar ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border border-yellow-400 text-[10px]">
+                                <span className="text-yellow-900 font-bold">
                                   ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
                                 </span>
                               ) : (
-                                <span>{item.ubicacion?.codigo || 'N/A'}</span>
+                                <span className="text-gray-700 font-medium">{item.ubicacion?.codigo || 'N/A'}</span>
                               )}
                             </div>
-                          </div>
-
-                          {/* Stock info */}
-                          <div className="bg-gray-50 rounded p-2 mb-2">
-                            <div className="grid grid-cols-3 gap-2 text-xs">
-                              <div>
-                                <div className="text-gray-500">Stock</div>
-                                <div className={`font-semibold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                                  {parseFloat(item.stock_actual).toFixed(2)}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-gray-500">Mín</div>
-                                <div className="font-semibold text-gray-700">{parseFloat(item.stock_minimo).toFixed(2)}</div>
-                              </div>
-                              <div>
-                                <div className="text-gray-500">Máx</div>
-                                <div className="font-semibold text-gray-700">{item.stock_maximo ? parseFloat(item.stock_maximo).toFixed(2) : 'N/A'}</div>
-                              </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-gray-500">🔧</span>
+                              <span className={`font-bold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                                {parseFloat(item.stock_actual).toFixed(2)}
+                              </span>
+                              <span className="text-gray-400 text-[10px] uppercase">{item.unidad}</span>
                             </div>
-                            <div className="text-xs text-gray-500 mt-1">Unidad: <span className="uppercase font-medium">{item.unidad}</span></div>
-                          </div>
-
-                          {/* Costo y proveedores */}
-                          <div className="text-xs space-y-1">
-                            <div><span className="font-semibold">Costo:</span> <span className="text-green-700 font-bold">${parseFloat(item.costo_unitario || 0).toFixed(2)}</span></div>
-                            {item.proveedores && item.proveedores.length > 0 && (
-                              <div>
-                                <span className="font-semibold">Proveedores:</span> {item.proveedores.map(p => `${p.nombre}${p.ArticuloProveedor?.es_preferido ? '⭐' : ''}`).join(', ')}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Fechas */}
-                          <div className="text-[10px] text-gray-400 mt-2 space-x-2">
-                            {item.created_at && <span>Creado: {new Date(item.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
-                            {item.updated_at && <span>Act: {new Date(item.updated_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: '2-digit' })}</span>}
                           </div>
                         </div>
                       </div>
