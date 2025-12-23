@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, MapPin, DollarSign, Hash, Box, Edit, Sparkles, Eye } from 'lucide-react';
+import { X, Package, MapPin, DollarSign, Hash, Box, Edit, Sparkles, Eye, PackagePlus, PackageMinus } from 'lucide-react';
 import { Modal } from '../common';
 import BarcodeDisplay from './BarcodeDisplay';
 import UnidadHerramientaDetalleModal from './UnidadHerramientaDetalleModal';
@@ -7,7 +7,18 @@ import { getImageUrl } from '../../utils/imageUtils';
 import articulosService from '../../services/articulos.service';
 import herramientasRentaService from '../../services/herramientasRenta.service';
 
-const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = false, onImageReprocessed }) => {
+const ArticuloDetalleModal = ({
+  articulo,
+  isOpen,
+  onClose,
+  onEdit,
+  canEdit = false,
+  onImageReprocessed,
+  onEntrada,
+  onSalida,
+  puedeGestionarInventario = false,
+  puedeRegistrarSalida = false
+}) => {
   const [imagenExpandida, setImagenExpandida] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
 
@@ -320,25 +331,58 @@ const ArticuloDetalleModal = ({ articulo, isOpen, onClose, onEdit, canEdit = fal
         </div>
 
         {/* Botones de acción */}
-        <div className="flex gap-3 pt-4 border-t">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-          >
-            Cerrar
-          </button>
-          {canEdit && onEdit && (
-            <button
-              onClick={() => {
-                onEdit(articulo);
-                onClose();
-              }}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors"
-            >
-              <Edit size={18} />
-              Editar Artículo
-            </button>
+        <div className="space-y-3 pt-4 border-t">
+          {/* Botones de Entrada y Salida - Solo para almacenistas */}
+          {(puedeGestionarInventario || puedeRegistrarSalida) && (
+            <div className="grid grid-cols-2 gap-3">
+              {puedeGestionarInventario && onEntrada && (
+                <button
+                  onClick={() => {
+                    onEntrada(articulo);
+                    onClose();
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
+                >
+                  <PackagePlus size={20} />
+                  Entrada
+                </button>
+              )}
+              {puedeRegistrarSalida && onSalida && (
+                <button
+                  onClick={() => {
+                    onSalida(articulo);
+                    onClose();
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors font-medium"
+                >
+                  <PackageMinus size={20} />
+                  Salida
+                </button>
+              )}
+            </div>
           )}
+
+          {/* Botones de cerrar y editar */}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+            >
+              Cerrar
+            </button>
+            {canEdit && onEdit && (
+              <button
+                onClick={() => {
+                  onEdit(articulo);
+                  onClose();
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors"
+              >
+                <Edit size={18} />
+                Editar
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

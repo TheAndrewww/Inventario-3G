@@ -2497,6 +2497,10 @@ const InventarioPage = () => {
         onClose={() => setModalDetalleOpen(false)}
         onEdit={handleEditar}
         canEdit={puedeEditarArticulos}
+        onEntrada={handleAbrirEntrada}
+        onSalida={handleAbrirSalida}
+        puedeGestionarInventario={puedeGestionarInventario}
+        puedeRegistrarSalida={puedeRegistrarSalida}
       />
 
       {/* Modal de formulario para crear/editar */}
