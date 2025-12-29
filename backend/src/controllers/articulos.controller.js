@@ -848,7 +848,7 @@ export const updateArticulo = async (req, res) => {
                                 tipo_herramienta_id: tipoHerramienta.id,
                                 codigo_unico: codigoUnico,
                                 codigo_ean13: null,  // No necesario, las etiquetas usan QR
-                                estado: 'disponible',
+                                estado: 'buen_estado',
                                 activo: true
                             });
 
@@ -862,8 +862,45 @@ export const updateArticulo = async (req, res) => {
                         });
 
                         console.log(`✅ Se crearon ${diferencia} nuevas unidades para ${articulo.nombre}`);
+                    } else if (diferencia < 0) {
+                        // DESACTIVAR unidades sobrantes cuando el stock disminuye
+                        const unidadesSobran = Math.abs(diferencia);
+                        console.log(`⚠️ Stock reducido. Necesitamos desactivar ${unidadesSobran} unidades`);
+
+                        // Obtener unidades no asignadas (disponibles) ordenadas por ID descendente
+                        const unidadesParaDesactivar = await UnidadHerramientaRenta.findAll({
+                            where: {
+                                tipo_herramienta_id: tipoHerramienta.id,
+                                activo: true,
+                                estado: { [Op.ne]: 'asignada' }  // Solo desactivar las que NO están asignadas
+                            },
+                            order: [['id', 'DESC']],  // Las más recientes primero
+                            limit: unidadesSobran
+                        });
+
+                        if (unidadesParaDesactivar.length < unidadesSobran) {
+                            // No hay suficientes unidades disponibles para desactivar
+                            console.warn(`⚠️ Solo se pueden desactivar ${unidadesParaDesactivar.length} de ${unidadesSobran} unidades (las demás están asignadas)`);
+                        }
+
+                        // Desactivar las unidades
+                        for (const unidad of unidadesParaDesactivar) {
+                            await unidad.update({
+                                activo: false,
+                                observaciones: `Desactivada automáticamente al reducir stock de ${unidadesActuales} a ${nuevoStock}`
+                            });
+                            console.log(`   ❌ Desactivada unidad: ${unidad.codigo_unico}`);
+                        }
+
+                        // Actualizar contadores del tipo
+                        const unidadesDisponiblesRestantes = Math.max(0, tipoHerramienta.unidades_disponibles - unidadesParaDesactivar.length);
+                        await tipoHerramienta.update({
+                            total_unidades: nuevoStock,
+                            unidades_disponibles: unidadesDisponiblesRestantes
+                        });
+
+                        console.log(`✅ Se desactivaron ${unidadesParaDesactivar.length} unidades de ${articulo.nombre}`);
                     }
-                    // Si diferencia < 0, NO eliminamos unidades automáticamente (seguridad)
                 } else {
                     // El artículo se convirtió en herramienta pero no tiene TipoHerramientaRenta
                     // Usar la función de migración individual
