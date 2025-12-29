@@ -163,6 +163,7 @@ export const obtenerTipoPorId = async (req, res) => {
                 {
                     model: UnidadHerramientaRenta,
                     as: 'unidades',
+                    where: { activo: true },
                     include: [
                         {
                             model: Usuario,
