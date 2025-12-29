@@ -2421,3 +2421,147 @@ export const completarOrdenManualmente = async (req, res) => {
     });
   }
 };
+
+/**
+ * Generar solicitudes de compra para artículos con stock bajo
+ * - Busca artículos activos con stock_actual < stock_minimo
+ * - Verifica que no tengan solicitudes pendientes
+ * - Crea solicitudes automáticamente
+ */
+export const generarSolicitudesStockBajo = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    console.log('🔍 Buscando artículos con stock bajo...');
+
+    // Buscar artículos con stock por debajo del mínimo
+    const articulosBajos = await Articulo.findAll({
+      where: {
+        activo: true,
+        stock_actual: {
+          [Op.lt]: sequelize.col('stock_minimo')
+        }
+      },
+      attributes: ['id', 'nombre', 'codigo_ean13', 'unidad', 'stock_actual', 'stock_minimo', 'stock_maximo'],
+      transaction
+    });
+
+    console.log(`📦 Encontrados ${articulosBajos.length} artículos con stock bajo`);
+
+    if (articulosBajos.length === 0) {
+      await transaction.rollback();
+      return res.status(200).json({
+        success: true,
+        message: 'No hay artículos con stock bajo',
+        data: { solicitudes_creadas: [] }
+      });
+    }
+
+    // Obtener solicitudes pendientes existentes
+    const solicitudesPendientes = await SolicitudCompra.findAll({
+      where: { estado: 'pendiente' },
+      attributes: ['articulo_id'],
+      transaction
+    });
+
+    const articulosConSolicitud = new Set(solicitudesPendientes.map(s => s.articulo_id));
+
+    // Filtrar artículos que NO tienen solicitud pendiente
+    const articulosSinSolicitud = articulosBajos.filter(a => !articulosConSolicitud.has(a.id));
+
+    console.log(`✅ ${articulosSinSolicitud.length} artículos sin solicitud pendiente`);
+
+    if (articulosSinSolicitud.length === 0) {
+      await transaction.rollback();
+      return res.status(200).json({
+        success: true,
+        message: 'Todos los artículos con stock bajo ya tienen solicitudes pendientes',
+        data: { solicitudes_creadas: [] }
+      });
+    }
+
+    // Generar ticket_id base
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yy = String(now.getFullYear()).slice(-2);
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const ddmmyy = `${dd}${mm}${yy}`;
+    const hhmm = `${hh}${min}`;
+
+    // Obtener contador de solicitudes del día
+    const contadorBase = await SolicitudCompra.count({
+      where: {
+        created_at: {
+          [Op.gte]: new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        }
+      },
+      transaction
+    });
+
+    const solicitudesCreadas = [];
+    let contador = 0;
+
+    // Crear solicitudes para cada artículo
+    for (const articulo of articulosSinSolicitud) {
+      contador++;
+      const nn = String(contadorBase + contador).padStart(2, '0');
+      const ticket_id = `SC-${ddmmyy}-${hhmm}-${nn}`;
+
+      // Calcular cantidad a solicitar (hasta el stock máximo o mínimo + 50%)
+      const stockMaximo = articulo.stock_maximo || (articulo.stock_minimo * 3);
+      const cantidadAReponer = Math.max(stockMaximo - parseFloat(articulo.stock_actual), parseFloat(articulo.stock_minimo));
+
+      // Determinar prioridad según qué tan bajo esté el stock
+      const stockActual = parseFloat(articulo.stock_actual);
+      const stockMinimo = parseFloat(articulo.stock_minimo);
+      let prioridad = 'media';
+
+      if (stockActual <= 0) {
+        prioridad = 'urgente';
+      } else if (stockActual < (stockMinimo * 0.5)) {
+        prioridad = 'alta';
+      }
+
+      const solicitud = await SolicitudCompra.create({
+        ticket_id,
+        articulo_id: articulo.id,
+        cantidad_solicitada: Math.ceil(cantidadAReponer),
+        prioridad,
+        motivo: `Stock bajo detectado automáticamente. Stock actual: ${stockActual} ${articulo.unidad}, mínimo: ${stockMinimo} ${articulo.unidad}`,
+        estado: 'pendiente',
+        usuario_solicitante_id: req.usuario.id,
+        fecha_solicitud: now
+      }, { transaction });
+
+      console.log(`  ✅ Solicitud ${ticket_id} creada para ${articulo.nombre} (${cantidadAReponer} ${articulo.unidad})`);
+
+      solicitudesCreadas.push({
+        ticket_id: solicitud.ticket_id,
+        articulo: articulo.nombre,
+        cantidad: solicitud.cantidad_solicitada,
+        prioridad: solicitud.prioridad
+      });
+    }
+
+    await transaction.commit();
+
+    console.log(`✨ ${solicitudesCreadas.length} solicitudes de compra generadas automáticamente`);
+
+    res.status(201).json({
+      success: true,
+      message: `Se generaron ${solicitudesCreadas.length} solicitudes de compra automáticamente`,
+      data: { solicitudes_creadas: solicitudesCreadas }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al generar solicitudes:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar solicitudes de compra',
+      error: error.message
+    });
+  }
+};

@@ -16,7 +16,8 @@ import {
   recibirMercancia,
   obtenerHistorialRecepciones,
   obtenerProgresoRecepcion,
-  completarOrdenManualmente
+  completarOrdenManualmente,
+  generarSolicitudesStockBajo
 } from '../controllers/ordenesCompra.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -70,6 +71,11 @@ router.put(
   '/solicitudes-compra/:id/cancelar',
   verificarRol('compras', 'almacen', 'administrador', 'diseñador'),
   cancelarSolicitudCompra
+);
+router.post(
+  '/solicitudes-compra/generar-stock-bajo',
+  verificarRol('compras', 'almacen', 'administrador'),
+  generarSolicitudesStockBajo
 );
 
 export default router;
