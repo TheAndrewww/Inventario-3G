@@ -108,7 +108,7 @@ export const migrarArticuloIndividual = async (articuloId, transaction = null) =
             const unidad = await UnidadHerramientaRenta.create({
                 tipo_herramienta_id: nuevoTipo.id,
                 codigo_unico: codigoUnico,
-                estado: 'disponible',
+                estado: 'buen_estado',
                 activo: true
             }, { transaction: transactionLocal });
             unidadesCreadas.push(unidad);
@@ -206,7 +206,7 @@ export const migrarArticulosPendientes = async () => {
                 await UnidadHerramientaRenta.create({
                     tipo_herramienta_id: nuevoTipo.id,
                     codigo_unico: codigoUnico,
-                    estado: 'disponible',
+                    estado: 'buen_estado',
                     activo: true
                 }, { transaction });
                 totalUnidadesCreadas++;

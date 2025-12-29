@@ -289,7 +289,7 @@ export const crearTipo = async (req, res) => {
                 tipo_herramienta_id: nuevoTipo.id,
                 codigo_unico: codigoUnico,
                 codigo_ean13: codigoEAN13,
-                estado: 'disponible',
+                estado: 'buen_estado',
                 activo: true
             }, { transaction });
 
@@ -524,10 +524,10 @@ export const asignarHerramienta = async (req, res) => {
             });
         }
 
-        if (unidad.estado !== 'disponible') {
+        if (unidad.estado === 'asignada') {
             return res.status(400).json({
                 success: false,
-                message: `La unidad no está disponible. Estado actual: ${unidad.estado}`
+                message: `La unidad ya está asignada`
             });
         }
 
@@ -628,7 +628,7 @@ export const devolverHerramienta = async (req, res) => {
 
         // Actualizar la unidad
         await unidad.update({
-            estado: 'disponible',
+            estado: 'buen_estado',
             usuario_asignado_id: null,
             equipo_asignado_id: null,
             fecha_asignacion: null
@@ -1071,7 +1071,7 @@ export const cambiarEstadoUnidad = async (req, res) => {
         const { estado, motivo } = req.body;
 
         // Validar que el estado sea válido
-        const estadosValidos = ['disponible', 'asignada', 'en_reparacion', 'perdida', 'baja', 'en_transito', 'pendiente_devolucion'];
+        const estadosValidos = ['buen_estado', 'estado_regular', 'mal_estado', 'asignada', 'disponible', 'en_reparacion', 'perdida', 'baja', 'en_transito', 'pendiente_devolucion'];
         if (!estadosValidos.includes(estado)) {
             return res.status(400).json({
                 success: false,
@@ -1111,8 +1111,8 @@ export const cambiarEstadoUnidad = async (req, res) => {
 
         const estadoAnterior = unidad.estado;
 
-        // Si está pasando de asignada a disponible, limpiar asignación
-        if (estadoAnterior === 'asignada' && estado === 'disponible') {
+        // Si está pasando de asignada a cualquier otro estado, limpiar asignación
+        if (estadoAnterior === 'asignada' && estado !== 'asignada') {
             const usuarioAnterior = unidad.usuario_asignado_id;
             const equipoAnterior = unidad.equipo_asignado_id;
             const fechaAsignacionOriginal = unidad.fecha_asignacion;
@@ -1131,7 +1131,7 @@ export const cambiarEstadoUnidad = async (req, res) => {
                 tipo_movimiento: 'devolucion',
                 fecha_asignacion: fechaAsignacionOriginal,
                 fecha_devolucion: new Date(),
-                observaciones: motivo || 'Cambio de estado a disponible',
+                observaciones: motivo || `Cambio de estado a ${estado}`,
                 registrado_por_usuario_id: req.usuario.id
             }, { transaction });
 

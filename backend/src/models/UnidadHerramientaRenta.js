@@ -33,9 +33,9 @@ const UnidadHerramientaRenta = sequelize.define('UnidadHerramientaRenta', {
         comment: 'Número de serie del fabricante (opcional)'
     },
     estado: {
-        type: DataTypes.ENUM('disponible', 'asignada', 'en_reparacion', 'perdida', 'baja', 'en_transito', 'pendiente_devolucion'),
+        type: DataTypes.ENUM('buen_estado', 'estado_regular', 'mal_estado', 'asignada', 'disponible', 'en_reparacion', 'perdida', 'baja', 'en_transito', 'pendiente_devolucion'),
         allowNull: false,
-        defaultValue: 'disponible'
+        defaultValue: 'buen_estado'
     },
     usuario_asignado_id: {
         type: DataTypes.INTEGER,

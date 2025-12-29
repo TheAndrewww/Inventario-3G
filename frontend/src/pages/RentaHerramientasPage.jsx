@@ -131,15 +131,17 @@ const RentaHerramientasPage = () => {
 
     const getEstadoBadge = (estado) => {
         const badges = {
-            disponible: { color: 'bg-green-100 text-green-800', texto: 'Disponible', icon: CheckCircle },
+            buen_estado: { color: 'bg-green-100 text-green-800', texto: '🟢 Buen estado', icon: CheckCircle },
+            estado_regular: { color: 'bg-yellow-100 text-yellow-800', texto: '🟡 Estado regular', icon: AlertCircle },
+            mal_estado: { color: 'bg-red-100 text-red-800', texto: '🔴 Mal estado', icon: AlertCircle },
+            // Mantener compatibilidad con estados antiguos
+            disponible: { color: 'bg-green-100 text-green-800', texto: '🟢 Buen estado', icon: CheckCircle },
             asignada: { color: 'bg-blue-100 text-blue-800', texto: 'Asignada', icon: UserCheck },
-            en_reparacion: { color: 'bg-yellow-100 text-yellow-800', texto: 'En Reparación', icon: Settings },
-            perdida: { color: 'bg-red-100 text-red-800', texto: 'Perdida', icon: AlertCircle },
-            baja: { color: 'bg-gray-100 text-gray-800', texto: 'Baja', icon: AlertCircle },
-            en_transito: { color: 'bg-purple-100 text-purple-800', texto: 'En Tránsito', icon: Clock },
-            pendiente_devolucion: { color: 'bg-orange-100 text-orange-800', texto: 'Pendiente Devolución', icon: Clock }
+            en_reparacion: { color: 'bg-yellow-100 text-yellow-800', texto: '🟡 Estado regular', icon: Settings },
+            perdida: { color: 'bg-red-100 text-red-800', texto: '🔴 Mal estado', icon: AlertCircle },
+            baja: { color: 'bg-red-100 text-red-800', texto: '🔴 Mal estado', icon: AlertCircle }
         };
-        const badge = badges[estado] || badges.disponible;
+        const badge = badges[estado] || badges.buen_estado;
         const Icon = badge.icon;
         return (
             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
@@ -400,7 +402,7 @@ const RentaHerramientasPage = () => {
                                                         )}
 
                                                         <div className="flex gap-2">
-                                                            {unidad.estado === 'disponible' && (
+                                                            {unidad.estado !== 'asignada' && (
                                                                 <Button
                                                                     onClick={() => handleAsignar(unidad, tipo)}
                                                                     variant="secondary"
@@ -1086,13 +1088,9 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
     }, [isOpen, unidad]);
 
     const estadosDisponibles = [
-        { value: 'disponible', label: 'Disponible', color: 'text-green-700' },
-        { value: 'asignada', label: 'Asignada', color: 'text-blue-700' },
-        { value: 'en_reparacion', label: 'En Reparación', color: 'text-yellow-700' },
-        { value: 'en_transito', label: 'En Tránsito', color: 'text-purple-700' },
-        { value: 'pendiente_devolucion', label: 'Pendiente Devolución', color: 'text-orange-700' },
-        { value: 'perdida', label: 'Perdida', color: 'text-red-700' },
-        { value: 'baja', label: 'Baja', color: 'text-gray-700' }
+        { value: 'buen_estado', label: '🟢 Buen estado', color: 'text-green-700' },
+        { value: 'estado_regular', label: '🟡 Estado regular', color: 'text-yellow-700' },
+        { value: 'mal_estado', label: '🔴 Mal estado', color: 'text-red-700' }
     ];
 
     const handleSubmit = async (e) => {
@@ -1200,11 +1198,11 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
                 </div>
 
                 {/* Advertencia si va a cambiar de asignada a otro estado */}
-                {unidad.estado === 'asignada' && nuevoEstado === 'disponible' && (
+                {unidad.estado === 'asignada' && nuevoEstado !== 'asignada' && (
                     <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
                         <p className="text-sm text-blue-800">
                             <AlertCircle size={14} className="inline mr-1" />
-                            Al cambiar a "Disponible", se registrará automáticamente la devolución de la herramienta.
+                            Al cambiar el estado, se registrará automáticamente la devolución de la herramienta.
                         </p>
                     </div>
                 )}
