@@ -1193,3 +1193,186 @@ export const cambiarEstadoUnidad = async (req, res) => {
         });
     }
 };
+
+/**
+ * POST /api/herramientas-renta/sincronizar-todas
+ * Sincroniza TODAS las unidades de herramientas con el stock_actual de sus artículos
+ * Útil para corregir discrepancias existentes
+ */
+export const sincronizarTodasLasUnidades = async (req, res) => {
+    const transaction = await sequelize.transaction();
+
+    try {
+        console.log('🔄 Iniciando sincronización de todas las herramientas...');
+
+        // Obtener todos los tipos de herramientas activos
+        const tipos = await TipoHerramientaRenta.findAll({
+            where: { activo: true },
+            include: [{
+                model: Articulo,
+                as: 'articuloOrigen',
+                where: { es_herramienta: true, activo: true },
+                required: true
+            }],
+            transaction
+        });
+
+        console.log(`📦 Encontrados ${tipos.length} tipos de herramientas para sincronizar`);
+
+        const resultados = [];
+
+        for (const tipo of tipos) {
+            const articulo = tipo.articuloOrigen;
+            const stockActual = parseInt(articulo.stock_actual);
+
+            // Contar unidades activas
+            const unidadesActivas = await UnidadHerramientaRenta.count({
+                where: { tipo_herramienta_id: tipo.id, activo: true },
+                transaction
+            });
+
+            const diferencia = stockActual - unidadesActivas;
+
+            console.log(`\n📋 ${articulo.nombre} (${tipo.prefijo_codigo})`);
+            console.log(`   Stock: ${stockActual} | Unidades: ${unidadesActivas} | Diferencia: ${diferencia}`);
+
+            if (diferencia === 0) {
+                console.log(`   ✅ Ya está sincronizado`);
+                resultados.push({
+                    articulo_id: articulo.id,
+                    nombre: articulo.nombre,
+                    prefijo: tipo.prefijo_codigo,
+                    accion: 'sin_cambios',
+                    stock: stockActual,
+                    unidades: unidadesActivas
+                });
+                continue;
+            }
+
+            if (diferencia > 0) {
+                // CREAR nuevas unidades
+                const prefijo = tipo.prefijo_codigo;
+
+                // Obtener el último número usado
+                const ultimaUnidad = await UnidadHerramientaRenta.findOne({
+                    where: { codigo_unico: { [Op.like]: `${prefijo}-%` } },
+                    order: [['codigo_unico', 'DESC']],
+                    transaction
+                });
+
+                let numeroInicial = 1;
+                if (ultimaUnidad) {
+                    const match = ultimaUnidad.codigo_unico.match(/-(\d+)$/);
+                    if (match) {
+                        numeroInicial = parseInt(match[1]) + 1;
+                    }
+                }
+
+                const unidadesCreadas = [];
+                for (let i = 0; i < diferencia; i++) {
+                    const numeroActual = numeroInicial + i;
+                    const codigoUnico = `${prefijo}-${numeroActual.toString().padStart(3, '0')}`;
+
+                    await UnidadHerramientaRenta.create({
+                        tipo_herramienta_id: tipo.id,
+                        codigo_unico: codigoUnico,
+                        codigo_ean13: null,
+                        estado: 'buen_estado',
+                        activo: true
+                    }, { transaction });
+
+                    unidadesCreadas.push(codigoUnico);
+                    console.log(`   ✅ Creada: ${codigoUnico}`);
+                }
+
+                // Actualizar contadores
+                await tipo.update({
+                    total_unidades: stockActual,
+                    unidades_disponibles: tipo.unidades_disponibles + diferencia
+                }, { transaction });
+
+                resultados.push({
+                    articulo_id: articulo.id,
+                    nombre: articulo.nombre,
+                    prefijo: tipo.prefijo_codigo,
+                    accion: 'creadas',
+                    cantidad: diferencia,
+                    unidades_creadas: unidadesCreadas,
+                    stock: stockActual,
+                    unidades_antes: unidadesActivas,
+                    unidades_despues: stockActual
+                });
+
+            } else {
+                // DESACTIVAR unidades sobrantes
+                const unidadesSobran = Math.abs(diferencia);
+
+                const unidadesParaDesactivar = await UnidadHerramientaRenta.findAll({
+                    where: {
+                        tipo_herramienta_id: tipo.id,
+                        activo: true,
+                        estado: { [Op.ne]: 'asignada' }
+                    },
+                    order: [['id', 'DESC']],
+                    limit: unidadesSobran,
+                    transaction
+                });
+
+                const unidadesDesactivadas = [];
+                for (const unidad of unidadesParaDesactivar) {
+                    await unidad.update({
+                        activo: false,
+                        observaciones: `Desactivada en sincronización masiva (stock: ${stockActual}, unidades activas: ${unidadesActivas})`
+                    }, { transaction });
+
+                    unidadesDesactivadas.push(unidad.codigo_unico);
+                    console.log(`   ❌ Desactivada: ${unidad.codigo_unico}`);
+                }
+
+                // Actualizar contadores
+                const unidadesDisponiblesRestantes = Math.max(0, tipo.unidades_disponibles - unidadesParaDesactivar.length);
+                await tipo.update({
+                    total_unidades: stockActual,
+                    unidades_disponibles: unidadesDisponiblesRestantes
+                }, { transaction });
+
+                resultados.push({
+                    articulo_id: articulo.id,
+                    nombre: articulo.nombre,
+                    prefijo: tipo.prefijo_codigo,
+                    accion: 'desactivadas',
+                    cantidad: unidadesParaDesactivar.length,
+                    unidades_desactivadas: unidadesDesactivadas,
+                    stock: stockActual,
+                    unidades_antes: unidadesActivas,
+                    unidades_despues: stockActual
+                });
+            }
+        }
+
+        await transaction.commit();
+
+        console.log('\n✅ Sincronización completada exitosamente');
+
+        res.status(200).json({
+            success: true,
+            message: `Sincronización completada. ${resultados.length} artículos procesados`,
+            data: {
+                total_procesados: resultados.length,
+                sin_cambios: resultados.filter(r => r.accion === 'sin_cambios').length,
+                unidades_creadas: resultados.filter(r => r.accion === 'creadas').length,
+                unidades_desactivadas: resultados.filter(r => r.accion === 'desactivadas').length,
+                detalles: resultados
+            }
+        });
+
+    } catch (error) {
+        await transaction.rollback();
+        console.error('❌ Error en sincronización masiva:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al sincronizar unidades de herramientas',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};

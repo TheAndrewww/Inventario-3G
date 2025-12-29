@@ -16,7 +16,8 @@ import {
     generarCodigosMasivos,
     obtenerCodigoBarras,
     obtenerCodigoBarrasSVG,
-    ejecutarMigracionManual
+    ejecutarMigracionManual,
+    sincronizarTodasLasUnidades
 } from '../controllers/herramientasRenta.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -187,5 +188,13 @@ router.get('/unidades/:unidadId/barcode-svg', obtenerCodigoBarrasSVG);
  * Acceso: Solo administrador
  */
 router.post('/migrar-pendientes', verificarRol('administrador'), ejecutarMigracionManual);
+
+/**
+ * POST /api/herramientas-renta/sincronizar-todas
+ * Sincronizar TODAS las unidades con el stock_actual de sus artículos
+ * Corrige discrepancias: crea unidades faltantes o desactiva sobrantes
+ * Acceso: Solo administrador
+ */
+router.post('/sincronizar-todas', verificarRol('administrador'), sincronizarTodasLasUnidades);
 
 export default router;
