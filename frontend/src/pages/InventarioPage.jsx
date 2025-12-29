@@ -1926,15 +1926,21 @@ const InventarioPage = () => {
                                   </div>
                                   <div>
                                     <span className="text-gray-500">Estado:</span>
-                                    <p className={`font-medium ${unidad.estado === 'disponible' ? 'text-green-600' :
+                                    <p className={`font-medium ${
+                                      unidad.estado === 'buen_estado' || unidad.estado === 'disponible' ? 'text-green-600' :
+                                      unidad.estado === 'estado_regular' || unidad.estado === 'en_reparacion' ? 'text-yellow-600' :
+                                      unidad.estado === 'mal_estado' || unidad.estado === 'perdida' || unidad.estado === 'baja' ? 'text-red-600' :
                                       unidad.estado === 'asignada' ? 'text-blue-600' :
-                                        unidad.estado === 'en_mantenimiento' ? 'text-orange-600' :
-                                          'text-red-600'
+                                      'text-gray-600'
                                       }`}>
-                                      {unidad.estado === 'disponible' ? '✓ Disponible' :
-                                        unidad.estado === 'asignada' ? '📍 Asignada' :
-                                          unidad.estado === 'en_mantenimiento' ? '🔧 Mantenimiento' :
-                                            '❌ Fuera de servicio'}
+                                      {unidad.estado === 'buen_estado' ? '🟢 Buen estado' :
+                                        unidad.estado === 'estado_regular' ? '🟡 Estado regular' :
+                                          unidad.estado === 'mal_estado' ? '🔴 Mal estado' :
+                                            unidad.estado === 'disponible' ? '🟢 Buen estado' :
+                                              unidad.estado === 'asignada' ? '📍 Asignada' :
+                                                unidad.estado === 'en_reparacion' ? '🟡 Estado regular' :
+                                                  unidad.estado === 'perdida' || unidad.estado === 'baja' ? '🔴 Mal estado' :
+                                                    unidad.estado}
                                     </p>
                                   </div>
                                 </div>
@@ -2361,15 +2367,21 @@ const InventarioPage = () => {
                                 </div>
                                 <div>
                                   <span className="text-gray-500">Estado:</span>
-                                  <span className={`ml-1 font-medium ${unidad.estado === 'disponible' ? 'text-green-600' :
+                                  <span className={`ml-1 font-medium ${
+                                    unidad.estado === 'buen_estado' || unidad.estado === 'disponible' ? 'text-green-600' :
+                                    unidad.estado === 'estado_regular' || unidad.estado === 'en_reparacion' ? 'text-yellow-600' :
+                                    unidad.estado === 'mal_estado' || unidad.estado === 'perdida' || unidad.estado === 'baja' ? 'text-red-600' :
                                     unidad.estado === 'asignada' ? 'text-blue-600' :
-                                      unidad.estado === 'en_mantenimiento' ? 'text-orange-600' :
-                                        'text-red-600'
+                                    'text-gray-600'
                                     }`}>
-                                    {unidad.estado === 'disponible' ? '✓ Disponible' :
-                                      unidad.estado === 'asignada' ? '📍 Asignada' :
-                                        unidad.estado === 'en_mantenimiento' ? '🔧 Mantenimiento' :
-                                          '❌ Fuera de servicio'}
+                                    {unidad.estado === 'buen_estado' ? '🟢 Buen estado' :
+                                      unidad.estado === 'estado_regular' ? '🟡 Estado regular' :
+                                        unidad.estado === 'mal_estado' ? '🔴 Mal estado' :
+                                          unidad.estado === 'disponible' ? '🟢 Buen estado' :
+                                            unidad.estado === 'asignada' ? '📍 Asignada' :
+                                              unidad.estado === 'en_reparacion' ? '🟡 Estado regular' :
+                                                unidad.estado === 'perdida' || unidad.estado === 'baja' ? '🔴 Mal estado' :
+                                                  unidad.estado}
                                   </span>
                                 </div>
                               </div>
