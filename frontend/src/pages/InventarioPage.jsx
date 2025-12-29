@@ -18,6 +18,26 @@ import { getImageUrl } from '../utils/imageUtils';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import BarcodeScannerIndicator from '../components/scanner/BarcodeScannerIndicator';
 
+/**
+ * Formatea la cantidad según la unidad de medida
+ * - kg, litros, metros, m², m³: muestra 2 decimales
+ * - piezas, cajas, unidades: muestra sin decimales
+ */
+const formatearCantidad = (cantidad, unidad) => {
+  const valor = parseFloat(cantidad);
+  const unidadLower = (unidad || '').toLowerCase();
+
+  // Unidades que requieren decimales
+  const unidadesConDecimales = ['kg', 'litros', 'metros', 'm²', 'm³', 'gramos', 'ml', 'cm', 'mm'];
+
+  if (unidadesConDecimales.some(u => unidadLower.includes(u))) {
+    return valor.toFixed(2);
+  }
+
+  // Para piezas y otras unidades, sin decimales
+  return valor.toFixed(0);
+};
+
 const InventarioPage = () => {
   const [articulos, setArticulos] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -1632,7 +1652,7 @@ const InventarioPage = () => {
                         {/* Stock Actual */}
                         <td className="px-4 py-4 whitespace-nowrap">
                           <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                            {parseFloat(item.stock_actual).toFixed(2)}
+                            {formatearCantidad(item.stock_actual, item.unidad)}
                           </span>
                         </td>
 
@@ -1817,7 +1837,7 @@ const InventarioPage = () => {
                           {/* Stock Actual */}
                           <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
                             <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                              {parseFloat(item.stock_actual).toFixed(2)}
+                              {formatearCantidad(item.stock_actual, item.unidad)}
                             </span>
                           </td>
 
@@ -2091,7 +2111,7 @@ const InventarioPage = () => {
                           <div className="flex items-center gap-1">
                             <span className="text-gray-500">📦</span>
                             <span className={`font-bold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                              {parseFloat(item.stock_actual).toFixed(2)}
+                              {formatearCantidad(item.stock_actual, item.unidad)}
                             </span>
                             <span className="text-gray-400 text-[10px] uppercase">{item.unidad}</span>
                           </div>
@@ -2270,7 +2290,7 @@ const InventarioPage = () => {
                             <div className="flex items-center gap-1">
                               <span className="text-gray-500">🔧</span>
                               <span className={`font-bold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                                {parseFloat(item.stock_actual).toFixed(2)}
+                                {formatearCantidad(item.stock_actual, item.unidad)}
                               </span>
                               <span className="text-gray-400 text-[10px] uppercase">{item.unidad}</span>
                             </div>
@@ -2471,7 +2491,7 @@ const InventarioPage = () => {
               <div>
                 <span className="text-gray-600">Stock actual:</span>
                 <span className="ml-2 font-semibold text-gray-900">
-                  {articuloParaEntrada ? parseFloat(articuloParaEntrada.stock_actual).toFixed(0) : '0'} {articuloParaEntrada?.unidad}
+                  {articuloParaEntrada ? formatearCantidad(articuloParaEntrada.stock_actual, articuloParaEntrada.unidad) : '0'} {articuloParaEntrada?.unidad}
                 </span>
               </div>
               <div>
@@ -2517,7 +2537,7 @@ const InventarioPage = () => {
             <div className="bg-green-50 border border-green-200 rounded-lg p-3">
               <p className="text-sm text-green-800">
                 Nuevo stock: <span className="font-semibold">
-                  {(parseFloat(articuloParaEntrada.stock_actual) + parseFloat(cantidadEntrada)).toFixed(0)} {articuloParaEntrada.unidad}
+                  {formatearCantidad(parseFloat(articuloParaEntrada.stock_actual) + parseFloat(cantidadEntrada), articuloParaEntrada.unidad)} {articuloParaEntrada.unidad}
                 </span>
               </p>
             </div>
@@ -2566,7 +2586,7 @@ const InventarioPage = () => {
               <div>
                 <span className="text-gray-600">Stock actual:</span>
                 <span className="ml-2 font-semibold text-gray-900">
-                  {articuloParaSalida ? parseFloat(articuloParaSalida.stock_actual).toFixed(0) : '0'} {articuloParaSalida?.unidad}
+                  {articuloParaSalida ? formatearCantidad(articuloParaSalida.stock_actual, articuloParaSalida.unidad) : '0'} {articuloParaSalida?.unidad}
                 </span>
               </div>
               <div>
@@ -2612,7 +2632,7 @@ const InventarioPage = () => {
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
               <p className="text-sm text-orange-800">
                 Nuevo stock: <span className="font-semibold">
-                  {(parseFloat(articuloParaSalida.stock_actual) - parseFloat(cantidadSalida)).toFixed(0)} {articuloParaSalida.unidad}
+                  {formatearCantidad(parseFloat(articuloParaSalida.stock_actual) - parseFloat(cantidadSalida), articuloParaSalida.unidad)} {articuloParaSalida.unidad}
                 </span>
               </p>
             </div>
