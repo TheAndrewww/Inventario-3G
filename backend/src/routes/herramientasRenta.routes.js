@@ -9,6 +9,7 @@ import {
     obtenerHistorialUnidad,
     asignarHerramienta,
     devolverHerramienta,
+    cambiarEstadoUnidad,
     obtenerHerramientasPorUsuario,
     obtenerHerramientasPorEquipo,
     generarCodigoEAN13Unidad,
@@ -118,6 +119,18 @@ router.post('/asignar', verificarRol('administrador', 'almacenista', 'encargado'
  * }
  */
 router.post('/devolver/:unidadId', verificarRol('administrador', 'almacenista', 'encargado'), devolverHerramienta);
+
+/**
+ * PUT /api/herramientas-renta/unidades/:id/cambiar-estado
+ * Cambiar el estado de una unidad de herramienta
+ * Acceso: Administrador, almacenista, encargado
+ *
+ * Body: {
+ *   estado: string ('disponible' | 'asignada' | 'en_reparacion' | 'perdida' | 'baja' | 'en_transito' | 'pendiente_devolucion'),
+ *   motivo?: string
+ * }
+ */
+router.put('/unidades/:id/cambiar-estado', verificarRol('administrador', 'almacenista', 'encargado'), cambiarEstadoUnidad);
 
 // ========== RUTAS DE CONSULTA ==========
 

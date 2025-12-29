@@ -19,6 +19,9 @@ import {
 import herramientasRentaService from '../services/herramientasRenta.service';
 import usuariosService from '../services/usuarios.service';
 import equiposService from '../services/equipos.service';
+import categoriasService from '../services/categorias.service';
+import ubicacionesService from '../services/ubicaciones.service';
+import proveedoresService from '../services/proveedores.service';
 import { Loader, Modal, Button } from '../components/common';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -32,6 +35,7 @@ const RentaHerramientasPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [modalAsignar, setModalAsignar] = useState(false);
     const [modalDevolver, setModalDevolver] = useState(false);
+    const [modalCambiarEstado, setModalCambiarEstado] = useState(false);
     const [unidadSeleccionada, setUnidadSeleccionada] = useState(null);
     const [modalNuevoTipo, setModalNuevoTipo] = useState(false);
     const { user } = useAuth();
@@ -94,6 +98,11 @@ const RentaHerramientasPage = () => {
         setModalDevolver(true);
     };
 
+    const handleCambiarEstado = (unidad, tipo) => {
+        setUnidadSeleccionada({ ...unidad, tipo });
+        setModalCambiarEstado(true);
+    };
+
     const handleImprimirCodigos = (tipo) => {
         const unidades = unidadesPorTipo[tipo.id] || [];
         navigate('/renta-herramientas/imprimir-codigos', {
@@ -126,7 +135,9 @@ const RentaHerramientasPage = () => {
             asignada: { color: 'bg-blue-100 text-blue-800', texto: 'Asignada', icon: UserCheck },
             en_reparacion: { color: 'bg-yellow-100 text-yellow-800', texto: 'En Reparación', icon: Settings },
             perdida: { color: 'bg-red-100 text-red-800', texto: 'Perdida', icon: AlertCircle },
-            baja: { color: 'bg-gray-100 text-gray-800', texto: 'Baja', icon: AlertCircle }
+            baja: { color: 'bg-gray-100 text-gray-800', texto: 'Baja', icon: AlertCircle },
+            en_transito: { color: 'bg-purple-100 text-purple-800', texto: 'En Tránsito', icon: Clock },
+            pendiente_devolucion: { color: 'bg-orange-100 text-orange-800', texto: 'Pendiente Devolución', icon: Clock }
         };
         const badge = badges[estado] || badges.disponible;
         const Icon = badge.icon;
@@ -365,12 +376,20 @@ const RentaHerramientasPage = () => {
                                                                         </>
                                                                     ) : null}
                                                                 </div>
-                                                                {unidad.fecha_asignacion && (
-                                                                    <p className="text-xs text-blue-700 mt-1 flex items-center gap-1">
-                                                                        <Clock size={12} />
-                                                                        {new Date(unidad.fecha_asignacion).toLocaleDateString('es-MX')}
-                                                                    </p>
-                                                                )}
+                                                                <div className="flex items-center gap-3 mt-1">
+                                                                    {unidad.fecha_asignacion && (
+                                                                        <p className="text-xs text-blue-700 flex items-center gap-1">
+                                                                            <Clock size={12} />
+                                                                            Asignada: {new Date(unidad.fecha_asignacion).toLocaleDateString('es-MX')}
+                                                                        </p>
+                                                                    )}
+                                                                    {unidad.fecha_vencimiento_asignacion && (
+                                                                        <p className="text-xs text-orange-700 flex items-center gap-1 font-medium">
+                                                                            <AlertCircle size={12} />
+                                                                            Vence: {new Date(unidad.fecha_vencimiento_asignacion).toLocaleDateString('es-MX')}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         )}
 
@@ -401,6 +420,14 @@ const RentaHerramientasPage = () => {
                                                                     Devolver
                                                                 </Button>
                                                             )}
+                                                            <Button
+                                                                onClick={() => handleCambiarEstado(unidad, tipo)}
+                                                                variant="secondary"
+                                                                className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 text-sm py-2"
+                                                            >
+                                                                <Settings size={14} />
+                                                                Estado
+                                                            </Button>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -463,6 +490,26 @@ const RentaHerramientasPage = () => {
                     }}
                 />
             )}
+
+            {modalCambiarEstado && unidadSeleccionada && (
+                <ModalCambiarEstado
+                    isOpen={modalCambiarEstado}
+                    unidad={unidadSeleccionada}
+                    onClose={() => {
+                        setModalCambiarEstado(false);
+                        setUnidadSeleccionada(null);
+                    }}
+                    onSuccess={() => {
+                        setModalCambiarEstado(false);
+                        setUnidadSeleccionada(null);
+                        // Refrescar unidades del tipo
+                        if (unidadSeleccionada?.tipo_herramienta_id) {
+                            fetchUnidadesTipo(unidadSeleccionada.tipo_herramienta_id);
+                        }
+                        fetchTipos();
+                    }}
+                />
+            )}
         </div>
     );
 };
@@ -473,6 +520,7 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
     const [usuarioSeleccionado, setUsuarioSeleccionado] = useState('');
     const [equipoSeleccionado, setEquipoSeleccionado] = useState('');
     const [observaciones, setObservaciones] = useState('');
+    const [fechaVencimiento, setFechaVencimiento] = useState('');
     const [usuarios, setUsuarios] = useState([]);
     const [equipos, setEquipos] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -484,11 +532,14 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
     const fetchDatos = async () => {
         try {
             const [usuariosData, equiposData] = await Promise.all([
-                usuariosService.getAll(),
-                equiposService.getAll()
+                usuariosService.obtenerTodos(),
+                equiposService.obtenerTodos()
             ]);
-            setUsuarios(Array.isArray(usuariosData) ? usuariosData : []);
-            setEquipos(Array.isArray(equiposData) ? equiposData : []);
+            // Ambos servicios devuelven { data: { usuarios/equipos: [...] } }
+            const usuarios = usuariosData.data?.usuarios || [];
+            const equipos = equiposData.data?.equipos || [];
+            setUsuarios(usuarios);
+            setEquipos(equipos);
         } catch (error) {
             console.error('Error al cargar datos:', error);
             toast.error('Error al cargar datos');
@@ -515,7 +566,8 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
                 unidad_id: unidad.id,
                 usuario_id: tipoAsignacion === 'usuario' ? parseInt(usuarioSeleccionado) : undefined,
                 equipo_id: tipoAsignacion === 'equipo' ? parseInt(equipoSeleccionado) : undefined,
-                observaciones: observaciones.trim() || undefined
+                observaciones: observaciones.trim() || undefined,
+                fecha_vencimiento: fechaVencimiento || undefined
             });
 
             toast.success('Herramienta asignada exitosamente');
@@ -621,6 +673,22 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
                     />
                 </div>
 
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Fecha de Vencimiento (opcional)
+                    </label>
+                    <input
+                        type="date"
+                        value={fechaVencimiento}
+                        onChange={(e) => setFechaVencimiento(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                        min={new Date().toISOString().split('T')[0]}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                        Fecha límite para devolver la herramienta
+                    </p>
+                </div>
+
                 <div className="flex gap-3 justify-end mt-6">
                     <Button type="button" onClick={onClose} variant="secondary" disabled={loading}>
                         Cancelar
@@ -708,20 +776,458 @@ const ModalDevolver = ({ isOpen, unidad, onClose, onSuccess }) => {
     );
 };
 
-// Modal para crear nuevo tipo (placeholder - se puede expandir después)
+// Modal para crear nuevo tipo de herramienta
 const ModalNuevoTipo = ({ isOpen, onClose, onSuccess }) => {
+    const [loading, setLoading] = useState(false);
+    const [categorias, setCategorias] = useState([]);
+    const [ubicaciones, setUbicaciones] = useState([]);
+    const [proveedores, setProveedores] = useState([]);
+    const [formData, setFormData] = useState({
+        nombre: '',
+        descripcion: '',
+        categoria_id: '',
+        ubicacion_id: '',
+        proveedor_id: '',
+        precio_unitario: '',
+        cantidad_unidades: '1',
+        imagen_url: '',
+        prefijo_codigo: ''
+    });
+
+    useEffect(() => {
+        if (isOpen) {
+            fetchDatosIniciales();
+        }
+    }, [isOpen]);
+
+    const fetchDatosIniciales = async () => {
+        try {
+            const [categoriasData, ubicacionesData, proveedoresData] = await Promise.all([
+                categoriasService.getAll(),
+                ubicacionesService.getAll(),
+                proveedoresService.listar()
+            ]);
+
+            setCategorias(categoriasData || []);
+            setUbicaciones(ubicacionesData || []);
+            setProveedores(proveedoresData.data?.proveedores || []);
+        } catch (error) {
+            console.error('Error al cargar datos iniciales:', error);
+            toast.error('Error al cargar las opciones del formulario');
+        }
+    };
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        // Validaciones
+        if (!formData.nombre.trim()) {
+            toast.error('El nombre es requerido');
+            return;
+        }
+
+        if (!formData.categoria_id) {
+            toast.error('La categoría es requerida');
+            return;
+        }
+
+        if (!formData.ubicacion_id) {
+            toast.error('La ubicación es requerida');
+            return;
+        }
+
+        if (!formData.precio_unitario || parseFloat(formData.precio_unitario) <= 0) {
+            toast.error('El precio unitario debe ser mayor a 0');
+            return;
+        }
+
+        if (!formData.cantidad_unidades || parseInt(formData.cantidad_unidades) <= 0) {
+            toast.error('La cantidad de unidades debe ser mayor a 0');
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            const dataToSend = {
+                nombre: formData.nombre.trim(),
+                descripcion: formData.descripcion.trim() || undefined,
+                categoria_id: parseInt(formData.categoria_id),
+                ubicacion_id: parseInt(formData.ubicacion_id),
+                proveedor_id: formData.proveedor_id ? parseInt(formData.proveedor_id) : undefined,
+                precio_unitario: parseFloat(formData.precio_unitario),
+                cantidad_unidades: parseInt(formData.cantidad_unidades),
+                imagen_url: formData.imagen_url.trim() || undefined,
+                prefijo_codigo: formData.prefijo_codigo.trim() || undefined
+            };
+
+            await herramientasRentaService.crearTipo(dataToSend);
+
+            toast.success(`Tipo de herramienta creado con ${formData.cantidad_unidades} unidad(es)`);
+            onSuccess();
+        } catch (error) {
+            console.error('Error al crear tipo:', error);
+            toast.error(error.message || 'Error al crear el tipo de herramienta');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Nuevo Tipo de Herramienta">
-            <div className="p-4 text-center">
-                <p className="text-gray-600">
-                    Esta funcionalidad estará disponible próximamente.
-                    <br />
-                    Por ahora, los tipos se crean directamente desde la base de datos.
-                </p>
-                <Button onClick={onClose} className="mt-4">
-                    Entendido
-                </Button>
-            </div>
+        <Modal isOpen={isOpen} onClose={onClose} title="Nuevo Tipo de Herramienta" maxWidth="max-w-2xl">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                {/* Nombre */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Nombre <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        name="nombre"
+                        value={formData.nombre}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="Ej: Pistola de Pintar"
+                        required
+                    />
+                </div>
+
+                {/* Descripción */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Descripción
+                    </label>
+                    <textarea
+                        name="descripcion"
+                        value={formData.descripcion}
+                        onChange={handleChange}
+                        rows="2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="Descripción opcional del tipo de herramienta"
+                    />
+                </div>
+
+                {/* Grid de 2 columnas para campos principales */}
+                <div className="grid grid-cols-2 gap-4">
+                    {/* Categoría */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Categoría <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                            name="categoria_id"
+                            value={formData.categoria_id}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                            required
+                        >
+                            <option value="">Seleccionar categoría</option>
+                            {categorias.map(cat => (
+                                <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Ubicación */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Ubicación <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                            name="ubicacion_id"
+                            value={formData.ubicacion_id}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                            required
+                        >
+                            <option value="">Seleccionar ubicación</option>
+                            {ubicaciones.map(ubi => (
+                                <option key={ubi.id} value={ubi.id}>{ubi.nombre}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {/* Proveedor */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Proveedor (opcional)
+                    </label>
+                    <select
+                        name="proveedor_id"
+                        value={formData.proveedor_id}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    >
+                        <option value="">Sin proveedor</option>
+                        {proveedores.filter(p => p.activo).map(prov => (
+                            <option key={prov.id} value={prov.id}>{prov.nombre}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Grid de 2 columnas para precio y cantidad */}
+                <div className="grid grid-cols-2 gap-4">
+                    {/* Precio Unitario */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Precio Unitario <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="number"
+                            name="precio_unitario"
+                            value={formData.precio_unitario}
+                            onChange={handleChange}
+                            step="0.01"
+                            min="0"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="0.00"
+                            required
+                        />
+                    </div>
+
+                    {/* Cantidad de Unidades */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Cantidad de Unidades <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="number"
+                            name="cantidad_unidades"
+                            value={formData.cantidad_unidades}
+                            onChange={handleChange}
+                            min="1"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="1"
+                            required
+                        />
+                    </div>
+                </div>
+
+                {/* Grid de 2 columnas para imagen y prefijo */}
+                <div className="grid grid-cols-2 gap-4">
+                    {/* URL Imagen */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            URL de Imagen (opcional)
+                        </label>
+                        <input
+                            type="url"
+                            name="imagen_url"
+                            value={formData.imagen_url}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="https://..."
+                        />
+                    </div>
+
+                    {/* Prefijo Código */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Prefijo Código (opcional)
+                        </label>
+                        <input
+                            type="text"
+                            name="prefijo_codigo"
+                            value={formData.prefijo_codigo}
+                            onChange={handleChange}
+                            maxLength="3"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="Ej: PP, CP"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Si no se especifica, se generará automáticamente
+                        </p>
+                    </div>
+                </div>
+
+                {/* Botones */}
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                    <Button
+                        type="button"
+                        onClick={onClose}
+                        variant="secondary"
+                        disabled={loading}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        type="submit"
+                        disabled={loading}
+                        className="bg-red-700 hover:bg-red-800"
+                    >
+                        {loading ? 'Creando...' : 'Crear Tipo'}
+                    </Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+// Modal para cambiar estado de una unidad
+const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
+    const [loading, setLoading] = useState(false);
+    const [nuevoEstado, setNuevoEstado] = useState('');
+    const [motivo, setMotivo] = useState('');
+
+    useEffect(() => {
+        if (isOpen) {
+            setNuevoEstado(unidad.estado || '');
+            setMotivo('');
+        }
+    }, [isOpen, unidad]);
+
+    const estadosDisponibles = [
+        { value: 'disponible', label: 'Disponible', color: 'text-green-700' },
+        { value: 'asignada', label: 'Asignada', color: 'text-blue-700' },
+        { value: 'en_reparacion', label: 'En Reparación', color: 'text-yellow-700' },
+        { value: 'en_transito', label: 'En Tránsito', color: 'text-purple-700' },
+        { value: 'pendiente_devolucion', label: 'Pendiente Devolución', color: 'text-orange-700' },
+        { value: 'perdida', label: 'Perdida', color: 'text-red-700' },
+        { value: 'baja', label: 'Baja', color: 'text-gray-700' }
+    ];
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        if (!nuevoEstado) {
+            toast.error('Debes seleccionar un estado');
+            return;
+        }
+
+        if (nuevoEstado === unidad.estado) {
+            toast.error('El estado seleccionado es el mismo que el actual');
+            return;
+        }
+
+        if (['en_reparacion', 'perdida', 'baja'].includes(nuevoEstado) && !motivo.trim()) {
+            toast.error('Debes proporcionar un motivo para este cambio de estado');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            await herramientasRentaService.cambiarEstadoUnidad(unidad.id, nuevoEstado, motivo.trim());
+            toast.success(`Estado cambiado a "${estadosDisponibles.find(e => e.value === nuevoEstado)?.label}"`);
+            onSuccess();
+        } catch (error) {
+            console.error('Error al cambiar estado:', error);
+            toast.error(error.message || 'Error al cambiar el estado');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Cambiar Estado de Unidad">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                {/* Información de la unidad */}
+                <div className="bg-gray-50 p-4 rounded-lg border">
+                    <h3 className="font-semibold text-gray-900 mb-2">
+                        {unidad.tipo?.nombre || 'Herramienta'}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                        Código: <span className="font-mono font-bold">{unidad.codigo_unico}</span>
+                    </p>
+                    <p className="text-sm text-gray-600">
+                        Estado actual: <span className="font-medium capitalize">{unidad.estado?.replace(/_/g, ' ')}</span>
+                    </p>
+                </div>
+
+                {/* Selector de nuevo estado */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Nuevo Estado <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                        {estadosDisponibles.map((estado) => (
+                            <button
+                                key={estado.value}
+                                type="button"
+                                onClick={() => setNuevoEstado(estado.value)}
+                                className={`
+                                    px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all
+                                    ${nuevoEstado === estado.value
+                                        ? 'border-red-600 bg-red-50 ' + estado.color
+                                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                                    }
+                                    ${unidad.estado === estado.value ? 'opacity-50 cursor-not-allowed' : ''}
+                                `}
+                                disabled={unidad.estado === estado.value}
+                            >
+                                {estado.label}
+                                {unidad.estado === estado.value && (
+                                    <span className="ml-1 text-xs">(actual)</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Motivo */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Motivo / Observaciones
+                        {['en_reparacion', 'perdida', 'baja'].includes(nuevoEstado) && (
+                            <span className="text-red-500 ml-1">*</span>
+                        )}
+                    </label>
+                    <textarea
+                        value={motivo}
+                        onChange={(e) => setMotivo(e.target.value)}
+                        rows="3"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder={
+                            ['en_reparacion', 'perdida', 'baja'].includes(nuevoEstado)
+                                ? 'Describe el motivo del cambio (requerido)'
+                                : 'Observaciones opcionales sobre este cambio de estado'
+                        }
+                        required={['en_reparacion', 'perdida', 'baja'].includes(nuevoEstado)}
+                    />
+                    {['en_reparacion', 'perdida', 'baja'].includes(nuevoEstado) && (
+                        <p className="text-xs text-gray-500 mt-1">
+                            Este cambio de estado requiere un motivo
+                        </p>
+                    )}
+                </div>
+
+                {/* Advertencia si va a cambiar de asignada a otro estado */}
+                {unidad.estado === 'asignada' && nuevoEstado === 'disponible' && (
+                    <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                        <p className="text-sm text-blue-800">
+                            <AlertCircle size={14} className="inline mr-1" />
+                            Al cambiar a "Disponible", se registrará automáticamente la devolución de la herramienta.
+                        </p>
+                    </div>
+                )}
+
+                {/* Botones */}
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                    <Button
+                        type="button"
+                        onClick={onClose}
+                        variant="secondary"
+                        disabled={loading}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        type="submit"
+                        disabled={loading || !nuevoEstado || nuevoEstado === unidad.estado}
+                        className="bg-red-700 hover:bg-red-800"
+                    >
+                        {loading ? 'Cambiando...' : 'Cambiar Estado'}
+                    </Button>
+                </div>
+            </form>
         </Modal>
     );
 };

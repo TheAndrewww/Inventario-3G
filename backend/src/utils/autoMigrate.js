@@ -47,6 +47,91 @@ const obtenerPrefijoUnico = async (prefijoBase, transaction) => {
 };
 
 /**
+ * Migra un artículo específico a tipo de herramienta con unidades
+ */
+export const migrarArticuloIndividual = async (articuloId, transaction = null) => {
+    const transactionLocal = transaction || await sequelize.transaction();
+    const debeCommitear = !transaction;
+
+    try {
+        // Buscar el artículo
+        const articulo = await Articulo.findByPk(articuloId, { transaction: transactionLocal });
+
+        if (!articulo) {
+            throw new Error('Artículo no encontrado');
+        }
+
+        if (!articulo.es_herramienta) {
+            throw new Error('El artículo no está marcado como herramienta');
+        }
+
+        // Verificar si ya existe el tipo
+        const tipoExiste = await TipoHerramientaRenta.findOne({
+            where: { articulo_origen_id: articulo.id },
+            transaction: transactionLocal
+        });
+
+        if (tipoExiste) {
+            console.log(`⚠️ El artículo ${articulo.id} ya tiene tipo de herramienta creado`);
+            if (debeCommitear) await transactionLocal.commit();
+            return { mensaje: 'Ya migrado', tipo: tipoExiste };
+        }
+
+        // Generar prefijo
+        const prefijoBase = generarPrefijo(articulo.nombre);
+        const prefijo = await obtenerPrefijoUnico(prefijoBase, transactionLocal);
+        const cantidadUnidades = Math.max(1, Math.floor(articulo.stock_actual || 0));
+
+        console.log(`🔄 Migrando artículo ${articulo.id}: "${articulo.nombre}" → ${prefijo} (${cantidadUnidades} unidades)`);
+
+        // Crear tipo de herramienta
+        const nuevoTipo = await TipoHerramientaRenta.create({
+            nombre: articulo.nombre,
+            descripcion: articulo.descripcion || `Creado automáticamente desde artículo #${articulo.id}`,
+            prefijo_codigo: prefijo,
+            categoria_id: articulo.categoria_id,
+            ubicacion_id: articulo.ubicacion_id,
+            proveedor_id: articulo.proveedor_id,
+            precio_unitario: articulo.costo_unitario || 0,
+            total_unidades: cantidadUnidades,
+            unidades_disponibles: cantidadUnidades,
+            unidades_asignadas: 0,
+            imagen_url: articulo.imagen_url,
+            activo: articulo.activo,
+            articulo_origen_id: articulo.id
+        }, { transaction: transactionLocal });
+
+        // Crear unidades individuales
+        const unidadesCreadas = [];
+        for (let i = 1; i <= cantidadUnidades; i++) {
+            const codigoUnico = `${prefijo}-${i.toString().padStart(3, '0')}`;
+            const unidad = await UnidadHerramientaRenta.create({
+                tipo_herramienta_id: nuevoTipo.id,
+                codigo_unico: codigoUnico,
+                estado: 'disponible',
+                activo: true
+            }, { transaction: transactionLocal });
+            unidadesCreadas.push(unidad);
+        }
+
+        if (debeCommitear) await transactionLocal.commit();
+
+        console.log(`✅ Artículo ${articulo.id} migrado: ${prefijo} con ${cantidadUnidades} unidades`);
+
+        return {
+            tipo: nuevoTipo,
+            unidades: unidadesCreadas,
+            mensaje: 'Migración exitosa'
+        };
+
+    } catch (error) {
+        if (debeCommitear) await transactionLocal.rollback();
+        console.error(`❌ Error al migrar artículo ${articuloId}:`, error.message);
+        throw error;
+    }
+};
+
+/**
  * Migra artículos pendientes que tienen es_herramienta = true
  * pero no están en el nuevo sistema
  */

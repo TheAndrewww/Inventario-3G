@@ -496,7 +496,7 @@ export const asignarHerramienta = async (req, res) => {
     const transaction = await sequelize.transaction();
 
     try {
-        const { unidad_id, usuario_id, equipo_id, observaciones } = req.body;
+        const { unidad_id, usuario_id, equipo_id, observaciones, fecha_vencimiento } = req.body;
         const usuario_registrador_id = req.usuario.id;
 
         // Validaciones
@@ -536,7 +536,8 @@ export const asignarHerramienta = async (req, res) => {
             estado: 'asignada',
             usuario_asignado_id: usuario_id || null,
             equipo_asignado_id: equipo_id || null,
-            fecha_asignacion: new Date()
+            fecha_asignacion: new Date(),
+            fecha_vencimiento_asignacion: fecha_vencimiento || null
         }, { transaction });
 
         // Registrar en el historial
@@ -796,8 +797,11 @@ export const generarCodigoEAN13Unidad = async (req, res) => {
         // Generar código EAN-13 basado en el ID de la unidad
         const codigoEAN13 = generarCodigoEAN13(unidad.id);
 
-        // Actualizar unidad
-        await unidad.update({ codigo_ean13: codigoEAN13 });
+        // Actualizar unidad y marcar como etiquetado
+        await unidad.update({
+            codigo_ean13: codigoEAN13,
+            etiquetado: true
+        });
 
         res.status(200).json({
             success: true,
@@ -848,7 +852,10 @@ export const generarCodigosMasivos = async (req, res) => {
         try {
             for (const unidad of unidades) {
                 const codigoEAN13 = generarCodigoEAN13(unidad.id);
-                await unidad.update({ codigo_ean13: codigoEAN13 }, { transaction });
+                await unidad.update({
+                    codigo_ean13: codigoEAN13,
+                    etiquetado: true
+                }, { transaction });
             }
 
             await transaction.commit();
@@ -991,17 +998,31 @@ export const ejecutarMigracionManual = async (req, res) => {
 
 /**
  * GET /api/herramientas-renta/unidades-todas
- * Obtener todas las unidades de herramientas (para pruebas y etiquetado)
+ * Obtener todas las unidades de herramientas con paginación completa
  */
 export const obtenerTodasLasUnidades = async (req, res) => {
     try {
-        const { activo = 'true', limit = 100 } = req.query;
+        const {
+            activo = 'true',
+            limit = 50,
+            page = 1,
+            offset
+        } = req.query;
 
         const whereClause = {};
         if (activo !== 'all') {
             whereClause.activo = activo === 'true';
         }
 
+        // Calcular offset
+        const calculatedOffset = offset !== undefined
+            ? parseInt(offset)
+            : (parseInt(page) - 1) * parseInt(limit);
+
+        // Obtener total de registros
+        const total = await UnidadHerramientaRenta.count({ where: whereClause });
+
+        // Obtener unidades con paginación
         const unidades = await UnidadHerramientaRenta.findAll({
             where: whereClause,
             include: [{
@@ -1010,6 +1031,7 @@ export const obtenerTodasLasUnidades = async (req, res) => {
                 attributes: ['id', 'nombre', 'descripcion', 'imagen_url', 'prefijo_codigo']
             }],
             limit: parseInt(limit),
+            offset: calculatedOffset,
             order: [['codigo_unico', 'ASC']]
         });
 
@@ -1017,7 +1039,13 @@ export const obtenerTodasLasUnidades = async (req, res) => {
             success: true,
             data: {
                 unidades,
-                total: unidades.length
+                pagination: {
+                    total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(total / parseInt(limit)),
+                    hasMore: calculatedOffset + unidades.length < total
+                }
             }
         });
 
@@ -1026,6 +1054,141 @@ export const obtenerTodasLasUnidades = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al obtener unidades',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * PUT /api/herramientas-renta/unidades/:id/cambiar-estado
+ * Cambiar el estado de una unidad de herramienta
+ */
+export const cambiarEstadoUnidad = async (req, res) => {
+    const transaction = await sequelize.transaction();
+
+    try {
+        const { id } = req.params;
+        const { estado, motivo } = req.body;
+
+        // Validar que el estado sea válido
+        const estadosValidos = ['disponible', 'asignada', 'en_reparacion', 'perdida', 'baja', 'en_transito', 'pendiente_devolucion'];
+        if (!estadosValidos.includes(estado)) {
+            return res.status(400).json({
+                success: false,
+                message: `Estado inválido. Debe ser uno de: ${estadosValidos.join(', ')}`
+            });
+        }
+
+        // Buscar la unidad
+        const unidad = await UnidadHerramientaRenta.findByPk(id, {
+            include: [
+                {
+                    model: TipoHerramientaRenta,
+                    as: 'tipoHerramienta',
+                    attributes: ['id', 'nombre', 'prefijo_codigo']
+                },
+                {
+                    model: Usuario,
+                    as: 'usuarioAsignado',
+                    attributes: ['id', 'nombre', 'email']
+                },
+                {
+                    model: Equipo,
+                    as: 'equipoAsignado',
+                    attributes: ['id', 'nombre']
+                }
+            ],
+            transaction
+        });
+
+        if (!unidad) {
+            await transaction.rollback();
+            return res.status(404).json({
+                success: false,
+                message: 'Unidad no encontrada'
+            });
+        }
+
+        const estadoAnterior = unidad.estado;
+
+        // Si está pasando de asignada a disponible, limpiar asignación
+        if (estadoAnterior === 'asignada' && estado === 'disponible') {
+            const usuarioAnterior = unidad.usuario_asignado_id;
+            const equipoAnterior = unidad.equipo_asignado_id;
+            const fechaAsignacionOriginal = unidad.fecha_asignacion;
+
+            // Limpiar asignación
+            unidad.usuario_asignado_id = null;
+            unidad.equipo_asignado_id = null;
+            unidad.fecha_asignacion = null;
+            unidad.fecha_vencimiento_asignacion = null;
+
+            // Registrar devolución en historial
+            await HistorialAsignacionHerramienta.create({
+                unidad_herramienta_id: unidad.id,
+                usuario_id: usuarioAnterior,
+                equipo_id: equipoAnterior,
+                tipo_movimiento: 'devolucion',
+                fecha_asignacion: fechaAsignacionOriginal,
+                fecha_devolucion: new Date(),
+                observaciones: motivo || 'Cambio de estado a disponible',
+                registrado_por_usuario_id: req.usuario.id
+            }, { transaction });
+
+            // Actualizar contadores del tipo
+            await TipoHerramientaRenta.update(
+                {
+                    unidades_disponibles: sequelize.literal('unidades_disponibles + 1'),
+                    unidades_asignadas: sequelize.literal('unidades_asignadas - 1')
+                },
+                {
+                    where: { id: unidad.tipo_herramienta_id },
+                    transaction
+                }
+            );
+        }
+
+        // Actualizar estado
+        unidad.estado = estado;
+        unidad.motivo_estado = motivo || null;
+        unidad.fecha_cambio_estado = new Date();
+        await unidad.save({ transaction });
+
+        // Registrar en historial si es un cambio significativo
+        if (['en_reparacion', 'perdida', 'baja'].includes(estado)) {
+            await HistorialAsignacionHerramienta.create({
+                unidad_herramienta_id: unidad.id,
+                usuario_id: unidad.usuario_asignado_id,
+                equipo_id: unidad.equipo_asignado_id,
+                tipo_movimiento: estado,
+                fecha_asignacion: new Date(),
+                observaciones: motivo || `Cambio de estado de ${estadoAnterior} a ${estado}`,
+                registrado_por_usuario_id: req.usuario.id
+            }, { transaction });
+        }
+
+        await transaction.commit();
+
+        res.json({
+            success: true,
+            message: `Estado actualizado de "${estadoAnterior}" a "${estado}"`,
+            data: {
+                unidad: await UnidadHerramientaRenta.findByPk(id, {
+                    include: [
+                        { model: TipoHerramientaRenta, as: 'tipoHerramienta' },
+                        { model: Usuario, as: 'usuarioAsignado', attributes: ['id', 'nombre'] },
+                        { model: Equipo, as: 'equipoAsignado', attributes: ['id', 'nombre'] }
+                    ]
+                })
+            }
+        });
+
+    } catch (error) {
+        await transaction.rollback();
+        console.error('Error al cambiar estado de unidad:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al cambiar estado de la unidad',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }

@@ -33,7 +33,7 @@ const UnidadHerramientaRenta = sequelize.define('UnidadHerramientaRenta', {
         comment: 'Número de serie del fabricante (opcional)'
     },
     estado: {
-        type: DataTypes.ENUM('disponible', 'asignada', 'en_reparacion', 'perdida', 'baja'),
+        type: DataTypes.ENUM('disponible', 'asignada', 'en_reparacion', 'perdida', 'baja', 'en_transito', 'pendiente_devolucion'),
         allowNull: false,
         defaultValue: 'disponible'
     },
@@ -58,6 +58,11 @@ const UnidadHerramientaRenta = sequelize.define('UnidadHerramientaRenta', {
         allowNull: true,
         comment: 'Fecha de la asignación actual'
     },
+    fecha_vencimiento_asignacion: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Fecha límite para devolver la herramienta asignada'
+    },
     fecha_adquisicion: {
         type: DataTypes.DATE,
         allowNull: true,
@@ -76,6 +81,16 @@ const UnidadHerramientaRenta = sequelize.define('UnidadHerramientaRenta', {
         defaultValue: false,
         allowNull: false,
         comment: 'Indica si la unidad tiene etiqueta generada'
+    },
+    motivo_estado: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: 'Motivo del cambio de estado (reparación, pérdida, baja, etc.)'
+    },
+    fecha_cambio_estado: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Fecha del último cambio de estado'
     },
     created_at: {
         type: DataTypes.DATE,

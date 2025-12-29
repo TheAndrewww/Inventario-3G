@@ -2,7 +2,7 @@ import { Op } from 'sequelize';
 import { Articulo, Categoria, Ubicacion, Proveedor, ArticuloProveedor, DetalleMovimiento, SolicitudCompra, DetalleOrdenCompra } from '../models/index.js';
 import { generarCodigoEAN13, generarCodigoEAN13Temporal, validarCodigoEAN13 } from '../utils/ean13-generator.js';
 import { generarImagenCodigoBarras, generarSVGCodigoBarras } from '../utils/barcode-generator.js';
-import { migrarArticulosPendientes } from '../utils/autoMigrate.js';
+import { migrarArticulosPendientes, migrarArticuloIndividual } from '../utils/autoMigrate.js';
 
 /**
  * GET /api/articulos
@@ -635,8 +635,8 @@ export const createArticulo = async (req, res) => {
         if (es_herramienta) {
             console.log(`🔄 Auto-migración: Artículo ${articulo.id} es herramienta, creando tipo y unidades...`);
             try {
-                await migrarArticulosPendientes();
-                console.log(`✅ Auto-migración completada para artículo ${articulo.id}`);
+                const resultado = await migrarArticuloIndividual(articulo.id);
+                console.log(`✅ Auto-migración completada para artículo ${articulo.id}: ${resultado.tipo.prefijo_codigo} con ${resultado.unidades.length} unidades`);
             } catch (error) {
                 console.error(`⚠️ Error en auto-migración del artículo ${articulo.id}:`, error.message);
                 // No fallar la creación del artículo si falla la migración
@@ -866,64 +866,15 @@ export const updateArticulo = async (req, res) => {
                     // Si diferencia < 0, NO eliminamos unidades automáticamente (seguridad)
                 } else {
                     // El artículo se convirtió en herramienta pero no tiene TipoHerramientaRenta
-                    // Crear el tipo y sus unidades
-                    console.log(`🆕 Creando TipoHerramientaRenta para artículo ${articulo.nombre} (se convirtió en herramienta)`);
-
-                    // Generar prefijo automático a partir del nombre
-                    const generarPrefijo = (nombre) => {
-                        const palabras = nombre.replace(/[^A-Z0-9\s]/gi, '').split(/\s+/).filter(p => p.length > 0);
-                        if (palabras.length === 0) return 'XX';
-                        if (palabras.length === 1) return palabras[0].substring(0, 3).toUpperCase();
-                        return palabras.slice(0, 2).map(p => p.charAt(0)).join('').toUpperCase();
-                    };
-
-                    let prefijo = generarPrefijo(articulo.nombre);
-
-                    // Verificar que el prefijo sea único
-                    let prefijoBase = prefijo;
-                    let contador = 1;
-                    while (await TipoHerramientaRenta.findOne({ where: { prefijo_codigo: prefijo } })) {
-                        prefijo = `${prefijoBase}${contador}`;
-                        contador++;
+                    // Usar la función de migración individual
+                    console.log(`🆕 Auto-migración: Artículo ${articulo.id} convertido a herramienta, creando tipo y unidades...`);
+                    try {
+                        const resultado = await migrarArticuloIndividual(articulo.id);
+                        console.log(`✅ Auto-migración completada: ${resultado.tipo.prefijo_codigo} con ${resultado.unidades.length} unidades`);
+                    } catch (migracionError) {
+                        console.error(`❌ Error en auto-migración:`, migracionError.message);
+                        // No fallar la actualización del artículo
                     }
-
-                    // Crear el tipo de herramienta
-                    const nuevoStock = parseInt(stock_actual) || 1;
-                    const nuevoTipo = await TipoHerramientaRenta.create({
-                        nombre: articulo.nombre,
-                        descripcion: articulo.descripcion || '',
-                        imagen_url: articulo.imagen_url,
-                        categoria_id: articulo.categoria_id,
-                        ubicacion_id: articulo.ubicacion_id,
-                        proveedor_id: articulo.proveedor_id,
-                        precio_unitario: articulo.costo_unitario || 0,
-                        prefijo_codigo: prefijo,
-                        total_unidades: nuevoStock,
-                        unidades_disponibles: nuevoStock,
-                        unidades_asignadas: 0,
-                        articulo_origen_id: articulo.id,
-                        activo: true
-                    });
-
-                    console.log(`   ✅ TipoHerramientaRenta creado: ${nuevoTipo.nombre} (prefijo: ${prefijo})`);
-
-                    // Crear las unidades
-                    for (let i = 0; i < nuevoStock; i++) {
-                        const numeroActual = i + 1;
-                        const codigoUnico = `${prefijo}-${numeroActual.toString().padStart(3, '0')}`;
-
-                        await UnidadHerramientaRenta.create({
-                            tipo_herramienta_id: nuevoTipo.id,
-                            codigo_unico: codigoUnico,
-                            codigo_ean13: null,
-                            estado: 'disponible',
-                            activo: true
-                        });
-
-                        console.log(`   ✅ Creada unidad: ${codigoUnico}`);
-                    }
-
-                    console.log(`✅ Se creó TipoHerramientaRenta con ${nuevoStock} unidades para ${articulo.nombre}`);
                 }
             } catch (syncError) {
                 console.error('⚠️ Error sincronizando unidades de herramienta:', syncError.message);
