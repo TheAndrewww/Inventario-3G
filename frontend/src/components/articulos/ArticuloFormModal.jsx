@@ -499,6 +499,17 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    // Prevenir múltiples submits mientras se está procesando
+    if (loading) {
+      console.log('⚠️ Submit ignorado - Ya hay una operación en proceso');
+      return;
+    }
+
+    console.log('📝 handleSubmit llamado - Modo:', isEdit ? 'EDICIÓN' : 'CREACIÓN');
+    console.log('📝 FormData:', formData);
+    console.log('📝 SelectedImage:', selectedImage);
 
     // Advertencia si hay un proveedor sin confirmar
     if (showNuevoProveedor && nuevoProveedorNombre.trim()) {
@@ -625,13 +636,17 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       let articuloCreado = null;
 
       if (isEdit) {
+        console.log('🔄 Actualizando artículo:', articulo.id, dataToSend);
         await articulosService.update(articulo.id, dataToSend);
         articuloId = articulo.id;
+        console.log('✅ Artículo actualizado exitosamente');
         toast.success('Artículo actualizado exitosamente');
       } else {
+        console.log('➕ Creando artículo:', dataToSend);
         const response = await articulosService.create(dataToSend);
         articuloId = response.articulo.id;
         articuloCreado = response.articulo;
+        console.log('✅ Artículo creado:', articuloId);
         const mensaje = dataToSend.codigo_ean13
           ? 'Artículo creado exitosamente con el código proporcionado'
           : 'Artículo creado exitosamente con código EAN-13 automático';
@@ -662,6 +677,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       }
 
       // Limpiar formulario
+      console.log('🧹 Limpiando formulario...');
       setFormData({
         codigo_ean13: '',
         codigo_tipo: 'EAN13',
@@ -681,25 +697,36 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       setCurrentImageUrl(null);
 
       // Pasar el artículo creado al callback
+      console.log('📞 Llamando onSuccess callback...');
       if (onSuccess && articuloCreado) {
         onSuccess(articuloCreado);
       } else if (onSuccess) {
         onSuccess();
       }
+
+      console.log('🚪 Cerrando modal...');
       onClose();
     } catch (error) {
-      console.error('Error al guardar artículo:', error);
+      console.error('❌ Error al guardar artículo:', error);
       toast.error(error.message || 'Error al guardar artículo');
     } finally {
+      console.log('🏁 Finalizando handleSubmit...');
       setLoading(false);
     }
   };
 
   const handleImageSelect = (file) => {
+    console.log('📷 Imagen seleccionada:', file);
     setSelectedImage(file);
+    // NO llamar a ninguna acción de guardado aquí
   };
 
-  const handleImageRemove = () => {
+  const handleImageRemove = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    console.log('🗑️ Imagen removida');
     setSelectedImage(null);
     setCurrentImageUrl(null);
   };
