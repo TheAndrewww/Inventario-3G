@@ -19,6 +19,7 @@ import {
 import herramientasRentaService from '../services/herramientasRenta.service';
 import usuariosService from '../services/usuarios.service';
 import equiposService from '../services/equipos.service';
+import camionetasService from '../services/camionetas.service';
 import categoriasService from '../services/categorias.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import proveedoresService from '../services/proveedores.service';
@@ -551,6 +552,8 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
     const [fechaVencimiento, setFechaVencimiento] = useState('');
     const [usuarios, setUsuarios] = useState([]);
     const [equipos, setEquipos] = useState([]);
+    const [camionetas, setCamionetas] = useState([]);
+    const [camionetaSeleccionada, setCamionetaSeleccionada] = useState('');
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -559,15 +562,18 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
 
     const fetchDatos = async () => {
         try {
-            const [usuariosData, equiposData] = await Promise.all([
+            const [usuariosData, equiposData, camionetasData] = await Promise.all([
                 usuariosService.obtenerTodos(),
-                equiposService.obtenerTodos()
+                equiposService.obtenerTodos(),
+                camionetasService.obtenerTodos()
             ]);
-            // Ambos servicios devuelven { data: { usuarios/equipos: [...] } }
+            // Ambos servicios devuelven { data: { usuarios/equipos/camionetas: [...] } }
             const usuarios = usuariosData.data?.usuarios || [];
             const equipos = equiposData.data?.equipos || [];
+            const camionetas = camionetasData.data?.camionetas || [];
             setUsuarios(usuarios);
             setEquipos(equipos);
+            setCamionetas(camionetas);
         } catch (error) {
             console.error('Error al cargar datos:', error);
             toast.error('Error al cargar datos');
@@ -587,6 +593,11 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
             return;
         }
 
+        if (tipoAsignacion === 'camioneta' && !camionetaSeleccionada) {
+            toast.error('Selecciona una camioneta');
+            return;
+        }
+
         try {
             setLoading(true);
 
@@ -594,6 +605,7 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
                 unidad_id: unidad.id,
                 usuario_id: tipoAsignacion === 'usuario' ? parseInt(usuarioSeleccionado) : undefined,
                 equipo_id: tipoAsignacion === 'equipo' ? parseInt(equipoSeleccionado) : undefined,
+                camioneta_id: tipoAsignacion === 'camioneta' ? parseInt(camionetaSeleccionada) : undefined,
                 observaciones: observaciones.trim() || undefined,
                 fecha_vencimiento: fechaVencimiento || undefined
             });
@@ -645,10 +657,20 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
                             />
                             Equipo
                         </label>
+                        <label className="flex items-center">
+                            <input
+                                type="radio"
+                                value="camioneta"
+                                checked={tipoAsignacion === 'camioneta'}
+                                onChange={(e) => setTipoAsignacion(e.target.value)}
+                                className="mr-2"
+                            />
+                            Camioneta
+                        </label>
                     </div>
                 </div>
 
-                {tipoAsignacion === 'usuario' ? (
+                {tipoAsignacion === 'usuario' && (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Usuario *
@@ -667,7 +689,9 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
                             ))}
                         </select>
                     </div>
-                ) : (
+                )}
+
+                {tipoAsignacion === 'equipo' && (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Equipo *
@@ -681,7 +705,28 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
                             <option value="">Seleccionar equipo...</option>
                             {equipos.filter(e => e.activo).map(equipo => (
                                 <option key={equipo.id} value={equipo.id}>
-                                    {equipo.nombre} - {equipo.supervisor?.nombre || 'Sin encargado'}
+                                    {equipo.nombre} - {equipo.encargado?.nombre || 'Sin encargado'}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                {tipoAsignacion === 'camioneta' && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Camioneta *
+                        </label>
+                        <select
+                            value={camionetaSeleccionada}
+                            onChange={(e) => setCamionetaSeleccionada(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                            required
+                        >
+                            <option value="">Seleccionar camioneta...</option>
+                            {camionetas.filter(c => c.activo).map(camioneta => (
+                                <option key={camioneta.id} value={camioneta.id}>
+                                    {camioneta.nombre} {camioneta.matricula ? `(${camioneta.matricula})` : ''} - {camioneta.encargado?.nombre || 'Sin encargado'}
                                 </option>
                             ))}
                         </select>

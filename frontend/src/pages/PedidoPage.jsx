@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import pedidosService from '../services/pedidos.service';
 import equiposService from '../services/equipos.service';
+import camionetasService from '../services/camionetas.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import articulosService from '../services/articulos.service';
 import EAN13Scanner from '../components/scanner/EAN13Scanner';
@@ -36,6 +37,9 @@ const PedidoPage = () => {
   const [equipos, setEquipos] = useState([]);
   const [equipoSeleccionado, setEquipoSeleccionado] = useState('');
   const [cargandoEquipos, setCargandoEquipos] = useState(false);
+  const [camionetas, setCamionetas] = useState([]);
+  const [camionetaSeleccionada, setCamionetaSeleccionada] = useState('');
+  const [cargandoCamionetas, setCargandoCamionetas] = useState(false);
   const [ubicaciones, setUbicaciones] = useState([]);
   const [ubicacionDestino, setUbicacionDestino] = useState('');
   const [cargandoUbicaciones, setCargandoUbicaciones] = useState(false);
@@ -73,6 +77,26 @@ const PedidoPage = () => {
     };
 
     cargarEquipos();
+  }, [user]);
+
+  // Cargar camionetas si el usuario es almacenista
+  useEffect(() => {
+    const cargarCamionetas = async () => {
+      if (user?.rol === 'almacen') {
+        try {
+          setCargandoCamionetas(true);
+          const response = await camionetasService.obtenerTodos();
+          setCamionetas(response.data.camionetas || []);
+        } catch (error) {
+          console.error('Error al cargar camionetas:', error);
+          toast.error('Error al cargar camionetas');
+        } finally {
+          setCargandoCamionetas(false);
+        }
+      }
+    };
+
+    cargarCamionetas();
   }, [user]);
 
   // Cargar ubicaciones (camionetas y stock general)
@@ -638,7 +662,35 @@ const PedidoPage = () => {
                   </select>
                   {equipoSeleccionado && equipos.find(e => e.id === parseInt(equipoSeleccionado)) && (
                     <p className="text-xs text-gray-500 mt-1">
-                      Supervisor: {equipos.find(e => e.id === parseInt(equipoSeleccionado))?.supervisor?.nombre || 'N/A'}
+                      Encargado: {equipos.find(e => e.id === parseInt(equipoSeleccionado))?.encargado?.nombre || 'N/A'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Selector de Camioneta */}
+                <div className="pt-2 border-t border-gray-100">
+                  <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex items-center gap-2">
+                      <Truck size={14} />
+                      <span>Camioneta (Opcional)</span>
+                    </div>
+                  </label>
+                  <select
+                    value={camionetaSeleccionada}
+                    onChange={(e) => setCamionetaSeleccionada(e.target.value)}
+                    className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                    disabled={cargandoCamionetas}
+                  >
+                    <option value="">Selecciona una camioneta...</option>
+                    {camionetas.map((camioneta) => (
+                      <option key={camioneta.id} value={camioneta.id}>
+                        {camioneta.nombre} {camioneta.matricula ? `(${camioneta.matricula})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {camionetaSeleccionada && camionetas.find(c => c.id === parseInt(camionetaSeleccionada)) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Encargado: {camionetas.find(c => c.id === parseInt(camionetaSeleccionada))?.encargado?.nombre || 'N/A'}
                     </p>
                   )}
                 </div>

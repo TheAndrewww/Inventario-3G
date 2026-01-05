@@ -58,6 +58,12 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       roles: ['administrador', 'encargado']
     },
     {
+      path: '/camionetas',
+      icon: Truck,
+      label: 'Camionetas',
+      roles: ['administrador', 'encargado']
+    },
+    {
       path: '/usuarios',
       icon: UserCog,
       label: 'Usuarios',

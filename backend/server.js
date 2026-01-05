@@ -84,6 +84,7 @@ import ubicacionesRoutes from './src/routes/ubicaciones.routes.js';
 import pedidosRoutes from './src/routes/pedidos.routes.js';
 import proveedoresRoutes from './src/routes/proveedores.routes.js';
 import equiposRoutes from './src/routes/equipos.routes.js';
+import camionetasRoutes from './src/routes/camionetas.routes.js';
 import usuariosRoutes from './src/routes/usuarios.routes.js';
 import ordenesCompraRoutes from './src/routes/ordenesCompra.routes.js';
 import notificacionesRoutes from './src/routes/notificaciones.routes.js';
@@ -106,6 +107,7 @@ app.get('/', (req, res) => {
             pedidos: '/api/pedidos',
             proveedores: '/api/proveedores',
             equipos: '/api/equipos',
+            camionetas: '/api/camionetas',
             usuarios: '/api/usuarios',
             ordenesCompra: '/api/ordenes-compra',
             solicitudesCompra: '/api/solicitudes-compra',
@@ -126,6 +128,7 @@ app.use('/api/ubicaciones', ubicacionesRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/proveedores', proveedoresRoutes);
 app.use('/api/equipos', equiposRoutes);
+app.use('/api/camionetas', camionetasRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/proyectos', proyectosRoutes);
 app.use('/api/calendario', calendarioRoutes);

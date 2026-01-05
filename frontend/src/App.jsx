@@ -13,6 +13,7 @@ import PedidoPage from './pages/PedidoPage';
 import PedidosPendientesPage from './pages/PedidosPendientesPage';
 import RecibirPedidosPage from './pages/RecibirPedidosPage';
 import EquiposPage from './pages/EquiposPage';
+import CamionetasPage from './pages/CamionetasPage';
 import UsuariosPage from './pages/UsuariosPage';
 import HistorialPage from './pages/HistorialPage';
 import PerfilPage from './pages/PerfilPage';
@@ -79,6 +80,7 @@ function App() {
               <Route path="pedidos-pendientes" element={<PedidosPendientesPage />} />
               <Route path="recibir-pedidos" element={<RecibirPedidosPage />} />
               <Route path="equipos" element={<EquiposPage />} />
+              <Route path="camionetas" element={<CamionetasPage />} />
               <Route path="usuarios" element={<UsuariosPage />} />
               <Route path="ordenes-compra" element={<OrdenesCompraPage />} />
               <Route path="renta-herramientas" element={<RentaHerramientasPage />} />
