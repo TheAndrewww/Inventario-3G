@@ -76,6 +76,30 @@ const UnidadHerramientaRenta = sequelize.define('UnidadHerramientaRenta', {
         type: DataTypes.BOOLEAN,
         defaultValue: true
     },
+    ubicacion_actual: {
+        type: DataTypes.ENUM('almacen', 'camioneta', 'empleado', 'asignada'),
+        allowNull: false,
+        defaultValue: 'almacen',
+        comment: 'Ubicación actual de la unidad'
+    },
+    camioneta_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'camionetas',
+            key: 'id'
+        },
+        comment: 'ID de la camioneta donde está ubicada (si aplica)'
+    },
+    empleado_propietario_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'usuarios',
+            key: 'id'
+        },
+        comment: 'ID del empleado propietario de la herramienta personal (si aplica)'
+    },
     etiquetado: {
         type: DataTypes.BOOLEAN,
         defaultValue: false,

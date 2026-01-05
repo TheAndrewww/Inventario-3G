@@ -8,6 +8,8 @@ import ArticuloProveedor from './ArticuloProveedor.js';
 import Movimiento from './Movimiento.js';
 import DetalleMovimiento from './DetalleMovimiento.js';
 import Equipo from './Equipo.js';
+import Camioneta from './Camioneta.js';
+import StockMinimoCamioneta from './StockMinimoCamioneta.js';
 import OrdenCompra from './OrdenCompra.js';
 import DetalleOrdenCompra from './DetalleOrdenCompra.js';
 import SolicitudCompra from './SolicitudCompra.js';
@@ -172,6 +174,48 @@ Movimiento.belongsTo(Equipo, {
 Equipo.hasMany(Movimiento, {
     foreignKey: 'equipo_id',
     as: 'pedidos'
+});
+
+// ========== RELACIONES CAMIONETAS ==========
+
+// Camioneta - Usuario (Muchos a Uno) - Encargado de la camioneta
+Camioneta.belongsTo(Usuario, {
+    foreignKey: 'encargado_id',
+    as: 'encargado'
+});
+Usuario.hasMany(Camioneta, {
+    foreignKey: 'encargado_id',
+    as: 'camionetas_a_cargo'
+});
+
+// Camioneta - Ubicacion (Muchos a Uno) - Almacén base de la camioneta
+Camioneta.belongsTo(Ubicacion, {
+    foreignKey: 'almacen_base_id',
+    as: 'almacenBase'
+});
+Ubicacion.hasMany(Camioneta, {
+    foreignKey: 'almacen_base_id',
+    as: 'camionetas'
+});
+
+// StockMinimoCamioneta - Camioneta (Muchos a Uno)
+StockMinimoCamioneta.belongsTo(Camioneta, {
+    foreignKey: 'camioneta_id',
+    as: 'camioneta'
+});
+Camioneta.hasMany(StockMinimoCamioneta, {
+    foreignKey: 'camioneta_id',
+    as: 'stocksMinimos'
+});
+
+// StockMinimoCamioneta - TipoHerramientaRenta (Muchos a Uno)
+StockMinimoCamioneta.belongsTo(TipoHerramientaRenta, {
+    foreignKey: 'tipo_herramienta_id',
+    as: 'tipoHerramienta'
+});
+TipoHerramientaRenta.hasMany(StockMinimoCamioneta, {
+    foreignKey: 'tipo_herramienta_id',
+    as: 'stocksMinimos'
 });
 
 // Movimiento - Ubicacion (Muchos a Uno) - Ubicación destino del pedido
@@ -396,6 +440,26 @@ Equipo.hasMany(UnidadHerramientaRenta, {
     as: 'herramientas_asignadas'
 });
 
+// UnidadHerramientaRenta - Camioneta (Muchos a Uno) - Camioneta donde está ubicada
+UnidadHerramientaRenta.belongsTo(Camioneta, {
+    foreignKey: 'camioneta_id',
+    as: 'camioneta'
+});
+Camioneta.hasMany(UnidadHerramientaRenta, {
+    foreignKey: 'camioneta_id',
+    as: 'herramientas'
+});
+
+// UnidadHerramientaRenta - Usuario (Muchos a Uno) - Empleado propietario (herramientas personales)
+UnidadHerramientaRenta.belongsTo(Usuario, {
+    foreignKey: 'empleado_propietario_id',
+    as: 'empleadoPropietario'
+});
+Usuario.hasMany(UnidadHerramientaRenta, {
+    foreignKey: 'empleado_propietario_id',
+    as: 'herramientas_personales'
+});
+
 // HistorialAsignacionHerramienta - UnidadHerramientaRenta (Muchos a Uno)
 HistorialAsignacionHerramienta.belongsTo(UnidadHerramientaRenta, {
     foreignKey: 'unidad_herramienta_id',
@@ -456,7 +520,9 @@ export {
     Proyecto,
     TipoHerramientaRenta,
     UnidadHerramientaRenta,
-    HistorialAsignacionHerramienta
+    HistorialAsignacionHerramienta,
+    Camioneta,
+    StockMinimoCamioneta
 };
 
 export default {
@@ -470,6 +536,8 @@ export default {
     Movimiento,
     DetalleMovimiento,
     Equipo,
+    Camioneta,
+    StockMinimoCamioneta,
     OrdenCompra,
     DetalleOrdenCompra,
     SolicitudCompra,
