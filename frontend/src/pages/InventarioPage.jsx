@@ -1568,7 +1568,8 @@ const InventarioPage = () => {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Artículo</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Actual</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Total</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Disponible</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
@@ -1578,7 +1579,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => !item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-blue-50 sticky top-[49px] z-20 border-b border-blue-200 shadow-sm">
-                    <td colSpan="6" className="px-6 py-3">
+                    <td colSpan="7" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-blue-900">
                         📦 Consumibles
                         <span className="text-xs font-normal text-blue-700">
@@ -1649,11 +1650,16 @@ const InventarioPage = () => {
                           )}
                         </td>
 
-                        {/* Stock Actual */}
+                        {/* Stock Total (para consumibles es stock actual) */}
                         <td className="px-4 py-4 whitespace-nowrap">
                           <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
                             {formatearCantidad(item.stock_actual, item.unidad)}
                           </span>
+                        </td>
+
+                        {/* Stock Disponible (no aplica para consumibles) */}
+                        <td className="px-4 py-4 whitespace-nowrap text-center text-gray-400 text-sm">
+                          -
                         </td>
 
                         {/* Unidad */}
@@ -1737,7 +1743,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-orange-50 sticky top-[49px] z-20 border-b border-orange-200 shadow-sm">
-                    <td colSpan="6" className="px-6 py-3">
+                    <td colSpan="7" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-orange-900">
                         🔧 Herramientas
                         <span className="text-xs font-normal text-orange-700">
@@ -1834,16 +1840,27 @@ const InventarioPage = () => {
                             )}
                           </td>
 
-                          {/* Stock Actual */}
+                          {/* Stock Total */}
                           <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
-                            <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                              {formatearCantidad(item.stock_actual, item.unidad)}
+                            <span className="font-medium text-gray-900">
+                              {item.tipo_herramienta_migrado?.total_unidades || 0}
+                            </span>
+                          </td>
+
+                          {/* Stock Disponible */}
+                          <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
+                            <span className={`font-medium ${
+                              (item.tipo_herramienta_migrado?.unidades_disponibles || 0) === 0
+                                ? 'text-red-600'
+                                : 'text-green-600'
+                            }`}>
+                              {item.tipo_herramienta_migrado?.unidades_disponibles || 0}
                             </span>
                           </td>
 
                           {/* Unidad */}
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase cursor-pointer" onClick={() => handleVerDetalle(item)}>
-                            {item.unidad}
+                            unidades
                           </td>
 
                           {/* Acciones */}
@@ -2275,8 +2292,8 @@ const InventarioPage = () => {
                             </span>
                           </div>
 
-                          {/* Ubicación y Stock en una línea */}
-                          <div className="flex items-center gap-3 text-xs mb-2">
+                          {/* Ubicación */}
+                          <div className="flex items-center gap-3 text-xs mb-1">
                             <div className="flex items-center gap-1">
                               <span className="text-gray-500">📍</span>
                               {esUbicacionRevisar ? (
@@ -2287,12 +2304,27 @@ const InventarioPage = () => {
                                 <span className="text-gray-700 font-medium">{item.ubicacion?.codigo || 'N/A'}</span>
                               )}
                             </div>
+                          </div>
+
+                          {/* Stock Total y Disponible */}
+                          <div className="flex items-center gap-3 text-xs mb-2">
                             <div className="flex items-center gap-1">
-                              <span className="text-gray-500">🔧</span>
-                              <span className={`font-bold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                                {formatearCantidad(item.stock_actual, item.unidad)}
+                              <span className="text-gray-500 text-[10px]">Total:</span>
+                              <span className="font-bold text-gray-900">
+                                {item.tipo_herramienta_migrado?.total_unidades || 0}
                               </span>
-                              <span className="text-gray-400 text-[10px] uppercase">{item.unidad}</span>
+                              <span className="text-gray-400 text-[10px]">unidades</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-gray-500 text-[10px]">Disponible:</span>
+                              <span className={`font-bold ${
+                                (item.tipo_herramienta_migrado?.unidades_disponibles || 0) === 0
+                                  ? 'text-red-600'
+                                  : 'text-green-600'
+                              }`}>
+                                {item.tipo_herramienta_migrado?.unidades_disponibles || 0}
+                              </span>
+                              <span className="text-gray-400 text-[10px]">unidades</span>
                             </div>
                           </div>
                         </div>

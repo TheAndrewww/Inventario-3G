@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { Articulo, Categoria, Ubicacion, Proveedor, ArticuloProveedor, DetalleMovimiento, SolicitudCompra, DetalleOrdenCompra } from '../models/index.js';
+import { Articulo, Categoria, Ubicacion, Proveedor, ArticuloProveedor, DetalleMovimiento, SolicitudCompra, DetalleOrdenCompra, TipoHerramientaRenta } from '../models/index.js';
 import { generarCodigoEAN13, generarCodigoEAN13Temporal, validarCodigoEAN13 } from '../utils/ean13-generator.js';
 import { generarImagenCodigoBarras, generarSVGCodigoBarras } from '../utils/barcode-generator.js';
 import { migrarArticulosPendientes, migrarArticuloIndividual } from '../utils/autoMigrate.js';
@@ -77,6 +77,12 @@ export const getArticulos = async (req, res) => {
                     through: {
                         attributes: ['costo_unitario', 'es_preferido', 'sku_proveedor', 'notas']
                     },
+                    required: false
+                },
+                {
+                    model: TipoHerramientaRenta,
+                    as: 'tipo_herramienta_migrado',
+                    attributes: ['id', 'nombre', 'total_unidades', 'unidades_disponibles', 'unidades_asignadas', 'prefijo_codigo'],
                     required: false
                 }
             ],
