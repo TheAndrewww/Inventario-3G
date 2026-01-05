@@ -25,6 +25,7 @@ import proveedoresService from '../services/proveedores.service';
 import { Loader, Modal, Button } from '../components/common';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { getImageUrl } from '../utils/imageUtils';
 
 const RentaHerramientasPage = () => {
     const navigate = useNavigate();
@@ -277,24 +278,29 @@ const RentaHerramientasPage = () => {
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-4 flex-1">
-                                            <div className="w-14 h-14 rounded-lg bg-red-100 flex items-center justify-center overflow-hidden">
-                                                {tipo.imagen_url ? (
-                                                    <img
-                                                        src={tipo.imagen_url}
-                                                        alt={tipo.nombre}
-                                                        className="w-full h-full object-cover"
-                                                        onError={(e) => {
-                                                            e.target.style.display = 'none';
-                                                            e.target.nextElementSibling.style.display = 'flex';
-                                                        }}
-                                                    />
-                                                ) : null}
-                                                <Wrench
-                                                    className="text-red-700"
-                                                    size={28}
-                                                    style={{ display: tipo.imagen_url ? 'none' : 'block' }}
-                                                />
-                                            </div>
+                                            {(() => {
+                                                const imagenUrl = tipo.imagen_url ? getImageUrl(tipo.imagen_url) : null;
+                                                return (
+                                                    <div className="w-14 h-14 rounded-lg bg-red-100 flex items-center justify-center overflow-hidden">
+                                                        {imagenUrl ? (
+                                                            <img
+                                                                src={imagenUrl}
+                                                                alt={tipo.nombre}
+                                                                className="w-full h-full object-cover"
+                                                                onError={(e) => {
+                                                                    e.target.style.display = 'none';
+                                                                    e.target.nextElementSibling.style.display = 'flex';
+                                                                }}
+                                                            />
+                                                        ) : null}
+                                                        <Wrench
+                                                            className="text-red-700"
+                                                            size={28}
+                                                            style={{ display: imagenUrl ? 'none' : 'block' }}
+                                                        />
+                                                    </div>
+                                                );
+                                            })()}
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-3 mb-1">
                                                     <h3 className="font-bold text-lg text-gray-900">{tipo.nombre}</h3>
