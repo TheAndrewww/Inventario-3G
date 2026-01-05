@@ -117,6 +117,12 @@ export const obtenerTipos = async (req, res) => {
                     model: Proveedor,
                     as: 'proveedor',
                     attributes: ['id', 'nombre']
+                },
+                {
+                    model: Articulo,
+                    as: 'articuloOrigen',
+                    attributes: ['id', 'nombre', 'imagen_url'],
+                    required: false
                 }
             ],
             order: [['nombre', 'ASC']]

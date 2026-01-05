@@ -279,7 +279,12 @@ const RentaHerramientasPage = () => {
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-4 flex-1">
                                             {(() => {
-                                                const imagenUrl = tipo.imagen_url ? getImageUrl(tipo.imagen_url) : null;
+                                                // Usar imagen del tipo, o si no existe, la del artículo origen
+                                                const imagenUrl = tipo.imagen_url
+                                                    ? getImageUrl(tipo.imagen_url)
+                                                    : tipo.articuloOrigen?.imagen_url
+                                                        ? getImageUrl(tipo.articuloOrigen.imagen_url)
+                                                        : null;
                                                 return (
                                                     <div className="w-14 h-14 rounded-lg bg-red-100 flex items-center justify-center overflow-hidden">
                                                         {imagenUrl ? (
