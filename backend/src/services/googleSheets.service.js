@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configuración del Google Sheet
-const SPREADSHEET_ID = '1LwZhLbcAykxkghhIvttAkVtwUo4suqotlAWhPMRz17w';
+const SPREADSHEET_ID = '1UhcwJ81cJ9yzteuK329HH3QnuZ3uPjCQ5ncdzn6urwY';
 
 /**
  * Autenticar con Google Sheets API usando Service Account
