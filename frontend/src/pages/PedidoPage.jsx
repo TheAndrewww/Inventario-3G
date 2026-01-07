@@ -194,6 +194,10 @@ const PedidoPage = () => {
       // Agregar proyecto o equipo según el rol
       if (user?.rol === 'almacen') {
         data.equipo_id = parseInt(equipoSeleccionado);
+        // Agregar camioneta si fue seleccionada
+        if (camionetaSeleccionada) {
+          data.camioneta_id = parseInt(camionetaSeleccionada);
+        }
       } else {
         // Si se seleccionó ubicación destino, no enviar proyecto
         if (ubicacionDestino) {
@@ -237,6 +241,7 @@ const PedidoPage = () => {
       setProyecto('');
       setObservaciones('');
       setEquipoSeleccionado('');
+      setCamionetaSeleccionada('');
       setUbicacionDestino('');
 
       navigate('/historial');
@@ -639,61 +644,63 @@ const PedidoPage = () => {
             <div className="space-y-3 md:space-y-4 mb-4 md:mb-6 pb-4 md:pb-6 border-b border-gray-200">
               {user?.rol === 'almacen' ? (
                 // Almacenista selecciona equipo
-                <div>
-                  <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
-                    <div className="flex items-center gap-2">
-                      <Users size={14} />
-                      <span>Equipo *</span>
-                    </div>
-                  </label>
-                  <select
-                    value={equipoSeleccionado}
-                    onChange={(e) => setEquipoSeleccionado(e.target.value)}
-                    className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                    disabled={cargandoEquipos}
-                    required
-                  >
-                    <option value="">Selecciona un equipo...</option>
-                    {equipos.map((equipo) => (
-                      <option key={equipo.id} value={equipo.id}>
-                        {equipo.nombre}
-                      </option>
-                    ))}
-                  </select>
-                  {equipoSeleccionado && equipos.find(e => e.id === parseInt(equipoSeleccionado)) && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Encargado: {equipos.find(e => e.id === parseInt(equipoSeleccionado))?.encargado?.nombre || 'N/A'}
-                    </p>
-                  )}
-                </div>
+                <>
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
+                      <div className="flex items-center gap-2">
+                        <Users size={14} />
+                        <span>Equipo *</span>
+                      </div>
+                    </label>
+                    <select
+                      value={equipoSeleccionado}
+                      onChange={(e) => setEquipoSeleccionado(e.target.value)}
+                      className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                      disabled={cargandoEquipos}
+                      required
+                    >
+                      <option value="">Selecciona un equipo...</option>
+                      {equipos.map((equipo) => (
+                        <option key={equipo.id} value={equipo.id}>
+                          {equipo.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    {equipoSeleccionado && equipos.find(e => e.id === parseInt(equipoSeleccionado)) && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Encargado: {equipos.find(e => e.id === parseInt(equipoSeleccionado))?.encargado?.nombre || 'N/A'}
+                      </p>
+                    )}
+                  </div>
 
-                {/* Selector de Camioneta */}
-                <div className="pt-2 border-t border-gray-100">
-                  <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
-                    <div className="flex items-center gap-2">
-                      <Truck size={14} />
-                      <span>Camioneta (Opcional)</span>
-                    </div>
-                  </label>
-                  <select
-                    value={camionetaSeleccionada}
-                    onChange={(e) => setCamionetaSeleccionada(e.target.value)}
-                    className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                    disabled={cargandoCamionetas}
-                  >
-                    <option value="">Selecciona una camioneta...</option>
-                    {camionetas.map((camioneta) => (
-                      <option key={camioneta.id} value={camioneta.id}>
-                        {camioneta.nombre} {camioneta.matricula ? `(${camioneta.matricula})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {camionetaSeleccionada && camionetas.find(c => c.id === parseInt(camionetaSeleccionada)) && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Encargado: {camionetas.find(c => c.id === parseInt(camionetaSeleccionada))?.encargado?.nombre || 'N/A'}
-                    </p>
-                  )}
-                </div>
+                  {/* Selector de Camioneta */}
+                  <div className="pt-2 border-t border-gray-100">
+                    <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
+                      <div className="flex items-center gap-2">
+                        <Truck size={14} />
+                        <span>Camioneta (Opcional)</span>
+                      </div>
+                    </label>
+                    <select
+                      value={camionetaSeleccionada}
+                      onChange={(e) => setCamionetaSeleccionada(e.target.value)}
+                      className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                      disabled={cargandoCamionetas}
+                    >
+                      <option value="">Selecciona una camioneta...</option>
+                      {camionetas.map((camioneta) => (
+                        <option key={camioneta.id} value={camioneta.id}>
+                          {camioneta.nombre} {camioneta.matricula ? `(${camioneta.matricula})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {camionetaSeleccionada && camionetas.find(c => c.id === parseInt(camionetaSeleccionada)) && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Encargado: {camionetas.find(c => c.id === parseInt(camionetaSeleccionada))?.encargado?.nombre || 'N/A'}
+                      </p>
+                    )}
+                  </div>
+                </>
               ) : (
                 // Diseñador/Admin especifica destino (proyecto o ubicación)
                 <>

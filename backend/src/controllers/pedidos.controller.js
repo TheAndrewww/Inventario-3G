@@ -94,7 +94,7 @@ export const crearPedido = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { articulos, proyecto, equipo_id, ubicacion_destino_id, observaciones } = req.body;
+    const { articulos, proyecto, equipo_id, camioneta_id, ubicacion_destino_id, observaciones } = req.body;
     const usuario_id = req.usuario.id;
     const usuario_rol = req.usuario.rol;
 
@@ -382,6 +382,7 @@ export const crearPedido = async (req, res) => {
       tipo: 'pedido',
       tipo_pedido,
       equipo_id: equipo_id || null,
+      camioneta_id: camioneta_id || null,
       ubicacion_destino_id: ubicacion_destino_id || null,
       fecha_hora: new Date(),
       usuario_id,

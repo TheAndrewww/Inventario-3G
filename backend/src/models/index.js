@@ -176,6 +176,16 @@ Equipo.hasMany(Movimiento, {
     as: 'pedidos'
 });
 
+// Movimiento - Camioneta (Muchos a Uno) - Camioneta asociada al pedido
+Movimiento.belongsTo(Camioneta, {
+    foreignKey: 'camioneta_id',
+    as: 'camioneta'
+});
+Camioneta.hasMany(Movimiento, {
+    foreignKey: 'camioneta_id',
+    as: 'pedidos'
+});
+
 // ========== RELACIONES CAMIONETAS ==========
 
 // Camioneta - Usuario (Muchos a Uno) - Encargado de la camioneta

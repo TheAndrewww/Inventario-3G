@@ -69,6 +69,15 @@ const Movimiento = sequelize.define('Movimiento', {
         },
         comment: 'ID del equipo para pedidos de tipo equipo'
     },
+    camioneta_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'camionetas',
+            key: 'id'
+        },
+        comment: 'ID de la camioneta para pedidos de tipo equipo (opcional)'
+    },
     ubicacion_destino_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
