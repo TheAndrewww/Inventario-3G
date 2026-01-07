@@ -23,6 +23,7 @@
   "author": "3G Arquitectura Textil",
   "license": "ISC",
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "bwip-js": "^4.7.0",

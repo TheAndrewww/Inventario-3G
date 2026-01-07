@@ -22,6 +22,7 @@ import RentaHerramientasPage from './pages/RentaHerramientasPage';
 import ImpresionCodigosHerramientasPage from './pages/ImpresionCodigosHerramientasPage';
 import CalendarioPage from './pages/CalendarioPage';
 import CalendarioPublicoPage from './pages/CalendarioPublicoPage';
+import AnunciosPublicosPage from './pages/AnunciosPublicosPage';
 import ProcesamientoMasivoPage from './pages/ProcesamientoMasivoPage';
 import MonitorPedidosPage from './pages/MonitorPedidosPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
@@ -62,6 +63,7 @@ function App() {
             {/* Rutas públicas */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/calendario-publico" element={<CalendarioPublicoPage />} />
+            <Route path="/anuncios" element={<AnunciosPublicosPage />} />
 
             {/* Rutas privadas */}
             <Route

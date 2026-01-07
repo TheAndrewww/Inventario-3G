@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { OrdenCompra, Usuario, Proveedor } from '../models/index.js';
 import { Op } from 'sequelize';
 import { crearNotificacion } from '../controllers/notificaciones.controller.js';
+import { iniciarJobAnuncios } from '../jobs/generarAnunciosDiarios.js';
 
 /**
  * Verificar órdenes de compra vencidas y enviar notificaciones
@@ -102,5 +103,6 @@ export const verificarOrdenesVencidas = () => {
  */
 export const iniciarCronJobs = () => {
   verificarOrdenesVencidas();
+  iniciarJobAnuncios();
   console.log('✅ Todos los cron jobs han sido iniciados');
 };

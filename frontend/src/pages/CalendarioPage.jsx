@@ -207,7 +207,7 @@ const CalendarioPage = () => {
               <Calendar className="w-8 h-8 text-red-700" />
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">
-                  Calendario de Entregas 2025
+                  Calendario de Entregas 2026
                 </h1>
                 <div className="flex items-center space-x-4 mt-1">
                   <button
