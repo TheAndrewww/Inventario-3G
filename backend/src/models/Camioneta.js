@@ -19,9 +19,12 @@ const Camioneta = sequelize.define('Camioneta', {
         comment: 'Matrícula o placa del vehículo'
     },
     tipo_camioneta: {
-        type: DataTypes.ENUM('instalacion', 'mantenimiento', 'supervision', 'general'),
+        type: DataTypes.STRING(50),
         allowNull: false,
         defaultValue: 'general',
+        validate: {
+            isIn: [['instalacion', 'mantenimiento', 'supervision', 'general']]
+        },
         comment: 'Tipo de trabajo que realiza la camioneta'
     },
     descripcion: {
