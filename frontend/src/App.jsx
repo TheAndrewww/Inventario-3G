@@ -12,7 +12,6 @@ import RecepcionMercanciaPage from './pages/RecepcionMercanciaPage';
 import PedidoPage from './pages/PedidoPage';
 import PedidosPendientesPage from './pages/PedidosPendientesPage';
 import RecibirPedidosPage from './pages/RecibirPedidosPage';
-import EquiposPage from './pages/EquiposPage';
 import CamionetasPage from './pages/CamionetasPage';
 import UsuariosPage from './pages/UsuariosPage';
 import HistorialPage from './pages/HistorialPage';
@@ -79,7 +78,6 @@ function App() {
               <Route path="pedido" element={<PedidoPage />} />
               <Route path="pedidos-pendientes" element={<PedidosPendientesPage />} />
               <Route path="recibir-pedidos" element={<RecibirPedidosPage />} />
-              <Route path="equipos" element={<EquiposPage />} />
               <Route path="camionetas" element={<CamionetasPage />} />
               <Route path="usuarios" element={<UsuariosPage />} />
               <Route path="ordenes-compra" element={<OrdenesCompraPage />} />

@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import herramientasRentaService from '../services/herramientasRenta.service';
 import usuariosService from '../services/usuarios.service';
-import equiposService from '../services/equipos.service';
 import camionetasService from '../services/camionetas.service';
 import categoriasService from '../services/categorias.service';
 import ubicacionesService from '../services/ubicaciones.service';
@@ -551,7 +550,6 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
     const [observaciones, setObservaciones] = useState('');
     const [fechaVencimiento, setFechaVencimiento] = useState('');
     const [usuarios, setUsuarios] = useState([]);
-    const [equipos, setEquipos] = useState([]);
     const [camionetas, setCamionetas] = useState([]);
     const [camionetaSeleccionada, setCamionetaSeleccionada] = useState('');
     const [loading, setLoading] = useState(false);
@@ -562,17 +560,14 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
 
     const fetchDatos = async () => {
         try {
-            const [usuariosData, equiposData, camionetasData] = await Promise.all([
+            const [usuariosData, camionetasData] = await Promise.all([
                 usuariosService.obtenerTodos(),
-                equiposService.obtenerTodos(),
                 camionetasService.obtenerTodos()
             ]);
-            // Ambos servicios devuelven { data: { usuarios/equipos/camionetas: [...] } }
+            // Ambos servicios devuelven { data: { usuarios/camionetas: [...] } }
             const usuarios = usuariosData.data?.usuarios || [];
-            const equipos = equiposData.data?.equipos || [];
             const camionetas = camionetasData.data?.camionetas || [];
             setUsuarios(usuarios);
-            setEquipos(equipos);
             setCamionetas(camionetas);
         } catch (error) {
             console.error('Error al cargar datos:', error);

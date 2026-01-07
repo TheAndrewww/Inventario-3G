@@ -5,7 +5,6 @@ import { Button } from '../components/common';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import pedidosService from '../services/pedidos.service';
-import equiposService from '../services/equipos.service';
 import camionetasService from '../services/camionetas.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import articulosService from '../services/articulos.service';
@@ -65,8 +64,8 @@ const PedidoPage = () => {
       if (user?.rol === 'almacen') {
         try {
           setCargandoEquipos(true);
-          const response = await equiposService.obtenerTodos();
-          setEquipos(response.data.equipos || []);
+          const response = await camionetasService.obtenerTodos();
+          setEquipos(response.data.camionetas || []);
         } catch (error) {
           console.error('Error al cargar equipos:', error);
           toast.error('Error al cargar equipos');
