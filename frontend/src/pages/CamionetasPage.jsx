@@ -3,6 +3,7 @@ import { Truck, Plus, Edit, Trash2, Package } from 'lucide-react';
 import camionetasService from '../services/camionetas.service';
 import usuariosService from '../services/usuarios.service';
 import ubicacionesService from '../services/ubicaciones.service';
+import InventarioCamionetaModal from '../components/camionetas/InventarioCamionetaModal';
 import toast from 'react-hot-toast';
 
 const CamionetasPage = () => {
@@ -12,6 +13,8 @@ const CamionetasPage = () => {
   const [cargando, setCargando] = useState(false);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [camionetaEditando, setCamionetaEditando] = useState(null);
+  const [mostrarInventario, setMostrarInventario] = useState(false);
+  const [camionetaInventario, setCamionetaInventario] = useState(null);
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
@@ -99,6 +102,16 @@ const CamionetasPage = () => {
       tipo_camioneta: 'general',
       almacen_base_id: ''
     });
+  };
+
+  const abrirInventario = (camioneta) => {
+    setCamionetaInventario(camioneta);
+    setMostrarInventario(true);
+  };
+
+  const cerrarInventario = () => {
+    setMostrarInventario(false);
+    setCamionetaInventario(null);
   };
 
   const handleSubmit = async (e) => {
@@ -261,20 +274,29 @@ const CamionetasPage = () => {
                 )}
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
                 <button
-                  onClick={() => abrirModalEditar(camioneta)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  onClick={() => abrirInventario(camioneta)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  <Edit size={16} />
-                  Editar
+                  <Package size={16} />
+                  Ver Inventario
                 </button>
-                <button
-                  onClick={() => handleEliminar(camioneta.id)}
-                  className="flex items-center justify-center gap-2 px-3 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => abrirModalEditar(camioneta)}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <Edit size={16} />
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleEliminar(camioneta.id)}
+                    className="flex items-center justify-center gap-2 px-3 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -424,6 +446,14 @@ const CamionetasPage = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal de inventario */}
+      {mostrarInventario && (
+        <InventarioCamionetaModal
+          camioneta={camionetaInventario}
+          onClose={cerrarInventario}
+        />
       )}
     </div>
   );

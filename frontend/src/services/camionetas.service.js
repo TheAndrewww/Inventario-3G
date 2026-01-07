@@ -63,6 +63,12 @@ const camionetasService = {
   obtenerInventario: async (camionetaId) => {
     const response = await api.get(`/camionetas/${camionetaId}/inventario`);
     return response.data;
+  },
+
+  // Obtener resumen de inventario (inventario actual vs stock mínimo)
+  obtenerResumenInventario: async (camionetaId) => {
+    const response = await api.get(`/camionetas/${camionetaId}/resumen-inventario`);
+    return response.data;
   }
 };
 
