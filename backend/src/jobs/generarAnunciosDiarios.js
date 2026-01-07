@@ -55,13 +55,13 @@ async function generarAnunciosDelDia() {
   console.log(`📅 Generando anuncios para: ${dia} de ${mes} (${fechaStr})`);
 
   // Paso 1: Verificar si ya existen anuncios para hoy
-  const anunciosExistentes = await db.query(
+  const [anunciosExistentes] = await db.query(
     'SELECT COUNT(*) as count FROM anuncios WHERE fecha = $1',
     [fechaStr]
   );
 
-  if (parseInt(anunciosExistentes.rows[0].count) > 0) {
-    console.log(`⚠️ Ya existen ${anunciosExistentes.rows[0].count} anuncios para hoy`);
+  if (parseInt(anunciosExistentes[0].count) > 0) {
+    console.log(`⚠️ Ya existen ${anunciosExistentes[0].count} anuncios para hoy`);
     console.log('   Saltando generación automática');
     return;
   }
@@ -121,7 +121,7 @@ async function generarAnunciosDelDia() {
       const imagenUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1763171532/logo_web_blanco_j8xeyh.png';
 
       // Guardar en base de datos
-      const result = await db.query(`
+      const [result] = await db.query(`
         INSERT INTO anuncios (
           fecha,
           frase,
@@ -140,8 +140,8 @@ async function generarAnunciosDelDia() {
         proyecto.equipoHora
       ]);
 
-      anunciosCreados.push(result.rows[0]);
-      console.log(`      ✅ Anuncio ID ${result.rows[0].id} creado`);
+      anunciosCreados.push(result[0]);
+      console.log(`      ✅ Anuncio ID ${result[0].id} creado`);
 
     } catch (error) {
       console.error(`      ❌ Error al crear anuncio: ${error.message}`);

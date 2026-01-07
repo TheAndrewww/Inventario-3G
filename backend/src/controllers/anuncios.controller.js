@@ -33,12 +33,12 @@ export const obtenerAnunciosActivos = async (req, res) => {
       ORDER BY fecha DESC, created_at DESC
     `;
 
-    const result = await db.query(query);
+    const [results] = await db.query(query);
 
     res.json({
       success: true,
-      data: result.rows,
-      total: result.rows.length
+      data: results,
+      total: results.length
     });
 
   } catch (error) {
@@ -73,10 +73,10 @@ export const obtenerAnunciosHoy = async (req, res) => {
       ORDER BY created_at DESC
     `;
 
-    const result = await db.query(query);
+    const [results] = await db.query(query);
 
     // Si no hay anuncios de hoy, devolver los más recientes
-    if (result.rows.length === 0) {
+    if (results.length === 0) {
       const queryRecientes = `
         SELECT
           id,
@@ -93,20 +93,20 @@ export const obtenerAnunciosHoy = async (req, res) => {
         LIMIT 5
       `;
 
-      const resultRecientes = await db.query(queryRecientes);
+      const [resultsRecientes] = await db.query(queryRecientes);
 
       return res.json({
         success: true,
-        data: resultRecientes.rows,
-        total: resultRecientes.rows.length,
+        data: resultsRecientes,
+        total: resultsRecientes.length,
         mensaje: 'No hay anuncios de hoy, mostrando recientes'
       });
     }
 
     res.json({
       success: true,
-      data: result.rows,
-      total: result.rows.length
+      data: results,
+      total: results.length
     });
 
   } catch (error) {
@@ -158,12 +158,12 @@ export const generarAnuncioManual = async (req, res) => {
     const fechaAnuncio = fecha || new Date().toISOString().split('T')[0];
     const values = [fechaAnuncio, frase, imagenUrl, proyectoNombre, equipo, 'manual'];
 
-    const result = await db.query(query, values);
+    const [result] = await db.query(query, values);
 
     res.json({
       success: true,
       data: {
-        anuncio: result.rows[0],
+        anuncio: result[0],
         descripcionIA: descripcion
       },
       message: 'Anuncio generado exitosamente'
@@ -235,8 +235,8 @@ export const generarAnunciosDesdeCalendario = async (req, res) => {
         'proyecto'
       ];
 
-      const result = await db.query(query, values);
-      anunciosGenerados.push(result.rows[0]);
+      const [result] = await db.query(query, values);
+      anunciosGenerados.push(result[0]);
     }
 
     res.json({
@@ -290,9 +290,9 @@ export const desactivarAnuncio = async (req, res) => {
     const { id } = req.params;
 
     const query = 'UPDATE anuncios SET activo = false WHERE id = $1 RETURNING *';
-    const result = await db.query(query, [id]);
+    const [result] = await db.query(query, [id]);
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Anuncio no encontrado'
@@ -301,7 +301,7 @@ export const desactivarAnuncio = async (req, res) => {
 
     res.json({
       success: true,
-      data: result.rows[0],
+      data: result[0],
       message: 'Anuncio desactivado'
     });
 
@@ -331,11 +331,11 @@ export const obtenerEstadisticas = async (req, res) => {
       FROM anuncios
     `;
 
-    const result = await db.query(query);
+    const [result] = await db.query(query);
 
     res.json({
       success: true,
-      data: result.rows[0]
+      data: result[0]
     });
 
   } catch (error) {
