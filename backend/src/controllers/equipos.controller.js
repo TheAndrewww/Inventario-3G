@@ -1,4 +1,4 @@
-import { Equipo, Usuario } from '../models/index.js';
+import { Equipo, Usuario, Ubicacion } from '../models/index.js';
 
 // Obtener todos los equipos
 export const obtenerEquipos = async (req, res) => {
@@ -7,8 +7,14 @@ export const obtenerEquipos = async (req, res) => {
             include: [
                 {
                     model: Usuario,
-                    as: 'supervisor',
+                    as: 'encargado',
                     attributes: ['id', 'nombre', 'email', 'puesto']
+                },
+                {
+                    model: Ubicacion,
+                    as: 'almacenBase',
+                    attributes: ['id', 'codigo', 'almacen', 'descripcion'],
+                    required: false
                 }
             ],
             order: [['nombre', 'ASC']]
@@ -36,8 +42,14 @@ export const obtenerEquipoPorId = async (req, res) => {
             include: [
                 {
                     model: Usuario,
-                    as: 'supervisor',
+                    as: 'encargado',
                     attributes: ['id', 'nombre', 'email', 'puesto']
+                },
+                {
+                    model: Ubicacion,
+                    as: 'almacenBase',
+                    attributes: ['id', 'codigo', 'almacen', 'descripcion'],
+                    required: false
                 }
             ]
         });
@@ -65,18 +77,18 @@ export const obtenerEquipoPorId = async (req, res) => {
 // Crear un equipo
 export const crearEquipo = async (req, res) => {
     try {
-        const { nombre, descripcion, supervisor_id } = req.body;
+        const { nombre, descripcion, encargado_id, matricula, tipo_camioneta, almacen_base_id } = req.body;
 
         // Validaciones
-        if (!nombre || !supervisor_id) {
+        if (!nombre || !encargado_id) {
             return res.status(400).json({
                 success: false,
-                message: 'El nombre y supervisor_id son requeridos'
+                message: 'El nombre y encargado_id son requeridos'
             });
         }
 
         // Verificar que el encargado existe y tiene rol de encargado
-        const encargado = await Usuario.findByPk(supervisor_id);
+        const encargado = await Usuario.findByPk(encargado_id);
         if (!encargado) {
             return res.status(404).json({
                 success: false,
@@ -94,7 +106,7 @@ export const crearEquipo = async (req, res) => {
         // Verificar que el encargado no esté ya asignado a otro equipo activo
         const equipoExistente = await Equipo.findOne({
             where: {
-                supervisor_id,
+                encargado_id,
                 activo: true
             }
         });
@@ -109,15 +121,24 @@ export const crearEquipo = async (req, res) => {
         const equipo = await Equipo.create({
             nombre,
             descripcion,
-            supervisor_id
+            encargado_id,
+            matricula,
+            tipo_camioneta: tipo_camioneta || 'general',
+            almacen_base_id
         });
 
         const equipoCompleto = await Equipo.findByPk(equipo.id, {
             include: [
                 {
                     model: Usuario,
-                    as: 'supervisor',
+                    as: 'encargado',
                     attributes: ['id', 'nombre', 'email', 'puesto']
+                },
+                {
+                    model: Ubicacion,
+                    as: 'almacenBase',
+                    attributes: ['id', 'codigo', 'almacen', 'descripcion'],
+                    required: false
                 }
             ]
         });
@@ -140,7 +161,7 @@ export const crearEquipo = async (req, res) => {
 export const actualizarEquipo = async (req, res) => {
     try {
         const { id } = req.params;
-        const { nombre, descripcion, supervisor_id, activo } = req.body;
+        const { nombre, descripcion, encargado_id, activo, matricula, tipo_camioneta, almacen_base_id } = req.body;
 
         const equipo = await Equipo.findByPk(id);
         if (!equipo) {
@@ -151,8 +172,8 @@ export const actualizarEquipo = async (req, res) => {
         }
 
         // Si se va a cambiar el encargado, validar
-        if (supervisor_id && supervisor_id !== equipo.supervisor_id) {
-            const encargado = await Usuario.findByPk(supervisor_id);
+        if (encargado_id && encargado_id !== equipo.encargado_id) {
+            const encargado = await Usuario.findByPk(encargado_id);
             if (!encargado) {
                 return res.status(404).json({
                     success: false,
@@ -170,7 +191,7 @@ export const actualizarEquipo = async (req, res) => {
             // Verificar que el encargado no esté ya asignado a otro equipo activo
             const equipoExistente = await Equipo.findOne({
                 where: {
-                    supervisor_id,
+                    encargado_id,
                     activo: true
                 }
             });
@@ -186,16 +207,25 @@ export const actualizarEquipo = async (req, res) => {
         await equipo.update({
             nombre: nombre || equipo.nombre,
             descripcion: descripcion !== undefined ? descripcion : equipo.descripcion,
-            supervisor_id: supervisor_id || equipo.supervisor_id,
-            activo: activo !== undefined ? activo : equipo.activo
+            encargado_id: encargado_id || equipo.encargado_id,
+            activo: activo !== undefined ? activo : equipo.activo,
+            matricula: matricula !== undefined ? matricula : equipo.matricula,
+            tipo_camioneta: tipo_camioneta || equipo.tipo_camioneta,
+            almacen_base_id: almacen_base_id !== undefined ? almacen_base_id : equipo.almacen_base_id
         });
 
         const equipoActualizado = await Equipo.findByPk(id, {
             include: [
                 {
                     model: Usuario,
-                    as: 'supervisor',
+                    as: 'encargado',
                     attributes: ['id', 'nombre', 'email', 'puesto']
+                },
+                {
+                    model: Ubicacion,
+                    as: 'almacenBase',
+                    attributes: ['id', 'codigo', 'almacen', 'descripcion'],
+                    required: false
                 }
             ]
         });
