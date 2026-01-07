@@ -9,7 +9,8 @@ import {
     obtenerStockMinimo,
     configurarStockMinimo,
     eliminarStockMinimo,
-    obtenerInventarioCamioneta
+    obtenerInventarioCamioneta,
+    obtenerResumenInventario
 } from '../controllers/camionetas.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -51,5 +52,8 @@ router.delete('/:id/stock-minimo/:stockId', verificarRol('administrador', 'encar
 
 // GET /api/camionetas/:id/inventario - Obtener inventario actual de la camioneta
 router.get('/:id/inventario', obtenerInventarioCamioneta);
+
+// GET /api/camionetas/:id/resumen-inventario - Obtener resumen comparando inventario actual vs stock mínimo
+router.get('/:id/resumen-inventario', obtenerResumenInventario);
 
 export default router;

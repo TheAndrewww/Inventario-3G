@@ -581,3 +581,161 @@ export const obtenerInventarioCamioneta = async (req, res) => {
         });
     }
 };
+
+// Obtener resumen de inventario vs stock mínimo
+export const obtenerResumenInventario = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Verificar que la camioneta existe
+        const camioneta = await Camioneta.findByPk(id, {
+            include: [
+                {
+                    model: Usuario,
+                    as: 'encargado',
+                    attributes: ['id', 'nombre', 'email']
+                }
+            ]
+        });
+
+        if (!camioneta) {
+            return res.status(404).json({
+                success: false,
+                message: 'Camioneta no encontrada'
+            });
+        }
+
+        // Obtener stock mínimo configurado
+        const stocksMinimos = await StockMinimoCamioneta.findAll({
+            where: { camioneta_id: id },
+            include: [
+                {
+                    model: TipoHerramientaRenta,
+                    as: 'tipoHerramienta',
+                    attributes: ['id', 'nombre', 'descripcion', 'prefijo_codigo']
+                }
+            ]
+        });
+
+        // Obtener inventario actual agrupado por tipo de herramienta
+        const unidades = await UnidadHerramientaRenta.findAll({
+            where: {
+                camioneta_id: id,
+                activo: true
+            },
+            include: [
+                {
+                    model: TipoHerramientaRenta,
+                    as: 'tipoHerramienta',
+                    attributes: ['id', 'nombre', 'descripcion', 'prefijo_codigo']
+                }
+            ]
+        });
+
+        // Contar unidades por tipo de herramienta
+        const inventarioActual = unidades.reduce((acc, unidad) => {
+            const tipoId = unidad.tipo_herramienta_id;
+            if (!acc[tipoId]) {
+                acc[tipoId] = {
+                    tipo_herramienta_id: tipoId,
+                    tipo_herramienta: unidad.tipoHerramienta,
+                    cantidad_actual: 0,
+                    unidades: []
+                };
+            }
+            acc[tipoId].cantidad_actual++;
+            acc[tipoId].unidades.push({
+                id: unidad.id,
+                codigo_unico: unidad.codigo_unico,
+                estado: unidad.estado,
+                observaciones: unidad.observaciones
+            });
+            return acc;
+        }, {});
+
+        // Crear resumen comparando stock mínimo con inventario actual
+        const resumen = stocksMinimos.map(stock => {
+            const inventario = inventarioActual[stock.tipo_herramienta_id] || {
+                tipo_herramienta_id: stock.tipo_herramienta_id,
+                tipo_herramienta: stock.tipoHerramienta,
+                cantidad_actual: 0,
+                unidades: []
+            };
+
+            const cantidad_minima = stock.cantidad_minima;
+            const cantidad_actual = inventario.cantidad_actual;
+            const faltante = Math.max(0, cantidad_minima - cantidad_actual);
+            const estado = cantidad_actual >= cantidad_minima ? 'completo' :
+                          cantidad_actual > 0 ? 'incompleto' : 'vacio';
+
+            return {
+                tipo_herramienta: {
+                    id: stock.tipoHerramienta.id,
+                    nombre: stock.tipoHerramienta.nombre,
+                    descripcion: stock.tipoHerramienta.descripcion,
+                    prefijo_codigo: stock.tipoHerramienta.prefijo_codigo
+                },
+                cantidad_minima,
+                cantidad_actual,
+                faltante,
+                estado,
+                observaciones_config: stock.observaciones,
+                unidades: inventario.unidades
+            };
+        });
+
+        // Agregar tipos de herramientas que están en el inventario pero no tienen stock mínimo configurado
+        Object.values(inventarioActual).forEach(inventario => {
+            const yaExiste = resumen.find(r => r.tipo_herramienta.id === inventario.tipo_herramienta_id);
+            if (!yaExiste) {
+                resumen.push({
+                    tipo_herramienta: {
+                        id: inventario.tipo_herramienta.id,
+                        nombre: inventario.tipo_herramienta.nombre,
+                        descripcion: inventario.tipo_herramienta.descripcion,
+                        prefijo_codigo: inventario.tipo_herramienta.prefijo_codigo
+                    },
+                    cantidad_minima: 0,
+                    cantidad_actual: inventario.cantidad_actual,
+                    faltante: 0,
+                    estado: 'sin_configurar',
+                    observaciones_config: null,
+                    unidades: inventario.unidades
+                });
+            }
+        });
+
+        // Ordenar por nombre de tipo de herramienta
+        resumen.sort((a, b) => a.tipo_herramienta.nombre.localeCompare(b.tipo_herramienta.nombre));
+
+        // Calcular estadísticas generales
+        const estadisticas = {
+            total_tipos_configurados: stocksMinimos.length,
+            tipos_completos: resumen.filter(r => r.estado === 'completo').length,
+            tipos_incompletos: resumen.filter(r => r.estado === 'incompleto').length,
+            tipos_vacios: resumen.filter(r => r.estado === 'vacio').length,
+            tipos_sin_configurar: resumen.filter(r => r.estado === 'sin_configurar').length,
+            total_unidades: unidades.length
+        };
+
+        res.status(200).json({
+            success: true,
+            data: {
+                camioneta: {
+                    id: camioneta.id,
+                    nombre: camioneta.nombre,
+                    matricula: camioneta.matricula,
+                    encargado: camioneta.encargado
+                },
+                resumen,
+                estadisticas
+            }
+        });
+    } catch (error) {
+        console.error('Error al obtener resumen de inventario:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener resumen de inventario'
+        });
+    }
+};
