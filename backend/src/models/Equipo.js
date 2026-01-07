@@ -17,14 +17,38 @@ const Equipo = sequelize.define('Equipo', {
         allowNull: true,
         comment: 'Descripción del equipo y sus funciones'
     },
-    supervisor_id: {
+    matricula: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        unique: true,
+        comment: 'Matrícula o placa del vehículo'
+    },
+    tipo_camioneta: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        defaultValue: 'general',
+        validate: {
+            isIn: [['instalacion', 'mantenimiento', 'supervision', 'general']]
+        },
+        comment: 'Tipo de trabajo que realiza la camioneta'
+    },
+    almacen_base_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'ubicaciones',
+            key: 'id'
+        },
+        comment: 'Almacén base donde se estaciona la camioneta'
+    },
+    encargado_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
             model: 'usuarios',
             key: 'id'
         },
-        comment: 'Supervisor responsable del equipo'
+        comment: 'Encargado responsable de la camioneta (antes supervisor)'
     },
     activo: {
         type: DataTypes.BOOLEAN,
@@ -32,8 +56,11 @@ const Equipo = sequelize.define('Equipo', {
         comment: 'Si el equipo está activo'
     }
 }, {
-    tableName: 'equipos',
-    timestamps: true
+    tableName: 'camionetas',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+    underscored: true
 });
 
 export default Equipo;

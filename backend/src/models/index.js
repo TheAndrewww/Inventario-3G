@@ -156,14 +156,24 @@ Usuario.hasMany(DetalleMovimiento, {
     as: 'detalles_dispersados'
 });
 
-// Equipo - Usuario (Muchos a Uno) - Supervisor del equipo
+// Equipo - Usuario (Muchos a Uno) - Encargado del equipo (ahora camioneta)
 Equipo.belongsTo(Usuario, {
-    foreignKey: 'supervisor_id',
-    as: 'supervisor'
+    foreignKey: 'encargado_id',
+    as: 'encargado'
 });
 Usuario.hasMany(Equipo, {
-    foreignKey: 'supervisor_id',
-    as: 'equipos_supervisados'
+    foreignKey: 'encargado_id',
+    as: 'equipos_a_cargo'
+});
+
+// Equipo - Ubicacion (Muchos a Uno) - Almacén base del equipo/camioneta
+Equipo.belongsTo(Ubicacion, {
+    foreignKey: 'almacen_base_id',
+    as: 'almacenBase'
+});
+Ubicacion.hasMany(Equipo, {
+    foreignKey: 'almacen_base_id',
+    as: 'equipos'
 });
 
 // Movimiento - Equipo (Muchos a Uno) - Equipo al que se asigna el pedido
