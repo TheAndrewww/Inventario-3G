@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Plus, Edit, Trash2, Package } from 'lucide-react';
+import { Truck, Plus, Edit, Trash2, Package, Settings } from 'lucide-react';
 import camionetasService from '../services/camionetas.service';
 import usuariosService from '../services/usuarios.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import InventarioCamionetaModal from '../components/camionetas/InventarioCamionetaModal';
+import ConfigurarStockMinimoModal from '../components/camionetas/ConfigurarStockMinimoModal';
 import toast from 'react-hot-toast';
 
 const CamionetasPage = () => {
@@ -15,6 +16,8 @@ const CamionetasPage = () => {
   const [camionetaEditando, setCamionetaEditando] = useState(null);
   const [mostrarInventario, setMostrarInventario] = useState(false);
   const [camionetaInventario, setCamionetaInventario] = useState(null);
+  const [mostrarConfiguracion, setMostrarConfiguracion] = useState(false);
+  const [camionetaConfiguracion, setCamionetaConfiguracion] = useState(null);
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
@@ -112,6 +115,16 @@ const CamionetasPage = () => {
   const cerrarInventario = () => {
     setMostrarInventario(false);
     setCamionetaInventario(null);
+  };
+
+  const abrirConfiguracion = (camioneta) => {
+    setCamionetaConfiguracion(camioneta);
+    setMostrarConfiguracion(true);
+  };
+
+  const cerrarConfiguracion = () => {
+    setMostrarConfiguracion(false);
+    setCamionetaConfiguracion(null);
   };
 
   const handleSubmit = async (e) => {
@@ -275,13 +288,22 @@ const CamionetasPage = () => {
               </div>
 
               <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => abrirInventario(camioneta)}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Package size={16} />
-                  Ver Inventario
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => abrirInventario(camioneta)}
+                    className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Package size={16} />
+                    Inventario
+                  </button>
+                  <button
+                    onClick={() => abrirConfiguracion(camioneta)}
+                    className="flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    <Settings size={16} />
+                    Configurar
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => abrirModalEditar(camioneta)}
@@ -453,6 +475,15 @@ const CamionetasPage = () => {
         <InventarioCamionetaModal
           camioneta={camionetaInventario}
           onClose={cerrarInventario}
+        />
+      )}
+
+      {/* Modal de configuración de stock mínimo */}
+      {mostrarConfiguracion && (
+        <ConfigurarStockMinimoModal
+          camioneta={camionetaConfiguracion}
+          onClose={cerrarConfiguracion}
+          onActualizar={cargarCamionetas}
         />
       )}
     </div>
