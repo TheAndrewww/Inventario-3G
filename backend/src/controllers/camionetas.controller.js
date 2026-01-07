@@ -13,7 +13,7 @@ export const obtenerCamionetas = async (req, res) => {
                 {
                     model: Ubicacion,
                     as: 'almacenBase',
-                    attributes: ['id', 'nombre', 'descripcion'],
+                    attributes: ['id', 'codigo', 'almacen', 'descripcion'],
                     required: false
                 }
             ],
@@ -48,7 +48,7 @@ export const obtenerCamionetaPorId = async (req, res) => {
                 {
                     model: Ubicacion,
                     as: 'almacenBase',
-                    attributes: ['id', 'nombre', 'descripcion'],
+                    attributes: ['id', 'codigo', 'almacen', 'descripcion'],
                     required: false
                 }
             ]
@@ -171,7 +171,7 @@ export const crearCamioneta = async (req, res) => {
                 {
                     model: Ubicacion,
                     as: 'almacenBase',
-                    attributes: ['id', 'nombre', 'descripcion'],
+                    attributes: ['id', 'codigo', 'almacen', 'descripcion'],
                     required: false
                 }
             ]
@@ -292,7 +292,7 @@ export const actualizarCamioneta = async (req, res) => {
                 {
                     model: Ubicacion,
                     as: 'almacenBase',
-                    attributes: ['id', 'nombre', 'descripcion'],
+                    attributes: ['id', 'codigo', 'almacen', 'descripcion'],
                     required: false
                 }
             ]
@@ -360,7 +360,7 @@ export const obtenerCamionetasPorEncargado = async (req, res) => {
                 {
                     model: Ubicacion,
                     as: 'almacenBase',
-                    attributes: ['id', 'nombre', 'descripcion'],
+                    attributes: ['id', 'codigo', 'almacen', 'descripcion'],
                     required: false
                 }
             ],
