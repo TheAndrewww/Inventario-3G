@@ -363,17 +363,20 @@ export const obtenerUnidadesPorTipo = async (req, res) => {
                 {
                     model: TipoHerramientaRenta,
                     as: 'tipoHerramienta',
-                    attributes: ['id', 'nombre', 'prefijo_codigo']
+                    attributes: ['id', 'nombre', 'prefijo_codigo'],
+                    required: false
                 },
                 {
                     model: Usuario,
                     as: 'usuarioAsignado',
-                    attributes: ['id', 'nombre', 'email']
+                    attributes: ['id', 'nombre', 'email'],
+                    required: false
                 },
                 {
                     model: Equipo,
                     as: 'equipoAsignado',
-                    attributes: ['id', 'nombre']
+                    attributes: ['id', 'nombre'],
+                    required: false
                 }
             ],
             order: [['codigo_unico', 'ASC']]
@@ -387,7 +390,8 @@ export const obtenerUnidadesPorTipo = async (req, res) => {
         console.error('Error al obtener unidades:', error);
         res.status(500).json({
             success: false,
-            message: 'Error al obtener unidades'
+            message: 'Error al obtener unidades',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };
