@@ -501,15 +501,15 @@ export const obtenerUnidadesPorArticulo = async (req, res) => {
 // ============ CONTROLADORES - ASIGNACIÓN ============
 
 /**
- * Asignar herramienta a usuario o equipo
+ * Asignar herramienta a usuario o camioneta
  * POST /api/herramientas-renta/asignar
- * Body: { unidad_id, usuario_id?, equipo_id?, observaciones? }
+ * Body: { unidad_id, usuario_id?, camioneta_id?, observaciones? }
  */
 export const asignarHerramienta = async (req, res) => {
     const transaction = await sequelize.transaction();
 
     try {
-        const { unidad_id, usuario_id, equipo_id, observaciones, fecha_vencimiento } = req.body;
+        const { unidad_id, usuario_id, camioneta_id, observaciones, fecha_vencimiento } = req.body;
         const usuario_registrador_id = req.usuario.id;
 
         // Validaciones
@@ -520,10 +520,10 @@ export const asignarHerramienta = async (req, res) => {
             });
         }
 
-        if (!usuario_id && !equipo_id) {
+        if (!usuario_id && !camioneta_id) {
             return res.status(400).json({
                 success: false,
-                message: 'Debe asignar a un usuario o equipo'
+                message: 'Debe asignar a un usuario o camioneta'
             });
         }
 
@@ -537,41 +537,57 @@ export const asignarHerramienta = async (req, res) => {
             });
         }
 
-        // Verificar disponibilidad usando el nuevo campo estatus
-        if (unidad.estatus === 'asignado') {
+        // Verificar disponibilidad usando el campo estado existente
+        if (unidad.estado === 'asignada') {
             return res.status(400).json({
                 success: false,
                 message: `La unidad ya está asignada`
             });
         }
 
-        // Actualizar la unidad - Solo cambiar estatus, preservar condicion
-        await unidad.update({
-            estatus: 'asignado',
-            estado: 'asignada', // DEPRECATED: mantener para compatibilidad
-            usuario_asignado_id: usuario_id || null,
-            equipo_asignado_id: equipo_id || null,
+        // Preparar datos de actualización
+        const updateData = {
+            estado: 'asignada',
             fecha_asignacion: new Date(),
             fecha_vencimiento_asignacion: fecha_vencimiento || null
-        }, { transaction });
+        };
+
+        // Asignación a usuario
+        if (usuario_id) {
+            updateData.usuario_asignado_id = usuario_id;
+            updateData.ubicacion_actual = 'empleado';
+            updateData.camioneta_id = null;
+        }
+        // Asignación a camioneta
+        else if (camioneta_id) {
+            updateData.camioneta_id = camioneta_id;
+            updateData.ubicacion_actual = 'camioneta';
+            updateData.usuario_asignado_id = null;
+        }
+
+        // Actualizar la unidad
+        await unidad.update(updateData, { transaction });
 
         // Registrar en el historial
         await HistorialAsignacionHerramienta.create({
             unidad_herramienta_id: unidad_id,
-            usuario_id,
-            equipo_id,
+            usuario_id: usuario_id || null,
             tipo_movimiento: 'asignacion',
             fecha_asignacion: new Date(),
-            observaciones,
+            observaciones: camioneta_id
+                ? `Asignada a camioneta ID: ${camioneta_id}. ${observaciones || ''}`
+                : observaciones,
             registrado_por_usuario_id: usuario_registrador_id
         }, { transaction });
 
         // Actualizar contadores del tipo
         const tipo = await TipoHerramientaRenta.findByPk(unidad.tipo_herramienta_id);
-        await tipo.update({
-            unidades_disponibles: tipo.unidades_disponibles - 1,
-            unidades_asignadas: tipo.unidades_asignadas + 1
-        }, { transaction });
+        if (tipo) {
+            await tipo.update({
+                unidades_disponibles: Math.max(0, (tipo.unidades_disponibles || 0) - 1),
+                unidades_asignadas: (tipo.unidades_asignadas || 0) + 1
+            }, { transaction });
+        }
 
         await transaction.commit();
 
@@ -580,15 +596,13 @@ export const asignarHerramienta = async (req, res) => {
             include: [
                 {
                     model: Usuario,
-                    as: 'usuarioAsignado'
-                },
-                {
-                    model: Equipo,
-                    as: 'equipoAsignado'
+                    as: 'usuarioAsignado',
+                    required: false
                 },
                 {
                     model: TipoHerramientaRenta,
-                    as: 'tipoHerramienta'
+                    as: 'tipoHerramienta',
+                    required: false
                 }
             ]
         });
@@ -603,7 +617,8 @@ export const asignarHerramienta = async (req, res) => {
         console.error('Error al asignar herramienta:', error);
         res.status(500).json({
             success: false,
-            message: 'Error al asignar herramienta'
+            message: 'Error al asignar herramienta',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };

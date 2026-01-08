@@ -434,11 +434,11 @@ const RentaHerramientasPage = () => {
                                                                                 {unidad.usuarioAsignado.nombre}
                                                                             </span>
                                                                         </>
-                                                                    ) : unidad.equipoAsignado ? (
+                                                                    ) : unidad.camioneta ? (
                                                                         <>
-                                                                            <Users size={14} className="text-blue-600" />
+                                                                            <Package size={14} className="text-blue-600" />
                                                                             <span className="text-blue-900 font-medium">
-                                                                                {unidad.equipoAsignado.nombre}
+                                                                                Camioneta: {unidad.camioneta.nombre}
                                                                             </span>
                                                                         </>
                                                                     ) : null}
@@ -583,9 +583,8 @@ const RentaHerramientasPage = () => {
 
 // Modal para asignar herramienta
 const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
-    const [tipoAsignacion, setTipoAsignacion] = useState('usuario'); // 'usuario' o 'equipo'
+    const [tipoAsignacion, setTipoAsignacion] = useState('usuario'); // 'usuario' o 'camioneta'
     const [usuarioSeleccionado, setUsuarioSeleccionado] = useState('');
-    const [equipoSeleccionado, setEquipoSeleccionado] = useState('');
     const [observaciones, setObservaciones] = useState('');
     const [fechaVencimiento, setFechaVencimiento] = useState('');
     const [usuarios, setUsuarios] = useState([]);
@@ -622,11 +621,6 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
             return;
         }
 
-        if (tipoAsignacion === 'equipo' && !equipoSeleccionado) {
-            toast.error('Selecciona un equipo');
-            return;
-        }
-
         if (tipoAsignacion === 'camioneta' && !camionetaSeleccionada) {
             toast.error('Selecciona una camioneta');
             return;
@@ -638,7 +632,6 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
             await herramientasRentaService.asignarHerramienta({
                 unidad_id: unidad.id,
                 usuario_id: tipoAsignacion === 'usuario' ? parseInt(usuarioSeleccionado) : undefined,
-                equipo_id: tipoAsignacion === 'equipo' ? parseInt(equipoSeleccionado) : undefined,
                 camioneta_id: tipoAsignacion === 'camioneta' ? parseInt(camionetaSeleccionada) : undefined,
                 observaciones: observaciones.trim() || undefined,
                 fecha_vencimiento: fechaVencimiento || undefined
@@ -684,16 +677,6 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
                         <label className="flex items-center">
                             <input
                                 type="radio"
-                                value="equipo"
-                                checked={tipoAsignacion === 'equipo'}
-                                onChange={(e) => setTipoAsignacion(e.target.value)}
-                                className="mr-2"
-                            />
-                            Equipo
-                        </label>
-                        <label className="flex items-center">
-                            <input
-                                type="radio"
                                 value="camioneta"
                                 checked={tipoAsignacion === 'camioneta'}
                                 onChange={(e) => setTipoAsignacion(e.target.value)}
@@ -719,27 +702,6 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
                             {usuarios.filter(u => u.activo).map(usuario => (
                                 <option key={usuario.id} value={usuario.id}>
                                     {usuario.nombre} - {usuario.puesto || usuario.rol}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-
-                {tipoAsignacion === 'equipo' && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Equipo *
-                        </label>
-                        <select
-                            value={equipoSeleccionado}
-                            onChange={(e) => setEquipoSeleccionado(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                            required
-                        >
-                            <option value="">Seleccionar equipo...</option>
-                            {equipos.filter(e => e.activo).map(equipo => (
-                                <option key={equipo.id} value={equipo.id}>
-                                    {equipo.nombre} - {equipo.encargado?.nombre || 'Sin encargado'}
                                 </option>
                             ))}
                         </select>
@@ -850,9 +812,9 @@ const ModalDevolver = ({ isOpen, unidad, onClose, onSuccess }) => {
                             <strong>Asignado a:</strong> {unidad.usuarioAsignado.nombre}
                         </p>
                     )}
-                    {unidad.equipoAsignado && (
+                    {unidad.camioneta && (
                         <p className="text-sm text-green-800">
-                            <strong>Equipo:</strong> {unidad.equipoAsignado.nombre}
+                            <strong>Camioneta:</strong> {unidad.camioneta.nombre}
                         </p>
                     )}
                 </div>
