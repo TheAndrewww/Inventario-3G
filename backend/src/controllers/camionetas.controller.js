@@ -593,7 +593,8 @@ export const obtenerResumenInventario = async (req, res) => {
                 {
                     model: Usuario,
                     as: 'encargado',
-                    attributes: ['id', 'nombre', 'email']
+                    attributes: ['id', 'nombre', 'email'],
+                    required: false
                 }
             ]
         });
@@ -606,39 +607,55 @@ export const obtenerResumenInventario = async (req, res) => {
         }
 
         // Obtener stock mínimo configurado
-        const stocksMinimos = await StockMinimoCamioneta.findAll({
-            where: { camioneta_id: id },
-            include: [
-                {
-                    model: TipoHerramientaRenta,
-                    as: 'tipoHerramienta',
-                    attributes: ['id', 'nombre', 'descripcion', 'prefijo_codigo']
-                }
-            ]
-        });
+        let stocksMinimos = [];
+        try {
+            stocksMinimos = await StockMinimoCamioneta.findAll({
+                where: { camioneta_id: id },
+                include: [
+                    {
+                        model: TipoHerramientaRenta,
+                        as: 'tipoHerramienta',
+                        attributes: ['id', 'nombre', 'descripcion', 'prefijo_codigo'],
+                        required: false
+                    }
+                ]
+            });
+        } catch (stockError) {
+            console.error('Error al obtener stock mínimo:', stockError.message);
+            // Continuar con array vacío
+        }
 
         // Obtener inventario actual agrupado por tipo de herramienta
-        const unidades = await UnidadHerramientaRenta.findAll({
-            where: {
-                camioneta_id: id,
-                activo: true
-            },
-            include: [
-                {
-                    model: TipoHerramientaRenta,
-                    as: 'tipoHerramienta',
-                    attributes: ['id', 'nombre', 'descripcion', 'prefijo_codigo']
-                }
-            ]
-        });
+        let unidades = [];
+        try {
+            unidades = await UnidadHerramientaRenta.findAll({
+                where: {
+                    camioneta_id: id,
+                    activo: true
+                },
+                include: [
+                    {
+                        model: TipoHerramientaRenta,
+                        as: 'tipoHerramienta',
+                        attributes: ['id', 'nombre', 'descripcion', 'prefijo_codigo'],
+                        required: false
+                    }
+                ]
+            });
+        } catch (unidadesError) {
+            console.error('Error al obtener unidades:', unidadesError.message);
+            // Continuar con array vacío
+        }
 
         // Contar unidades por tipo de herramienta
         const inventarioActual = unidades.reduce((acc, unidad) => {
             const tipoId = unidad.tipo_herramienta_id;
+            if (!tipoId) return acc;
+
             if (!acc[tipoId]) {
                 acc[tipoId] = {
                     tipo_herramienta_id: tipoId,
-                    tipo_herramienta: unidad.tipoHerramienta,
+                    tipo_herramienta: unidad.tipoHerramienta || { id: tipoId, nombre: 'Sin tipo', descripcion: '', prefijo_codigo: '' },
                     cantidad_actual: 0,
                     unidades: []
                 };
@@ -647,53 +664,57 @@ export const obtenerResumenInventario = async (req, res) => {
             acc[tipoId].unidades.push({
                 id: unidad.id,
                 codigo_unico: unidad.codigo_unico,
-                estado: unidad.estado,
+                estado: unidad.estado || unidad.condicion || 'desconocido',
                 observaciones: unidad.observaciones
             });
             return acc;
         }, {});
 
         // Crear resumen comparando stock mínimo con inventario actual
-        const resumen = stocksMinimos.map(stock => {
-            const inventario = inventarioActual[stock.tipo_herramienta_id] || {
-                tipo_herramienta_id: stock.tipo_herramienta_id,
-                tipo_herramienta: stock.tipoHerramienta,
-                cantidad_actual: 0,
-                unidades: []
-            };
+        const resumen = stocksMinimos
+            .filter(stock => stock.tipoHerramienta) // Solo procesar los que tienen tipoHerramienta
+            .map(stock => {
+                const inventario = inventarioActual[stock.tipo_herramienta_id] || {
+                    tipo_herramienta_id: stock.tipo_herramienta_id,
+                    tipo_herramienta: stock.tipoHerramienta,
+                    cantidad_actual: 0,
+                    unidades: []
+                };
 
-            const cantidad_minima = stock.cantidad_minima;
-            const cantidad_actual = inventario.cantidad_actual;
-            const faltante = Math.max(0, cantidad_minima - cantidad_actual);
-            const estado = cantidad_actual >= cantidad_minima ? 'completo' :
-                          cantidad_actual > 0 ? 'incompleto' : 'vacio';
+                const cantidad_minima = stock.cantidad_minima || 0;
+                const cantidad_actual = inventario.cantidad_actual;
+                const faltante = Math.max(0, cantidad_minima - cantidad_actual);
+                const estado = cantidad_actual >= cantidad_minima ? 'completo' :
+                    cantidad_actual > 0 ? 'incompleto' : 'vacio';
 
-            return {
-                tipo_herramienta: {
-                    id: stock.tipoHerramienta.id,
-                    nombre: stock.tipoHerramienta.nombre,
-                    descripcion: stock.tipoHerramienta.descripcion,
-                    prefijo_codigo: stock.tipoHerramienta.prefijo_codigo
-                },
-                cantidad_minima,
-                cantidad_actual,
-                faltante,
-                estado,
-                observaciones_config: stock.observaciones,
-                unidades: inventario.unidades
-            };
-        });
+                return {
+                    tipo_herramienta: {
+                        id: stock.tipoHerramienta?.id || stock.tipo_herramienta_id,
+                        nombre: stock.tipoHerramienta?.nombre || 'Sin nombre',
+                        descripcion: stock.tipoHerramienta?.descripcion || '',
+                        prefijo_codigo: stock.tipoHerramienta?.prefijo_codigo || ''
+                    },
+                    cantidad_minima,
+                    cantidad_actual,
+                    faltante,
+                    estado,
+                    observaciones_config: stock.observaciones,
+                    unidades: inventario.unidades
+                };
+            });
 
         // Agregar tipos de herramientas que están en el inventario pero no tienen stock mínimo configurado
         Object.values(inventarioActual).forEach(inventario => {
-            const yaExiste = resumen.find(r => r.tipo_herramienta.id === inventario.tipo_herramienta_id);
+            if (!inventario.tipo_herramienta) return;
+
+            const yaExiste = resumen.find(r => r.tipo_herramienta?.id === inventario.tipo_herramienta_id);
             if (!yaExiste) {
                 resumen.push({
                     tipo_herramienta: {
-                        id: inventario.tipo_herramienta.id,
-                        nombre: inventario.tipo_herramienta.nombre,
-                        descripcion: inventario.tipo_herramienta.descripcion,
-                        prefijo_codigo: inventario.tipo_herramienta.prefijo_codigo
+                        id: inventario.tipo_herramienta?.id || inventario.tipo_herramienta_id,
+                        nombre: inventario.tipo_herramienta?.nombre || 'Sin nombre',
+                        descripcion: inventario.tipo_herramienta?.descripcion || '',
+                        prefijo_codigo: inventario.tipo_herramienta?.prefijo_codigo || ''
                     },
                     cantidad_minima: 0,
                     cantidad_actual: inventario.cantidad_actual,
@@ -705,8 +726,8 @@ export const obtenerResumenInventario = async (req, res) => {
             }
         });
 
-        // Ordenar por nombre de tipo de herramienta
-        resumen.sort((a, b) => a.tipo_herramienta.nombre.localeCompare(b.tipo_herramienta.nombre));
+        // Ordenar por nombre de tipo de herramienta (con manejo de nulos)
+        resumen.sort((a, b) => (a.tipo_herramienta?.nombre || '').localeCompare(b.tipo_herramienta?.nombre || ''));
 
         // Calcular estadísticas generales
         const estadisticas = {
@@ -735,7 +756,8 @@ export const obtenerResumenInventario = async (req, res) => {
         console.error('Error al obtener resumen de inventario:', error);
         res.status(500).json({
             success: false,
-            message: 'Error al obtener resumen de inventario'
+            message: 'Error al obtener resumen de inventario',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };
