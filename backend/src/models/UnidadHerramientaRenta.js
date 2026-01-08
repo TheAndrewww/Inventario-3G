@@ -33,15 +33,16 @@ const UnidadHerramientaRenta = sequelize.define('UnidadHerramientaRenta', {
         comment: 'Número de serie del fabricante (opcional)'
     },
     // ===== NUEVOS CAMPOS (Refactorización 2026-01-08) =====
+    // NOTA: allowNull: true para compatibilidad con producción hasta que las columnas existan
     condicion: {
         type: DataTypes.ENUM('bueno', 'regular', 'malo', 'perdido', 'baja'),
-        allowNull: false,
+        allowNull: true,
         defaultValue: 'bueno',
         comment: 'Condición física de la herramienta: bueno, regular, malo, perdido, baja'
     },
     estatus: {
         type: DataTypes.ENUM('disponible', 'asignado', 'en_reparacion', 'en_transito'),
-        allowNull: false,
+        allowNull: true,
         defaultValue: 'disponible',
         comment: 'Estatus de disponibilidad: disponible, asignado, en_reparacion, en_transito'
     },
