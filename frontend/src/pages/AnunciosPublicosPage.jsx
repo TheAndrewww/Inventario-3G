@@ -55,10 +55,10 @@ const AnunciosPublicosPage = () => {
   useEffect(() => {
     cargarAnuncios(false);
 
-    // Auto-refresh cada 1 minuto para detectar nuevos anuncios
+    // Auto-refresh cada hora para detectar nuevos anuncios
     const interval = setInterval(() => {
       cargarAnuncios(false);
-    }, 1 * 60 * 1000);
+    }, 60 * 60 * 1000);
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
