@@ -1,17 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import CarouselAnuncios from '../components/anuncios/CarouselAnuncios';
 import { obtenerAnunciosHoy, incrementarVistaAnuncio } from '../services/anuncios.service';
 import { toast, Toaster } from 'react-hot-toast';
+import { Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 
 /**
  * Página pública para mostrar anuncios en pantallas
  * Optimizada para pantallas completas y uso 24/7
+ * Incluye botón de fullscreen para Android TV
  */
 const AnunciosPublicosPage = () => {
   const [anuncios, setAnuncios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [ultimaActualizacion, setUltimaActualizacion] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showControls, setShowControls] = useState(true);
 
   // Cargar anuncios
   const cargarAnuncios = async (mostrarToast = false) => {
@@ -51,6 +55,65 @@ const AnunciosPublicosPage = () => {
     }
   };
 
+  // Toggle fullscreen
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+        toast.success('Pantalla completa activada');
+      }).catch(err => {
+        console.log('No se pudo activar pantalla completa:', err);
+        toast.error('No se pudo activar pantalla completa');
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+      }).catch(console.error);
+    }
+  }, []);
+
+  // Ocultar controles después de inactividad
+  useEffect(() => {
+    let timeout;
+
+    const handleMouseMove = () => {
+      setShowControls(true);
+      clearTimeout(timeout);
+      timeout = setTimeout(() => setShowControls(false), 5000);
+    };
+
+    // También mostrar controles con teclado (para controles remotos de TV)
+    const handleKeyDown = () => {
+      setShowControls(true);
+      clearTimeout(timeout);
+      timeout = setTimeout(() => setShowControls(false), 5000);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('touchstart', handleMouseMove);
+
+    // Inicialmente ocultar después de 5 segundos
+    timeout = setTimeout(() => setShowControls(false), 5000);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('touchstart', handleMouseMove);
+      clearTimeout(timeout);
+    };
+  }, []);
+
+  // Detectar cambios de fullscreen
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
   // Cargar anuncios al montar el componente
   useEffect(() => {
     cargarAnuncios(false);
@@ -62,22 +125,6 @@ const AnunciosPublicosPage = () => {
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Activar pantalla completa automáticamente
-  useEffect(() => {
-    const requestFullscreen = () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => {
-          console.log('No se pudo activar pantalla completa:', err);
-        });
-      }
-    };
-
-    // Intentar activar pantalla completa después de 1 segundo
-    const timer = setTimeout(requestFullscreen, 1000);
-
-    return () => clearTimeout(timer);
   }, []);
 
   if (loading && anuncios.length === 0) {
@@ -133,23 +180,48 @@ const AnunciosPublicosPage = () => {
 
       <div className="h-screen bg-black overflow-hidden relative">
         {/* Indicador de LIVE en la esquina */}
-        <div className="absolute top-4 right-4 z-50 bg-black/50 backdrop-blur-md text-white text-xs px-3 py-1 rounded-full border border-white/10 flex items-center gap-2">
+        <div className={`absolute top-4 right-4 z-50 bg-black/50 backdrop-blur-md text-white text-xs px-3 py-1 rounded-full border border-white/10 flex items-center gap-2 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
           <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
           LIVE DISPLAY
+        </div>
+
+        {/* Botones de control para Android TV */}
+        <div className={`absolute top-4 left-4 z-50 flex gap-2 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+          {/* Botón de pantalla completa */}
+          <button
+            onClick={toggleFullscreen}
+            className="bg-black/70 backdrop-blur-md text-white p-3 rounded-xl border border-white/20 hover:bg-black/90 hover:border-orange-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          >
+            {isFullscreen ? <Minimize2 size={28} /> : <Maximize2 size={28} />}
+          </button>
+
+          {/* Botón de refrescar */}
+          <button
+            onClick={() => cargarAnuncios(true)}
+            className="bg-black/70 backdrop-blur-md text-white p-3 rounded-xl border border-white/20 hover:bg-black/90 hover:border-orange-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            title="Actualizar anuncios"
+          >
+            <RefreshCw size={28} className={loading ? 'animate-spin' : ''} />
+          </button>
         </div>
 
         {/* Carousel de anuncios */}
         <CarouselAnuncios anuncios={anuncios} />
 
-        {/* Indicador de última actualización (oculto en producción) */}
-        {import.meta.env.DEV && ultimaActualizacion && (
-          <div className="absolute bottom-4 left-4 z-50 bg-black/50 backdrop-blur-md text-white text-xs px-3 py-1 rounded-lg">
-            Última actualización: {ultimaActualizacion.toLocaleTimeString('es-MX')}
-          </div>
-        )}
+        {/* Indicador de última actualización */}
+        <div className={`absolute bottom-4 left-4 z-50 bg-black/50 backdrop-blur-md text-white text-xs px-3 py-1 rounded-lg transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+          {ultimaActualizacion && (
+            <>Última actualización: {ultimaActualizacion.toLocaleTimeString('es-MX')}</>
+          )}
+          {anuncios.length > 0 && (
+            <span className="ml-2">• {anuncios.length} anuncios</span>
+          )}
+        </div>
       </div>
     </>
   );
 };
 
 export default AnunciosPublicosPage;
+
