@@ -1461,3 +1461,160 @@ export const sincronizarTodasLasUnidades = async (req, res) => {
         });
     }
 };
+
+/**
+ * GET /api/herramientas-renta/diagnostico
+ * Endpoint temporal para diagnosticar problemas en producción
+ * Muestra las columnas de la tabla y prueba queries básicas
+ */
+export const diagnosticarProblemas = async (req, res) => {
+    try {
+        const diagnostico = {
+            timestamp: new Date().toISOString(),
+            ambiente: process.env.NODE_ENV || 'unknown'
+        };
+
+        // 1. Verificar columnas de la tabla
+        try {
+            const [columnas] = await sequelize.query(`
+                SELECT column_name, data_type, is_nullable, column_default
+                FROM information_schema.columns
+                WHERE table_name = 'unidades_herramienta_renta'
+                ORDER BY ordinal_position
+            `);
+            diagnostico.columnas = columnas;
+        } catch (e) {
+            diagnostico.error_columnas = e.message;
+        }
+
+        // 2. Probar query simple sin includes
+        try {
+            const unidadesSimple = await UnidadHerramientaRenta.findAll({
+                where: { activo: true },
+                limit: 1,
+                raw: true
+            });
+            diagnostico.query_simple = {
+                ok: true,
+                muestra: unidadesSimple[0] || null
+            };
+        } catch (e) {
+            diagnostico.query_simple = {
+                ok: false,
+                error: e.message,
+                stack: e.stack?.split('\n').slice(0, 5)
+            };
+        }
+
+        // 3. Probar query con TipoHerramientaRenta
+        try {
+            const unidadesConTipo = await UnidadHerramientaRenta.findAll({
+                where: { activo: true },
+                limit: 1,
+                include: [{
+                    model: TipoHerramientaRenta,
+                    as: 'tipoHerramienta',
+                    required: false
+                }]
+            });
+            diagnostico.query_con_tipo = { ok: true };
+        } catch (e) {
+            diagnostico.query_con_tipo = {
+                ok: false,
+                error: e.message
+            };
+        }
+
+        // 4. Probar query con Usuario
+        try {
+            const unidadesConUsuario = await UnidadHerramientaRenta.findAll({
+                where: { activo: true },
+                limit: 1,
+                include: [{
+                    model: Usuario,
+                    as: 'usuarioAsignado',
+                    required: false
+                }]
+            });
+            diagnostico.query_con_usuario = { ok: true };
+        } catch (e) {
+            diagnostico.query_con_usuario = {
+                ok: false,
+                error: e.message
+            };
+        }
+
+        // 5. Probar query con Equipo
+        try {
+            const unidadesConEquipo = await UnidadHerramientaRenta.findAll({
+                where: { activo: true },
+                limit: 1,
+                include: [{
+                    model: Equipo,
+                    as: 'equipoAsignado',
+                    required: false
+                }]
+            });
+            diagnostico.query_con_equipo = { ok: true };
+        } catch (e) {
+            diagnostico.query_con_equipo = {
+                ok: false,
+                error: e.message
+            };
+        }
+
+        // 6. Probar query completa (la que falla)
+        try {
+            const unidadesCompleta = await UnidadHerramientaRenta.findAll({
+                where: {
+                    tipo_herramienta_id: 115,
+                    activo: true
+                },
+                include: [
+                    {
+                        model: TipoHerramientaRenta,
+                        as: 'tipoHerramienta',
+                        attributes: ['id', 'nombre', 'prefijo_codigo'],
+                        required: false
+                    },
+                    {
+                        model: Usuario,
+                        as: 'usuarioAsignado',
+                        attributes: ['id', 'nombre', 'email'],
+                        required: false
+                    },
+                    {
+                        model: Equipo,
+                        as: 'equipoAsignado',
+                        attributes: ['id', 'nombre'],
+                        required: false
+                    }
+                ],
+                order: [['codigo_unico', 'ASC']]
+            });
+            diagnostico.query_completa = {
+                ok: true,
+                count: unidadesCompleta.length
+            };
+        } catch (e) {
+            diagnostico.query_completa = {
+                ok: false,
+                error: e.message,
+                stack: e.stack?.split('\n').slice(0, 5)
+            };
+        }
+
+        res.json({
+            success: true,
+            data: diagnostico
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error en diagnóstico',
+            error: error.message,
+            stack: error.stack?.split('\n').slice(0, 10)
+        });
+    }
+};

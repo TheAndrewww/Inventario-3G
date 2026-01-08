@@ -17,7 +17,8 @@ import {
     obtenerCodigoBarras,
     obtenerCodigoBarrasSVG,
     ejecutarMigracionManual,
-    sincronizarTodasLasUnidades
+    sincronizarTodasLasUnidades,
+    diagnosticarProblemas
 } from '../controllers/herramientasRenta.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -196,5 +197,12 @@ router.post('/migrar-pendientes', verificarRol('administrador'), ejecutarMigraci
  * Acceso: Solo administrador
  */
 router.post('/sincronizar-todas', verificarRol('administrador'), sincronizarTodasLasUnidades);
+
+/**
+ * GET /api/herramientas-renta/diagnostico
+ * Endpoint temporal para diagnosticar problemas de producción
+ * Acceso: Solo administrador
+ */
+router.get('/diagnostico', verificarRol('administrador'), diagnosticarProblemas);
 
 export default router;
