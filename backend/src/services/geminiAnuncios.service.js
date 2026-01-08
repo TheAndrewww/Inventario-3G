@@ -60,7 +60,7 @@ export const generarImagenAnuncio = async (frase, mascotBase64 = null, mascotMim
 Genera una imagen publicitaria profesional de alta calidad en formato horizontal (16:9).
 
 CONTEXTO:
-Es un anuncio corporativo para 3G VELARIAS, empresa mexicana líder en construcción de tensoestructuras, velarías y membranas arquitectónicas.
+Es un anuncio corporativo para 3G ARQUITECTURA TEXTIL, empresa mexicana líder en construcción de tensoestructuras, velarías y membranas arquitectónicas.
 
 ${mascotBase64 ? `PERSONAJE PRINCIPAL (MANDATORIO):
 La imagen DEBE incluir al personaje mascota "Tensito" proporcionado en la imagen de referencia.
@@ -83,7 +83,7 @@ El anuncio debe transmitir:
 - Construcción moderna
 
 COLORES CORPORATIVOS:
-- Naranja (#FF6B00), Blanco, Gris
+- ROJO (#C53131), Blanco, Gris
 
 FORMATO:
 - Aspecto: 16:9 (horizontal)
