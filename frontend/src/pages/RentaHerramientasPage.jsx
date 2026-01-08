@@ -130,26 +130,62 @@ const RentaHerramientasPage = () => {
         }, { totalUnidades: 0, disponibles: 0, asignadas: 0 });
     }, [tipos]);
 
-    const getEstadoBadge = (estado) => {
+    // Mostrar badge de condición física
+    const getCondicionBadge = (unidad) => {
+        // Usar nuevo campo condicion si existe, o mapear desde estado
+        const condicion = unidad.condicion || mapearEstadoACondicion(unidad.estado);
         const badges = {
-            buen_estado: { color: 'bg-green-100 text-green-800', texto: '🟢 Buen estado', icon: CheckCircle },
-            estado_regular: { color: 'bg-yellow-100 text-yellow-800', texto: '🟡 Estado regular', icon: AlertCircle },
-            mal_estado: { color: 'bg-red-100 text-red-800', texto: '🔴 Mal estado', icon: AlertCircle },
-            // Mantener compatibilidad con estados antiguos
-            disponible: { color: 'bg-green-100 text-green-800', texto: '🟢 Buen estado', icon: CheckCircle },
-            asignada: { color: 'bg-blue-100 text-blue-800', texto: 'Asignada', icon: UserCheck },
-            en_reparacion: { color: 'bg-yellow-100 text-yellow-800', texto: '🟡 Estado regular', icon: Settings },
-            perdida: { color: 'bg-red-100 text-red-800', texto: '🔴 Mal estado', icon: AlertCircle },
-            baja: { color: 'bg-red-100 text-red-800', texto: '🔴 Mal estado', icon: AlertCircle }
+            bueno: { color: 'bg-green-100 text-green-800 border-green-200', texto: '🟢 Bueno', icon: CheckCircle },
+            regular: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', texto: '🟡 Regular', icon: AlertCircle },
+            malo: { color: 'bg-red-100 text-red-800 border-red-200', texto: '🔴 Malo', icon: AlertCircle },
+            perdido: { color: 'bg-gray-100 text-gray-800 border-gray-200', texto: '⚫ Perdido', icon: AlertCircle },
+            baja: { color: 'bg-gray-100 text-gray-800 border-gray-200', texto: '⚫ Baja', icon: AlertCircle }
         };
-        const badge = badges[estado] || badges.buen_estado;
+        const badge = badges[condicion] || badges.bueno;
         const Icon = badge.icon;
         return (
-            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
-                <Icon size={12} />
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${badge.color}`}>
+                <Icon size={10} />
                 {badge.texto}
             </span>
         );
+    };
+
+    // Mostrar badge de estatus de disponibilidad
+    const getEstatusBadge = (unidad) => {
+        // Usar nuevo campo estatus si existe, o mapear desde estado
+        const estatus = unidad.estatus || (unidad.estado === 'asignada' ? 'asignado' : 'disponible');
+        const badges = {
+            disponible: { color: 'bg-blue-50 text-blue-700 border-blue-200', texto: 'Disponible' },
+            asignado: { color: 'bg-purple-100 text-purple-800 border-purple-200', texto: 'Asignada' },
+            en_reparacion: { color: 'bg-orange-100 text-orange-800 border-orange-200', texto: 'En reparación' },
+            en_transito: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', texto: 'En tránsito' }
+        };
+        const badge = badges[estatus] || badges.disponible;
+        return (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${badge.color}`}>
+                {badge.texto}
+            </span>
+        );
+    };
+
+    // Mapear estado antiguo a condicion nueva (para compatibilidad)
+    const mapearEstadoACondicion = (estado) => {
+        const mapeo = {
+            'buen_estado': 'bueno',
+            'estado_regular': 'regular',
+            'mal_estado': 'malo',
+            'perdida': 'perdido',
+            'baja': 'baja',
+            'disponible': 'bueno',
+            'asignada': 'bueno'
+        };
+        return mapeo[estado] || 'bueno';
+    };
+
+    // Verificar si la unidad está asignada (usar nuevo campo estatus)
+    const estaAsignada = (unidad) => {
+        return unidad.estatus === 'asignado' || unidad.estado === 'asignada';
     };
 
     if (!puedeGestionar) {
@@ -382,10 +418,13 @@ const RentaHerramientasPage = () => {
                                                                     </p>
                                                                 )}
                                                             </div>
-                                                            {getEstadoBadge(unidad.estado)}
+                                                            <div className="flex gap-2">
+                                                                {getCondicionBadge(unidad)}
+                                                                {getEstatusBadge(unidad)}
+                                                            </div>
                                                         </div>
 
-                                                        {unidad.estado === 'asignada' && (
+                                                        {estaAsignada(unidad) && (
                                                             <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-100">
                                                                 <div className="flex items-center gap-2 text-sm">
                                                                     {unidad.usuarioAsignado ? (
@@ -428,7 +467,7 @@ const RentaHerramientasPage = () => {
                                                         )}
 
                                                         <div className="flex gap-2">
-                                                            {unidad.estado !== 'asignada' && (
+                                                            {!estaAsignada(unidad) && (
                                                                 <Button
                                                                     onClick={() => handleAsignar(unidad, tipo)}
                                                                     variant="secondary"
@@ -438,7 +477,7 @@ const RentaHerramientasPage = () => {
                                                                     Asignar
                                                                 </Button>
                                                             )}
-                                                            {unidad.estado === 'asignada' && (
+                                                            {estaAsignada(unidad) && (
                                                                 <Button
                                                                     onClick={() => handleDevolver(unidad, tipo)}
                                                                     variant="secondary"
@@ -1143,55 +1182,75 @@ const ModalNuevoTipo = ({ isOpen, onClose, onSuccess }) => {
 // Modal para cambiar estado de una unidad
 const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
-    const [nuevoEstado, setNuevoEstado] = useState('');
+    const [nuevaCondicion, setNuevaCondicion] = useState('');
     const [motivo, setMotivo] = useState('');
 
     useEffect(() => {
         if (isOpen) {
-            setNuevoEstado(unidad.estado || '');
+            // Usar el nuevo campo condicion si existe, o mapear desde estado
+            const condicionActual = unidad.condicion || mapearEstadoACondicion(unidad.estado);
+            setNuevaCondicion(condicionActual);
             setMotivo('');
         }
     }, [isOpen, unidad]);
 
-    const estadosDisponibles = [
-        { value: 'buen_estado', label: '🟢 Buen estado', color: 'text-green-700' },
-        { value: 'estado_regular', label: '🟡 Estado regular', color: 'text-yellow-700' },
-        { value: 'mal_estado', label: '🔴 Mal estado', color: 'text-red-700' }
+    // Mapear estado antiguo a condicion nueva
+    const mapearEstadoACondicion = (estado) => {
+        const mapeo = {
+            'buen_estado': 'bueno',
+            'estado_regular': 'regular',
+            'mal_estado': 'malo',
+            'perdida': 'perdido',
+            'baja': 'baja',
+            'disponible': 'bueno',
+            'asignada': 'bueno'
+        };
+        return mapeo[estado] || 'bueno';
+    };
+
+    // Solo condiciones físicas - el estatus se maneja por asignar/devolver
+    const condicionesDisponibles = [
+        { value: 'bueno', label: '🟢 Buen estado', color: 'text-green-700', desc: 'Funciona correctamente' },
+        { value: 'regular', label: '🟡 Estado regular', color: 'text-yellow-700', desc: 'Funcional con desgaste' },
+        { value: 'malo', label: '🔴 Mal estado', color: 'text-red-700', desc: 'Necesita reparación' }
     ];
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!nuevoEstado) {
-            toast.error('Debes seleccionar un estado');
+        if (!nuevaCondicion) {
+            toast.error('Debes seleccionar una condición');
             return;
         }
 
-        if (nuevoEstado === unidad.estado) {
-            toast.error('El estado seleccionado es el mismo que el actual');
-            return;
-        }
-
-        if (['en_reparacion', 'perdida', 'baja'].includes(nuevoEstado) && !motivo.trim()) {
-            toast.error('Debes proporcionar un motivo para este cambio de estado');
+        const condicionActual = unidad.condicion || mapearEstadoACondicion(unidad.estado);
+        if (nuevaCondicion === condicionActual) {
+            toast.error('La condición seleccionada es la misma que la actual');
             return;
         }
 
         try {
             setLoading(true);
-            await herramientasRentaService.cambiarEstadoUnidad(unidad.id, nuevoEstado, motivo.trim());
-            toast.success(`Estado cambiado a "${estadosDisponibles.find(e => e.value === nuevoEstado)?.label}"`);
+            // Enviar solo condicion, el estatus no cambia al cambiar condición
+            await herramientasRentaService.cambiarEstadoUnidad(unidad.id, {
+                condicion: nuevaCondicion,
+                motivo: motivo.trim()
+            });
+            toast.success(`Condición cambiada a "${condicionesDisponibles.find(c => c.value === nuevaCondicion)?.label}"`);
             onSuccess();
         } catch (error) {
-            console.error('Error al cambiar estado:', error);
-            toast.error(error.message || 'Error al cambiar el estado');
+            console.error('Error al cambiar condición:', error);
+            toast.error(error.message || 'Error al cambiar la condición');
         } finally {
             setLoading(false);
         }
     };
 
+    const condicionActual = unidad.condicion || mapearEstadoACondicion(unidad.estado);
+    const estatusActual = unidad.estatus || (unidad.estado === 'asignada' ? 'asignado' : 'disponible');
+
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Cambiar Estado de Unidad">
+        <Modal isOpen={isOpen} onClose={onClose} title="Cambiar Condición de Herramienta">
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 {/* Información de la unidad */}
                 <div className="bg-gray-50 p-4 rounded-lg border">
@@ -1201,35 +1260,50 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
                     <p className="text-sm text-gray-600">
                         Código: <span className="font-mono font-bold">{unidad.codigo_unico}</span>
                     </p>
-                    <p className="text-sm text-gray-600">
-                        Estado actual: <span className="font-medium capitalize">{unidad.estado?.replace(/_/g, ' ')}</span>
-                    </p>
+                    <div className="flex gap-4 mt-2">
+                        <p className="text-sm text-gray-600">
+                            Condición: <span className="font-medium capitalize">{condicionActual}</span>
+                        </p>
+                        <p className="text-sm text-gray-600">
+                            Estatus: <span className={`font-medium capitalize ${estatusActual === 'asignado' ? 'text-blue-600' : 'text-green-600'}`}>
+                                {estatusActual}
+                            </span>
+                        </p>
+                    </div>
                 </div>
 
-                {/* Selector de nuevo estado */}
+                {/* Selector de nueva condición */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Nuevo Estado <span className="text-red-500">*</span>
+                        Nueva Condición <span className="text-red-500">*</span>
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
-                        {estadosDisponibles.map((estado) => (
+                    <p className="text-xs text-gray-500 mb-3">
+                        Indica el estado físico de la herramienta. El estatus de asignación no cambia aquí.
+                    </p>
+                    <div className="grid grid-cols-1 gap-2">
+                        {condicionesDisponibles.map((condicion) => (
                             <button
-                                key={estado.value}
+                                key={condicion.value}
                                 type="button"
-                                onClick={() => setNuevoEstado(estado.value)}
+                                onClick={() => setNuevaCondicion(condicion.value)}
                                 className={`
-                                    px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all
-                                    ${nuevoEstado === estado.value
-                                        ? 'border-red-600 bg-red-50 ' + estado.color
-                                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                                    px-4 py-3 rounded-lg border-2 text-left transition-all
+                                    ${nuevaCondicion === condicion.value
+                                        ? 'border-red-600 bg-red-50'
+                                        : 'border-gray-200 bg-white hover:border-gray-300'
                                     }
-                                    ${unidad.estado === estado.value ? 'opacity-50 cursor-not-allowed' : ''}
+                                    ${condicionActual === condicion.value ? 'opacity-50' : ''}
                                 `}
-                                disabled={unidad.estado === estado.value}
+                                disabled={condicionActual === condicion.value}
                             >
-                                {estado.label}
-                                {unidad.estado === estado.value && (
-                                    <span className="ml-1 text-xs">(actual)</span>
+                                <span className={`text-sm font-medium ${condicion.color}`}>
+                                    {condicion.label}
+                                </span>
+                                <span className="block text-xs text-gray-500 mt-1">
+                                    {condicion.desc}
+                                </span>
+                                {condicionActual === condicion.value && (
+                                    <span className="text-xs text-gray-400 ml-2">(actual)</span>
                                 )}
                             </button>
                         ))}
@@ -1240,35 +1314,22 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                         Motivo / Observaciones
-                        {['en_reparacion', 'perdida', 'baja'].includes(nuevoEstado) && (
-                            <span className="text-red-500 ml-1">*</span>
-                        )}
                     </label>
                     <textarea
                         value={motivo}
                         onChange={(e) => setMotivo(e.target.value)}
-                        rows="3"
+                        rows="2"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                        placeholder={
-                            ['en_reparacion', 'perdida', 'baja'].includes(nuevoEstado)
-                                ? 'Describe el motivo del cambio (requerido)'
-                                : 'Observaciones opcionales sobre este cambio de estado'
-                        }
-                        required={['en_reparacion', 'perdida', 'baja'].includes(nuevoEstado)}
+                        placeholder="Describe el motivo del cambio de condición..."
                     />
-                    {['en_reparacion', 'perdida', 'baja'].includes(nuevoEstado) && (
-                        <p className="text-xs text-gray-500 mt-1">
-                            Este cambio de estado requiere un motivo
-                        </p>
-                    )}
                 </div>
 
-                {/* Advertencia si va a cambiar de asignada a otro estado */}
-                {unidad.estado === 'asignada' && nuevoEstado !== 'asignada' && (
+                {/* Advertencia si está asignada */}
+                {estatusActual === 'asignado' && (
                     <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
                         <p className="text-sm text-blue-800">
                             <AlertCircle size={14} className="inline mr-1" />
-                            Al cambiar el estado, se registrará automáticamente la devolución de la herramienta.
+                            Esta herramienta está asignada. El cambio de condición no afecta la asignación.
                         </p>
                     </div>
                 )}
@@ -1285,10 +1346,10 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
                     </Button>
                     <Button
                         type="submit"
-                        disabled={loading || !nuevoEstado || nuevoEstado === unidad.estado}
+                        disabled={loading || !nuevaCondicion || nuevaCondicion === condicionActual}
                         className="bg-red-700 hover:bg-red-800"
                     >
-                        {loading ? 'Cambiando...' : 'Cambiar Estado'}
+                        {loading ? 'Cambiando...' : 'Cambiar Condición'}
                     </Button>
                 </div>
             </form>

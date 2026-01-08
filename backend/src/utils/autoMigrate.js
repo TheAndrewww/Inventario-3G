@@ -394,6 +394,9 @@ export const ejecutarAutoMigracion = async () => {
         // Migrar artículos pendientes después de crear las tablas
         const resultadoArticulos = await migrarArticulosPendientes();
 
+        // Migrar campos condicion/estatus
+        await migrarCondicionEstatus();
+
         return {
             migrado: true,
             mensaje: 'Migración de herramientas de renta completada',
@@ -408,5 +411,87 @@ export const ejecutarAutoMigracion = async () => {
             migrado: false,
             error: error.message
         };
+    }
+};
+
+/**
+ * Migra el campo 'estado' a los nuevos campos 'condicion' y 'estatus'
+ * Este proceso es seguro y solo actualiza registros que no tienen los nuevos campos poblados
+ */
+export const migrarCondicionEstatus = async () => {
+    try {
+        console.log('🔄 Verificando migración de condicion/estatus...');
+
+        // Verificar si la columna condicion existe
+        const [columnas] = await sequelize.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'unidades_herramienta_renta' 
+            AND column_name = 'condicion'
+        `);
+
+        if (columnas.length === 0) {
+            console.log('📝 Agregando columnas condicion y estatus...');
+
+            // Agregar la columna condicion si no existe
+            await sequelize.query(`
+                ALTER TABLE unidades_herramienta_renta
+                ADD COLUMN IF NOT EXISTS condicion VARCHAR(20) DEFAULT 'bueno'
+            `);
+
+            await sequelize.query(`
+                ALTER TABLE unidades_herramienta_renta
+                ADD COLUMN IF NOT EXISTS estatus VARCHAR(20) DEFAULT 'disponible'
+            `);
+
+            console.log('✅ Columnas condicion y estatus agregadas');
+        }
+
+        // Contar registros que necesitan migración
+        const [pendientes] = await sequelize.query(`
+            SELECT COUNT(*) as count FROM unidades_herramienta_renta 
+            WHERE condicion = 'bueno' AND estatus = 'disponible' 
+            AND estado != 'buen_estado'
+        `);
+
+        const countPendientes = parseInt(pendientes[0].count);
+
+        if (countPendientes > 0) {
+            console.log(`📝 Migrando ${countPendientes} registros a nuevos campos...`);
+
+            // Migrar datos existentes
+            await sequelize.query(`
+                UPDATE unidades_herramienta_renta
+                SET 
+                    condicion = CASE
+                        WHEN estado = 'buen_estado' THEN 'bueno'
+                        WHEN estado = 'estado_regular' THEN 'regular'
+                        WHEN estado = 'mal_estado' THEN 'malo'
+                        WHEN estado = 'perdida' THEN 'perdido'
+                        WHEN estado = 'baja' THEN 'baja'
+                        ELSE 'bueno'
+                    END,
+                    estatus = CASE
+                        WHEN estado = 'asignada' THEN 'asignado'
+                        WHEN estado = 'disponible' THEN 'disponible'
+                        WHEN estado = 'en_reparacion' THEN 'en_reparacion'
+                        WHEN estado = 'en_transito' THEN 'en_transito'
+                        WHEN estado = 'pendiente_devolucion' THEN 'asignado'
+                        WHEN estado IN ('buen_estado', 'estado_regular', 'mal_estado') THEN 'disponible'
+                        WHEN estado IN ('perdida', 'baja') THEN 'disponible'
+                        ELSE 'disponible'
+                    END
+                WHERE condicion = 'bueno' AND estatus = 'disponible' 
+                AND estado IS NOT NULL AND estado != 'buen_estado'
+            `);
+
+            console.log(`✅ Migración de condicion/estatus completada`);
+        } else {
+            console.log('✅ Campos condicion/estatus ya están actualizados');
+        }
+
+    } catch (error) {
+        console.error('⚠️ Error en migración condicion/estatus (no crítico):', error.message);
+        // No lanzar error para no interrumpir el inicio del servidor
     }
 };

@@ -296,7 +296,9 @@ export const crearTipo = async (req, res) => {
                 tipo_herramienta_id: nuevoTipo.id,
                 codigo_unico: codigoUnico,
                 codigo_ean13: codigoEAN13,
-                estado: 'buen_estado',
+                condicion: 'bueno',
+                estatus: 'disponible',
+                estado: 'buen_estado', // DEPRECATED: mantener para compatibilidad
                 activo: true
             }, { transaction });
 
@@ -531,16 +533,18 @@ export const asignarHerramienta = async (req, res) => {
             });
         }
 
-        if (unidad.estado === 'asignada') {
+        // Verificar disponibilidad usando el nuevo campo estatus
+        if (unidad.estatus === 'asignado') {
             return res.status(400).json({
                 success: false,
                 message: `La unidad ya está asignada`
             });
         }
 
-        // Actualizar la unidad
+        // Actualizar la unidad - Solo cambiar estatus, preservar condicion
         await unidad.update({
-            estado: 'asignada',
+            estatus: 'asignado',
+            estado: 'asignada', // DEPRECATED: mantener para compatibilidad
             usuario_asignado_id: usuario_id || null,
             equipo_asignado_id: equipo_id || null,
             fecha_asignacion: new Date(),
@@ -622,10 +626,11 @@ export const devolverHerramienta = async (req, res) => {
             });
         }
 
-        if (unidad.estado !== 'asignada') {
+        // Verificar que esté asignada usando el nuevo campo estatus
+        if (unidad.estatus !== 'asignado') {
             return res.status(400).json({
                 success: false,
-                message: `La unidad no está asignada. Estado actual: ${unidad.estado}`
+                message: `La unidad no está asignada. Estatus actual: ${unidad.estatus}`
             });
         }
 
@@ -633,9 +638,10 @@ export const devolverHerramienta = async (req, res) => {
         const usuario_anterior = unidad.usuario_asignado_id;
         const equipo_anterior = unidad.equipo_asignado_id;
 
-        // Actualizar la unidad
+        // Actualizar la unidad - Solo cambiar estatus a disponible, preservar condicion
         await unidad.update({
-            estado: 'buen_estado',
+            estatus: 'disponible',
+            estado: 'buen_estado', // DEPRECATED: mantener para compatibilidad
             usuario_asignado_id: null,
             equipo_asignado_id: null,
             fecha_asignacion: null
@@ -1068,21 +1074,67 @@ export const obtenerTodasLasUnidades = async (req, res) => {
 
 /**
  * PUT /api/herramientas-renta/unidades/:id/cambiar-estado
- * Cambiar el estado de una unidad de herramienta
+ * Cambiar la condición y/o estatus de una unidad de herramienta
+ * Body: { condicion?, estatus?, motivo? }
+ * 
+ * REFACTORIZADO: Ahora maneja condicion y estatus por separado
+ * - condicion: estado físico (bueno, regular, malo, perdido, baja)
+ * - estatus: disponibilidad (disponible, asignado, en_reparacion, en_transito)
  */
 export const cambiarEstadoUnidad = async (req, res) => {
     const transaction = await sequelize.transaction();
 
     try {
         const { id } = req.params;
-        const { estado, motivo } = req.body;
+        const { condicion, estatus, estado, motivo } = req.body;
 
-        // Validar que el estado sea válido
-        const estadosValidos = ['buen_estado', 'estado_regular', 'mal_estado', 'asignada', 'disponible', 'en_reparacion', 'perdida', 'baja', 'en_transito', 'pendiente_devolucion'];
-        if (!estadosValidos.includes(estado)) {
+        // Definir valores válidos
+        const condicionesValidas = ['bueno', 'regular', 'malo', 'perdido', 'baja'];
+        const estatusValidos = ['disponible', 'asignado', 'en_reparacion', 'en_transito'];
+
+        // Compatibilidad con el campo antiguo 'estado'
+        let nuevaCondicion = condicion;
+        let nuevoEstatus = estatus;
+
+        if (estado && !condicion && !estatus) {
+            // Convertir estado antiguo a nuevos campos
+            const mapeoCondicion = {
+                'buen_estado': 'bueno',
+                'estado_regular': 'regular',
+                'mal_estado': 'malo',
+                'perdida': 'perdido',
+                'baja': 'baja'
+            };
+            const mapeoEstatus = {
+                'asignada': 'asignado',
+                'disponible': 'disponible',
+                'en_reparacion': 'en_reparacion',
+                'en_transito': 'en_transito',
+                'pendiente_devolucion': 'asignado'
+            };
+
+            if (mapeoCondicion[estado]) {
+                nuevaCondicion = mapeoCondicion[estado];
+            }
+            if (mapeoEstatus[estado]) {
+                nuevoEstatus = mapeoEstatus[estado];
+            }
+        }
+
+        // Validar campos si se proporcionan
+        if (nuevaCondicion && !condicionesValidas.includes(nuevaCondicion)) {
+            await transaction.rollback();
             return res.status(400).json({
                 success: false,
-                message: `Estado inválido. Debe ser uno de: ${estadosValidos.join(', ')}`
+                message: `Condición inválida. Debe ser una de: ${condicionesValidas.join(', ')}`
+            });
+        }
+
+        if (nuevoEstatus && !estatusValidos.includes(nuevoEstatus)) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: `Estatus inválido. Debe ser uno de: ${estatusValidos.join(', ')}`
             });
         }
 
@@ -1116,10 +1168,11 @@ export const cambiarEstadoUnidad = async (req, res) => {
             });
         }
 
-        const estadoAnterior = unidad.estado;
+        const condicionAnterior = unidad.condicion;
+        const estatusAnterior = unidad.estatus;
 
-        // Si está pasando de asignada a cualquier otro estado, limpiar asignación
-        if (estadoAnterior === 'asignada' && estado !== 'asignada') {
+        // Si está pasando de asignado a cualquier otro estatus, limpiar asignación
+        if (estatusAnterior === 'asignado' && nuevoEstatus && nuevoEstatus !== 'asignado') {
             const usuarioAnterior = unidad.usuario_asignado_id;
             const equipoAnterior = unidad.equipo_asignado_id;
             const fechaAsignacionOriginal = unidad.fecha_asignacion;
@@ -1138,7 +1191,7 @@ export const cambiarEstadoUnidad = async (req, res) => {
                 tipo_movimiento: 'devolucion',
                 fecha_asignacion: fechaAsignacionOriginal,
                 fecha_devolucion: new Date(),
-                observaciones: motivo || `Cambio de estado a ${estado}`,
+                observaciones: motivo || `Cambio de estatus a ${nuevoEstatus}`,
                 registrado_por_usuario_id: req.usuario.id
             }, { transaction });
 
@@ -1155,21 +1208,42 @@ export const cambiarEstadoUnidad = async (req, res) => {
             );
         }
 
-        // Actualizar estado
-        unidad.estado = estado;
+        // Actualizar campos
+        if (nuevaCondicion) {
+            unidad.condicion = nuevaCondicion;
+        }
+        if (nuevoEstatus) {
+            unidad.estatus = nuevoEstatus;
+        }
+
+        // Actualizar campo deprecated para compatibilidad
+        const mapeoEstadoDeprecado = {
+            'bueno': 'buen_estado',
+            'regular': 'estado_regular',
+            'malo': 'mal_estado',
+            'perdido': 'perdida',
+            'baja': 'baja'
+        };
+        if (nuevaCondicion) {
+            unidad.estado = mapeoEstadoDeprecado[nuevaCondicion] || 'buen_estado';
+        }
+        if (nuevoEstatus === 'asignado') {
+            unidad.estado = 'asignada';
+        }
+
         unidad.motivo_estado = motivo || null;
         unidad.fecha_cambio_estado = new Date();
         await unidad.save({ transaction });
 
-        // Registrar en historial si es un cambio significativo
-        if (['en_reparacion', 'perdida', 'baja'].includes(estado)) {
+        // Registrar en historial si es un cambio significativo de condición
+        if (nuevaCondicion && ['perdido', 'baja', 'malo'].includes(nuevaCondicion)) {
             await HistorialAsignacionHerramienta.create({
                 unidad_herramienta_id: unidad.id,
                 usuario_id: unidad.usuario_asignado_id,
                 equipo_id: unidad.equipo_asignado_id,
-                tipo_movimiento: estado,
+                tipo_movimiento: nuevaCondicion === 'perdido' ? 'perdida' : nuevaCondicion,
                 fecha_asignacion: new Date(),
-                observaciones: motivo || `Cambio de estado de ${estadoAnterior} a ${estado}`,
+                observaciones: motivo || `Cambio de condición de ${condicionAnterior} a ${nuevaCondicion}`,
                 registrado_por_usuario_id: req.usuario.id
             }, { transaction });
         }
@@ -1178,7 +1252,7 @@ export const cambiarEstadoUnidad = async (req, res) => {
 
         res.json({
             success: true,
-            message: `Estado actualizado de "${estadoAnterior}" a "${estado}"`,
+            message: `Actualizado: condición "${condicionAnterior}" → "${unidad.condicion}", estatus "${estatusAnterior}" → "${unidad.estatus}"`,
             data: {
                 unidad: await UnidadHerramientaRenta.findByPk(id, {
                     include: [

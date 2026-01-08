@@ -25,6 +25,7 @@ import CalendarioPublicoPage from './pages/CalendarioPublicoPage';
 import AnunciosPublicosPage from './pages/AnunciosPublicosPage';
 import ProcesamientoMasivoPage from './pages/ProcesamientoMasivoPage';
 import MonitorPedidosPage from './pages/MonitorPedidosPage';
+import MiEquipoPage from './pages/MiEquipoPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 
 function App() {
@@ -95,6 +96,7 @@ function App() {
                       <Route path="calendario" element={<CalendarioPage />} />
                       <Route path="procesamiento-masivo" element={<ProcesamientoMasivoPage />} />
                       <Route path="monitor-pedidos" element={<MonitorPedidosPage />} />
+                      <Route path="mi-equipo" element={<MiEquipoPage />} />
                       <Route path="perfil" element={<PerfilPage />} />
 
                       {/* Ruta 404 para rutas privadas no encontradas */}

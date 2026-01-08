@@ -92,6 +92,7 @@ import proyectosRoutes from './src/routes/proyectos.routes.js';
 import calendarioRoutes from './src/routes/calendario.routes.js';
 import herramientasRentaRoutes from './src/routes/herramientasRenta.routes.js';
 import anunciosRoutes from './src/routes/anuncios.routes.js';
+import miEquipoRoutes from './src/routes/miEquipo.routes.js';
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -116,7 +117,8 @@ app.get('/', (req, res) => {
             proyectos: '/api/proyectos',
             calendario: '/api/calendario',
             herramientasRenta: '/api/herramientas-renta',
-            anuncios: '/api/anuncios'
+            anuncios: '/api/anuncios',
+            miEquipo: '/api/mi-equipo'
         }
     });
 });
@@ -136,6 +138,7 @@ app.use('/api/proyectos', proyectosRoutes);
 app.use('/api/calendario', calendarioRoutes);
 app.use('/api/herramientas-renta', herramientasRentaRoutes);
 app.use('/api/anuncios', anunciosRoutes);
+app.use('/api/mi-equipo', miEquipoRoutes);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
 

@@ -114,14 +114,24 @@ const herramientasRentaService = {
     },
 
     /**
-     * Cambiar el estado de una unidad de herramienta
+     * Cambiar la condición y/o estatus de una unidad de herramienta
+     * @param {number} unidadId - ID de la unidad
+     * @param {Object|string} data - Objeto { condicion?, estatus?, motivo? } o string de estado (compatibilidad)
+     * @param {string} motivo - Motivo del cambio (solo si data es string)
      */
-    cambiarEstadoUnidad: async (unidadId, estado, motivo = '') => {
+    cambiarEstadoUnidad: async (unidadId, data, motivo = '') => {
         try {
-            const response = await api.put(`/herramientas-renta/unidades/${unidadId}/cambiar-estado`, {
-                estado,
-                motivo
-            });
+            // Soportar formato antiguo (string) y nuevo (objeto)
+            let body;
+            if (typeof data === 'string') {
+                // Formato antiguo: cambiarEstadoUnidad(id, 'buen_estado', 'motivo')
+                body = { estado: data, motivo };
+            } else {
+                // Formato nuevo: cambiarEstadoUnidad(id, { condicion: 'bueno', motivo: '...' })
+                body = data;
+            }
+
+            const response = await api.put(`/herramientas-renta/unidades/${unidadId}/cambiar-estado`, body);
             return response.data.data;
         } catch (error) {
             console.error(`Error al cambiar estado de unidad ${unidadId}:`, error);

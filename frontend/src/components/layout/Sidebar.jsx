@@ -82,6 +82,12 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       roles: ['administrador', 'diseñador', 'almacen', 'ventas', 'compras', 'encargado']
     },
     {
+      path: '/mi-equipo',
+      icon: User,
+      label: 'Mi Equipo',
+      roles: ['administrador', 'diseñador', 'almacen', 'ventas', 'compras', 'encargado', 'operador']
+    },
+    {
       path: '/historial',
       icon: History,
       label: 'Historial',
@@ -151,11 +157,10 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
               key={item.path}
               to={item.path}
               onClick={onNavigate}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                isActive
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
                   ? 'bg-red-50 text-red-700'
                   : 'text-gray-700 hover:bg-gray-100'
-              }`}
+                }`}
             >
               <Icon size={20} />
               {isOpen && <span className="font-medium">{item.label}</span>}
@@ -169,11 +174,10 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
         <Link
           to="/perfil"
           onClick={onNavigate}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-            location.pathname === '/perfil'
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${location.pathname === '/perfil'
               ? 'bg-red-50 text-red-700'
               : 'text-gray-700 hover:bg-gray-100'
-          }`}
+            }`}
         >
           <User size={20} />
           {isOpen && (

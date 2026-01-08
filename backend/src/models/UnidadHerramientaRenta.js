@@ -25,17 +25,32 @@ const UnidadHerramientaRenta = sequelize.define('UnidadHerramientaRenta', {
         type: DataTypes.STRING(13),
         allowNull: true,
         unique: true,
-        comment: 'Código de barras EAN-13 para la unidad'
+        comment: 'DEPRECATED: Ya no se usa, se mantiene por compatibilidad'
     },
     numero_serie: {
         type: DataTypes.STRING(100),
         allowNull: true,
         comment: 'Número de serie del fabricante (opcional)'
     },
+    // ===== NUEVOS CAMPOS (Refactorización 2026-01-08) =====
+    condicion: {
+        type: DataTypes.ENUM('bueno', 'regular', 'malo', 'perdido', 'baja'),
+        allowNull: false,
+        defaultValue: 'bueno',
+        comment: 'Condición física de la herramienta: bueno, regular, malo, perdido, baja'
+    },
+    estatus: {
+        type: DataTypes.ENUM('disponible', 'asignado', 'en_reparacion', 'en_transito'),
+        allowNull: false,
+        defaultValue: 'disponible',
+        comment: 'Estatus de disponibilidad: disponible, asignado, en_reparacion, en_transito'
+    },
+    // ===== CAMPO DEPRECATED (mantener temporalmente para compatibilidad) =====
     estado: {
         type: DataTypes.ENUM('buen_estado', 'estado_regular', 'mal_estado', 'asignada', 'disponible', 'en_reparacion', 'perdida', 'baja', 'en_transito', 'pendiente_devolucion'),
-        allowNull: false,
-        defaultValue: 'buen_estado'
+        allowNull: true,
+        defaultValue: 'buen_estado',
+        comment: 'DEPRECATED: Usar condicion + estatus en su lugar. Se mantiene por compatibilidad.'
     },
     usuario_asignado_id: {
         type: DataTypes.INTEGER,
