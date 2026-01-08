@@ -268,6 +268,36 @@ const startServer = async () => {
                 console.log('✅ Tabla anuncios ya existe');
             }
 
+            // Verificar/crear tabla de produccion_proyectos
+            console.log('🔍 Verificando tabla produccion_proyectos...');
+            const [produccionTableCheck] = await sequelize.query(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'produccion_proyectos'"
+            );
+
+            const produccionTableExists = parseInt(produccionTableCheck[0].count) > 0;
+
+            if (!produccionTableExists) {
+                console.log('🔄 Creando tabla produccion_proyectos...');
+
+                const fs = await import('fs');
+                const path = await import('path');
+                const { fileURLToPath } = await import('url');
+
+                const __filename = fileURLToPath(import.meta.url);
+                const __dirname = path.dirname(__filename);
+                const migrationPath = path.join(__dirname, 'migrations', 'create-tabla-produccion-proyectos.sql');
+
+                try {
+                    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+                    await sequelize.query(migrationSQL);
+                    console.log('✅ Tabla produccion_proyectos creada exitosamente');
+                } catch (migrationError) {
+                    console.error('⚠️ Error al crear tabla produccion_proyectos:', migrationError.message);
+                }
+            } else {
+                console.log('✅ Tabla produccion_proyectos ya existe');
+            }
+
             // Auto-migración de herramientas de renta
             await ejecutarAutoMigracion();
         }
