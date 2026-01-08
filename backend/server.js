@@ -231,6 +231,37 @@ const startServer = async () => {
                 console.log('✅ Tabla image_processing_queue ya existe');
             }
 
+            // Verificar/crear tabla de anuncios
+            console.log('🔍 Verificando tabla anuncios...');
+            const [anunciosTableCheck] = await sequelize.query(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'anuncios'"
+            );
+
+            const anunciosTableExists = parseInt(anunciosTableCheck[0].count) > 0;
+
+            if (!anunciosTableExists) {
+                console.log('🔄 Creando tabla anuncios...');
+
+                // Leer y ejecutar el archivo de migración de anuncios
+                const fs = await import('fs');
+                const path = await import('path');
+                const { fileURLToPath } = await import('url');
+
+                const __filename = fileURLToPath(import.meta.url);
+                const __dirname = path.dirname(__filename);
+                const migrationPath = path.join(__dirname, 'migrations', 'create-tabla-anuncios.sql');
+
+                try {
+                    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+                    await sequelize.query(migrationSQL);
+                    console.log('✅ Tabla anuncios creada exitosamente');
+                } catch (migrationError) {
+                    console.error('⚠️ Error al crear tabla anuncios (puede que ya exista parcialmente):', migrationError.message);
+                }
+            } else {
+                console.log('✅ Tabla anuncios ya existe');
+            }
+
             // Auto-migración de herramientas de renta
             await ejecutarAutoMigracion();
         }
