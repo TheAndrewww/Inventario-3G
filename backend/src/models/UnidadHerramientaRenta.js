@@ -32,20 +32,20 @@ const UnidadHerramientaRenta = sequelize.define('UnidadHerramientaRenta', {
         allowNull: true,
         comment: 'Número de serie del fabricante (opcional)'
     },
-    // ===== NUEVOS CAMPOS (Refactorización 2026-01-08) =====
-    // NOTA: Usamos STRING en lugar de ENUM para evitar problemas con tipos no definidos en producción
-    condicion: {
-        type: DataTypes.STRING(20),
-        allowNull: true,
-        defaultValue: 'bueno',
-        comment: 'Condición física de la herramienta: bueno, regular, malo, perdido, baja'
-    },
-    estatus: {
-        type: DataTypes.STRING(20),
-        allowNull: true,
-        defaultValue: 'disponible',
-        comment: 'Estatus de disponibilidad: disponible, asignado, en_reparacion, en_transito'
-    },
+    // ===== CAMPOS PENDIENTES DE MIGRACIÓN (No existen en producción aún) =====
+    // TODO: Ejecutar migración SQL para agregar estas columnas antes de descomentar
+    // condicion: {
+    //     type: DataTypes.STRING(20),
+    //     allowNull: true,
+    //     defaultValue: 'bueno',
+    //     comment: 'Condición física de la herramienta: bueno, regular, malo, perdido, baja'
+    // },
+    // estatus: {
+    //     type: DataTypes.STRING(20),
+    //     allowNull: true,
+    //     defaultValue: 'disponible',
+    //     comment: 'Estatus de disponibilidad: disponible, asignado, en_reparacion, en_transito'
+    // },
     // ===== CAMPO DEPRECATED (mantener temporalmente para compatibilidad) =====
     estado: {
         type: DataTypes.ENUM('buen_estado', 'estado_regular', 'mal_estado', 'asignada', 'disponible', 'en_reparacion', 'perdida', 'baja', 'en_transito', 'pendiente_devolucion'),
