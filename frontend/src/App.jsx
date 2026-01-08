@@ -60,7 +60,7 @@ function App() {
           />
 
           <Routes>
-            {/* Rutas públicas */}
+            {/* Rutas públicas - DEBEN estar primero */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/calendario-publico" element={<CalendarioPublicoPage />} />
             <Route path="/anuncios" element={<AnunciosPublicosPage />} />
@@ -91,10 +91,10 @@ function App() {
               <Route path="procesamiento-masivo" element={<ProcesamientoMasivoPage />} />
               <Route path="monitor-pedidos" element={<MonitorPedidosPage />} />
               <Route path="perfil" element={<PerfilPage />} />
-            </Route>
 
-            {/* Ruta 404 */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+              {/* Ruta 404 para rutas privadas no encontradas */}
+              <Route path="*" element={<Navigate to="/inventario" replace />} />
+            </Route>
           </Routes>
           </PedidoProvider>
           </CalendarioProvider>
