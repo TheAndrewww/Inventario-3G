@@ -32,74 +32,81 @@ function App() {
   useVersionCheck();
   return (
     <Router>
-      <AuthProvider>
-        <NotificacionesProvider>
-          <CalendarioProvider>
-            <PedidoProvider>
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 3000,
-              style: {
-                background: '#363636',
-                color: '#fff',
-              },
-              success: {
-                iconTheme: {
-                  primary: '#10b981',
-                  secondary: '#fff',
-                },
-              },
-              error: {
-                iconTheme: {
-                  primary: '#ef4444',
-                  secondary: '#fff',
-                },
-              },
-            }}
-          />
+      <Routes>
+        {/* Rutas 100% públicas - completamente fuera del AuthProvider */}
+        <Route path="/anuncios" element={<AnunciosPublicosPage />} />
+        <Route path="/calendario-publico" element={<CalendarioPublicoPage />} />
 
-          <Routes>
-            {/* Rutas públicas - DEBEN estar primero */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/calendario-publico" element={<CalendarioPublicoPage />} />
-            <Route path="/anuncios" element={<AnunciosPublicosPage />} />
+        {/* Resto de la aplicación con autenticación */}
+        <Route path="/*" element={
+          <AuthProvider>
+            <NotificacionesProvider>
+              <CalendarioProvider>
+                <PedidoProvider>
+                  <Toaster
+                    position="top-right"
+                    toastOptions={{
+                      duration: 3000,
+                      style: {
+                        background: '#363636',
+                        color: '#fff',
+                      },
+                      success: {
+                        iconTheme: {
+                          primary: '#10b981',
+                          secondary: '#fff',
+                        },
+                      },
+                      error: {
+                        iconTheme: {
+                          primary: '#ef4444',
+                          secondary: '#fff',
+                        },
+                      },
+                    }}
+                  />
 
-            {/* Rutas privadas */}
-            <Route
-              path="/"
-              element={
-                <PrivateRoute>
-                  <DashboardLayout />
-                </PrivateRoute>
-              }
-            >
-              <Route index element={<Navigate to="/inventario" replace />} />
-              <Route path="inventario" element={<InventarioPage />} />
-              <Route path="recepcion-mercancia" element={<RecepcionMercanciaPage />} />
-              <Route path="pedido" element={<PedidoPage />} />
-              <Route path="pedidos-pendientes" element={<PedidosPendientesPage />} />
-              <Route path="recibir-pedidos" element={<RecibirPedidosPage />} />
-              <Route path="camionetas" element={<CamionetasPage />} />
-              <Route path="usuarios" element={<UsuariosPage />} />
-              <Route path="ordenes-compra" element={<OrdenesCompraPage />} />
-              <Route path="renta-herramientas" element={<RentaHerramientasPage />} />
-              <Route path="renta-herramientas/imprimir-codigos" element={<ImpresionCodigosHerramientasPage />} />
-              <Route path="historial" element={<HistorialPage />} />
-              <Route path="proveedores" element={<ProveedoresPage />} />
-              <Route path="calendario" element={<CalendarioPage />} />
-              <Route path="procesamiento-masivo" element={<ProcesamientoMasivoPage />} />
-              <Route path="monitor-pedidos" element={<MonitorPedidosPage />} />
-              <Route path="perfil" element={<PerfilPage />} />
+                  <Routes>
+                    {/* Ruta de login */}
+                    <Route path="/login" element={<LoginPage />} />
 
-              {/* Ruta 404 para rutas privadas no encontradas */}
-              <Route path="*" element={<Navigate to="/inventario" replace />} />
-            </Route>
-          </Routes>
-          </PedidoProvider>
-          </CalendarioProvider>
-        </NotificacionesProvider>
-      </AuthProvider>
+                    {/* Rutas privadas */}
+                    <Route
+                      path="/"
+                      element={
+                        <PrivateRoute>
+                          <DashboardLayout />
+                        </PrivateRoute>
+                      }
+                    >
+                      <Route index element={<Navigate to="/inventario" replace />} />
+                      <Route path="inventario" element={<InventarioPage />} />
+                      <Route path="recepcion-mercancia" element={<RecepcionMercanciaPage />} />
+                      <Route path="pedido" element={<PedidoPage />} />
+                      <Route path="pedidos-pendientes" element={<PedidosPendientesPage />} />
+                      <Route path="recibir-pedidos" element={<RecibirPedidosPage />} />
+                      <Route path="camionetas" element={<CamionetasPage />} />
+                      <Route path="usuarios" element={<UsuariosPage />} />
+                      <Route path="ordenes-compra" element={<OrdenesCompraPage />} />
+                      <Route path="renta-herramientas" element={<RentaHerramientasPage />} />
+                      <Route path="renta-herramientas/imprimir-codigos" element={<ImpresionCodigosHerramientasPage />} />
+                      <Route path="historial" element={<HistorialPage />} />
+                      <Route path="proveedores" element={<ProveedoresPage />} />
+                      <Route path="calendario" element={<CalendarioPage />} />
+                      <Route path="procesamiento-masivo" element={<ProcesamientoMasivoPage />} />
+                      <Route path="monitor-pedidos" element={<MonitorPedidosPage />} />
+                      <Route path="perfil" element={<PerfilPage />} />
+
+                      {/* Ruta 404 para rutas privadas no encontradas */}
+                      <Route path="*" element={<Navigate to="/inventario" replace />} />
+                    </Route>
+                  </Routes>
+                </PedidoProvider>
+              </CalendarioProvider>
+            </NotificacionesProvider>
+          </AuthProvider>
+        } />
+      </Routes>
     </Router>
   );
 }
