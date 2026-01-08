@@ -16,6 +16,7 @@ import SolicitudCompra from './SolicitudCompra.js';
 import Notificacion from './Notificacion.js';
 import FCMToken from './FCMToken.js';
 import Proyecto from './Proyecto.js';
+import ProduccionProyecto from './ProduccionProyecto.js';
 import TipoHerramientaRenta from './TipoHerramientaRenta.js';
 import UnidadHerramientaRenta from './UnidadHerramientaRenta.js';
 import HistorialAsignacionHerramienta from './HistorialAsignacionHerramienta.js';
@@ -538,6 +539,7 @@ export {
     Notificacion,
     FCMToken,
     Proyecto,
+    ProduccionProyecto,
     TipoHerramientaRenta,
     UnidadHerramientaRenta,
     HistorialAsignacionHerramienta,
@@ -564,6 +566,7 @@ export default {
     Notificacion,
     FCMToken,
     Proyecto,
+    ProduccionProyecto,
     TipoHerramientaRenta,
     UnidadHerramientaRenta,
     HistorialAsignacionHerramienta

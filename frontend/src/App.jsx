@@ -26,6 +26,8 @@ import AnunciosPublicosPage from './pages/AnunciosPublicosPage';
 import ProcesamientoMasivoPage from './pages/ProcesamientoMasivoPage';
 import MonitorPedidosPage from './pages/MonitorPedidosPage';
 import MiEquipoPage from './pages/MiEquipoPage';
+import DashboardProduccionPage from './pages/DashboardProduccionPage';
+import TerminalAreaPage from './pages/TerminalAreaPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 
 function App() {
@@ -37,6 +39,8 @@ function App() {
         {/* Rutas 100% públicas - completamente fuera del AuthProvider */}
         <Route path="/anuncios" element={<AnunciosPublicosPage />} />
         <Route path="/calendario-publico" element={<CalendarioPublicoPage />} />
+        <Route path="/terminal" element={<TerminalAreaPage />} />
+        <Route path="/terminal/:area" element={<TerminalAreaPage />} />
 
         {/* Resto de la aplicación con autenticación */}
         <Route path="/*" element={
@@ -97,6 +101,7 @@ function App() {
                       <Route path="procesamiento-masivo" element={<ProcesamientoMasivoPage />} />
                       <Route path="monitor-pedidos" element={<MonitorPedidosPage />} />
                       <Route path="mi-equipo" element={<MiEquipoPage />} />
+                      <Route path="produccion" element={<DashboardProduccionPage />} />
                       <Route path="perfil" element={<PerfilPage />} />
 
                       {/* Ruta 404 para rutas privadas no encontradas */}

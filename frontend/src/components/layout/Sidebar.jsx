@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2 } from 'lucide-react';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -88,6 +88,12 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       roles: ['administrador', 'diseñador', 'almacen', 'ventas', 'compras', 'encargado', 'operador']
     },
     {
+      path: '/produccion',
+      icon: Factory,
+      label: 'Dashboard Producción',
+      roles: ['administrador', 'diseñador', 'encargado']
+    },
+    {
       path: '/historial',
       icon: History,
       label: 'Historial',
@@ -158,8 +164,8 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
               to={item.path}
               onClick={onNavigate}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
-                  ? 'bg-red-50 text-red-700'
-                  : 'text-gray-700 hover:bg-gray-100'
+                ? 'bg-red-50 text-red-700'
+                : 'text-gray-700 hover:bg-gray-100'
                 }`}
             >
               <Icon size={20} />
@@ -175,8 +181,8 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
           to="/perfil"
           onClick={onNavigate}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${location.pathname === '/perfil'
-              ? 'bg-red-50 text-red-700'
-              : 'text-gray-700 hover:bg-gray-100'
+            ? 'bg-red-50 text-red-700'
+            : 'text-gray-700 hover:bg-gray-100'
             }`}
         >
           <User size={20} />
