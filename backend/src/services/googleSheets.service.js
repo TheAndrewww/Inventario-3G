@@ -520,8 +520,78 @@ export const obtenerDistribucionEquipos = async (mes = 'NOVIEMBRE') => {
   }
 };
 
+/**
+ * Leer anuncios desde el rango W20:Z23 del calendario
+ * @param {string} mes - Nombre del mes (ENERO, FEBRERO, etc.)
+ * @returns {Promise<Object>} - Lista de anuncios del calendario
+ */
+export const leerAnunciosCalendario = async (mes) => {
+  try {
+    console.log(`📢 Leyendo anuncios del mes: ${mes}`);
+
+    const sheets = await authenticate();
+
+    // Leer el rango W20:Z23 (4 filas x 4 columnas)
+    const range = `${mes}!W20:Z23`;
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: range,
+    });
+
+    const rows = response.data.values || [];
+
+    if (rows.length === 0) {
+      console.log('⚠️  No se encontraron anuncios en el rango W20:Z23');
+      return {
+        success: true,
+        data: {
+          anuncios: [],
+          total: 0
+        }
+      };
+    }
+
+    // Procesar cada fila como un anuncio
+    // Estructura esperada: [Columna W, X, Y, Z]
+    const anuncios = rows
+      .filter(row => row && row.length > 0 && row[0]) // Filtrar filas vacías
+      .map((row, index) => ({
+        numero: index + 1,
+        textoAnuncio: row[0] || '', // Columna W
+        proyecto: row[1] || '',     // Columna X
+        equipo: row[2] || '',        // Columna Y
+        categoria: row[3] || ''      // Columna Z
+      }))
+      .filter(anuncio => anuncio.textoAnuncio.trim() !== ''); // Filtrar anuncios sin texto
+
+    console.log(`✅ Anuncios encontrados: ${anuncios.length}`);
+    anuncios.forEach((a, i) => {
+      console.log(`   ${i+1}. "${a.textoAnuncio}" - ${a.proyecto || 'Sin proyecto'}`);
+    });
+
+    return {
+      success: true,
+      data: {
+        anuncios: anuncios,
+        total: anuncios.length
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Error al leer anuncios del calendario:', error);
+
+    if (error.message && error.message.includes('Unable to parse range')) {
+      throw new Error(`La pestaña "${mes}" no existe en el Google Sheet`);
+    }
+
+    throw new Error(`Error al leer anuncios del calendario: ${error.message}`);
+  }
+};
+
 export default {
   leerCalendarioMes,
   obtenerProyectosDia,
-  obtenerDistribucionEquipos
+  obtenerDistribucionEquipos,
+  leerAnunciosCalendario
 };

@@ -1,7 +1,8 @@
 import db from '../config/database.js';
-import { generarImagenAnuncio, generarFrasesDesdeProyectos } from '../services/geminiAnuncios.service.js';
+import { QueryTypes } from 'sequelize';
+import { generarImagenAnuncio, generarFrasesDesdeProyectos, obtenerImagenTensito } from '../services/geminiAnuncios.service.js';
 import { subirImagenAnuncio } from '../services/cloudinaryAnuncios.service.js';
-import { leerCalendarioMes, obtenerProyectosDia } from '../services/googleSheets.service.js';
+import { leerCalendarioMes, obtenerProyectosDia, leerAnunciosCalendario } from '../services/googleSheets.service.js';
 
 const MESES = [
   'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
@@ -151,14 +152,23 @@ export const generarAnuncioManual = async (req, res) => {
         equipo,
         tipo_anuncio,
         activo
-      ) VALUES ($1, $2, $3, $4, $5, $6, true)
+      ) VALUES (:fecha, :frase, :imagenUrl, :proyectoNombre, :equipo, :tipoAnuncio, true)
       RETURNING *
     `;
 
     const fechaAnuncio = fecha || new Date().toISOString().split('T')[0];
-    const values = [fechaAnuncio, frase, imagenUrl, proyectoNombre, equipo, 'manual'];
 
-    const [result] = await db.query(query, values);
+    const [result] = await db.query(query, {
+      replacements: {
+        fecha: fechaAnuncio,
+        frase,
+        imagenUrl,
+        proyectoNombre,
+        equipo,
+        tipoAnuncio: 'manual'
+      },
+      type: QueryTypes.SELECT
+    });
 
     res.json({
       success: true,
@@ -180,74 +190,100 @@ export const generarAnuncioManual = async (req, res) => {
 };
 
 /**
- * Generar anuncios desde calendario
+ * Generar anuncios desde calendario (celdas W20:Z23)
  * POST /api/anuncios/generar-desde-calendario
  */
 export const generarAnunciosDesdeCalendario = async (req, res) => {
   try {
     const hoy = new Date();
     const mes = MESES[hoy.getMonth()];
-    const dia = hoy.getDate();
 
-    // Obtener proyectos del día desde Google Sheets
-    const resultado = await obtenerProyectosDia(mes, dia);
-    const proyectos = resultado.data.proyectos;
+    console.log(`🎯 Generando anuncios desde calendario para ${mes}`);
 
-    if (proyectos.length === 0) {
+    // Leer anuncios del rango W20:Z23
+    const resultado = await leerAnunciosCalendario(mes);
+    const anunciosCalendario = resultado.data.anuncios;
+
+    if (anunciosCalendario.length === 0) {
       return res.json({
         success: true,
         data: [],
-        message: 'No hay proyectos para hoy en el calendario',
-        proyectosEncontrados: 0
+        message: 'No hay anuncios en el rango W20:Z23 del calendario',
+        anunciosEncontrados: 0
       });
     }
 
-    // Generar frases para anuncios
-    const frases = generarFrasesDesdeProyectos(proyectos);
+    // Descargar imagen de Tensito UNA SOLA VEZ para usarla en todos los anuncios
+    console.log('🤖 Descargando imagen de Tensito para incluirla en todos los anuncios...');
+    const tensito = await obtenerImagenTensito();
+
+    // Desactivar anuncios viejos antes de generar nuevos
+    console.log('🧹 Desactivando anuncios viejos del calendario...');
+    await db.query(
+      `UPDATE anuncios SET activo = false WHERE tipo_anuncio = 'calendario' AND activo = true`,
+      { type: QueryTypes.UPDATE }
+    );
 
     const anunciosGenerados = [];
 
-    for (let i = 0; i < frases.length; i++) {
-      const frase = frases[i];
-      const proyecto = proyectos[i];
+    // Generar imagen para cada anuncio con IA
+    for (const anuncio of anunciosCalendario) {
+      console.log(`🎨 Generando imagen para: "${anuncio.textoAnuncio}" con Tensito`);
 
-      // Insertar en BD (sin imagen por ahora, se generará con el job)
-      const query = `
-        INSERT INTO anuncios (
-          fecha,
-          frase,
-          imagen_url,
-          proyecto_nombre,
-          equipo,
-          tipo_anuncio,
-          activo
-        ) VALUES ($1, $2, $3, $4, $5, $6, true)
-        RETURNING *
-      `;
+      try {
+        // Generar imagen con Gemini 3 Pro (Nano Banana Pro) CON TENSITO
+        // La función ahora retorna la imagen generada como data URL
+        const imagenDataUrl = await generarImagenAnuncio(
+          anuncio.textoAnuncio,
+          tensito.base64,  // Pasar imagen de Tensito
+          tensito.mimeType // Pasar MIME type de Tensito
+        );
+        console.log(`✅ Imagen generada con IA para: "${anuncio.textoAnuncio}"`);
 
-      const placeholderUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1763171532/logo_web_blanco_j8xeyh.png';
-      const values = [
-        hoy.toISOString().split('T')[0],
-        frase,
-        placeholderUrl,
-        proyecto.nombre,
-        proyecto.equipoHora,
-        'proyecto'
-      ];
+        // Insertar en base de datos con la imagen generada
+        const query = `
+          INSERT INTO anuncios (
+            fecha,
+            frase,
+            imagen_url,
+            proyecto_nombre,
+            equipo,
+            tipo_anuncio,
+            activo
+          ) VALUES (:fecha, :frase, :imagenUrl, :proyectoNombre, :equipo, :tipoAnuncio, true)
+          RETURNING *
+        `;
 
-      const [result] = await db.query(query, values);
-      anunciosGenerados.push(result[0]);
+        const [result] = await db.query(query, {
+          replacements: {
+            fecha: hoy.toISOString().split('T')[0],
+            frase: anuncio.textoAnuncio,
+            imagenUrl: imagenDataUrl, // Usar imagen generada por IA
+            proyectoNombre: anuncio.proyecto || null,
+            equipo: anuncio.equipo || null,
+            tipoAnuncio: 'calendario'
+          },
+          type: QueryTypes.SELECT
+        });
+
+        anunciosGenerados.push(result[0]);
+
+      } catch (errorAnuncio) {
+        console.error(`❌ Error generando anuncio "${anuncio.textoAnuncio}":`, errorAnuncio.message);
+        // Continuar con el siguiente anuncio
+      }
     }
 
     res.json({
       success: true,
       data: anunciosGenerados,
-      proyectosEncontrados: proyectos.length,
-      message: `${anunciosGenerados.length} anuncios generados desde el calendario`
+      anunciosEncontrados: anunciosCalendario.length,
+      anunciosGenerados: anunciosGenerados.length,
+      message: `${anunciosGenerados.length} anuncios generados desde el calendario con Tensito`
     });
 
   } catch (error) {
-    console.error('Error al generar anuncios desde calendario:', error);
+    console.error('❌ Error al generar anuncios desde calendario:', error);
     res.status(500).json({
       success: false,
       message: 'Error al generar anuncios desde calendario',
@@ -264,7 +300,10 @@ export const incrementarVista = async (req, res) => {
   try {
     const { id } = req.params;
 
-    await db.query('SELECT incrementar_vistas_anuncio($1)', [id]);
+    await db.query('SELECT incrementar_vistas_anuncio(:id)', {
+      replacements: { id },
+      type: QueryTypes.SELECT
+    });
 
     res.json({
       success: true,
@@ -289,8 +328,11 @@ export const desactivarAnuncio = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const query = 'UPDATE anuncios SET activo = false WHERE id = $1 RETURNING *';
-    const [result] = await db.query(query, [id]);
+    const query = 'UPDATE anuncios SET activo = false WHERE id = :id RETURNING *';
+    const [result] = await db.query(query, {
+      replacements: { id },
+      type: QueryTypes.SELECT
+    });
 
     if (result.length === 0) {
       return res.status(404).json({

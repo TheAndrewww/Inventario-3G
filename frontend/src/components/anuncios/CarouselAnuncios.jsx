@@ -61,11 +61,11 @@ const CarouselAnuncios = ({ anuncios = [] }) => {
             />
 
             {/* Container de imagen principal */}
-            <div className="absolute inset-0 flex items-center justify-center p-4 md:p-12">
+            <div className="absolute inset-0 flex items-center justify-center">
               <img
                 src={anuncio.imagen_url}
                 alt={anuncio.frase}
-                className={`max-w-full max-h-full object-contain shadow-2xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-1000 ease-out ${
+                className={`w-full h-full object-cover shadow-2xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-1000 ease-out ${
                   isActive ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'
                 }`}
               />
