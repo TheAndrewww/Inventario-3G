@@ -141,6 +141,13 @@ const ProduccionProyecto = sequelize.define('ProduccionProyecto', {
         allowNull: true
     },
 
+    // ===== Tipo de proyecto (para color de cards) =====
+    tipo_proyecto: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+        comment: 'Tipo de proyecto: MTO, GTIA, A, B, C, etc. Para determinar color de card'
+    },
+
     // ===== Estado general =====
     activo: {
         type: DataTypes.BOOLEAN,

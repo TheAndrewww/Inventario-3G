@@ -52,6 +52,22 @@ export const completarEtapa = async (proyectoId, observaciones = '') => {
     return response.data;
 };
 
+// Sincronización con Google Sheets
+export const sincronizarConSheets = async (mes = null) => {
+    const response = await api.post('/produccion/sincronizar', { mes });
+    return response.data;
+};
+
+export const obtenerMesesDisponibles = async () => {
+    const response = await api.get('/produccion/meses-disponibles');
+    return response.data;
+};
+
+export const previewProyectosSheets = async (mes) => {
+    const response = await api.get(`/produccion/preview-sheets/${mes}`);
+    return response.data;
+};
+
 export default {
     obtenerDashboard,
     obtenerEstadisticas,
@@ -61,5 +77,8 @@ export default {
     crearProyecto,
     actualizarProyecto,
     eliminarProyecto,
-    completarEtapa
+    completarEtapa,
+    sincronizarConSheets,
+    obtenerMesesDisponibles,
+    previewProyectosSheets
 };

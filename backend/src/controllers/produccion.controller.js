@@ -1,5 +1,6 @@
 import { ProduccionProyecto, Usuario, sequelize } from '../models/index.js';
 import { Op } from 'sequelize';
+import produccionSheetsService from '../services/produccionSheets.service.js';
 
 // Colores por área (del sistema de calendario existente)
 const COLORES_AREAS = {
@@ -355,6 +356,87 @@ export const obtenerEstadisticas = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al obtener estadísticas',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * POST /api/produccion/sincronizar
+ * Sincronizar proyectos desde Google Sheets
+ */
+export const sincronizarConSheets = async (req, res) => {
+    try {
+        const { mes } = req.body; // Opcional, si no se especifica usa el mes actual
+
+        console.log(`🔄 Iniciando sincronización con Google Sheets ${mes ? `(mes: ${mes})` : '(mes actual)'}...`);
+
+        const resultado = await produccionSheetsService.sincronizarConDB(mes);
+
+        res.json({
+            success: true,
+            message: resultado.message,
+            data: {
+                mes: resultado.mes,
+                creados: resultado.creados,
+                actualizados: resultado.actualizados,
+                total: resultado.total
+            }
+        });
+    } catch (error) {
+        console.error('Error al sincronizar con Sheets:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al sincronizar con Google Sheets',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * GET /api/produccion/meses-disponibles
+ * Obtener lista de meses disponibles en el spreadsheet
+ */
+export const obtenerMesesDisponibles = async (req, res) => {
+    try {
+        const resultado = await produccionSheetsService.obtenerMesesDisponibles();
+
+        res.json({
+            success: true,
+            data: resultado.data,
+            todasLasHojas: resultado.todasLasHojas
+        });
+    } catch (error) {
+        console.error('Error al obtener meses:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener meses disponibles',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * GET /api/produccion/preview-sheets/:mes
+ * Vista previa de proyectos en el spreadsheet (sin guardar)
+ */
+export const previewProyectosSheets = async (req, res) => {
+    try {
+        const { mes } = req.params;
+
+        const resultado = await produccionSheetsService.leerProyectosProduccion(mes);
+
+        res.json({
+            success: true,
+            data: resultado.data,
+            mes: resultado.mes,
+            total: resultado.total
+        });
+    } catch (error) {
+        console.error('Error al obtener preview:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener vista previa',
             error: error.message
         });
     }

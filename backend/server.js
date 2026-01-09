@@ -165,6 +165,21 @@ const startServer = async () => {
         if (process.env.NODE_ENV === 'development') {
             await sequelize.sync({ alter: false });
             console.log('✅ Modelos sincronizados con la base de datos');
+
+            // Verificar columna tipo_proyecto en desarrollo también
+            try {
+                const [tipoProyectoCheck] = await sequelize.query(
+                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'produccion_proyectos' AND column_name = 'tipo_proyecto'"
+                );
+
+                if (parseInt(tipoProyectoCheck[0]?.count || 0) === 0) {
+                    console.log('🔄 Agregando columna tipo_proyecto...');
+                    await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS tipo_proyecto VARCHAR(20)");
+                    console.log('✅ Columna tipo_proyecto agregada');
+                }
+            } catch (e) {
+                console.log('⚠️ No se pudo verificar/agregar tipo_proyecto:', e.message);
+            }
         } else {
             // En producción, ejecutar setup automático si no hay tablas
             const [results] = await sequelize.query(
@@ -296,6 +311,17 @@ const startServer = async () => {
                 }
             } else {
                 console.log('✅ Tabla produccion_proyectos ya existe');
+
+                // Verificar si existe la columna tipo_proyecto
+                const [tipoProyectoCheck] = await sequelize.query(
+                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'produccion_proyectos' AND column_name = 'tipo_proyecto'"
+                );
+
+                if (parseInt(tipoProyectoCheck[0].count) === 0) {
+                    console.log('🔄 Agregando columna tipo_proyecto...');
+                    await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN tipo_proyecto VARCHAR(20)");
+                    console.log('✅ Columna tipo_proyecto agregada');
+                }
             }
 
             // Auto-migración de herramientas de renta

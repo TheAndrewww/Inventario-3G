@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS produccion_proyectos (
     observaciones_produccion TEXT,
     observaciones_instalacion TEXT,
     
+    -- Tipo de proyecto (para color de cards)
+    tipo_proyecto VARCHAR(20),
+    
     -- Estado general
     activo BOOLEAN NOT NULL DEFAULT true,
     
@@ -48,6 +51,9 @@ CREATE TABLE IF NOT EXISTS produccion_proyectos (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Agregar columna tipo_proyecto si no existe (para tablas existentes)
+ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS tipo_proyecto VARCHAR(20);
 
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_produccion_etapa ON produccion_proyectos(etapa_actual);

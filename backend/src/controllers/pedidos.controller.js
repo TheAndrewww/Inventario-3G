@@ -1905,24 +1905,25 @@ export const marcarPedidoListo = async (req, res) => {
 
   try {
     const { pedido_id } = req.params;
-    const { supervisor_id } = req.body;
+    // Aceptar encargado_id o supervisor_id (compatibilidad)
+    const encargado_id = req.body.encargado_id || req.body.supervisor_id;
 
-    // Validar que se proporcionó un supervisor
-    if (!supervisor_id) {
+    // Validar que se proporcionó un encargado/supervisor
+    if (!encargado_id) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
-        message: 'Debe asignar un supervisor para recibir el pedido'
+        message: 'Debe asignar un encargado para recibir el pedido'
       });
     }
 
-    // Verificar que el supervisor existe y es supervisor o admin
-    const supervisor = await Usuario.findByPk(supervisor_id);
-    if (!supervisor || !['supervisor', 'administrador'].includes(supervisor.rol)) {
+    // Verificar que el encargado existe y tiene rol válido
+    const encargado = await Usuario.findByPk(encargado_id);
+    if (!encargado || !['encargado', 'supervisor', 'administrador'].includes(encargado.rol)) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
-        message: 'El supervisor seleccionado no es válido'
+        message: 'El encargado seleccionado no es válido'
       });
     }
 
@@ -1965,10 +1966,10 @@ export const marcarPedidoListo = async (req, res) => {
       });
     }
 
-    // Marcar como listo para entrega y asignar supervisor
+    // Marcar como listo para entrega y asignar encargado
     await pedido.update({
       estado: 'listo_para_entrega',
-      supervisor_id: supervisor_id
+      supervisor_id: encargado_id
     }, { transaction });
 
     await transaction.commit();
@@ -2350,7 +2351,7 @@ export const listarSupervisores = async (req, res) => {
     const supervisores = await Usuario.findAll({
       where: {
         rol: {
-          [Op.in]: ['supervisor', 'administrador']
+          [Op.in]: ['encargado', 'supervisor', 'administrador']
         },
         activo: true
       },

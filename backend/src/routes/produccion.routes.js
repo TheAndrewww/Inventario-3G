@@ -7,7 +7,10 @@ import {
     crearProyecto,
     actualizarProyecto,
     eliminarProyecto,
-    obtenerEstadisticas
+    obtenerEstadisticas,
+    sincronizarConSheets,
+    obtenerMesesDisponibles,
+    previewProyectosSheets
 } from '../controllers/produccion.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -56,6 +59,27 @@ router.get('/dashboard', obtenerDashboard);
 router.get('/estadisticas', obtenerEstadisticas);
 
 /**
+ * GET /api/produccion/meses-disponibles
+ * Obtener lista de meses disponibles en el spreadsheet
+ * Acceso: Usuarios autenticados
+ */
+router.get('/meses-disponibles', obtenerMesesDisponibles);
+
+/**
+ * GET /api/produccion/preview-sheets/:mes
+ * Vista previa de proyectos del spreadsheet
+ * Acceso: Usuarios autenticados
+ */
+router.get('/preview-sheets/:mes', previewProyectosSheets);
+
+/**
+ * POST /api/produccion/sincronizar
+ * Sincronizar proyectos desde Google Sheets
+ * Acceso: Administrador
+ */
+router.post('/sincronizar', verificarRol('administrador'), sincronizarConSheets);
+
+/**
  * GET /api/produccion/area/:area
  * Obtener proyectos de un área (autenticado)
  * Acceso: Usuarios autenticados
@@ -91,3 +115,4 @@ router.put('/:id', verificarRol('administrador', 'almacenista'), actualizarProye
 router.delete('/:id', verificarRol('administrador'), eliminarProyecto);
 
 export default router;
+
