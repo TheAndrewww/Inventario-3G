@@ -145,10 +145,10 @@ const pedidosService = {
   },
 
   /**
-   * Listar encargados disponibles
+   * Listar supervisores disponibles
    */
   listarSupervisores: async () => {
-    const response = await api.get('/pedidos/encargados');
+    const response = await api.get('/pedidos/supervisores');
     return response.data;
   }
 };
