@@ -10,11 +10,11 @@ const MESES = [
 ];
 
 /**
- * Job para generar anuncios automáticamente todos los días a las 7:00 AM
+ * Job para generar anuncios automáticamente todos los días a las 12:00 AM (medianoche)
  */
 export const iniciarJobAnuncios = () => {
-  // Ejecutar todos los días a las 7:00 AM (hora de México)
-  cron.schedule('0 7 * * *', async () => {
+  // Ejecutar todos los días a las 12:00 AM medianoche (hora de México)
+  cron.schedule('0 0 * * *', async () => {
     console.log('');
     console.log('🤖 ========================================');
     console.log('🤖 JOB AUTOMÁTICO: Generación de Anuncios');
@@ -35,7 +35,7 @@ export const iniciarJobAnuncios = () => {
   });
 
   console.log('⏰ Job de anuncios programado:');
-  console.log('   - Horario: 7:00 AM diario (Hora de México)');
+  console.log('   - Horario: 12:00 AM (medianoche) diario');
   console.log('   - Zona horaria: America/Mexico_City');
   console.log('');
 
