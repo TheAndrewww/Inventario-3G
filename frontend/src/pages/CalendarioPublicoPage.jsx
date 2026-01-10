@@ -157,6 +157,21 @@ const CalendarioPublicoPage = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Auto-entrar en pantalla completa al cargar la página
+  useEffect(() => {
+    const entrarPantallaCompleta = () => {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch((err) => {
+          console.log('No se pudo entrar en pantalla completa automáticamente:', err.message);
+        });
+      }
+    };
+
+    // Intentar entrar después de un pequeño delay para asegurar que la página cargó
+    const timer = setTimeout(entrarPantallaCompleta, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Auto-ocultar controles en pantalla completa
   useEffect(() => {
     if (!modoPantallaCompleta) {
@@ -289,9 +304,8 @@ const CalendarioPublicoPage = () => {
         {modoPantallaCompleta && (
           <button
             onClick={togglePantallaCompleta}
-            className={`fixed top-4 right-4 z-50 p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 shadow-lg transition-all duration-300 ${
-              mostrarControles ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
-            }`}
+            className={`fixed top-4 right-4 z-50 p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 shadow-lg transition-all duration-300 ${mostrarControles ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
+              }`}
             title="Salir de pantalla completa"
           >
             <Minimize2 className="w-6 h-6" />
@@ -300,9 +314,8 @@ const CalendarioPublicoPage = () => {
 
         {/* Controles de zoom en pantalla completa */}
         {modoPantallaCompleta && (
-          <div className={`fixed bottom-4 right-4 z-50 flex flex-col gap-2 transition-all duration-300 ${
-            mostrarControles ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
-          }`}>
+          <div className={`fixed bottom-4 right-4 z-50 flex flex-col gap-2 transition-all duration-300 ${mostrarControles ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+            }`}>
             {/* Indicador de escala */}
             <div className="bg-gray-800 bg-opacity-70 text-white px-3 py-2 rounded-lg text-center font-bold">
               {escala}%
@@ -340,98 +353,169 @@ const CalendarioPublicoPage = () => {
           {/* Distribución de Equipos y Reloj */}
           {distribucionEquipos && distribucionEquipos.equipos && distribucionEquipos.equipos.length > 0 && (
             <div className={`${modoPantallaCompleta ? 'mb-2 grid-cols-6 gap-2' : 'mb-4 grid-cols-1 lg:grid-cols-3 gap-4'} grid`}>
-            {modoPantallaCompleta ? (
-              <>
-                {/* Fila única: Logo + Fecha y Hora + Distribución de Equipos */}
+              {modoPantallaCompleta ? (
+                <>
+                  {/* Fila única: Logo + Fecha y Hora + Distribución de Equipos */}
 
-                {/* Logo de la empresa */}
-                <div className="p-4 flex items-center justify-center bg-gray-900 rounded-lg">
-                  <img
-                    src="https://res.cloudinary.com/dd93jrilg/image/upload/v1763171532/logo_web_blanco_j8xeyh.png"
-                    alt="Logo 3G"
-                    className="w-full h-auto object-contain"
-                  />
-                </div>
+                  {/* Logo de la empresa */}
+                  <div className="p-4 flex items-center justify-center bg-gray-900 rounded-lg">
+                    <img
+                      src="https://res.cloudinary.com/dd93jrilg/image/upload/v1763171532/logo_web_blanco_j8xeyh.png"
+                      alt="Logo 3G"
+                      className="w-full h-auto object-contain"
+                    />
+                  </div>
 
-                {/* Fecha y Hora */}
-                <div
-                  className="col-span-2 bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md flex items-center justify-between text-white"
-                  style={{ padding: `calc(0.5rem * var(--escala, 1))` }}
-                >
-                  {/* Fecha a la izquierda */}
-                  <div className="flex-1">
+                  {/* Fecha y Hora */}
+                  <div
+                    className="col-span-2 bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md flex items-center justify-between text-white"
+                    style={{ padding: `calc(0.5rem * var(--escala, 1))` }}
+                  >
+                    {/* Fecha a la izquierda */}
+                    <div className="flex-1">
+                      <div
+                        className="font-bold capitalize"
+                        style={{
+                          fontSize: `calc(1.5rem * var(--escala, 1))`,
+                          marginBottom: `calc(0.25rem * var(--escala, 1))`
+                        }}
+                      >
+                        {horaActual.toLocaleDateString('es-MX', {
+                          weekday: 'long',
+                          timeZone: 'America/Mexico_City'
+                        })}
+                      </div>
+                      <div
+                        className="font-medium opacity-90 capitalize"
+                        style={{ fontSize: `calc(1.125rem * var(--escala, 1))` }}
+                      >
+                        {horaActual.toLocaleDateString('es-MX', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                          timeZone: 'America/Mexico_City'
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Hora a la derecha */}
                     <div
-                      className="font-bold capitalize"
+                      className="flex items-center"
+                      style={{ gap: `calc(0.5rem * var(--escala, 1))` }}
+                    >
+                      <Clock style={{ width: `calc(1.5rem * var(--escala, 1))`, height: `calc(1.5rem * var(--escala, 1))` }} />
+                      <div
+                        className="font-bold tabular-nums"
+                        style={{ fontSize: `calc(2.25rem * var(--escala, 1))` }}
+                      >
+                        {horaActual.toLocaleTimeString('es-MX', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: false,
+                          timeZone: 'America/Mexico_City'
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Distribución de Equipos */}
+                  <div
+                    className="col-span-3 bg-white rounded-lg shadow-md flex flex-col"
+                    style={{ padding: `calc(0.375rem * var(--escala, 1))` }}
+                  >
+                    <div
+                      className="flex items-center"
                       style={{
-                        fontSize: `calc(1.5rem * var(--escala, 1))`,
+                        gap: `calc(0.25rem * var(--escala, 1))`,
                         marginBottom: `calc(0.25rem * var(--escala, 1))`
                       }}
                     >
-                      {horaActual.toLocaleDateString('es-MX', {
-                        weekday: 'long',
-                        timeZone: 'America/Mexico_City'
-                      })}
+                      <Users style={{ width: `calc(0.75rem * var(--escala, 1))`, height: `calc(0.75rem * var(--escala, 1))` }} className="text-red-700" />
+                      <h3
+                        className="font-bold text-gray-800"
+                        style={{ fontSize: `calc(0.625rem * var(--escala, 1))` }}
+                      >
+                        Distribución de Equipos
+                      </h3>
                     </div>
-                    <div
-                      className="font-medium opacity-90 capitalize"
-                      style={{ fontSize: `calc(1.125rem * var(--escala, 1))` }}
-                    >
-                      {horaActual.toLocaleDateString('es-MX', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                        timeZone: 'America/Mexico_City'
-                      })}
+
+                    <div className="flex-1 overflow-y-auto">
+                      <div
+                        className="flex flex-wrap content-start"
+                        style={{ gap: `calc(0.25rem * var(--escala, 1))` }}
+                      >
+                        {distribucionEquipos.equipos.map((equipo, index) => {
+                          const colores = COLORES_EQUIPO[equipo.tipoEquipo];
+
+                          const estiloPersonalizado = !colores && equipo.color ? {
+                            backgroundColor: `rgb(${equipo.color.red}, ${equipo.color.green}, ${equipo.color.blue})`,
+                            borderColor: `rgb(${Math.max(0, equipo.color.red - 30)}, ${Math.max(0, equipo.color.green - 30)}, ${Math.max(0, equipo.color.blue - 30)})`,
+                            color: (equipo.color.red + equipo.color.green + equipo.color.blue) / 3 > 180 ? '#1f2937' : '#ffffff'
+                          } : null;
+
+                          // Separar encargado del resto de integrantes
+                          const encargado = equipo.integrantes && equipo.integrantes.length > 0 ? equipo.integrantes[0] : null;
+                          const otrosIntegrantes = equipo.integrantes && equipo.integrantes.length > 1 ? equipo.integrantes.slice(1) : [];
+
+                          return (
+                            <div
+                              key={index}
+                              className={colores ? `${colores.bg} ${colores.border} border rounded-lg flex flex-col flex-1 min-w-fit` : `border rounded-lg flex flex-col flex-1 min-w-fit`}
+                              style={{
+                                ...estiloPersonalizado,
+                                padding: `calc(0.25rem * var(--escala, 1))`,
+                                gap: `calc(0.125rem * var(--escala, 1))`
+                              }}
+                            >
+                              {/* Nombre del equipo */}
+                              <div
+                                className={`font-bold ${colores ? colores.text : ''}`}
+                                style={{ fontSize: `calc(0.6875rem * var(--escala, 1))` }}
+                              >
+                                {equipo.nombre}
+                              </div>
+                              {/* Encargado */}
+                              {encargado && (
+                                <div
+                                  className={`font-semibold ${colores ? colores.text : ''} underline uppercase`}
+                                  style={{ fontSize: `calc(0.625rem * var(--escala, 1))` }}
+                                >
+                                  {encargado}
+                                </div>
+                              )}
+                              {/* Otros integrantes */}
+                              {otrosIntegrantes.length > 0 && (
+                                <div className={`flex flex-col ${colores ? colores.text : ''} opacity-75`}>
+                                  {otrosIntegrantes.map((integrante, idx) => (
+                                    <span
+                                      key={idx}
+                                      style={{ fontSize: `calc(0.5625rem * var(--escala, 1))` }}
+                                    >
+                                      {integrante}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Hora a la derecha */}
-                  <div
-                    className="flex items-center"
-                    style={{ gap: `calc(0.5rem * var(--escala, 1))` }}
-                  >
-                    <Clock style={{ width: `calc(1.5rem * var(--escala, 1))`, height: `calc(1.5rem * var(--escala, 1))` }} />
-                    <div
-                      className="font-bold tabular-nums"
-                      style={{ fontSize: `calc(2.25rem * var(--escala, 1))` }}
-                    >
-                      {horaActual.toLocaleTimeString('es-MX', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false,
-                        timeZone: 'America/Mexico_City'
-                      })}
+                </>
+              ) : (
+                <>
+                  {/* Vista Normal - Distribución de Equipos - 2/3 del ancho */}
+                  <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-3 flex-shrink-0">
+                    <div className="flex items-center space-x-1 mb-2">
+                      <Users className="w-5 h-5 text-red-700" />
+                      <h3 className="text-base font-bold text-gray-800">
+                        Distribución de Equipos
+                      </h3>
                     </div>
-                  </div>
-                </div>
 
-                {/* Distribución de Equipos */}
-                <div
-                  className="col-span-3 bg-white rounded-lg shadow-md flex flex-col"
-                  style={{ padding: `calc(0.375rem * var(--escala, 1))` }}
-                >
-                  <div
-                    className="flex items-center"
-                    style={{
-                      gap: `calc(0.25rem * var(--escala, 1))`,
-                      marginBottom: `calc(0.25rem * var(--escala, 1))`
-                    }}
-                  >
-                    <Users style={{ width: `calc(0.75rem * var(--escala, 1))`, height: `calc(0.75rem * var(--escala, 1))` }} className="text-red-700" />
-                    <h3
-                      className="font-bold text-gray-800"
-                      style={{ fontSize: `calc(0.625rem * var(--escala, 1))` }}
-                    >
-                      Distribución de Equipos
-                    </h3>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto">
-                    <div
-                      className="flex flex-wrap content-start"
-                      style={{ gap: `calc(0.25rem * var(--escala, 1))` }}
-                    >
+                    <div className="flex flex-wrap gap-2">
                       {distribucionEquipos.equipos.map((equipo, index) => {
                         const colores = COLORES_EQUIPO[equipo.tipoEquipo];
 
@@ -441,44 +525,30 @@ const CalendarioPublicoPage = () => {
                           color: (equipo.color.red + equipo.color.green + equipo.color.blue) / 3 > 180 ? '#1f2937' : '#ffffff'
                         } : null;
 
-                        // Separar encargado del resto de integrantes
                         const encargado = equipo.integrantes && equipo.integrantes.length > 0 ? equipo.integrantes[0] : null;
                         const otrosIntegrantes = equipo.integrantes && equipo.integrantes.length > 1 ? equipo.integrantes.slice(1) : [];
 
                         return (
                           <div
                             key={index}
-                            className={colores ? `${colores.bg} ${colores.border} border rounded-lg flex flex-col flex-1 min-w-fit` : `border rounded-lg flex flex-col flex-1 min-w-fit`}
-                            style={{
-                              ...estiloPersonalizado,
-                              padding: `calc(0.25rem * var(--escala, 1))`,
-                              gap: `calc(0.125rem * var(--escala, 1))`
-                            }}
+                            className={colores ? `${colores.bg} ${colores.border} border-2 rounded-lg p-4 flex items-center gap-3 flex-1 min-w-fit` : `border-2 rounded-lg p-4 flex items-center gap-3 flex-1 min-w-fit`}
+                            style={estiloPersonalizado || undefined}
                           >
-                            {/* Nombre del equipo */}
-                            <div
-                              className={`font-bold ${colores ? colores.text : ''}`}
-                              style={{ fontSize: `calc(0.6875rem * var(--escala, 1))` }}
-                            >
-                              {equipo.nombre}
-                            </div>
-                            {/* Encargado */}
-                            {encargado && (
-                              <div
-                                className={`font-semibold ${colores ? colores.text : ''} underline uppercase`}
-                                style={{ fontSize: `calc(0.625rem * var(--escala, 1))` }}
-                              >
-                                {encargado}
+                            <div className="flex-shrink-0">
+                              <div className={`text-lg font-bold ${colores ? colores.text : ''}`}>
+                                {equipo.nombre}
                               </div>
-                            )}
-                            {/* Otros integrantes */}
+                              {encargado && (
+                                <div className={`text-lg font-semibold ${colores ? colores.text : ''} underline uppercase`}>
+                                  {encargado}
+                                </div>
+                              )}
+                            </div>
+
                             {otrosIntegrantes.length > 0 && (
-                              <div className={`flex flex-col ${colores ? colores.text : ''} opacity-75`}>
+                              <div className={`flex flex-col text-base ${colores ? colores.text : ''} opacity-75`}>
                                 {otrosIntegrantes.map((integrante, idx) => (
-                                  <span
-                                    key={idx}
-                                    style={{ fontSize: `calc(0.5625rem * var(--escala, 1))` }}
-                                  >
+                                  <span key={idx} className="whitespace-nowrap">
                                     {integrante}
                                   </span>
                                 ))}
@@ -489,388 +559,331 @@ const CalendarioPublicoPage = () => {
                       })}
                     </div>
                   </div>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Vista Normal - Distribución de Equipos - 2/3 del ancho */}
-                <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-3 flex-shrink-0">
-                  <div className="flex items-center space-x-1 mb-2">
-                    <Users className="w-5 h-5 text-red-700" />
-                    <h3 className="text-base font-bold text-gray-800">
-                      Distribución de Equipos
-                    </h3>
-                  </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {distribucionEquipos.equipos.map((equipo, index) => {
-                      const colores = COLORES_EQUIPO[equipo.tipoEquipo];
-
-                      const estiloPersonalizado = !colores && equipo.color ? {
-                        backgroundColor: `rgb(${equipo.color.red}, ${equipo.color.green}, ${equipo.color.blue})`,
-                        borderColor: `rgb(${Math.max(0, equipo.color.red - 30)}, ${Math.max(0, equipo.color.green - 30)}, ${Math.max(0, equipo.color.blue - 30)})`,
-                        color: (equipo.color.red + equipo.color.green + equipo.color.blue) / 3 > 180 ? '#1f2937' : '#ffffff'
-                      } : null;
-
-                      const encargado = equipo.integrantes && equipo.integrantes.length > 0 ? equipo.integrantes[0] : null;
-                      const otrosIntegrantes = equipo.integrantes && equipo.integrantes.length > 1 ? equipo.integrantes.slice(1) : [];
-
-                      return (
-                        <div
-                          key={index}
-                          className={colores ? `${colores.bg} ${colores.border} border-2 rounded-lg p-4 flex items-center gap-3 flex-1 min-w-fit` : `border-2 rounded-lg p-4 flex items-center gap-3 flex-1 min-w-fit`}
-                          style={estiloPersonalizado || undefined}
-                        >
-                          <div className="flex-shrink-0">
-                            <div className={`text-lg font-bold ${colores ? colores.text : ''}`}>
-                              {equipo.nombre}
-                            </div>
-                            {encargado && (
-                              <div className={`text-lg font-semibold ${colores ? colores.text : ''} underline uppercase`}>
-                                {encargado}
-                              </div>
-                            )}
-                          </div>
-
-                          {otrosIntegrantes.length > 0 && (
-                            <div className={`flex flex-col text-base ${colores ? colores.text : ''} opacity-75`}>
-                              {otrosIntegrantes.map((integrante, idx) => (
-                                <span key={idx} className="whitespace-nowrap">
-                                  {integrante}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Vista Normal - Reloj - 1/3 del ancho */}
-                <div className="bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md p-6 flex flex-col items-center justify-center text-white">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Clock className="w-8 h-8" />
-                    <h3 className="text-lg font-bold">Hora Actual</h3>
-                  </div>
-
-                  <div className="text-center">
-                    <div className="text-6xl font-bold mb-2 tabular-nums">
-                      {horaActual.toLocaleTimeString('es-MX', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false,
-                        timeZone: 'America/Mexico_City'
-                      })}
+                  {/* Vista Normal - Reloj - 1/3 del ancho */}
+                  <div className="bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md p-6 flex flex-col items-center justify-center text-white">
+                    <div className="flex items-center space-x-2 mb-4">
+                      <Clock className="w-8 h-8" />
+                      <h3 className="text-lg font-bold">Hora Actual</h3>
                     </div>
-                    <div className="text-xl font-medium opacity-90">
-                      {horaActual.toLocaleDateString('es-MX', {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                        timeZone: 'America/Mexico_City'
-                      })}
+
+                    <div className="text-center">
+                      <div className="text-6xl font-bold mb-2 tabular-nums">
+                        {horaActual.toLocaleTimeString('es-MX', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: false,
+                          timeZone: 'America/Mexico_City'
+                        })}
+                      </div>
+                      <div className="text-xl font-medium opacity-90">
+                        {horaActual.toLocaleDateString('es-MX', {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                          timeZone: 'America/Mexico_City'
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+                </>
+              )}
+            </div>
+          )}
 
-        {/* Calendario - Vista adaptativa según modo */}
-        {calendario && (
-          <>
-            {modoPantallaCompleta ? (
-              // Vista Pantalla Completa: Semana actual grande + 2 semanas siguientes
-              (() => {
-                const hoy = new Date();
-                const diaHoy = hoy.getDate();
-
-                // Combinar semanas del mes actual y el siguiente
-                const todasLasSemanas = [
-                  ...(calendario?.semanas || []),
-                  ...(calendarioSiguienteMes?.semanas || [])
-                ];
-
-                // Encontrar la semana actual
-                let semanaActualIndex = todasLasSemanas.findIndex(semana =>
-                  semana.dias.some(dia => dia.numero === diaHoy)
-                );
-
-                // Si no encontramos la semana actual, usar la primera
-                if (semanaActualIndex === -1) semanaActualIndex = 0;
-
-                const semanaActual = todasLasSemanas[semanaActualIndex];
-                const semanaSiguiente1 = todasLasSemanas[semanaActualIndex + 1] || null;
-                const semanaSiguiente2 = todasLasSemanas[semanaActualIndex + 2] || null;
-
-                const renderSemana = (semana, esGrande = false) => {
-                  if (!semana) return null;
-
+          {/* Calendario - Vista adaptativa según modo */}
+          {calendario && (
+            <>
+              {modoPantallaCompleta ? (
+                // Vista Pantalla Completa: Semana actual grande + 2 semanas siguientes
+                (() => {
                   const hoy = new Date();
                   const diaHoy = hoy.getDate();
 
-                  return (
-                    <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col h-full">
-                      <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200">
-                        {semana.dias.map((dia, diaIndex) => {
-                          const esDiaActual = esGrande && dia.numero === diaHoy;
-                          const esAsueto = dia.proyectos.some(p => p.nombre.toUpperCase().includes('ASUETO'));
+                  // Combinar semanas del mes actual y el siguiente
+                  const todasLasSemanas = [
+                    ...(calendario?.semanas || []),
+                    ...(calendarioSiguienteMes?.semanas || [])
+                  ];
 
-                          return (
-                            <div key={diaIndex} className={`flex flex-col ${dia.numero === null ? 'bg-gray-100' : esAsueto ? 'bg-red-50' : esDiaActual ? 'bg-yellow-50' : ''} overflow-hidden relative`}>
-                              {/* Header del día */}
-                              <div
-                                className={`${dia.numero === null ? 'bg-gray-400' : esAsueto ? 'bg-red-600' : esDiaActual ? 'bg-yellow-500' : 'bg-blue-600'} text-white ${esDiaActual || esAsueto ? 'shadow-lg' : ''}`}
-                                style={{ padding: esGrande ? `calc(0.75rem * var(--escala, 1))` : `calc(0.25rem * var(--escala, 1))` }}
-                              >
+                  // Encontrar la semana actual
+                  let semanaActualIndex = todasLasSemanas.findIndex(semana =>
+                    semana.dias.some(dia => dia.numero === diaHoy)
+                  );
+
+                  // Si no encontramos la semana actual, usar la primera
+                  if (semanaActualIndex === -1) semanaActualIndex = 0;
+
+                  const semanaActual = todasLasSemanas[semanaActualIndex];
+                  const semanaSiguiente1 = todasLasSemanas[semanaActualIndex + 1] || null;
+                  const semanaSiguiente2 = todasLasSemanas[semanaActualIndex + 2] || null;
+
+                  const renderSemana = (semana, esGrande = false) => {
+                    if (!semana) return null;
+
+                    const hoy = new Date();
+                    const diaHoy = hoy.getDate();
+
+                    return (
+                      <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col h-full">
+                        <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200">
+                          {semana.dias.map((dia, diaIndex) => {
+                            const esDiaActual = esGrande && dia.numero === diaHoy;
+                            const esAsueto = dia.proyectos.some(p => p.nombre.toUpperCase().includes('ASUETO'));
+
+                            return (
+                              <div key={diaIndex} className={`flex flex-col ${dia.numero === null ? 'bg-gray-100' : esAsueto ? 'bg-red-50' : esDiaActual ? 'bg-yellow-50' : ''} overflow-hidden relative`}>
+                                {/* Header del día */}
                                 <div
-                                  className="font-bold"
-                                  style={{ fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))` }}
+                                  className={`${dia.numero === null ? 'bg-gray-400' : esAsueto ? 'bg-red-600' : esDiaActual ? 'bg-yellow-500' : 'bg-blue-600'} text-white ${esDiaActual || esAsueto ? 'shadow-lg' : ''}`}
+                                  style={{ padding: esGrande ? `calc(0.75rem * var(--escala, 1))` : `calc(0.25rem * var(--escala, 1))` }}
                                 >
-                                  {dia.nombre}
-                                </div>
-                                <div
-                                  className="font-bold"
-                                  style={{ fontSize: esGrande ? `calc(1.875rem * var(--escala, 1))` : `calc(0.6875rem * var(--escala, 1))` }}
-                                >
-                                  {dia.numero || '-'}
-                                </div>
-                                {esDiaActual && (
                                   <div
-                                    className="font-bold animate-pulse"
-                                    style={{
-                                      fontSize: esGrande ? `calc(0.625rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
-                                      marginTop: `calc(0.25rem * var(--escala, 1))`
-                                    }}
+                                    className="font-bold"
+                                    style={{ fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))` }}
                                   >
-                                    HOY
+                                    {dia.nombre}
                                   </div>
-                                )}
-                                {esAsueto && (
                                   <div
-                                    className="font-bold animate-pulse"
-                                    style={{
-                                      fontSize: esGrande ? `calc(0.625rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
-                                      marginTop: `calc(0.25rem * var(--escala, 1))`
-                                    }}
+                                    className="font-bold"
+                                    style={{ fontSize: esGrande ? `calc(1.875rem * var(--escala, 1))` : `calc(0.6875rem * var(--escala, 1))` }}
                                   >
-                                    ASUETO
+                                    {dia.numero || '-'}
                                   </div>
-                                )}
-                              </div>
-
-                            {/* Proyectos del día */}
-                            <div
-                              className="flex-1 overflow-y-auto overflow-x-hidden"
-                              style={{
-                                padding: esGrande ? `calc(0.75rem * var(--escala, 1))` : `calc(0.25rem * var(--escala, 1))`,
-                                gap: esGrande ? `calc(0.5rem * var(--escala, 1))` : `calc(0.125rem * var(--escala, 1))`,
-                                display: 'flex',
-                                flexDirection: 'column'
-                              }}
-                            >
-                              {dia.proyectos.filter(p => !p.nombre.toUpperCase().includes('ASUETO')).length === 0 ? (
-                                <div
-                                  className="text-center text-gray-400"
-                                  style={{
-                                    fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
-                                    marginTop: `calc(0.5rem * var(--escala, 1))`
-                                  }}
-                                >
-                                  Sin proyectos
-                                </div>
-                              ) : (
-                                dia.proyectos.filter(p => !p.nombre.toUpperCase().includes('ASUETO')).map((proyecto, proyectoIndex) => {
-                                  const coloresProyecto = COLORES_EQUIPO[proyecto.tipoProyecto] || COLORES_EQUIPO['NORMAL'];
-                                  const coloresHora = COLORES_EQUIPO[proyecto.equipoHora] || COLORES_EQUIPO['NORMAL'];
-                                  const textoProyecto = proyecto.cliente
-                                    ? `${proyecto.nombre} / ${proyecto.cliente}`
-                                    : proyecto.nombre;
-
-                                  return (
+                                  {esDiaActual && (
                                     <div
-                                      key={proyectoIndex}
-                                      className="flex items-stretch"
+                                      className="font-bold animate-pulse"
                                       style={{
-                                        gap: `calc(0.25rem * var(--escala, 1))`,
-                                        marginBottom: `calc(0.25rem * var(--escala, 1))`
+                                        fontSize: esGrande ? `calc(0.625rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
+                                        marginTop: `calc(0.25rem * var(--escala, 1))`
                                       }}
                                     >
-                                      {/* Nombre del proyecto */}
-                                      <div
-                                        className={`flex-1 ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded flex items-center overflow-hidden min-w-0`}
-                                        style={{
-                                          padding: esGrande ? `calc(0.625rem * var(--escala, 1)) calc(0.75rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))`
-                                        }}
-                                      >
-                                        <span
-                                          className={`font-medium ${coloresProyecto.text} leading-tight break-words w-full`}
-                                          style={{ fontSize: esGrande ? `calc(1rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))` }}
-                                        >
-                                          {textoProyecto}
-                                        </span>
-                                      </div>
+                                      HOY
+                                    </div>
+                                  )}
+                                  {esAsueto && (
+                                    <div
+                                      className="font-bold animate-pulse"
+                                      style={{
+                                        fontSize: esGrande ? `calc(0.625rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
+                                        marginTop: `calc(0.25rem * var(--escala, 1))`
+                                      }}
+                                    >
+                                      ASUETO
+                                    </div>
+                                  )}
+                                </div>
 
-                                      {/* Hora */}
-                                      {proyecto.hora && (
+                                {/* Proyectos del día */}
+                                <div
+                                  className="flex-1 overflow-y-auto overflow-x-hidden"
+                                  style={{
+                                    padding: esGrande ? `calc(0.75rem * var(--escala, 1))` : `calc(0.25rem * var(--escala, 1))`,
+                                    gap: esGrande ? `calc(0.5rem * var(--escala, 1))` : `calc(0.125rem * var(--escala, 1))`,
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                  }}
+                                >
+                                  {dia.proyectos.filter(p => !p.nombre.toUpperCase().includes('ASUETO')).length === 0 ? (
+                                    <div
+                                      className="text-center text-gray-400"
+                                      style={{
+                                        fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
+                                        marginTop: `calc(0.5rem * var(--escala, 1))`
+                                      }}
+                                    >
+                                      Sin proyectos
+                                    </div>
+                                  ) : (
+                                    dia.proyectos.filter(p => !p.nombre.toUpperCase().includes('ASUETO')).map((proyecto, proyectoIndex) => {
+                                      const coloresProyecto = COLORES_EQUIPO[proyecto.tipoProyecto] || COLORES_EQUIPO['NORMAL'];
+                                      const coloresHora = COLORES_EQUIPO[proyecto.equipoHora] || COLORES_EQUIPO['NORMAL'];
+                                      const textoProyecto = proyecto.cliente
+                                        ? `${proyecto.nombre} / ${proyecto.cliente}`
+                                        : proyecto.nombre;
+
+                                      return (
                                         <div
-                                          className={`${coloresHora.bg} ${coloresHora.text} rounded flex items-center justify-center flex-shrink-0 overflow-hidden`}
+                                          key={proyectoIndex}
+                                          className="flex items-stretch"
                                           style={{
-                                            width: esGrande ? `calc(2rem * var(--escala, 1))` : `calc(0.875rem * var(--escala, 1))`,
-                                            maxWidth: esGrande ? `calc(2rem * var(--escala, 1))` : `calc(0.875rem * var(--escala, 1))`,
-                                            padding: esGrande ? `calc(0.625rem * var(--escala, 1)) calc(0.3125rem * var(--escala, 1))` : `calc(0.25rem * var(--escala, 1)) calc(0.125rem * var(--escala, 1))`
+                                            gap: `calc(0.25rem * var(--escala, 1))`,
+                                            marginBottom: `calc(0.25rem * var(--escala, 1))`
                                           }}
                                         >
-                                          <div style={{
-                                            writingMode: 'vertical-rl',
-                                            textOrientation: 'mixed',
-                                            whiteSpace: 'nowrap',
-                                            overflow: 'hidden'
-                                          }}>
+                                          {/* Nombre del proyecto */}
+                                          <div
+                                            className={`flex-1 ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded flex items-center overflow-hidden min-w-0`}
+                                            style={{
+                                              padding: esGrande ? `calc(0.625rem * var(--escala, 1)) calc(0.75rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))`
+                                            }}
+                                          >
                                             <span
-                                              className="font-bold text-center leading-tight"
-                                              style={{ fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))` }}
+                                              className={`font-medium ${coloresProyecto.text} leading-tight break-words w-full`}
+                                              style={{ fontSize: esGrande ? `calc(1rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))` }}
                                             >
-                                              {proyecto.hora}
+                                              {textoProyecto}
                                             </span>
                                           </div>
+
+                                          {/* Hora */}
+                                          {proyecto.hora && (
+                                            <div
+                                              className={`${coloresHora.bg} ${coloresHora.text} rounded flex items-center justify-center flex-shrink-0 overflow-hidden`}
+                                              style={{
+                                                width: esGrande ? `calc(2rem * var(--escala, 1))` : `calc(0.875rem * var(--escala, 1))`,
+                                                maxWidth: esGrande ? `calc(2rem * var(--escala, 1))` : `calc(0.875rem * var(--escala, 1))`,
+                                                padding: esGrande ? `calc(0.625rem * var(--escala, 1)) calc(0.3125rem * var(--escala, 1))` : `calc(0.25rem * var(--escala, 1)) calc(0.125rem * var(--escala, 1))`
+                                              }}
+                                            >
+                                              <div style={{
+                                                writingMode: 'vertical-rl',
+                                                textOrientation: 'mixed',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden'
+                                              }}>
+                                                <span
+                                                  className="font-bold text-center leading-tight"
+                                                  style={{ fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))` }}
+                                                >
+                                                  {proyecto.hora}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
-                                      )}
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
-                            </div>
-                          );
-                        })}
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                };
-
-                return (
-                  <div className="flex-1 grid grid-cols-3 gap-2 overflow-hidden">
-                    {/* Semana actual - 2 columnas (grande) */}
-                    <div className="col-span-2 flex h-full">
-                      {renderSemana(semanaActual, true)}
-                    </div>
-
-                    {/* Siguientes 2 semanas - 1 columna */}
-                    <div className="col-span-1 flex flex-col gap-2 h-full">
-                      <div className="flex-1">
-                        {renderSemana(semanaSiguiente1, false)}
-                      </div>
-                      <div className="flex-1">
-                        {renderSemana(semanaSiguiente2, false)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()
-            ) : (
-              // Vista Normal: Todas las semanas en 2 columnas
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden">
-                {calendario.semanas.map((semana, semanaIndex) => {
-                  const hoy = new Date();
-                  const diaHoy = hoy.getDate();
+                    );
+                  };
 
                   return (
-                    <div key={semanaIndex} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
-                      <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200">
-                        {semana.dias.map((dia, diaIndex) => {
-                          const esDiaActual = dia.numero === diaHoy;
-                          const esAsueto = dia.proyectos.some(p => p.nombre.toUpperCase().includes('ASUETO'));
+                    <div className="flex-1 grid grid-cols-3 gap-2 overflow-hidden">
+                      {/* Semana actual - 2 columnas (grande) */}
+                      <div className="col-span-2 flex h-full">
+                        {renderSemana(semanaActual, true)}
+                      </div>
 
-                          return (
-                            <div key={diaIndex} className={`flex flex-col ${dia.numero === null ? 'bg-gray-100' : esAsueto ? 'bg-red-50' : esDiaActual ? 'bg-yellow-50' : ''} overflow-hidden`}>
-                              {/* Header del día */}
-                              <div className={`${dia.numero === null ? 'bg-gray-400' : esAsueto ? 'bg-red-600' : esDiaActual ? 'bg-yellow-500' : 'bg-blue-600'} text-white p-1.5 ${esDiaActual || esAsueto ? 'shadow-md' : ''}`}>
-                                <div className="font-bold text-[10px]">
-                                  {dia.nombre}
-                                </div>
-                                <div className="text-lg font-bold">
-                                  {dia.numero || '-'}
-                                </div>
-                                {esDiaActual && (
-                                  <div className="text-[8px] font-bold mt-0.5 animate-pulse">
-                                    HOY
-                                  </div>
-                                )}
-                                {esAsueto && (
-                                  <div className="text-[8px] font-bold mt-0.5">
-                                    ASUETO
-                                  </div>
-                                )}
-                              </div>
-
-                          {/* Proyectos del día */}
-                          <div className="flex-1 p-1.5 space-y-1.5 overflow-y-auto overflow-x-hidden">
-                            {dia.proyectos.filter(p => !p.nombre.toUpperCase().includes('ASUETO')).length === 0 ? (
-                              <div className="text-center text-gray-400 text-xs mt-2">
-                                Sin proyectos
-                              </div>
-                            ) : (
-                              dia.proyectos.filter(p => !p.nombre.toUpperCase().includes('ASUETO')).map((proyecto, proyectoIndex) => {
-                                const coloresProyecto = COLORES_EQUIPO[proyecto.tipoProyecto] || COLORES_EQUIPO['NORMAL'];
-                                const coloresHora = COLORES_EQUIPO[proyecto.equipoHora] || COLORES_EQUIPO['NORMAL'];
-                                const textoProyecto = proyecto.cliente
-                                  ? `${proyecto.nombre} / ${proyecto.cliente}`
-                                  : proyecto.nombre;
-
-                                return (
-                                  <div
-                                    key={proyectoIndex}
-                                    className="flex items-stretch gap-1 mb-1"
-                                  >
-                                    {/* Nombre del proyecto con color del equipo */}
-                                    <div className={`flex-1 ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded px-2 py-2 flex items-center overflow-hidden min-w-0`}>
-                                      <span className={`font-medium text-xs ${coloresProyecto.text} leading-relaxed break-words w-full`}>
-                                        {textoProyecto}
-                                      </span>
-                                    </div>
-
-                                    {/* Hora rotada 90° con color del equipo */}
-                                    {proyecto.hora && (
-                                      <div className={`${coloresHora.bg} ${coloresHora.text} rounded flex items-center justify-center flex-shrink-0 overflow-hidden`}
-                                        style={{
-                                          width: '24px',
-                                          maxWidth: '24px',
-                                          padding: '8px 4px'
-                                        }}
-                                      >
-                                        <div style={{
-                                          writingMode: 'vertical-rl',
-                                          textOrientation: 'mixed',
-                                          whiteSpace: 'nowrap',
-                                          overflow: 'hidden'
-                                        }}>
-                                          <span className="font-bold text-[10px] text-center leading-tight">
-                                            {proyecto.hora}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })
-                            )}
-                          </div>
+                      {/* Siguientes 2 semanas - 1 columna */}
+                      <div className="col-span-1 flex flex-col gap-2 h-full">
+                        <div className="flex-1">
+                          {renderSemana(semanaSiguiente1, false)}
                         </div>
-                          );
-                        })}
+                        <div className="flex-1">
+                          {renderSemana(semanaSiguiente2, false)}
+                        </div>
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
-          </>
-        )}
+                })()
+              ) : (
+                // Vista Normal: Todas las semanas en 2 columnas
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden">
+                  {calendario.semanas.map((semana, semanaIndex) => {
+                    const hoy = new Date();
+                    const diaHoy = hoy.getDate();
+
+                    return (
+                      <div key={semanaIndex} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
+                        <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200">
+                          {semana.dias.map((dia, diaIndex) => {
+                            const esDiaActual = dia.numero === diaHoy;
+                            const esAsueto = dia.proyectos.some(p => p.nombre.toUpperCase().includes('ASUETO'));
+
+                            return (
+                              <div key={diaIndex} className={`flex flex-col ${dia.numero === null ? 'bg-gray-100' : esAsueto ? 'bg-red-50' : esDiaActual ? 'bg-yellow-50' : ''} overflow-hidden`}>
+                                {/* Header del día */}
+                                <div className={`${dia.numero === null ? 'bg-gray-400' : esAsueto ? 'bg-red-600' : esDiaActual ? 'bg-yellow-500' : 'bg-blue-600'} text-white p-1.5 ${esDiaActual || esAsueto ? 'shadow-md' : ''}`}>
+                                  <div className="font-bold text-[10px]">
+                                    {dia.nombre}
+                                  </div>
+                                  <div className="text-lg font-bold">
+                                    {dia.numero || '-'}
+                                  </div>
+                                  {esDiaActual && (
+                                    <div className="text-[8px] font-bold mt-0.5 animate-pulse">
+                                      HOY
+                                    </div>
+                                  )}
+                                  {esAsueto && (
+                                    <div className="text-[8px] font-bold mt-0.5">
+                                      ASUETO
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Proyectos del día */}
+                                <div className="flex-1 p-1.5 space-y-1.5 overflow-y-auto overflow-x-hidden">
+                                  {dia.proyectos.filter(p => !p.nombre.toUpperCase().includes('ASUETO')).length === 0 ? (
+                                    <div className="text-center text-gray-400 text-xs mt-2">
+                                      Sin proyectos
+                                    </div>
+                                  ) : (
+                                    dia.proyectos.filter(p => !p.nombre.toUpperCase().includes('ASUETO')).map((proyecto, proyectoIndex) => {
+                                      const coloresProyecto = COLORES_EQUIPO[proyecto.tipoProyecto] || COLORES_EQUIPO['NORMAL'];
+                                      const coloresHora = COLORES_EQUIPO[proyecto.equipoHora] || COLORES_EQUIPO['NORMAL'];
+                                      const textoProyecto = proyecto.cliente
+                                        ? `${proyecto.nombre} / ${proyecto.cliente}`
+                                        : proyecto.nombre;
+
+                                      return (
+                                        <div
+                                          key={proyectoIndex}
+                                          className="flex items-stretch gap-1 mb-1"
+                                        >
+                                          {/* Nombre del proyecto con color del equipo */}
+                                          <div className={`flex-1 ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded px-2 py-2 flex items-center overflow-hidden min-w-0`}>
+                                            <span className={`font-medium text-xs ${coloresProyecto.text} leading-relaxed break-words w-full`}>
+                                              {textoProyecto}
+                                            </span>
+                                          </div>
+
+                                          {/* Hora rotada 90° con color del equipo */}
+                                          {proyecto.hora && (
+                                            <div className={`${coloresHora.bg} ${coloresHora.text} rounded flex items-center justify-center flex-shrink-0 overflow-hidden`}
+                                              style={{
+                                                width: '24px',
+                                                maxWidth: '24px',
+                                                padding: '8px 4px'
+                                              }}
+                                            >
+                                              <div style={{
+                                                writingMode: 'vertical-rl',
+                                                textOrientation: 'mixed',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden'
+                                              }}>
+                                                <span className="font-bold text-[10px] text-center leading-tight">
+                                                  {proyecto.hora}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </div>
         {/* Fin del contenedor con escala */}
       </div>
