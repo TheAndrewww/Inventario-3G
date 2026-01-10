@@ -17,7 +17,8 @@ import {
   listarPedidosListosParaRecibir,
   recibirPedido,
   rechazarPedidoListoParaEntrega,
-  listarSupervisores
+  listarSupervisores,
+  marcarPedidoEntregadoDirecto
 } from '../controllers/pedidos.controller.js';
 import {
   verificarToken,
@@ -242,6 +243,18 @@ router.put(
   verificarToken,
   verificarRol('supervisor', 'administrador'),
   rechazarPedidoListoParaEntrega
+);
+
+/**
+ * @route   PUT /api/pedidos/:pedido_id/entregar-directo
+ * @desc    Marcar pedido como entregado directamente (sin supervisor)
+ * @access  Solo Administrador
+ */
+router.put(
+  '/:pedido_id/entregar-directo',
+  verificarToken,
+  verificarRol('administrador'),
+  marcarPedidoEntregadoDirecto
 );
 
 export default router;

@@ -2373,3 +2373,127 @@ export const listarSupervisores = async (req, res) => {
     });
   }
 };
+
+/**
+ * Marcar pedido como entregado directamente (solo administrador)
+ * Salta el flujo de supervisor y marca como terminado inmediatamente
+ */
+export const marcarPedidoEntregadoDirecto = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { pedido_id } = req.params;
+    const usuario_id = req.usuario.id;
+    const usuario_rol = req.usuario.rol;
+
+    // Solo administradores pueden usar esta función
+    if (usuario_rol !== 'administrador') {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        message: 'Solo los administradores pueden marcar pedidos como terminados directamente'
+      });
+    }
+
+    // Obtener el pedido
+    const pedido = await Movimiento.findOne({
+      where: { id: pedido_id, tipo: 'pedido' },
+      include: [
+        {
+          model: DetalleMovimiento,
+          as: 'detalles'
+        }
+      ],
+      transaction
+    });
+
+    if (!pedido) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Pedido no encontrado'
+      });
+    }
+
+    // Validar que el pedido está en estado pendiente o aprobado
+    if (!['pendiente', 'aprobado'].includes(pedido.estado)) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `El pedido está en estado ${pedido.estado}, solo se pueden marcar como terminados pedidos pendientes o aprobados`
+      });
+    }
+
+    // Marcar todos los detalles como dispersados automáticamente
+    await DetalleMovimiento.update(
+      {
+        dispersado: true,
+        dispersado_por_id: usuario_id,
+        fecha_dispersado: new Date()
+      },
+      {
+        where: { movimiento_id: pedido_id },
+        transaction
+      }
+    );
+
+    // Marcar pedido como entregado directamente
+    await pedido.update({
+      estado: 'entregado',
+      supervisor_id: usuario_id,
+      recibido_por_id: usuario_id,
+      fecha_recepcion: new Date()
+    }, { transaction });
+
+    await transaction.commit();
+
+    // Obtener pedido completo
+    const pedidoCompleto = await Movimiento.findByPk(pedido_id, {
+      include: [
+        {
+          model: Usuario,
+          as: 'usuario',
+          attributes: ['id', 'nombre', 'email']
+        },
+        {
+          model: Usuario,
+          as: 'recibidoPor',
+          attributes: ['id', 'nombre', 'email']
+        },
+        {
+          model: Ubicacion,
+          as: 'ubicacionDestino'
+        },
+        {
+          model: Equipo,
+          as: 'equipo'
+        },
+        {
+          model: DetalleMovimiento,
+          as: 'detalles',
+          include: [
+            {
+              model: Articulo,
+              as: 'articulo'
+            }
+          ]
+        }
+      ]
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Pedido marcado como entregado exitosamente',
+      data: { pedido: pedidoCompleto }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al marcar pedido como entregado:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al marcar pedido como entregado',
+      error: error.message
+    });
+  }
+};

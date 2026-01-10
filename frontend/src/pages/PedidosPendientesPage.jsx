@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardList, CheckSquare, Square, Package, User, Calendar, AlertCircle, Edit2, Plus, Minus, Trash2, Save, X, Truck, Send, XCircle } from 'lucide-react';
+import { ClipboardList, CheckSquare, Square, Package, User, Calendar, AlertCircle, Edit2, Plus, Minus, Trash2, Save, X, Truck, Send, XCircle, CheckCircle } from 'lucide-react';
 import pedidosService from '../services/pedidos.service';
 import { Loader, Modal } from '../components/common';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const PedidosPendientesPage = () => {
   const [pedidos, setPedidos] = useState([]);
@@ -17,6 +18,8 @@ const PedidosPendientesPage = () => {
   const [showModalAnular, setShowModalAnular] = useState(false);
   const [motivoAnulacion, setMotivoAnulacion] = useState('');
   const [pedidoAAnular, setPedidoAAnular] = useState(null);
+  const { user } = useAuth();
+  const esAdmin = user?.rol === 'administrador';
 
   useEffect(() => {
     cargarPedidosPendientes();
@@ -199,6 +202,25 @@ const PedidosPendientesPage = () => {
     if (porcentaje < 50) return 'bg-orange-500';
     if (porcentaje < 100) return 'bg-yellow-500';
     return 'bg-green-500';
+  };
+
+  const handleEntregarDirecto = async () => {
+    if (!confirm('¿Marcar este pedido como ENTREGADO directamente?\n\nEsto saltará el flujo de supervisor y marcará todos los artículos como preparados automáticamente.')) {
+      return;
+    }
+
+    try {
+      setProcesando(true);
+      await pedidosService.entregarDirecto(pedidoSeleccionado.id);
+      toast.success('Pedido marcado como entregado exitosamente');
+      setShowModal(false);
+      await cargarPedidosPendientes();
+    } catch (error) {
+      console.error('Error al entregar pedido:', error);
+      toast.error(error.response?.data?.message || 'Error al entregar pedido');
+    } finally {
+      setProcesando(false);
+    }
   };
 
   if (loading && pedidos.length === 0) {
@@ -393,11 +415,10 @@ const PedidosPendientesPage = () => {
                 {pedidoSeleccionado.detalles?.map((detalle) => (
                   <div
                     key={detalle.id}
-                    className={`border-2 rounded-lg p-4 transition-all ${
-                      detalle.dispersado
+                    className={`border-2 rounded-lg p-4 transition-all ${detalle.dispersado
                         ? 'border-green-300 bg-green-50'
                         : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start gap-4">
                       <button
@@ -479,11 +500,10 @@ const PedidosPendientesPage = () => {
                                     {detalle.cantidad} {detalle.articulo?.unidad || 'uds'}
                                   </p>
                                   {detalle.articulo?.stock_actual !== undefined && (
-                                    <p className={`text-sm ${
-                                      detalle.articulo.stock_actual >= detalle.cantidad
+                                    <p className={`text-sm ${detalle.articulo.stock_actual >= detalle.cantidad
                                         ? 'text-green-600'
                                         : 'text-red-600'
-                                    }`}>
+                                      }`}>
                                       Stock: {detalle.articulo.stock_actual}
                                     </p>
                                   )}
@@ -547,7 +567,7 @@ const PedidosPendientesPage = () => {
             )}
 
             {pedidoSeleccionado.progreso_dispersion === 100 && (
-              <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
                 <button
                   onClick={handleAbrirModalMarcarListo}
                   disabled={procesando}
@@ -556,9 +576,20 @@ const PedidosPendientesPage = () => {
                   <Send size={20} />
                   Marcar como Listo para Entrega
                 </button>
-                <p className="text-sm text-gray-600 text-center mt-2">
+                <p className="text-sm text-gray-600 text-center">
                   El pedido será enviado al supervisor para su recepción
                 </p>
+
+                {esAdmin && (
+                  <button
+                    onClick={handleEntregarDirecto}
+                    disabled={procesando}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50"
+                  >
+                    <CheckCircle size={20} />
+                    Marcar como Terminado (Admin)
+                  </button>
+                )}
               </div>
             )}
           </div>

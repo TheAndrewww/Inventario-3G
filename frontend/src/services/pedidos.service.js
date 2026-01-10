@@ -150,6 +150,14 @@ const pedidosService = {
   listarSupervisores: async () => {
     const response = await api.get('/pedidos/supervisores');
     return response.data;
+  },
+
+  /**
+   * Marcar pedido como entregado directamente (solo admin)
+   */
+  entregarDirecto: async (pedidoId) => {
+    const response = await api.put(`/pedidos/${pedidoId}/entregar-directo`);
+    return response.data;
   }
 };
 
