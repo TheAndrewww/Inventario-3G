@@ -53,7 +53,7 @@ const CalendarioPublicoPage = () => {
     return escalaGuardada ? parseFloat(escalaGuardada) : 100;
   });
   const [mostrarControles, setMostrarControles] = useState(true);
-  const [modoPantallaCompleta, setModoPantallaCompleta] = useState(false);
+  const [modoPantallaCompleta, setModoPantallaCompleta] = useState(true); // Siempre inicia en modo pantalla completa
 
   // Función para toggle pantalla completa
   const togglePantallaCompleta = () => {
@@ -147,30 +147,8 @@ const CalendarioPublicoPage = () => {
     return () => clearInterval(intervaloReloj);
   }, []);
 
-  // Escuchar cambios de pantalla completa
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setModoPantallaCompleta(!!document.fullscreenElement);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  // Auto-entrar en pantalla completa al cargar la página
-  useEffect(() => {
-    const entrarPantallaCompleta = () => {
-      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch((err) => {
-          console.log('No se pudo entrar en pantalla completa automáticamente:', err.message);
-        });
-      }
-    };
-
-    // Intentar entrar después de un pequeño delay para asegurar que la página cargó
-    const timer = setTimeout(entrarPantallaCompleta, 500);
-    return () => clearTimeout(timer);
-  }, []);
+  // Nota: El modo pantalla completa visual es independiente del fullscreen del navegador
+  // Esto garantiza que siempre se muestre el diseño optimizado para pantallas
 
   // Auto-ocultar controles en pantalla completa
   useEffect(() => {
