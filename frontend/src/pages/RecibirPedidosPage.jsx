@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Clock, Users, Package, AlertCircle, CheckSquare, Square } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Users, Package, AlertCircle, CheckSquare, Square, Plus, Search, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import pedidosService from '../services/pedidos.service';
+import articulosService from '../services/articulos.service';
 import { Button, Modal } from '../components/common';
 import toast from 'react-hot-toast';
 
@@ -14,6 +15,12 @@ const RecibirPedidosPage = () => {
   const [mostrarModalRechazo, setMostrarModalRechazo] = useState(false);
   const [mostrarModalDetalle, setMostrarModalDetalle] = useState(false);
   const [mostrarModalConfirmarRecepcion, setMostrarModalConfirmarRecepcion] = useState(false);
+  const [mostrarModalAgregarArticulo, setMostrarModalAgregarArticulo] = useState(false);
+  const [busquedaArticulo, setBusquedaArticulo] = useState('');
+  const [articulosEncontrados, setArticulosEncontrados] = useState([]);
+  const [buscandoArticulos, setBuscandoArticulos] = useState(false);
+  const [articuloAAgregar, setArticuloAAgregar] = useState(null);
+  const [cantidadAAgregar, setCantidadAAgregar] = useState(1);
 
   const cargarPedidos = async () => {
     try {
@@ -102,6 +109,78 @@ const RecibirPedidosPage = () => {
   const cerrarModalDetalle = () => {
     setMostrarModalDetalle(false);
     setPedidoSeleccionado(null);
+  };
+
+  // Funciones para agregar artículos
+  const abrirModalAgregarArticulo = () => {
+    setMostrarModalAgregarArticulo(true);
+    setBusquedaArticulo('');
+    setArticulosEncontrados([]);
+    setArticuloAAgregar(null);
+    setCantidadAAgregar(1);
+  };
+
+  const cerrarModalAgregarArticulo = () => {
+    setMostrarModalAgregarArticulo(false);
+    setBusquedaArticulo('');
+    setArticulosEncontrados([]);
+    setArticuloAAgregar(null);
+    setCantidadAAgregar(1);
+  };
+
+  const buscarArticulos = async () => {
+    if (!busquedaArticulo.trim() || busquedaArticulo.length < 2) {
+      return;
+    }
+
+    try {
+      setBuscandoArticulos(true);
+      const response = await articulosService.search(busquedaArticulo);
+      setArticulosEncontrados(response.data?.articulos || []);
+    } catch (error) {
+      console.error('Error al buscar artículos:', error);
+      toast.error('Error al buscar artículos');
+    } finally {
+      setBuscandoArticulos(false);
+    }
+  };
+
+  const seleccionarArticulo = (articulo) => {
+    // Verificar si ya está en el pedido
+    const yaEsta = pedidoSeleccionado?.detalles?.some(d => d.articulo_id === articulo.id);
+    if (yaEsta) {
+      toast.error('Este artículo ya está en el pedido');
+      return;
+    }
+    setArticuloAAgregar(articulo);
+    setCantidadAAgregar(1);
+  };
+
+  const handleAgregarArticulo = async () => {
+    if (!articuloAAgregar || cantidadAAgregar <= 0) {
+      toast.error('Selecciona un artículo y cantidad válida');
+      return;
+    }
+
+    try {
+      setCargando(true);
+      await pedidosService.agregarArticulo(pedidoSeleccionado.id, {
+        articulo_id: articuloAAgregar.id,
+        cantidad: cantidadAAgregar,
+        observaciones: 'Agregado durante recepción'
+      });
+      toast.success(`Artículo "${articuloAAgregar.nombre}" agregado al pedido`);
+
+      // Recargar el pedido
+      const response = await pedidosService.obtenerPorId(pedidoSeleccionado.id);
+      setPedidoSeleccionado(response.data?.pedido);
+      cerrarModalAgregarArticulo();
+    } catch (error) {
+      console.error('Error al agregar artículo:', error);
+      toast.error(error.response?.data?.message || 'Error al agregar artículo');
+    } finally {
+      setCargando(false);
+    }
   };
 
   if (cargando && pedidos.length === 0) {
@@ -337,6 +416,20 @@ const RecibirPedidosPage = () => {
               </div>
             )}
 
+            {/* Botón para agregar artículos faltantes */}
+            <div className="border-t border-gray-200 pt-4">
+              <button
+                onClick={abrirModalAgregarArticulo}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 text-blue-700 border-2 border-blue-300 border-dashed rounded-lg hover:bg-blue-100 transition-colors font-medium"
+              >
+                <Plus size={20} />
+                Agregar Artículo Faltante
+              </button>
+              <p className="text-xs text-gray-500 text-center mt-2">
+                Si falta algún artículo, puedes agregarlo antes de recibir el pedido
+              </p>
+            </div>
+
             {/* Botones de acción */}
             <div className="flex gap-3 pt-4 border-t border-gray-200">
               <button
@@ -457,6 +550,127 @@ const RecibirPedidosPage = () => {
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Rechazar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de agregar artículo faltante */}
+      {mostrarModalAgregarArticulo && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Plus size={20} className="text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Agregar Artículo</h3>
+                  <p className="text-sm text-gray-600">Busca y agrega artículos faltantes</p>
+                </div>
+              </div>
+              <button
+                onClick={cerrarModalAgregarArticulo}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            {/* Barra de búsqueda */}
+            <div className="mb-4">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={busquedaArticulo}
+                    onChange={(e) => setBusquedaArticulo(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && buscarArticulos()}
+                    placeholder="Buscar por nombre o código..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                  />
+                </div>
+                <button
+                  onClick={buscarArticulos}
+                  disabled={buscandoArticulos || busquedaArticulo.length < 2}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {buscandoArticulos ? 'Buscando...' : 'Buscar'}
+                </button>
+              </div>
+              {busquedaArticulo.length > 0 && busquedaArticulo.length < 2 && (
+                <p className="text-xs text-gray-500 mt-1">Escribe al menos 2 caracteres</p>
+              )}
+            </div>
+
+            {/* Resultados de búsqueda */}
+            {articulosEncontrados.length > 0 && !articuloAAgregar && (
+              <div className="mb-4 max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+                {articulosEncontrados.map((articulo) => (
+                  <button
+                    key={articulo.id}
+                    onClick={() => seleccionarArticulo(articulo)}
+                    className="w-full text-left p-3 hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                  >
+                    <div className="font-medium text-gray-900">{articulo.nombre}</div>
+                    <div className="text-sm text-gray-500">
+                      EAN-13: {articulo.codigo_ean13} | Stock: {articulo.stock_actual} {articulo.unidad}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Artículo seleccionado */}
+            {articuloAAgregar && (
+              <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h4 className="font-bold text-blue-900">{articuloAAgregar.nombre}</h4>
+                    <p className="text-sm text-blue-700">EAN-13: {articuloAAgregar.codigo_ean13}</p>
+                    <p className="text-sm text-blue-700">Stock disponible: {articuloAAgregar.stock_actual} {articuloAAgregar.unidad}</p>
+                  </div>
+                  <button
+                    onClick={() => setArticuloAAgregar(null)}
+                    className="p-1 hover:bg-blue-100 rounded-full"
+                  >
+                    <X size={18} className="text-blue-600" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="text-sm font-medium text-blue-800">Cantidad:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={articuloAAgregar.stock_actual}
+                    value={cantidadAAgregar}
+                    onChange={(e) => setCantidadAAgregar(parseInt(e.target.value) || 1)}
+                    className="w-24 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                  />
+                  <span className="text-sm text-blue-700">{articuloAAgregar.unidad}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Botones de acción */}
+            <div className="flex gap-3">
+              <button
+                onClick={cerrarModalAgregarArticulo}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAgregarArticulo}
+                disabled={!articuloAAgregar || cantidadAAgregar <= 0 || cargando}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Plus size={18} />
+                {cargando ? 'Agregando...' : 'Agregar al Pedido'}
               </button>
             </div>
           </div>

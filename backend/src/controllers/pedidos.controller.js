@@ -1338,16 +1338,30 @@ export const agregarArticuloAPedido = async (req, res) => {
       });
     }
 
-    // Verificar que el pedido existe y está pendiente
+    // Obtener usuario actual
+    const usuario_rol = req.usuario.rol;
+
+    // Determinar estados permitidos según el rol
+    let estadosPermitidos = ['pendiente', 'aprobado'];
+    if (['supervisor', 'encargado', 'administrador'].includes(usuario_rol)) {
+      // Supervisores y encargados pueden agregar artículos cuando reciben el pedido
+      estadosPermitidos.push('listo_para_entrega');
+    }
+
+    // Verificar que el pedido existe y está en un estado permitido
     const pedido = await Movimiento.findOne({
-      where: { id: pedido_id, tipo: 'pedido', estado: 'pendiente' }
+      where: {
+        id: pedido_id,
+        tipo: 'pedido',
+        estado: { [Op.in]: estadosPermitidos }
+      }
     });
 
     if (!pedido) {
       await transaction.rollback();
       return res.status(404).json({
         success: false,
-        message: 'Pedido no encontrado o ya está completado'
+        message: 'Pedido no encontrado o no está en un estado que permita agregar artículos'
       });
     }
 
