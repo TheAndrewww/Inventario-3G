@@ -76,8 +76,8 @@ const getEquipoFromColor = (backgroundColor) => {
   // Azul claro: RGB(207, 226, 243) = (0.812, 0.886, 0.953)
   // Azul oscuro: RGB(159, 197, 232) = (0.624, 0.773, 0.910)
   if (blue > 0.90 && blue < 0.97 &&
-      ((red > 0.79 && red < 0.84 && green > 0.86 && green < 0.91) || // Azul claro
-       (red > 0.60 && red < 0.65 && green > 0.75 && green < 0.80))) { // Azul oscuro
+    ((red > 0.79 && red < 0.84 && green > 0.86 && green < 0.91) || // Azul claro
+      (red > 0.60 && red < 0.65 && green > 0.75 && green < 0.80))) { // Azul oscuro
     return 'EQUIPO I';
   }
 
@@ -144,7 +144,7 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
 
     // Validar que el nombre del mes sea válido
     const mesesValidos = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
-                          'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+      'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
 
     if (!mesesValidos.includes(mes.toUpperCase())) {
       console.warn(`⚠️ Mes no válido: ${mes}. Meses válidos: ${mesesValidos.join(', ')}`);
@@ -521,7 +521,7 @@ export const obtenerDistribucionEquipos = async (mes = 'NOVIEMBRE') => {
 };
 
 /**
- * Leer anuncios desde el rango W20:Z23 del calendario
+ * Leer anuncios desde el rango W33:Z35 del calendario
  * @param {string} mes - Nombre del mes (ENERO, FEBRERO, etc.)
  * @returns {Promise<Object>} - Lista de anuncios del calendario
  */
@@ -531,8 +531,8 @@ export const leerAnunciosCalendario = async (mes) => {
 
     const sheets = await authenticate();
 
-    // Leer el rango W20:Z23 (4 filas x 4 columnas)
-    const range = `${mes}!W20:Z23`;
+    // Leer el rango W33:Z35 (3 filas x 4 columnas)
+    const range = `${mes}!W33:Z35`;
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -542,7 +542,7 @@ export const leerAnunciosCalendario = async (mes) => {
     const rows = response.data.values || [];
 
     if (rows.length === 0) {
-      console.log('⚠️  No se encontraron anuncios en el rango W20:Z23');
+      console.log('⚠️  No se encontraron anuncios en el rango W33:Z35');
       return {
         success: true,
         data: {
@@ -567,7 +567,7 @@ export const leerAnunciosCalendario = async (mes) => {
 
     console.log(`✅ Anuncios encontrados: ${anuncios.length}`);
     anuncios.forEach((a, i) => {
-      console.log(`   ${i+1}. "${a.textoAnuncio}" - ${a.proyecto || 'Sin proyecto'}`);
+      console.log(`   ${i + 1}. "${a.textoAnuncio}" - ${a.proyecto || 'Sin proyecto'}`);
     });
 
     return {
