@@ -435,7 +435,7 @@ export const crearPedido = async (req, res) => {
       } else if (estado_inicial === 'pendiente_aprobacion') {
         // Pedido de almacenista para equipo - notificar a supervisores
         await notificarPorRol({
-          roles: ['supervisor', 'administrador'],
+          roles: ['encargado', 'administrador'],
           tipo: 'pedido_pendiente_aprobacion',
           titulo: 'Pedido pendiente de aprobación',
           mensaje: `${req.usuario.nombre} creó un pedido para el equipo ${equipo.nombre}. Requiere tu aprobación.`,
@@ -995,7 +995,7 @@ export const anularPedido = async (req, res) => {
     }
 
     // Verificar permisos: solo supervisor o admin
-    if (!['supervisor', 'administrador'].includes(usuario.rol)) {
+    if (!['encargado', 'administrador'].includes(usuario.rol)) {
       await transaction.rollback();
       return res.status(403).json({
         success: false,
@@ -1178,7 +1178,7 @@ export const cancelarPedido = async (req, res) => {
     // Verificar permisos: solo el creador, supervisor o admin
     if (
       pedido.usuario_id !== usuario.id &&
-      !['supervisor', 'administrador'].includes(usuario.rol)
+      !['encargado', 'administrador'].includes(usuario.rol)
     ) {
       return res.status(403).json({
         success: false,

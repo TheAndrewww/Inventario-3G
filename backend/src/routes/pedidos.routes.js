@@ -49,7 +49,7 @@ router.post(
 router.get(
   '/',
   verificarToken,
-  verificarRol('diseñador', 'almacen', 'supervisor', 'administrador'),
+  verificarRol('diseñador', 'almacen', 'encargado', 'administrador'),
   listarPedidos
 );
 
@@ -85,7 +85,7 @@ router.get(
 router.get(
   '/:id',
   verificarToken,
-  verificarRol('diseñador', 'almacen', 'supervisor', 'administrador'),
+  verificarRol('diseñador', 'almacen', 'encargado', 'administrador'),
   obtenerPedido
 );
 
@@ -109,7 +109,7 @@ router.put(
 router.put(
   '/:id/cancelar',
   verificarToken,
-  verificarRol('diseñador', 'supervisor', 'administrador'),
+  verificarRol('diseñador', 'encargado', 'administrador'),
   cancelarPedido
 );
 
@@ -121,7 +121,7 @@ router.put(
 router.put(
   '/:id/anular',
   verificarToken,
-  verificarRol('supervisor', 'administrador'),
+  verificarRol('encargado', 'administrador'),
   anularPedido
 );
 
@@ -169,7 +169,7 @@ router.delete(
 router.get(
   '/aprobacion/pendientes',
   verificarToken,
-  verificarRol('supervisor', 'administrador'),
+  verificarRol('encargado', 'administrador'),
   listarPedidosPendientesAprobacion
 );
 
@@ -181,7 +181,7 @@ router.get(
 router.put(
   '/:pedido_id/aprobar',
   verificarToken,
-  verificarRol('supervisor', 'administrador'),
+  verificarRol('encargado', 'administrador'),
   aprobarPedido
 );
 
@@ -193,7 +193,7 @@ router.put(
 router.put(
   '/:pedido_id/rechazar',
   verificarToken,
-  verificarRol('supervisor', 'administrador'),
+  verificarRol('encargado', 'administrador'),
   rechazarPedido
 );
 
@@ -217,7 +217,7 @@ router.put(
 router.get(
   '/recepcion/pendientes',
   verificarToken,
-  verificarRol('supervisor', 'administrador'),
+  verificarRol('encargado', 'administrador'),
   listarPedidosListosParaRecibir
 );
 
@@ -229,7 +229,7 @@ router.get(
 router.put(
   '/:pedido_id/recibir',
   verificarToken,
-  verificarRol('supervisor', 'administrador'),
+  verificarRol('encargado', 'administrador'),
   recibirPedido
 );
 
@@ -241,7 +241,7 @@ router.put(
 router.put(
   '/:pedido_id/rechazar-entrega',
   verificarToken,
-  verificarRol('supervisor', 'administrador'),
+  verificarRol('encargado', 'administrador'),
   rechazarPedidoListoParaEntrega
 );
 

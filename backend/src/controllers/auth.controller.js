@@ -47,7 +47,7 @@ export const register = async (req, res) => {
         }
 
         // Validar rol
-        const rolesPermitidos = ['administrador', 'supervisor', 'empleado'];
+        const rolesPermitidos = ['administrador', 'encargado', 'almacen', 'diseñador', 'compras', 'ventas', 'operador'];
         if (!rolesPermitidos.includes(rol)) {
             return res.status(400).json({
                 success: false,
