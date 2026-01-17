@@ -52,6 +52,17 @@ export const completarEtapa = async (proyectoId, observaciones = '') => {
     return response.data;
 };
 
+// Sub-etapas de Producción (Manufactura y Herrería)
+export const completarSubEtapa = async (proyectoId, subEtapa) => {
+    const response = await api.post(`/produccion/${proyectoId}/completar-subetapa`, { subEtapa });
+    return response.data;
+};
+
+export const completarSubEtapaTerminal = async (proyectoId, subEtapa) => {
+    const response = await api.post(`/produccion/terminal/${proyectoId}/completar-subetapa`, { subEtapa });
+    return response.data;
+};
+
 // Sincronización con Google Sheets
 export const sincronizarConSheets = async (mes = null) => {
     const response = await api.post('/produccion/sincronizar', { mes });
@@ -68,17 +79,58 @@ export const previewProyectosSheets = async (mes) => {
     return response.data;
 };
 
+// ===== Google Drive =====
+
+/**
+ * Obtener archivos de Drive de un proyecto (para usuarios autenticados)
+ */
+export const obtenerArchivosDrive = async (proyectoId) => {
+    const response = await api.get(`/produccion/${proyectoId}/archivos`);
+    return response.data;
+};
+
+/**
+ * Obtener archivos de Drive de un proyecto (para terminales públicas)
+ */
+export const obtenerArchivosDriveTerminal = async (proyectoId) => {
+    const response = await api.get(`/produccion/terminal/${proyectoId}/archivos`);
+    return response.data;
+};
+
+/**
+ * Forzar sincronización con Drive de un proyecto
+ */
+export const sincronizarProyectoDrive = async (proyectoId) => {
+    const response = await api.post(`/produccion/${proyectoId}/sincronizar-drive`);
+    return response.data;
+};
+
+/**
+ * Sincronizar todos los proyectos con Drive
+ */
+export const sincronizarTodosDrive = async () => {
+    const response = await api.post('/produccion/sincronizar-drive');
+    return response.data;
+};
+
 export default {
     obtenerDashboard,
     obtenerEstadisticas,
     obtenerProyectosArea,
     validarCodigoArea,
     completarEtapaTerminal,
+    completarSubEtapa,
+    completarSubEtapaTerminal,
     crearProyecto,
     actualizarProyecto,
     eliminarProyecto,
     completarEtapa,
     sincronizarConSheets,
     obtenerMesesDisponibles,
-    previewProyectosSheets
+    previewProyectosSheets,
+    // Google Drive
+    obtenerArchivosDrive,
+    obtenerArchivosDriveTerminal,
+    sincronizarProyectoDrive,
+    sincronizarTodosDrive
 };

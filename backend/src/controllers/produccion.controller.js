@@ -6,7 +6,8 @@ import produccionSheetsService from '../services/produccionSheets.service.js';
 const COLORES_AREAS = {
     diseno: { nombre: 'Diseño', color: '#8E99EB', bgClass: 'bg-indigo-500' },
     compras: { nombre: 'Compras', color: '#10B981', bgClass: 'bg-emerald-500' },
-    produccion: { nombre: 'Producción', color: '#F59E0B', bgClass: 'bg-amber-500' },
+    manufactura: { nombre: 'Manufactura', color: '#F59E0B', bgClass: 'bg-amber-500' },
+    herreria: { nombre: 'Herrería', color: '#EF4444', bgClass: 'bg-red-500' },
     instalacion: { nombre: 'Instalación', color: '#3B82F6', bgClass: 'bg-blue-500' }
 };
 
@@ -14,7 +15,8 @@ const COLORES_AREAS = {
 const CODIGOS_AREA = {
     'DIS-2026': 'diseno',
     'COM-2026': 'compras',
-    'PRO-2026': 'produccion',
+    'MAN-2026': 'manufactura',
+    'HER-2026': 'herreria',
     'INS-2026': 'instalacion'
 };
 
@@ -26,14 +28,15 @@ export const obtenerDashboard = async (req, res) => {
     try {
         const resultado = await ProduccionProyecto.obtenerResumenDashboard();
 
-        // Agregar información de colores
+        // Agregar información de colores y sub-etapas
         const resumenConColores = {};
         Object.keys(resultado.resumen).forEach(etapa => {
             resumenConColores[etapa] = {
                 proyectos: resultado.resumen[etapa].map(p => ({
                     ...p.toJSON(),
                     diasRestantes: p.getDiasRestantes(),
-                    porcentaje: p.getPorcentajeAvance()
+                    porcentaje: p.getPorcentajeAvance(),
+                    estadoSubEtapas: p.getEstadoSubEtapas()
                 })),
                 info: COLORES_AREAS[etapa] || { nombre: etapa, color: '#6B7280' }
             };
@@ -65,19 +68,49 @@ export const obtenerPorArea = async (req, res) => {
     try {
         const { area } = req.params;
 
-        // Mapear área a etapa
-        // En la terminal de cada área se muestran los proyectos que ESTÁN en esa etapa
-        // (es decir, esperando ser completados por esa área)
-        const etapasValidas = ['diseno', 'compras', 'produccion', 'instalacion'];
+        // Áreas válidas (incluyendo sub-áreas de producción)
+        const areasValidas = ['diseno', 'compras', 'manufactura', 'herreria', 'instalacion'];
 
-        if (!etapasValidas.includes(area)) {
+        if (!areasValidas.includes(area)) {
             return res.status(400).json({
                 success: false,
-                message: `Área inválida. Use: ${etapasValidas.join(', ')}`
+                message: `Área inválida. Use: ${areasValidas.join(', ')}`
             });
         }
 
-        const proyectos = await ProduccionProyecto.obtenerPorEtapa(area);
+        let proyectos;
+
+        // Manufactura y Herrería son sub-áreas de Producción
+        if (area === 'manufactura') {
+            // Obtener proyectos en producción que NO tienen manufactura completada
+            proyectos = await ProduccionProyecto.findAll({
+                where: {
+                    etapa_actual: 'produccion',
+                    activo: true,
+                    manufactura_completado: false
+                },
+                order: [
+                    ['prioridad', 'ASC'],
+                    ['fecha_limite', 'ASC']
+                ]
+            });
+        } else if (area === 'herreria') {
+            // Obtener proyectos en producción que NO tienen herrería completada
+            proyectos = await ProduccionProyecto.findAll({
+                where: {
+                    etapa_actual: 'produccion',
+                    activo: true,
+                    herreria_completado: false
+                },
+                order: [
+                    ['prioridad', 'ASC'],
+                    ['fecha_limite', 'ASC']
+                ]
+            });
+        } else {
+            // Áreas normales (diseño, compras, instalación)
+            proyectos = await ProduccionProyecto.obtenerPorEtapa(area);
+        }
 
         res.json({
             success: true,
@@ -87,7 +120,8 @@ export const obtenerPorArea = async (req, res) => {
                 proyectos: proyectos.map(p => ({
                     ...p.toJSON(),
                     diasRestantes: p.getDiasRestantes(),
-                    porcentaje: p.getPorcentajeAvance()
+                    porcentaje: p.getPorcentajeAvance(),
+                    estadoSubEtapas: p.getEstadoSubEtapas()
                 })),
                 total: proyectos.length
             }
@@ -157,6 +191,72 @@ export const completarEtapa = async (req, res) => {
             success: false,
             message: 'Error al completar etapa',
             error: error.message
+        });
+    }
+};
+
+/**
+ * POST /api/produccion/:id/completar-subetapa
+ * Completar una sub-etapa de producción (manufactura o herrería)
+ */
+export const completarSubEtapa = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { subEtapa } = req.body; // 'manufactura' o 'herreria'
+
+        if (!subEtapa || !['manufactura', 'herreria'].includes(subEtapa)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Sub-etapa inválida. Use "manufactura" o "herreria"'
+            });
+        }
+
+        const proyecto = await ProduccionProyecto.findByPk(id);
+
+        if (!proyecto) {
+            return res.status(404).json({
+                success: false,
+                message: 'Proyecto no encontrado'
+            });
+        }
+
+        if (proyecto.etapa_actual !== 'produccion') {
+            return res.status(400).json({
+                success: false,
+                message: 'El proyecto no está en la etapa de Producción'
+            });
+        }
+
+        let usuarioId = null;
+        if (req.usuario) {
+            usuarioId = req.usuario.id;
+        }
+
+        const resultado = await proyecto.completarSubEtapaProduccion(subEtapa, usuarioId);
+
+        const nombreSubEtapa = subEtapa === 'manufactura' ? 'Manufactura' : 'Herrería';
+
+        console.log(`✅ ${nombreSubEtapa} completada para "${proyecto.nombre}"`);
+
+        res.json({
+            success: true,
+            message: `${nombreSubEtapa} completada`,
+            data: {
+                proyecto: {
+                    ...resultado.proyecto.toJSON(),
+                    diasRestantes: resultado.proyecto.getDiasRestantes(),
+                    porcentaje: resultado.proyecto.getPorcentajeAvance()
+                },
+                subEtapaCompletada: subEtapa,
+                puedeAvanzarAInstalacion: resultado.puedeAvanzarAInstalacion,
+                estadoSubEtapas: resultado.estadoSubEtapas
+            }
+        });
+    } catch (error) {
+        console.error('Error al completar sub-etapa:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error al completar sub-etapa'
         });
     }
 };
@@ -338,7 +438,7 @@ export const obtenerEstadisticas = async (req, res) => {
                 etapa_actual: { [Op.notIn]: ['completado', 'pendiente'] },
                 [Op.or]: [
                     { prioridad: 1 },
-                    { fecha_limite: { [Op.between]: [hoy, en3Dias] } }
+                    { fecha_limite: { [Op.lte]: en3Dias } }  // Incluye vencidos + próximos 3 días
                 ]
             }
         });
@@ -437,6 +537,169 @@ export const previewProyectosSheets = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al obtener vista previa',
+            error: error.message
+        });
+    }
+};
+
+// ===== ENDPOINTS DE GOOGLE DRIVE =====
+
+import googleDriveService from '../services/googleDrive.service.js';
+
+/**
+ * GET /api/produccion/:id/archivos
+ * Obtener archivos de Drive de un proyecto
+ */
+export const obtenerArchivosDrive = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const proyecto = await ProduccionProyecto.findByPk(id);
+
+        if (!proyecto) {
+            return res.status(404).json({
+                success: false,
+                message: 'Proyecto no encontrado'
+            });
+        }
+
+        // Si no tiene carpeta de Drive, intentar buscarla
+        if (!proyecto.drive_folder_id) {
+            const resultado = await googleDriveService.sincronizarProyecto(proyecto);
+            if (!resultado.success) {
+                return res.json({
+                    success: true,
+                    data: {
+                        tieneManufactura: false,
+                        tieneHerreria: false,
+                        archivos: { manufactura: [], herreria: [] },
+                        mensaje: 'No se encontró carpeta en Drive para este proyecto'
+                    }
+                });
+            }
+            await proyecto.reload();
+        }
+
+        res.json({
+            success: true,
+            data: {
+                tieneManufactura: proyecto.tiene_manufactura,
+                tieneHerreria: proyecto.tiene_herreria,
+                archivos: {
+                    manufactura: proyecto.archivos_manufactura || [],
+                    herreria: proyecto.archivos_herreria || []
+                },
+                ultimaSincronizacion: proyecto.drive_sync_at,
+                carpetaId: proyecto.drive_folder_id
+            }
+        });
+    } catch (error) {
+        console.error('Error al obtener archivos de Drive:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener archivos de Drive',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * POST /api/produccion/:id/sincronizar-drive
+ * Forzar sincronización con Drive de un proyecto
+ */
+export const sincronizarProyectoDrive = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const proyecto = await ProduccionProyecto.findByPk(id);
+
+        if (!proyecto) {
+            return res.status(404).json({
+                success: false,
+                message: 'Proyecto no encontrado'
+            });
+        }
+
+        const resultado = await googleDriveService.sincronizarProyecto(proyecto);
+
+        if (resultado.success) {
+            await proyecto.reload();
+        }
+
+        res.json({
+            success: resultado.success,
+            data: resultado,
+            proyecto: {
+                id: proyecto.id,
+                nombre: proyecto.nombre,
+                tieneManufactura: proyecto.tiene_manufactura,
+                tieneHerreria: proyecto.tiene_herreria,
+                archivos: {
+                    manufactura: proyecto.archivos_manufactura || [],
+                    herreria: proyecto.archivos_herreria || []
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error al sincronizar con Drive:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al sincronizar con Drive',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * POST /api/produccion/sincronizar-drive
+ * Sincronizar todos los proyectos activos con Drive
+ */
+export const sincronizarTodosDrive = async (req, res) => {
+    try {
+        console.log('🔄 Iniciando sincronización masiva con Drive...');
+
+        const proyectos = await ProduccionProyecto.findAll({
+            where: {
+                activo: true,
+                etapa_actual: { [Op.notIn]: ['completado', 'pendiente'] }
+            }
+        });
+
+        console.log(`📊 Proyectos a sincronizar: ${proyectos.length}`);
+
+        const resultados = {
+            total: proyectos.length,
+            exitosos: 0,
+            fallidos: 0,
+            detalles: []
+        };
+
+        for (const proyecto of proyectos) {
+            const resultado = await googleDriveService.sincronizarProyecto(proyecto);
+
+            if (resultado.success) {
+                resultados.exitosos++;
+            } else {
+                resultados.fallidos++;
+            }
+
+            resultados.detalles.push({
+                proyecto: proyecto.nombre,
+                ...resultado
+            });
+        }
+
+        console.log(`✅ Sincronización completada: ${resultados.exitosos} exitosos, ${resultados.fallidos} fallidos`);
+
+        res.json({
+            success: true,
+            data: resultados
+        });
+    } catch (error) {
+        console.error('Error en sincronización masiva:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error en sincronización masiva',
             error: error.message
         });
     }

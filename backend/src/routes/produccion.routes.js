@@ -3,6 +3,7 @@ import {
     obtenerDashboard,
     obtenerPorArea,
     completarEtapa,
+    completarSubEtapa,
     validarCodigoArea,
     crearProyecto,
     actualizarProyecto,
@@ -10,7 +11,10 @@ import {
     obtenerEstadisticas,
     sincronizarConSheets,
     obtenerMesesDisponibles,
-    previewProyectosSheets
+    previewProyectosSheets,
+    obtenerArchivosDrive,
+    sincronizarProyectoDrive,
+    sincronizarTodosDrive
 } from '../controllers/produccion.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -38,6 +42,20 @@ router.get('/terminal/:area', obtenerPorArea);
  * Acceso: Público (validado por código)
  */
 router.post('/terminal/:id/completar', completarEtapa);
+
+/**
+ * POST /api/produccion/terminal/:id/completar-subetapa
+ * Completar sub-etapa de producción (manufactura o herrería) desde terminal
+ * Acceso: Público (validado por código)
+ */
+router.post('/terminal/:id/completar-subetapa', completarSubEtapa);
+
+/**
+ * GET /api/produccion/terminal/:id/archivos
+ * Obtener archivos de Drive para terminal
+ * Acceso: Público
+ */
+router.get('/terminal/:id/archivos', obtenerArchivosDrive);
 
 // ========== RUTAS PROTEGIDAS ==========
 
@@ -94,6 +112,13 @@ router.get('/area/:area', obtenerPorArea);
 router.post('/:id/completar-etapa', completarEtapa);
 
 /**
+ * POST /api/produccion/:id/completar-subetapa
+ * Completar sub-etapa de producción (manufactura o herrería)
+ * Acceso: Usuarios autenticados
+ */
+router.post('/:id/completar-subetapa', completarSubEtapa);
+
+/**
  * POST /api/produccion
  * Crear nuevo proyecto
  * Acceso: Administrador, Almacenista
@@ -113,6 +138,29 @@ router.put('/:id', verificarRol('administrador', 'almacenista'), actualizarProye
  * Acceso: Solo Administrador
  */
 router.delete('/:id', verificarRol('administrador'), eliminarProyecto);
+
+// ========== RUTAS DE GOOGLE DRIVE ==========
+
+/**
+ * GET /api/produccion/:id/archivos
+ * Obtener archivos de Drive de un proyecto
+ * Acceso: Usuarios autenticados
+ */
+router.get('/:id/archivos', obtenerArchivosDrive);
+
+/**
+ * POST /api/produccion/:id/sincronizar-drive
+ * Forzar sincronización con Drive de un proyecto
+ * Acceso: Administrador, Almacenista
+ */
+router.post('/:id/sincronizar-drive', verificarRol('administrador', 'almacenista'), sincronizarProyectoDrive);
+
+/**
+ * POST /api/produccion/sincronizar-drive
+ * Sincronizar todos los proyectos activos con Drive
+ * Acceso: Solo Administrador
+ */
+router.post('/sincronizar-drive', verificarRol('administrador'), sincronizarTodosDrive);
 
 export default router;
 

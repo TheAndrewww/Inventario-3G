@@ -49,31 +49,69 @@ const authenticate = async () => {
 };
 
 /**
- * Parsear fecha en formato dd/mm/yyyy o similar
+ * Meses en español para parseo de fechas
+ */
+const MESES_ESPANOL = {
+    'enero': 0, 'ene': 0,
+    'febrero': 1, 'feb': 1,
+    'marzo': 2, 'mar': 2,
+    'abril': 3, 'abr': 3,
+    'mayo': 4, 'may': 4,
+    'junio': 5, 'jun': 5,
+    'julio': 6, 'jul': 6,
+    'agosto': 7, 'ago': 7,
+    'septiembre': 8, 'sep': 8, 'sept': 8,
+    'octubre': 9, 'oct': 9,
+    'noviembre': 10, 'nov': 10,
+    'diciembre': 11, 'dic': 11
+};
+
+/**
+ * Parsear fecha en múltiples formatos:
+ * - dd/mm/yyyy (02/01/2026)
+ * - dd MES yyyy (02 enero 2026)
+ * - dd-MES-yyyy (02-enero-2026)
  */
 const parsearFecha = (fechaStr) => {
     if (!fechaStr) return null;
 
-    // Intentar diferentes formatos
-    const fechaLimpia = fechaStr.toString().trim();
+    const fechaLimpia = fechaStr.toString().trim().toLowerCase();
 
-    // Formato dd/mm/yyyy
-    const partes = fechaLimpia.split('/');
-    if (partes.length === 3) {
-        const dia = parseInt(partes[0]);
-        const mes = parseInt(partes[1]) - 1; // JavaScript usa 0-11 para meses
-        let anio = parseInt(partes[2]);
-
-        // Si el año es de 2 dígitos, asumir 2000s
+    // Formato dd/mm/yyyy o dd-mm-yyyy
+    const partesSlash = fechaLimpia.split(/[\/\-]/);
+    if (partesSlash.length === 3 && !isNaN(partesSlash[1])) {
+        const dia = parseInt(partesSlash[0]);
+        const mes = parseInt(partesSlash[1]) - 1;
+        let anio = parseInt(partesSlash[2]);
         if (anio < 100) anio += 2000;
 
         const fecha = new Date(anio, mes, dia);
         if (!isNaN(fecha.getTime())) {
-            return fecha.toISOString().split('T')[0]; // Retorna YYYY-MM-DD
+            return fecha.toISOString().split('T')[0];
         }
     }
 
-    // Intentar parseo directo
+    // Formato "dd MES yyyy" o "dd-MES-yyyy" (español)
+    // Ejemplos: "02 enero 2026", "15-febrero-2026"
+    const regexEspanol = /^(\d{1,2})[\s\-]+([a-záéíóú]+)[\s\-]+(\d{4})$/i;
+    const matchEspanol = fechaLimpia.match(regexEspanol);
+
+    if (matchEspanol) {
+        const dia = parseInt(matchEspanol[1]);
+        const mesTexto = matchEspanol[2].toLowerCase();
+        const anio = parseInt(matchEspanol[3]);
+
+        const mes = MESES_ESPANOL[mesTexto];
+
+        if (mes !== undefined) {
+            const fecha = new Date(anio, mes, dia);
+            if (!isNaN(fecha.getTime())) {
+                return fecha.toISOString().split('T')[0];
+            }
+        }
+    }
+
+    // Intentar parseo directo como último recurso
     const fechaDirecta = new Date(fechaLimpia);
     if (!isNaN(fechaDirecta.getTime())) {
         return fechaDirecta.toISOString().split('T')[0];
@@ -220,22 +258,31 @@ export const sincronizarConDB = async (mes = null) => {
                 if (existente.nombre !== proyecto.nombre) {
                     cambios.nombre = proyecto.nombre;
                 }
+
+                // Actualizar fecha_entrada si existe en el sheet y es diferente o estaba vacía
+                if (proyecto.fechaIngreso && existente.fecha_entrada !== proyecto.fechaIngreso) {
+                    cambios.fecha_entrada = proyecto.fechaIngreso;
+                }
+
+                // Actualizar fecha_limite si existe en el sheet y es diferente o estaba vacía
                 if (proyecto.fechaEntrega && existente.fecha_limite !== proyecto.fechaEntrega) {
                     cambios.fecha_limite = proyecto.fechaEntrega;
                 }
+
                 if (proyecto.estaEntregado && existente.etapa_actual !== 'completado') {
                     cambios.etapa_actual = 'completado';
                     cambios.fecha_completado = new Date();
                 }
+
                 // Actualizar tipo_proyecto si cambió
-                if (proyecto.tipoProyecto && existente.tipo_proyecto !== proyecto.tipoProyecto) {
+                if (proyecto.tipoProyecto && existente.tipo_proyecto !== proyecto.tipoProyecto.toUpperCase()) {
                     cambios.tipo_proyecto = proyecto.tipoProyecto.toUpperCase();
                 }
 
                 if (Object.keys(cambios).length > 0) {
                     await existente.update(cambios);
                     actualizados++;
-                    console.log(`📝 Actualizado: "${proyecto.nombre}"`);
+                    console.log(`📝 Actualizado: "${proyecto.nombre}" - Cambios: ${Object.keys(cambios).join(', ')}`);
                 }
             } else {
                 // Crear nuevo proyecto

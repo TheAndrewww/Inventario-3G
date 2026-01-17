@@ -10,7 +10,12 @@ import {
     AlertTriangle,
     LogOut,
     RefreshCw,
-    Lock
+    Lock,
+    Hammer,
+    Wrench,
+    FileText,
+    Eye,
+    X
 } from 'lucide-react';
 import produccionService from '../services/produccion.service';
 import toast, { Toaster } from 'react-hot-toast';
@@ -21,25 +26,38 @@ const AREAS_CONFIG = {
         nombre: 'Diseño',
         color: '#8B5CF6',
         bgGradient: 'from-violet-600 to-violet-800',
-        icon: Package
+        icon: Package,
+        esSubEtapa: false
     },
     compras: {
         nombre: 'Compras',
         color: '#10B981',
         bgGradient: 'from-emerald-600 to-emerald-800',
-        icon: ShoppingCart
+        icon: ShoppingCart,
+        esSubEtapa: false
     },
-    produccion: {
-        nombre: 'Producción',
+    manufactura: {
+        nombre: 'Manufactura',
         color: '#F59E0B',
         bgGradient: 'from-amber-500 to-amber-700',
-        icon: Factory
+        icon: Factory,
+        esSubEtapa: true,
+        subEtapa: 'manufactura'
+    },
+    herreria: {
+        nombre: 'Herrería',
+        color: '#EF4444',
+        bgGradient: 'from-red-500 to-red-700',
+        icon: Hammer,
+        esSubEtapa: true,
+        subEtapa: 'herreria'
     },
     instalacion: {
         nombre: 'Instalación',
         color: '#3B82F6',
         bgGradient: 'from-blue-600 to-blue-800',
-        icon: Truck
+        icon: Truck,
+        esSubEtapa: false
     }
 };
 
@@ -108,11 +126,75 @@ const LoginArea = ({ onLogin }) => {
     );
 };
 
+// Modal para visualizar PDFs
+const PDFViewerModal = ({ archivo, onClose }) => {
+    if (!archivo) return null;
+
+    // Generar link de embed para Google Drive
+    const embedLink = archivo.link
+        ? archivo.link.replace('/view', '/preview')
+        : `https://drive.google.com/file/d/${archivo.id}/preview`;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-75">
+            <div className="relative w-full h-full max-w-6xl max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 bg-gray-100 border-b">
+                    <div className="flex items-center gap-3">
+                        <FileText size={24} className="text-blue-600" />
+                        <h3 className="text-xl font-bold text-gray-800">{archivo.nombre}</h3>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                    >
+                        <X size={28} className="text-gray-600" />
+                    </button>
+                </div>
+
+                {/* PDF Viewer */}
+                <div className="w-full h-[calc(100%-4rem)]">
+                    <iframe
+                        src={embedLink}
+                        className="w-full h-full border-0"
+                        title={archivo.nombre}
+                        allow="autoplay"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // Tarjeta de proyecto para terminal (grande y simple)
-const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: globalLoading }) => {
+const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: globalLoading, area }) => {
     const [loading, setLoading] = useState(false);
+    const [archivosLoading, setArchivosLoading] = useState(false);
+    const [archivos, setArchivos] = useState(null);
+    const [pdfAbierto, setPdfAbierto] = useState(null);
     const diasRestantes = proyecto.diasRestantes;
     const esUrgente = proyecto.prioridad === 1 || (diasRestantes !== null && diasRestantes <= 3);
+
+    // Cargar archivos de Drive cuando se monta el componente (solo para manufactura/herreria)
+    useEffect(() => {
+        const cargarArchivos = async () => {
+            if (area !== 'manufactura' && area !== 'herreria') return;
+
+            setArchivosLoading(true);
+            try {
+                const response = await produccionService.obtenerArchivosDriveTerminal(proyecto.id);
+                if (response.success) {
+                    setArchivos(response.data);
+                }
+            } catch (error) {
+                console.error('Error cargando archivos:', error);
+            } finally {
+                setArchivosLoading(false);
+            }
+        };
+
+        cargarArchivos();
+    }, [proyecto.id, area]);
 
     const handleCompletar = async () => {
         if (loading || globalLoading) return;
@@ -124,9 +206,21 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
         }
     };
 
+    // Obtener archivos relevantes para esta área
+    const archivosRelevantes = archivos?.archivos?.[area] || [];
+    const tieneArchivos = archivosRelevantes.length > 0;
+
     return (
         <div className={`bg-white rounded-2xl shadow-xl p-6 border-4 ${esUrgente ? 'border-red-500 ring-4 ring-red-200' : 'border-white'
             }`}>
+            {/* Modal de PDF */}
+            {pdfAbierto && (
+                <PDFViewerModal
+                    archivo={pdfAbierto}
+                    onClose={() => setPdfAbierto(null)}
+                />
+            )}
+
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
                 <div>
@@ -151,8 +245,8 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
             {/* Fecha límite */}
             {proyecto.fecha_limite && (
                 <div className={`flex items-center gap-2 text-lg mb-6 ${diasRestantes !== null && diasRestantes <= 3
-                        ? 'text-red-600 font-bold'
-                        : 'text-gray-500'
+                    ? 'text-red-600 font-bold'
+                    : 'text-gray-500'
                     }`}>
                     <Clock size={20} />
                     {diasRestantes !== null && diasRestantes < 0
@@ -167,6 +261,40 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
                                     month: 'short'
                                 })
                     }
+                </div>
+            )}
+
+            {/* Botones Ver Plano (si hay archivos) */}
+            {(area === 'manufactura' || area === 'herreria') && (
+                <div className="mb-4">
+                    {archivosLoading ? (
+                        <div className="flex items-center justify-center gap-2 text-gray-400 py-3">
+                            <RefreshCw size={20} className="animate-spin" />
+                            <span>Cargando planos...</span>
+                        </div>
+                    ) : tieneArchivos ? (
+                        <div className="space-y-2">
+                            <p className="text-sm text-gray-500 mb-2 font-medium">
+                                📄 {archivosRelevantes.length} plano(s) disponible(s):
+                            </p>
+                            <div className="grid gap-2">
+                                {archivosRelevantes.map((archivo, index) => (
+                                    <button
+                                        key={archivo.id || index}
+                                        onClick={() => setPdfAbierto(archivo)}
+                                        className="w-full py-3 px-4 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl text-blue-700 font-semibold flex items-center justify-center gap-3 transition-all"
+                                    >
+                                        <Eye size={24} />
+                                        Ver: {archivo.nombre}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : archivos && !tieneArchivos ? (
+                        <p className="text-center text-gray-400 text-sm py-2">
+                            Sin planos en Drive para este proyecto
+                        </p>
+                    ) : null}
                 </div>
             )}
 
@@ -233,20 +361,52 @@ const TerminalView = ({ area, onLogout }) => {
 
     const handleCompletar = async (proyectoId) => {
         try {
-            const response = await produccionService.completarEtapaTerminal(proyectoId);
-            if (response.success) {
-                toast.success(
-                    <div className="text-center">
-                        <div className="text-2xl mb-1">✅</div>
-                        <div className="font-bold">{response.message}</div>
-                    </div>,
-                    { duration: 3000 }
+            let response;
+
+            // Si es una sub-etapa (manufactura o herrería), usar el endpoint específico
+            if (areaConfig?.esSubEtapa && areaConfig?.subEtapa) {
+                response = await produccionService.completarSubEtapaTerminal(
+                    proyectoId,
+                    areaConfig.subEtapa
                 );
-                cargarProyectos(false);
+
+                if (response.success) {
+                    const mensaje = response.data.puedeAvanzarAInstalacion
+                        ? `${areaConfig.nombre} completada ✅ ¡Listo para Instalación!`
+                        : `${areaConfig.nombre} completada ✅`;
+
+                    toast.success(
+                        <div className="text-center">
+                            <div className="text-2xl mb-1">✅</div>
+                            <div className="font-bold">{mensaje}</div>
+                            {!response.data.puedeAvanzarAInstalacion && (
+                                <div className="text-sm opacity-80 mt-1">
+                                    Esperando {areaConfig.subEtapa === 'manufactura' ? 'Herrería' : 'Manufactura'}
+                                </div>
+                            )}
+                        </div>,
+                        { duration: 4000 }
+                    );
+                }
+            } else {
+                // Áreas normales (diseño, compras, instalación)
+                response = await produccionService.completarEtapaTerminal(proyectoId);
+
+                if (response.success) {
+                    toast.success(
+                        <div className="text-center">
+                            <div className="text-2xl mb-1">✅</div>
+                            <div className="font-bold">{response.message}</div>
+                        </div>,
+                        { duration: 3000 }
+                    );
+                }
             }
+
+            cargarProyectos(false);
         } catch (error) {
             console.error('Error al completar:', error);
-            toast.error('Error al completar etapa');
+            toast.error(error.response?.data?.message || 'Error al completar');
         }
     };
 
@@ -312,6 +472,7 @@ const TerminalView = ({ area, onLogout }) => {
                             onCompletar={handleCompletar}
                             areaConfig={areaConfig}
                             loading={actualizando}
+                            area={area}
                         />
                     ))}
                 </div>

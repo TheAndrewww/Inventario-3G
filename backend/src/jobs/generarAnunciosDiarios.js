@@ -56,8 +56,8 @@ async function generarAnunciosDelDia() {
 
   // Paso 1: Verificar si ya existen anuncios para hoy
   const [anunciosExistentes] = await db.query(
-    'SELECT COUNT(*) as count FROM anuncios WHERE fecha = $1',
-    [fechaStr]
+    'SELECT COUNT(*) as count FROM anuncios WHERE fecha = :fecha',
+    { replacements: { fecha: fechaStr } }
   );
 
   if (parseInt(anunciosExistentes[0].count) > 0) {
@@ -93,8 +93,8 @@ async function generarAnunciosDelDia() {
         imagen_url,
         tipo_anuncio,
         activo
-      ) VALUES ($1, $2, $3, 'generico', true)
-    `, [fechaStr, fraseGenerica, imagenPlaceholder]);
+      ) VALUES (:fecha, :frase, :imagen, 'generico', true)
+    `, { replacements: { fecha: fechaStr, frase: fraseGenerica, imagen: imagenPlaceholder } });
 
     console.log('✅ Anuncio genérico creado');
     return;
@@ -130,15 +130,17 @@ async function generarAnunciosDelDia() {
           equipo,
           tipo_anuncio,
           activo
-        ) VALUES ($1, $2, $3, $4, $5, 'proyecto', true)
+        ) VALUES (:fecha, :frase, :imagen, :proyecto, :equipo, 'proyecto', true)
         RETURNING id, frase
-      `, [
-        fechaStr,
-        frase,
-        imagenUrl,
-        proyecto.nombre,
-        proyecto.equipoHora
-      ]);
+      `, {
+        replacements: {
+          fecha: fechaStr,
+          frase: frase,
+          imagen: imagenUrl,
+          proyecto: proyecto.nombre,
+          equipo: proyecto.equipoHora
+        }
+      });
 
       anunciosCreados.push(result[0]);
       console.log(`      ✅ Anuncio ID ${result[0].id} creado`);

@@ -141,6 +141,80 @@ const ProduccionProyecto = sequelize.define('ProduccionProyecto', {
         allowNull: true
     },
 
+    // ===== Sub-etapas de Producción (Paralelas) =====
+    // Manufactura y Herrería trabajan en paralelo
+    // Solo cuando ambas están completadas, el proyecto puede avanzar a Instalación
+
+    manufactura_completado: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Si Manufactura completó su parte'
+    },
+    manufactura_completado_en: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Timestamp cuando Manufactura completó'
+    },
+    manufactura_completado_por: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: { model: 'usuarios', key: 'id' },
+        comment: 'Usuario que marcó Manufactura como completado'
+    },
+
+    herreria_completado: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Si Herrería completó su parte'
+    },
+    herreria_completado_en: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Timestamp cuando Herrería completó'
+    },
+    herreria_completado_por: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: { model: 'usuarios', key: 'id' },
+        comment: 'Usuario que marcó Herrería como completado'
+    },
+
+    // ===== Integración con Google Drive =====
+    drive_folder_id: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: 'ID de la carpeta del proyecto en Google Drive'
+    },
+    tiene_manufactura: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Si se encontraron PDFs de Manufactura en Drive'
+    },
+    tiene_herreria: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Si se encontraron PDFs de Herrería en Drive'
+    },
+    archivos_manufactura: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: 'Array de archivos PDF de Manufactura [{id, nombre, link}]'
+    },
+    archivos_herreria: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: 'Array de archivos PDF de Herrería [{id, nombre, link}]'
+    },
+    drive_sync_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Última sincronización con Google Drive'
+    },
+
     // ===== Tipo de proyecto (para color de cards) =====
     tipo_proyecto: {
         type: DataTypes.STRING(20),
@@ -213,18 +287,103 @@ ProduccionProyecto.prototype.completarEtapaActual = async function (usuarioId, o
 };
 
 /**
- * Obtiene el porcentaje de avance (25% por etapa completada)
+ * Completar una sub-etapa de Producción (Manufactura o Herrería)
+ * @param {string} subEtapa - 'manufactura' o 'herreria'
+ * @param {number} usuarioId - ID del usuario que completa
+ */
+ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEtapa, usuarioId) {
+    if (this.etapa_actual !== 'produccion') {
+        throw new Error('El proyecto no está en la etapa de Producción');
+    }
+
+    const ahora = new Date();
+
+    if (subEtapa === 'manufactura') {
+        if (this.manufactura_completado) {
+            throw new Error('Manufactura ya está completada');
+        }
+        this.manufactura_completado = true;
+        this.manufactura_completado_en = ahora;
+        this.manufactura_completado_por = usuarioId;
+    } else if (subEtapa === 'herreria') {
+        if (this.herreria_completado) {
+            throw new Error('Herrería ya está completada');
+        }
+        this.herreria_completado = true;
+        this.herreria_completado_en = ahora;
+        this.herreria_completado_por = usuarioId;
+    } else {
+        throw new Error('Sub-etapa inválida. Use "manufactura" o "herreria"');
+    }
+
+    await this.save();
+
+    // Verificar si ambas sub-etapas están completas para auto-avanzar
+    const puedeAvanzar = this.manufactura_completado && this.herreria_completado;
+
+    return {
+        proyecto: this,
+        subEtapaCompletada: subEtapa,
+        puedeAvanzarAInstalacion: puedeAvanzar,
+        estadoSubEtapas: {
+            manufactura: this.manufactura_completado,
+            herreria: this.herreria_completado
+        }
+    };
+};
+
+/**
+ * Verifica si el proyecto puede avanzar de Producción a Instalación
+ * Requiere que Manufactura Y Herrería estén completadas
+ */
+ProduccionProyecto.prototype.puedeAvanzarDeProduccion = function () {
+    if (this.etapa_actual !== 'produccion') return false;
+    return this.manufactura_completado && this.herreria_completado;
+};
+
+/**
+ * Obtiene el estado de las sub-etapas de producción
+ */
+ProduccionProyecto.prototype.getEstadoSubEtapas = function () {
+    return {
+        manufactura: {
+            completado: this.manufactura_completado || false,
+            completadoEn: this.manufactura_completado_en,
+            completadoPor: this.manufactura_completado_por
+        },
+        herreria: {
+            completado: this.herreria_completado || false,
+            completadoEn: this.herreria_completado_en,
+            completadoPor: this.herreria_completado_por
+        },
+        ambosCompletados: (this.manufactura_completado || false) && (this.herreria_completado || false)
+    };
+};
+
+/**
+ * Obtiene el porcentaje de avance
+ * Ahora considera las sub-etapas de Producción
  */
 ProduccionProyecto.prototype.getPorcentajeAvance = function () {
-    const porcentajes = {
+    const porcentajesBase = {
         'pendiente': 0,
-        'diseno': 25,
-        'compras': 50,
-        'produccion': 75,
+        'diseno': 20,
+        'compras': 40,
+        'produccion': 60,  // Base, se ajusta con sub-etapas
         'instalacion': 90,
         'completado': 100
     };
-    return porcentajes[this.etapa_actual] || 0;
+
+    let porcentaje = porcentajesBase[this.etapa_actual] || 0;
+
+    // Si está en producción, ajustar según sub-etapas completadas
+    if (this.etapa_actual === 'produccion') {
+        // Base 60%, +10% por cada sub-etapa completada (máx 80%)
+        if (this.manufactura_completado) porcentaje += 10;
+        if (this.herreria_completado) porcentaje += 10;
+    }
+
+    return porcentaje;
 };
 
 /**
@@ -262,11 +421,13 @@ ProduccionProyecto.obtenerPorEtapa = async function (etapa) {
  * Obtener resumen para dashboard
  */
 ProduccionProyecto.obtenerResumenDashboard = async function () {
-    const { Op } = await import('sequelize');
+    const { Op, literal } = await import('sequelize');
 
     const proyectos = await this.findAll({
         where: { activo: true },
         order: [
+            // GTIA (garantías) primero
+            [literal("CASE WHEN tipo_proyecto = 'GTIA' THEN 0 ELSE 1 END"), 'ASC'],
             ['prioridad', 'ASC'],
             ['fecha_limite', 'ASC']
         ]
