@@ -18,7 +18,8 @@ import {
     Maximize2,
     Minimize2,
     RotateCw,
-    ZoomIn
+    ZoomIn,
+    ZoomOut
 } from 'lucide-react';
 import produccionService from '../services/produccion.service';
 import { Loader, Modal, Button } from '../components/common';
@@ -699,6 +700,18 @@ const DashboardProduccionPage = () => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [orientacion, setOrientacion] = useState('horizontal'); // 'horizontal' | 'vertical'
     const [tamano, setTamano] = useState('mediano'); // 'pequeno' | 'mediano' | 'grande'
+    const [zoomLevel, setZoomLevel] = useState(() => {
+        const savedZoom = localStorage.getItem('dashboardZoomLevel');
+        return savedZoom ? parseInt(savedZoom, 10) : 100;
+    });
+
+    // Guardar zoom en localStorage
+    useEffect(() => {
+        localStorage.setItem('dashboardZoomLevel', zoomLevel.toString());
+    }, [zoomLevel]);
+
+    const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 10, 200));
+    const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 10, 30));
 
     const cargarDatos = useCallback(async () => {
         try {
@@ -878,8 +891,8 @@ const DashboardProduccionPage = () => {
                 left: '50%',
                 marginTop: '-50vw',
                 marginLeft: '-50vh',
-                zoom: '67%'
-            } : { zoom: '67%' }}
+                zoom: `${zoomLevel}%`
+            } : { zoom: `${zoomLevel}%` }}
         >
             {/* Header - oculto en fullscreen */}
             {!isFullscreen && (
@@ -955,6 +968,28 @@ const DashboardProduccionPage = () => {
                     >
                         <Minimize2 size={16} />
                     </button>
+
+                    <div className="h-full w-px bg-gray-400 opacity-50 mx-1"></div>
+
+                    <div className="flex bg-white/10 rounded-lg overflow-hidden backdrop-blur-sm">
+                        <button
+                            onClick={handleZoomOut}
+                            className="p-2 text-white hover:bg-white/20 transition-colors"
+                            title="Reducir Zoom"
+                        >
+                            <ZoomOut size={16} />
+                        </button>
+                        <div className="px-2 py-1 text-white text-xs font-bold flex items-center justify-center min-w-[40px]">
+                            {zoomLevel}%
+                        </div>
+                        <button
+                            onClick={handleZoomIn}
+                            className="p-2 text-white hover:bg-white/20 transition-colors"
+                            title="Aumentar Zoom"
+                        >
+                            <ZoomIn size={16} />
+                        </button>
+                    </div>
                 </div>
             )}
 
