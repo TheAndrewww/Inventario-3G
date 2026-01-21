@@ -800,10 +800,23 @@ const DashboardProduccionPage = () => {
     }
 
     return (
-        <div className={`min-h-screen bg-gray-50 transition-all duration-300 ${isFullscreen
-            ? 'fixed inset-0 z-50 overflow-auto p-4'
-            : 'p-4 lg:p-6'
-            }`}>
+        <div
+            className={`min-h-screen bg-gray-50 transition-all duration-300 ${isFullscreen
+                    ? 'fixed inset-0 z-50 overflow-auto p-4'
+                    : 'p-4 lg:p-6'
+                }`}
+            style={isFullscreen && orientacion === 'vertical' ? {
+                transform: 'rotate(90deg)',
+                transformOrigin: 'center center',
+                width: '100vh',
+                height: '100vw',
+                position: 'fixed',
+                top: '50%',
+                left: '50%',
+                marginTop: '-50vw',
+                marginLeft: '-50vh'
+            } : {}}
+        >
             {/* Header */}
             <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 ${isFullscreen ? 'mb-4' : ''
                 }`}>
