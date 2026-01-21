@@ -14,7 +14,10 @@ import {
     Calendar,
     User,
     Circle,
-    Download
+    Download,
+    Maximize2,
+    Minimize2,
+    RotateCw
 } from 'lucide-react';
 import produccionService from '../services/produccion.service';
 import { Loader, Modal, Button } from '../components/common';
@@ -69,7 +72,7 @@ const ETAPAS_CONFIG = {
 const ETAPAS_ORDEN = ['pendiente', 'diseno', 'compras', 'produccion', 'instalacion', 'completado'];
 
 // Componente de línea de tiempo para un proyecto - Diseño Stepper Profesional
-const ProyectoTimeline = ({ proyecto, onCompletar }) => {
+const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orientacion = 'horizontal' }) => {
     const [loading, setLoading] = useState(false);
     const diasRestantes = proyecto.diasRestantes;
     const esGarantia = proyecto.tipo_proyecto?.toUpperCase() === 'GTIA';
@@ -122,9 +125,13 @@ const ProyectoTimeline = ({ proyecto, onCompletar }) => {
     // Solo mostrar etapas principales (sin pendiente)
     const etapasVisibles = ETAPAS_ORDEN.filter(e => e !== 'pendiente');
 
+    // Ajustar clases según modo fullscreen
+    const cardClasses = isFullscreen && orientacion === 'horizontal'
+        ? `${colorTipo.bg} ${colorTipo.border} rounded-xl shadow-md overflow-hidden transition-all hover:shadow-lg ${esUrgente ? 'ring-2 ring-red-400' : ''}`
+        : `${colorTipo.bg} ${colorTipo.border} rounded-2xl shadow-lg overflow-hidden mb-5 transition-all hover:shadow-xl ${esUrgente ? 'ring-2 ring-red-400' : ''}`;
+
     return (
-        <div
-            className={`${colorTipo.bg} ${colorTipo.border} rounded-2xl shadow-lg overflow-hidden mb-5 transition-all hover:shadow-xl ${esUrgente ? 'ring-2 ring-red-400' : ''}`}
+        <div className={cardClasses}
         >
             {/* Header con gradiente sutil */}
             <div className={`${colorTipo.bg === 'bg-white' ? 'bg-gradient-to-r from-gray-50 to-white' : ''} px-6 py-4 border-b border-gray-100`}>
@@ -635,6 +642,10 @@ const DashboardProduccionPage = () => {
     const [sincronizando, setSincronizando] = useState(false);
     const [ultimaSync, setUltimaSync] = useState(null);
 
+    // Estados para modo fullscreen
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [orientacion, setOrientacion] = useState('horizontal'); // 'horizontal' | 'vertical'
+
     const cargarDatos = useCallback(async () => {
         try {
             setLoading(true);
@@ -674,10 +685,32 @@ const DashboardProduccionPage = () => {
 
         sincronizarYCargar();
 
-        // Auto-refresh cada 5 minutos (sincroniza y recarga)
-        const interval = setInterval(sincronizarYCargar, 5 * 60 * 1000);
+        // Auto-refresh: 1 minuto en fullscreen, 5 minutos normal
+        const intervalo = isFullscreen ? 60 * 1000 : 5 * 60 * 1000;
+        const interval = setInterval(sincronizarYCargar, intervalo);
         return () => clearInterval(interval);
-    }, [cargarDatos]);
+    }, [cargarDatos, isFullscreen]);
+
+    // Efecto para tecla ESC (salir de fullscreen)
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && isFullscreen) {
+                setIsFullscreen(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isFullscreen]);
+
+    // Función para toggle fullscreen
+    const toggleFullscreen = () => {
+        setIsFullscreen(!isFullscreen);
+    };
+
+    // Función para rotar orientación
+    const toggleOrientacion = () => {
+        setOrientacion(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
+    };
 
     const handleCompletar = async (proyectoId) => {
         try {
@@ -767,22 +800,57 @@ const DashboardProduccionPage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 p-4 lg:p-6">
+        <div className={`min-h-screen bg-gray-50 transition-all duration-300 ${isFullscreen
+            ? 'fixed inset-0 z-50 overflow-auto p-4'
+            : 'p-4 lg:p-6'
+            }`}>
             {/* Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+            <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 ${isFullscreen ? 'mb-4' : ''
+                }`}>
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">🏭 Dashboard de Producción</h1>
-                    <p className="text-gray-600 mt-1">
-                        Seguimiento visual de proyectos por etapas
-                    </p>
+                    <h1 className={`font-bold text-gray-900 ${isFullscreen ? 'text-2xl' : 'text-3xl'}`}>
+                        🏭 Dashboard de Producción
+                    </h1>
+                    {!isFullscreen && (
+                        <p className="text-gray-600 mt-1">
+                            Seguimiento visual de proyectos por etapas
+                        </p>
+                    )}
                 </div>
 
-                <div className="flex gap-3 items-center">
+                <div className="flex gap-2 items-center">
                     {ultimaSync && (
                         <span className="text-xs text-gray-400">
                             Actualizado: {ultimaSync.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                     )}
+
+                    {/* Botón de rotar orientación (solo en fullscreen) */}
+                    {isFullscreen && (
+                        <button
+                            onClick={toggleOrientacion}
+                            className="flex items-center gap-2 px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+                            title={`Cambiar a modo ${orientacion === 'horizontal' ? 'vertical' : 'horizontal'}`}
+                        >
+                            <RotateCw size={18} />
+                            {orientacion === 'horizontal' ? 'Vertical' : 'Horizontal'}
+                        </button>
+                    )}
+
+                    {/* Botón de fullscreen */}
+                    <button
+                        onClick={toggleFullscreen}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isFullscreen
+                            ? 'bg-gray-600 text-white hover:bg-gray-700'
+                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                            }`}
+                        title={isFullscreen ? 'Salir de pantalla completa (ESC)' : 'Pantalla completa'}
+                    >
+                        {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                        {isFullscreen ? 'Salir' : 'Fullscreen'}
+                    </button>
+
+                    {/* Botón de sincronizar */}
                     <button
                         onClick={handleSincronizar}
                         disabled={sincronizando}
@@ -812,13 +880,16 @@ const DashboardProduccionPage = () => {
                 </div>
             )}
 
-            {/* Filtros */}
-            <FiltrosProyectos filtro={filtro} setFiltro={setFiltro} />
+            {/* Filtros - ocultos en fullscreen para más espacio */}
+            {!isFullscreen && <FiltrosProyectos filtro={filtro} setFiltro={setFiltro} />}
 
             {/* Lista de proyectos como timeline */}
-            <div className="space-y-4">
+            <div className={`${isFullscreen && orientacion === 'horizontal'
+                ? 'grid grid-cols-2 xl:grid-cols-3 gap-4'
+                : 'space-y-4'
+                }`}>
                 {proyectosFiltrados.length === 0 ? (
-                    <div className="text-center py-16 bg-white rounded-xl">
+                    <div className="text-center py-16 bg-white rounded-xl col-span-full">
                         <Package size={64} className="mx-auto mb-4 text-gray-300" />
                         <h2 className="text-xl font-semibold text-gray-500">No hay proyectos</h2>
                         <p className="text-gray-400 mt-1">
@@ -833,6 +904,8 @@ const DashboardProduccionPage = () => {
                             key={proyecto.id}
                             proyecto={proyecto}
                             onCompletar={handleCompletar}
+                            isFullscreen={isFullscreen}
+                            orientacion={orientacion}
                         />
                     ))
                 )}

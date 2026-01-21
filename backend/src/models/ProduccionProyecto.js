@@ -421,7 +421,8 @@ ProduccionProyecto.obtenerPorEtapa = async function (etapa) {
  * Obtener resumen para dashboard
  */
 ProduccionProyecto.obtenerResumenDashboard = async function () {
-    const { Op, literal } = await import('sequelize');
+    const sequelize = await import('sequelize');
+    const { literal } = sequelize;
 
     const proyectos = await this.findAll({
         where: { activo: true },
