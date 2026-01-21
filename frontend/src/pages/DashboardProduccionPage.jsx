@@ -802,8 +802,8 @@ const DashboardProduccionPage = () => {
     return (
         <div
             className={`min-h-screen bg-gray-50 transition-all duration-300 ${isFullscreen
-                    ? 'fixed inset-0 z-50 overflow-auto p-4'
-                    : 'p-4 lg:p-6'
+                ? 'fixed inset-0 z-50 overflow-auto p-4'
+                : 'p-4 lg:p-6'
                 }`}
             style={isFullscreen && orientacion === 'vertical' ? {
                 transform: 'rotate(90deg)',
@@ -817,68 +817,72 @@ const DashboardProduccionPage = () => {
                 marginLeft: '-50vh'
             } : {}}
         >
-            {/* Header */}
-            <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 ${isFullscreen ? 'mb-4' : ''
-                }`}>
-                <div>
-                    <h1 className={`font-bold text-gray-900 ${isFullscreen ? 'text-2xl' : 'text-3xl'}`}>
-                        🏭 Dashboard de Producción
-                    </h1>
-                    {!isFullscreen && (
+            {/* Header - oculto en fullscreen */}
+            {!isFullscreen && (
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900">
+                            🏭 Dashboard de Producción
+                        </h1>
                         <p className="text-gray-600 mt-1">
                             Seguimiento visual de proyectos por etapas
                         </p>
-                    )}
-                </div>
+                    </div>
 
-                <div className="flex gap-2 items-center">
-                    {ultimaSync && (
-                        <span className="text-xs text-gray-400">
-                            Actualizado: {ultimaSync.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                    )}
+                    <div className="flex gap-2 items-center">
+                        {ultimaSync && (
+                            <span className="text-xs text-gray-400">
+                                Actualizado: {ultimaSync.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        )}
 
-                    {/* Botón de rotar orientación (solo en fullscreen) */}
-                    {isFullscreen && (
+                        {/* Botón de fullscreen */}
                         <button
-                            onClick={toggleOrientacion}
-                            className="flex items-center gap-2 px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
-                            title={`Cambiar a modo ${orientacion === 'horizontal' ? 'vertical' : 'horizontal'}`}
+                            onClick={toggleFullscreen}
+                            className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                            title="Pantalla completa"
                         >
-                            <RotateCw size={18} />
-                            {orientacion === 'horizontal' ? 'Vertical' : 'Horizontal'}
+                            <Maximize2 size={18} />
+                            Fullscreen
                         </button>
-                    )}
 
-                    {/* Botón de fullscreen */}
+                        {/* Botón de sincronizar */}
+                        <button
+                            onClick={handleSincronizar}
+                            disabled={sincronizando}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                            title="Sincronizar con Google Sheets"
+                        >
+                            {sincronizando ? (
+                                <RefreshCw size={18} className="animate-spin" />
+                            ) : (
+                                <Download size={18} />
+                            )}
+                            {sincronizando ? 'Sincronizando...' : 'Sincronizar'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Controles flotantes en fullscreen */}
+            {isFullscreen && (
+                <div className="fixed top-2 right-2 z-50 flex gap-2 opacity-30 hover:opacity-100 transition-opacity">
+                    <button
+                        onClick={toggleOrientacion}
+                        className="p-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+                        title={`Cambiar a modo ${orientacion === 'horizontal' ? 'vertical' : 'horizontal'}`}
+                    >
+                        <RotateCw size={16} />
+                    </button>
                     <button
                         onClick={toggleFullscreen}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isFullscreen
-                            ? 'bg-gray-600 text-white hover:bg-gray-700'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                            }`}
-                        title={isFullscreen ? 'Salir de pantalla completa (ESC)' : 'Pantalla completa'}
+                        className="p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                        title="Salir (ESC)"
                     >
-                        {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-                        {isFullscreen ? 'Salir' : 'Fullscreen'}
-                    </button>
-
-                    {/* Botón de sincronizar */}
-                    <button
-                        onClick={handleSincronizar}
-                        disabled={sincronizando}
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                        title="Sincronizar con Google Sheets"
-                    >
-                        {sincronizando ? (
-                            <RefreshCw size={18} className="animate-spin" />
-                        ) : (
-                            <Download size={18} />
-                        )}
-                        {sincronizando ? 'Sincronizando...' : 'Sincronizar'}
+                        <Minimize2 size={16} />
                     </button>
                 </div>
-            </div>
+            )}
 
             {/* Estadísticas */}
             <EstadisticasHeader estadisticas={estadisticas} />
@@ -898,8 +902,8 @@ const DashboardProduccionPage = () => {
 
             {/* Lista de proyectos como timeline */}
             <div className={`${isFullscreen && orientacion === 'horizontal'
-                ? 'grid grid-cols-2 xl:grid-cols-3 gap-4'
-                : 'space-y-4'
+                    ? 'grid grid-cols-2 xl:grid-cols-3 gap-4'
+                    : 'space-y-4'
                 }`}>
                 {proyectosFiltrados.length === 0 ? (
                     <div className="text-center py-16 bg-white rounded-xl col-span-full">
