@@ -28,6 +28,7 @@ import MonitorPedidosPage from './pages/MonitorPedidosPage';
 import MiEquipoPage from './pages/MiEquipoPage';
 import DashboardProduccionPage from './pages/DashboardProduccionPage';
 import TerminalAreaPage from './pages/TerminalAreaPage';
+import DashboardProduccionTVPage from './pages/DashboardProduccionTVPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
         {/* Rutas 100% públicas - completamente fuera del AuthProvider */}
         <Route path="/anuncios" element={<AnunciosPublicosPage />} />
         <Route path="/calendario-publico" element={<CalendarioPublicoPage />} />
+        <Route path="/produccion-tv" element={<DashboardProduccionTVPage />} />
         <Route path="/terminal" element={<TerminalAreaPage />} />
         <Route path="/terminal/:area" element={<TerminalAreaPage />} />
 

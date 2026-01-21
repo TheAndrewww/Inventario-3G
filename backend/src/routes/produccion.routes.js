@@ -57,6 +57,13 @@ router.post('/terminal/:id/completar-subetapa', completarSubEtapa);
  */
 router.get('/terminal/:id/archivos', obtenerArchivosDrive);
 
+/**
+ * GET /api/produccion/dashboard-publico
+ * Obtener dashboard para TV (sin auth)
+ * Acceso: Público
+ */
+router.get('/dashboard-publico', obtenerDashboard);
+
 // ========== RUTAS PROTEGIDAS ==========
 
 // Requiere autenticación para todas las siguientes rutas

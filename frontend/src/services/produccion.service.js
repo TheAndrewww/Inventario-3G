@@ -10,6 +10,14 @@ export const obtenerDashboard = async () => {
     return response.data;
 };
 
+/**
+ * Obtener datos del dashboard (versión pública para TV)
+ */
+export const obtenerDashboardPublico = async () => {
+    const response = await api.get('/produccion/dashboard-publico');
+    return response.data;
+};
+
 export const obtenerEstadisticas = async () => {
     const response = await api.get('/produccion/estadisticas');
     return response.data;
@@ -132,5 +140,6 @@ export default {
     obtenerArchivosDrive,
     obtenerArchivosDriveTerminal,
     sincronizarProyectoDrive,
-    sincronizarTodosDrive
+    sincronizarTodosDrive,
+    obtenerDashboardPublico
 };

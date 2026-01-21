@@ -15,11 +15,8 @@ import {
     User,
     Circle,
     Download,
-    Maximize2,
-    Minimize2,
-    RotateCw,
-    ZoomIn,
-    ZoomOut
+    Monitor,
+    ExternalLink
 } from 'lucide-react';
 import produccionService from '../services/produccion.service';
 import { Loader, Modal, Button } from '../components/common';
@@ -695,23 +692,7 @@ const DashboardProduccionPage = () => {
     const [filtro, setFiltro] = useState('activos');
     const [sincronizando, setSincronizando] = useState(false);
     const [ultimaSync, setUltimaSync] = useState(null);
-
-    // Estados para modo fullscreen
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [orientacion, setOrientacion] = useState('horizontal'); // 'horizontal' | 'vertical'
-    const [tamano, setTamano] = useState('mediano'); // 'pequeno' | 'mediano' | 'grande'
-    const [zoomLevel, setZoomLevel] = useState(() => {
-        const savedZoom = localStorage.getItem('dashboardZoomLevel');
-        return savedZoom ? parseInt(savedZoom, 10) : 100;
-    });
-
-    // Guardar zoom en localStorage
-    useEffect(() => {
-        localStorage.setItem('dashboardZoomLevel', zoomLevel.toString());
-    }, [zoomLevel]);
-
-    const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 10, 200));
-    const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 10, 30));
+    const [tamano, setTamano] = useState('mediano');
 
     const cargarDatos = useCallback(async () => {
         try {
@@ -752,41 +733,10 @@ const DashboardProduccionPage = () => {
 
         sincronizarYCargar();
 
-        // Auto-refresh: 1 minuto en fullscreen, 5 minutos normal
-        const intervalo = isFullscreen ? 60 * 1000 : 5 * 60 * 1000;
-        const interval = setInterval(sincronizarYCargar, intervalo);
+        // Auto-refresh: 5 minutos normal
+        const interval = setInterval(sincronizarYCargar, 5 * 60 * 1000);
         return () => clearInterval(interval);
-    }, [cargarDatos, isFullscreen]);
-
-    // Efecto para tecla ESC (salir de fullscreen)
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.key === 'Escape' && isFullscreen) {
-                setIsFullscreen(false);
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isFullscreen]);
-
-    // Función para toggle fullscreen
-    const toggleFullscreen = () => {
-        setIsFullscreen(!isFullscreen);
-    };
-
-    // Función para rotar orientación
-    const toggleOrientacion = () => {
-        setOrientacion(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
-    };
-
-    // Función para cambiar tamaño
-    const toggleTamano = () => {
-        setTamano(prev => {
-            if (prev === 'pequeno') return 'mediano';
-            if (prev === 'mediano') return 'grande';
-            return 'pequeno';
-        });
-    };
+    }, [cargarDatos]);
 
     const handleCompletar = async (proyectoId) => {
         try {
@@ -821,7 +771,7 @@ const DashboardProduccionPage = () => {
         }
     };
 
-    // Filtrar proyectos
+    // Filtros
     const proyectosFiltrados = proyectos.filter(p => {
         switch (filtro) {
             case 'activos':
@@ -834,40 +784,29 @@ const DashboardProduccionPage = () => {
                 return true;
         }
     }).sort((a, b) => {
-        // 1. Proyectos VENCIDOS primero (diasRestantes < 0)
         const aVencido = a.diasRestantes !== null && a.diasRestantes < 0;
         const bVencido = b.diasRestantes !== null && b.diasRestantes < 0;
         if (aVencido && !bVencido) return -1;
         if (!aVencido && bVencido) return 1;
-
-        // 2. Si ambos vencidos, ordenar por cuánto tiempo llevan vencidos (más vencido primero)
-        if (aVencido && bVencido) {
-            return a.diasRestantes - b.diasRestantes;
-        }
-
-        // 3. Proyectos URGENTES (prioridad 1 o <= 3 días)
-        const aUrgente = a.prioridad === 1 || (a.diasRestantes !== null && a.diasRestantes <= 3);
-        const bUrgente = b.prioridad === 1 || (b.diasRestantes !== null && b.diasRestantes <= 3);
-        if (aUrgente && !bUrgente) return -1;
-        if (!aUrgente && bUrgente) return 1;
-
-        // 4. Entre urgentes, ordenar por días restantes (más próximo primero)
-        if (aUrgente && bUrgente) {
-            if (a.diasRestantes === null) return 1;
-            if (b.diasRestantes === null) return -1;
-            if (a.diasRestantes !== b.diasRestantes) return a.diasRestantes - b.diasRestantes;
-        }
-
-        // 5. Por prioridad (1 = más urgente)
-        if (a.prioridad !== b.prioridad) return a.prioridad - b.prioridad;
-
-        // 6. Por días restantes (más próximo primero)
-        if (a.diasRestantes === null) return 1;
-        if (b.diasRestantes === null) return -1;
-        return a.diasRestantes - b.diasRestantes;
+        return (a.prioridad || 3) - (b.prioridad || 3);
     });
 
-    if (loading) {
+    // Nuevo Proyecto Modal
+    const [modalOpen, setModalOpen] = useState(false);
+    const handleCrearProyecto = async (data) => {
+        try {
+            const response = await produccionService.crearProyecto(data);
+            if (response.success) {
+                toast.success('Proyecto creado exitosamente');
+                cargarDatos();
+            }
+        } catch (error) {
+            console.error('Error al crear proyecto:', error);
+            toast.error('Error al crear proyecto');
+        }
+    };
+
+    if (loading && proyectos.length === 0) {
         return (
             <div className="flex items-center justify-center h-screen">
                 <Loader size="lg" />
@@ -876,26 +815,9 @@ const DashboardProduccionPage = () => {
     }
 
     return (
-        <div
-            className={`min-h-screen bg-gray-50 transition-all duration-300 ${isFullscreen
-                ? 'fixed inset-0 z-50 overflow-auto p-4'
-                : 'p-4 lg:p-6'
-                }`}
-            style={isFullscreen && orientacion === 'vertical' ? {
-                transform: 'rotate(90deg)',
-                transformOrigin: 'center center',
-                width: '100vh',
-                height: '100vw',
-                position: 'fixed',
-                top: '50%',
-                left: '50%',
-                marginTop: '-50vw',
-                marginLeft: '-50vh',
-                zoom: `${zoomLevel}%`
-            } : { zoom: `${zoomLevel}%` }}
-        >
-            {/* Header - oculto en fullscreen */}
-            {!isFullscreen && (
+        <div className="min-h-screen bg-gray-50 p-4 lg:p-6 transition-all duration-300">
+            {/* Header */}
+            <div>
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900">
@@ -913,17 +835,14 @@ const DashboardProduccionPage = () => {
                             </span>
                         )}
 
-                        {/* Botón de fullscreen */}
                         <button
-                            onClick={toggleFullscreen}
-                            className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                            title="Pantalla completa"
+                            onClick={() => setModalOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
                         >
-                            <Maximize2 size={18} />
-                            Fullscreen
+                            <Plus size={18} />
+                            Nuevo Proyecto
                         </button>
 
-                        {/* Botón de sincronizar */}
                         <button
                             onClick={handleSincronizar}
                             disabled={sincronizando}
@@ -937,96 +856,37 @@ const DashboardProduccionPage = () => {
                             )}
                             {sincronizando ? 'Sincronizando...' : 'Sincronizar'}
                         </button>
+
+                        <a
+                            href="/produccion-tv"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+                            title="Abrir vista para TV Vertical"
+                        >
+                            <Monitor size={18} />
+                            <span>Vista TV</span>
+                            <ExternalLink size={14} className="opacity-50" />
+                        </a>
                     </div>
                 </div>
-            )}
-
-            {/* Controles flotantes en fullscreen */}
-            {isFullscreen && (
-                <div className="fixed top-2 right-2 z-50 flex gap-2 opacity-30 hover:opacity-100 transition-opacity">
-                    <button
-                        onClick={toggleOrientacion}
-                        className="p-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
-                        title={`Cambiar a modo ${orientacion === 'horizontal' ? 'vertical' : 'horizontal'}`}
-                    >
-                        <RotateCw size={16} />
-                    </button>
-                    <button
-                        onClick={toggleTamano}
-                        className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
-                        title={`Tamaño: ${tamano} (click para cambiar)`}
-                    >
-                        <ZoomIn size={16} />
-                        <span className="text-xs font-bold">
-                            {tamano === 'pequeno' ? 'P' : tamano === 'mediano' ? 'M' : 'G'}
-                        </span>
-                    </button>
-                    <button
-                        onClick={toggleFullscreen}
-                        className="p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                        title="Salir (ESC)"
-                    >
-                        <Minimize2 size={16} />
-                    </button>
-
-                    <div className="h-full w-px bg-gray-400 opacity-50 mx-1"></div>
-
-                    <div className="flex bg-white/10 rounded-lg overflow-hidden backdrop-blur-sm">
-                        <button
-                            onClick={handleZoomOut}
-                            className="p-2 text-white hover:bg-white/20 transition-colors"
-                            title="Reducir Zoom"
-                        >
-                            <ZoomOut size={16} />
-                        </button>
-                        <div className="px-2 py-1 text-white text-xs font-bold flex items-center justify-center min-w-[40px]">
-                            {zoomLevel}%
-                        </div>
-                        <button
-                            onClick={handleZoomIn}
-                            className="p-2 text-white hover:bg-white/20 transition-colors"
-                            title="Aumentar Zoom"
-                        >
-                            <ZoomIn size={16} />
-                        </button>
-                    </div>
-                </div>
-            )}
+            </div>
 
             {/* Estadísticas */}
-            <EstadisticasHeader estadisticas={estadisticas} isFullscreen={isFullscreen} orientacion={orientacion} />
+            <EstadisticasHeader estadisticas={estadisticas} />
 
-            {/* Alerta de urgentes */}
-            {estadisticas.urgentes > 0 && (
-                <div className="bg-red-100 border-2 border-red-300 rounded-xl p-4 mb-6 flex items-center gap-3">
-                    <AlertTriangle size={24} className="text-red-600" />
-                    <span className="font-medium text-red-800">
-                        {estadisticas.urgentes} proyecto(s) urgente(s) o próximos a vencer
-                    </span>
-                </div>
-            )}
+            {/* Filtros */}
+            <FiltrosProyectos filtro={filtro} setFiltro={setFiltro} />
 
-            {/* Filtros - ocultos en fullscreen para más espacio */}
-            {!isFullscreen && <FiltrosProyectos filtro={filtro} setFiltro={setFiltro} />}
-
-            {/* Lista de proyectos como timeline */}
-            <div className={`${isFullscreen && orientacion === 'horizontal'
-                ? tamano === 'pequeno'
-                    ? 'grid grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3'
-                    : tamano === 'grande'
-                        ? 'grid grid-cols-1 xl:grid-cols-2 gap-4'
-                        : 'grid grid-cols-2 xl:grid-cols-3 gap-4'
-                : 'space-y-4'
-                }`}>
+            {/* Lista de Proyectos */}
+            <div className="space-y-6">
                 {proyectosFiltrados.length === 0 ? (
-                    <div className="text-center py-16 bg-white rounded-xl col-span-full">
-                        <Package size={64} className="mx-auto mb-4 text-gray-300" />
-                        <h2 className="text-xl font-semibold text-gray-500">No hay proyectos</h2>
-                        <p className="text-gray-400 mt-1">
-                            {filtro === 'todos'
-                                ? 'Crea tu primer proyecto de producción'
-                                : 'No hay proyectos con este filtro'}
-                        </p>
+                    <div className="text-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100">
+                        <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Package size={32} className="text-gray-400" />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900">No hay proyectos</h3>
+                        <p className="text-gray-500">No se encontraron proyectos con el filtro actual</p>
                     </div>
                 ) : (
                     proyectosFiltrados.map(proyecto => (
@@ -1034,15 +894,20 @@ const DashboardProduccionPage = () => {
                             key={proyecto.id}
                             proyecto={proyecto}
                             onCompletar={handleCompletar}
-                            isFullscreen={isFullscreen}
-                            orientacion={orientacion}
                             tamano={tamano}
                         />
                     ))
                 )}
             </div>
+
+            <ModalNuevoProyecto
+                isOpen={modalOpen}
+                onClose={() => setModalOpen(false)}
+                onCrear={handleCrearProyecto}
+            />
         </div>
     );
 };
 
 export default DashboardProduccionPage;
+
