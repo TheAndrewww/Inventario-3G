@@ -176,21 +176,13 @@ const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orienta
     // ¿Es modo compacto? (vertical o pequeño)
     const esCompacto = isFullscreen && (orientacion === 'vertical' || tamano === 'pequeno');
 
-    // Escala para modo vertical (50% para que quepan 6 en vez de 3)
-    const escalaVertical = isFullscreen && orientacion === 'vertical' ? 0.5 : 1;
+    // ¿Es modo vertical? (para ajustes más agresivos)
+    const esVertical = isFullscreen && orientacion === 'vertical';
 
     return (
-        <div
-            className={getCardClasses()}
-            style={escalaVertical !== 1 ? {
-                transform: `scale(${escalaVertical})`,
-                transformOrigin: 'top left',
-                width: `${100 / escalaVertical}%`,
-                marginBottom: '-50%'
-            } : {}}
-        >
+        <div className={getCardClasses()}>
             {/* Header con gradiente sutil */}
-            <div className={`${colorTipo.bg === 'bg-white' ? 'bg-gradient-to-r from-gray-50 to-white' : ''} ${getPadding()} border-b border-gray-100`}>
+            <div className={`${colorTipo.bg === 'bg-white' ? 'bg-gradient-to-r from-gray-50 to-white' : ''} ${getPadding()} ${esVertical ? 'py-1' : ''} border-b border-gray-100`}>
                 <div className="flex items-start justify-between">
                     <div className="flex-1">
                         <div className={`flex items-center gap-${esCompacto ? '1' : '3'} mb-${esCompacto ? '1' : '2'}`}>
@@ -274,10 +266,10 @@ const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orienta
             </div>
 
             {/* Stepper Profesional con Conexiones SVG */}
-            <div className="px-6 py-8 bg-gray-50 relative overflow-visible" style={{ height: '220px' }}>
+            <div className={`${esVertical ? 'px-2 py-2' : 'px-6 py-8'} bg-gray-50 relative overflow-visible`} style={{ height: esVertical ? '60px' : '220px' }}>
 
-                {/* Cuadro de fecha de entrega - Pegado a la derecha */}
-                {proyecto.fecha_limite && (
+                {/* Cuadro de fecha de entrega - Pegado a la derecha (oculto en vertical) */}
+                {proyecto.fecha_limite && !esVertical && (
                     <div className={`absolute right-4 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-1.5 px-5 py-4 rounded-xl shadow-md ${diasRestantes !== null && diasRestantes < 0
                         ? 'bg-red-100 text-red-700 border border-red-200'
                         : diasRestantes !== null && diasRestantes <= 3
@@ -301,173 +293,198 @@ const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orienta
                     </div>
                 )}
 
-                {/* Capa de Conexiones (SVG) */}
-                <svg
-                    className="absolute inset-0 w-full h-full pointer-events-none z-0"
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="none"
-                >
-                    <defs>
-                        <linearGradient id="gradGreen" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="#10B981" />
-                            <stop offset="100%" stopColor="#10B981" />
-                        </linearGradient>
-                    </defs>
-
-                    {/* Lógica de colores para líneas */}
-                    {(() => {
-                        // Detectar qué ramas tiene el proyecto (desde Drive)
-                        const tieneManufactura = proyecto.tiene_manufactura !== false; // true por defecto si no está definido
-                        const tieneHerreria = proyecto.tiene_herreria !== false;
-                        const tieneAmbas = tieneManufactura && tieneHerreria;
-                        const tieneSoloUna = (tieneManufactura && !tieneHerreria) || (!tieneManufactura && tieneHerreria);
-
-                        // Función helper para determinar color de línea base
-                        const getStrokeColor = (baseStage) => {
-                            const etapas = ['pendiente', 'diseno', 'compras', 'produccion', 'instalacion', 'completado'];
-                            const currentIndex = etapas.indexOf(proyecto.etapa_actual);
-                            const baseIndex = etapas.indexOf(baseStage);
-                            return currentIndex > baseIndex ? '#10B981' : '#CBD5E1';
-                        };
-
-                        // Función helper para sub-etapas
-                        const getSubStageStroke = (subStage) => {
-                            const etapas = ['pendiente', 'diseno', 'compras', 'produccion', 'instalacion', 'completado'];
-                            const currentIndex = etapas.indexOf(proyecto.etapa_actual);
-                            const prodIndex = etapas.indexOf('produccion');
-
-                            // Si ya pasó producción (está en instalación o completado), es verde
-                            if (currentIndex > prodIndex) return '#10B981';
-
-                            // Si está EN producción, depende del booleano específico
-                            if (currentIndex === prodIndex) {
-                                return proyecto.estadoSubEtapas?.[subStage]?.completado ? '#10B981' : '#CBD5E1';
-                            }
-
-                            // Si está antes de producción, gris
-                            return '#CBD5E1';
-                        };
-
-                        return (
-                            <>
-                                {/* Diseño -> Compras */}
-                                <line x1="10" y1="40" x2="30" y2="40" stroke={getStrokeColor('diseno')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
-
-                                {/* Stepper Bifurcado (tiene ambas ramas) */}
-                                {tieneAmbas && (
-                                    <>
-                                        {/* Compras -> Manufactura (Recto/Ortogonal) */}
-                                        <path d="M 30 40 L 40 40 L 40 20 L 50 20" fill="none" stroke={getStrokeColor('compras')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
-
-                                        {/* Compras -> Herrería (Recto/Ortogonal) */}
-                                        <path d="M 30 40 L 40 40 L 40 60 L 50 60" fill="none" stroke={getStrokeColor('compras')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
-
-                                        {/* Manufactura -> Instalación (Recto/Ortogonal) */}
-                                        <path d="M 50 20 L 60 20 L 60 40 L 70 40" fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
-
-                                        {/* Herrería -> Instalación (Recto/Ortogonal) */}
-                                        <path d="M 50 60 L 60 60 L 60 40 L 70 40" fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
-                                    </>
-                                )}
-
-                                {/* Stepper con solo Manufactura (línea por arriba, herrería desactivada) */}
-                                {tieneManufactura && !tieneHerreria && (
-                                    <>
-                                        {/* Compras -> Manufactura (Recto/Ortogonal) */}
-                                        <path d="M 30 40 L 40 40 L 40 20 L 50 20" fill="none" stroke={getStrokeColor('compras')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
-
-                                        {/* Manufactura -> Instalación (Recto/Ortogonal) */}
-                                        <path d="M 50 20 L 60 20 L 60 40 L 70 40" fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
-                                    </>
-                                )}
-
-                                {/* Stepper con solo Herrería (línea por abajo, manufactura desactivada) */}
-                                {!tieneManufactura && tieneHerreria && (
-                                    <>
-                                        {/* Compras -> Herrería (Recto/Ortogonal) */}
-                                        <path d="M 30 40 L 40 40 L 40 60 L 50 60" fill="none" stroke={getStrokeColor('compras')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
-
-                                        {/* Herrería -> Instalación (Recto/Ortogonal) */}
-                                        <path d="M 50 60 L 60 60 L 60 40 L 70 40" fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
-                                    </>
-                                )}
-
-                                {/* Si no tiene ninguna (fallback: línea directa) */}
-                                {!tieneManufactura && !tieneHerreria && (
-                                    <line x1="30" y1="40" x2="70" y2="40" stroke={getStrokeColor('compras')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
-                                )}
-
-                                {/* Instalación -> Completado */}
-                                <line x1="70" y1="40" x2="90" y2="40" stroke={getStrokeColor('instalacion')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
-                            </>
-                        );
-                    })()}
-                </svg>
-
-                {/* --- NODOS DEL STEPPER --- */}
-
-                {/* 1. DISEÑO (10%, 50%) */}
-                <div className="absolute top-[40%] left-[10%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 1 ? 'bg-green-500 text-white' :
-                        proyecto.etapa_actual === 'diseno' ? 'bg-white ring-4 ring-violet-200 text-violet-600' : 'bg-white border-2 border-gray-200 text-gray-400'
-                        }`}>
-                        {ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 1 ? <CheckCircle2 size={24} /> : <Package size={20} />}
-                    </div>
-                    <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Diseño</span>
-                </div>
-
-                {/* 2. COMPRAS (30%, 50%) */}
-                <div className="absolute top-[40%] left-[30%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 2 ? 'bg-green-500 text-white' :
-                        proyecto.etapa_actual === 'compras' ? 'bg-white ring-4 ring-emerald-200 text-emerald-600' : 'bg-white border-2 border-gray-200 text-gray-400'
-                        }`}>
-                        {ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 2 ? <CheckCircle2 size={24} /> : <ShoppingCart size={20} />}
-                    </div>
-                    <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Compras</span>
-                </div>
-
-                {/* 3A. MANUFACTURA (50%, 25%) - Solo si tiene archivos de manufactura */}
-                {proyecto.tiene_manufactura !== false && (
-                    <div className="absolute top-[20%] left-[50%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${(proyecto.estadoSubEtapas?.manufactura?.completado || ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) ? 'bg-green-500 text-white' :
-                            proyecto.etapa_actual === 'produccion' ? 'bg-white ring-4 ring-amber-200 text-amber-500' : 'bg-white border-2 border-gray-200 text-gray-400'
-                            }`}>
-                            {(proyecto.estadoSubEtapas?.manufactura?.completado || ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) ? <CheckCircle2 size={24} /> : <Factory size={20} />}
+                {/* Barra de progreso simple para modo vertical */}
+                {esVertical && (
+                    <div className="w-full h-full flex items-center px-4 gap-2">
+                        <div className="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden">
+                            <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{
+                                    width: `${porcentaje}%`,
+                                    backgroundColor: ETAPAS_CONFIG[proyecto.etapa_actual]?.color
+                                }}
+                            />
                         </div>
-                        <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Manufactura</span>
+                        <span className="text-xs font-bold text-gray-600 w-10">{porcentaje}%</span>
+                        {proyecto.fecha_limite && (
+                            <span className={`text-xs font-medium ${diasRestantes !== null && diasRestantes <= 3 ? 'text-red-600' : 'text-gray-400'}`}>
+                                {diasRestantes !== null && diasRestantes < 0 ? 'Venc' : diasRestantes === 0 ? 'Hoy' : `${diasRestantes}d`}
+                            </span>
+                        )}
                     </div>
                 )}
 
-                {/* 3B. HERRERÍA (50%, 75%) - Solo si tiene archivos de herrería */}
-                {proyecto.tiene_herreria !== false && (
-                    <div className="absolute top-[60%] left-[50%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${(proyecto.estadoSubEtapas?.herreria?.completado || ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) ? 'bg-green-500 text-white' :
-                            proyecto.etapa_actual === 'produccion' ? 'bg-white ring-4 ring-red-200 text-red-500' : 'bg-white border-2 border-gray-200 text-gray-400'
-                            }`}>
-                            {(proyecto.estadoSubEtapas?.herreria?.completado || ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) ? <CheckCircle2 size={24} /> : <Factory size={20} />}
+                {/* Capa de Conexiones (SVG) - Solo modo normal */}
+                {!esVertical && (
+                    <>
+                        <svg
+                            className="absolute inset-0 w-full h-full pointer-events-none z-0"
+                            viewBox="0 0 100 100"
+                            preserveAspectRatio="none"
+                        >
+                            <defs>
+                                <linearGradient id="gradGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stopColor="#10B981" />
+                                    <stop offset="100%" stopColor="#10B981" />
+                                </linearGradient>
+                            </defs>
+
+                            {/* Lógica de colores para líneas */}
+                            {(() => {
+                                // Detectar qué ramas tiene el proyecto (desde Drive)
+                                const tieneManufactura = proyecto.tiene_manufactura !== false; // true por defecto si no está definido
+                                const tieneHerreria = proyecto.tiene_herreria !== false;
+                                const tieneAmbas = tieneManufactura && tieneHerreria;
+                                const tieneSoloUna = (tieneManufactura && !tieneHerreria) || (!tieneManufactura && tieneHerreria);
+
+                                // Función helper para determinar color de línea base
+                                const getStrokeColor = (baseStage) => {
+                                    const etapas = ['pendiente', 'diseno', 'compras', 'produccion', 'instalacion', 'completado'];
+                                    const currentIndex = etapas.indexOf(proyecto.etapa_actual);
+                                    const baseIndex = etapas.indexOf(baseStage);
+                                    return currentIndex > baseIndex ? '#10B981' : '#CBD5E1';
+                                };
+
+                                // Función helper para sub-etapas
+                                const getSubStageStroke = (subStage) => {
+                                    const etapas = ['pendiente', 'diseno', 'compras', 'produccion', 'instalacion', 'completado'];
+                                    const currentIndex = etapas.indexOf(proyecto.etapa_actual);
+                                    const prodIndex = etapas.indexOf('produccion');
+
+                                    // Si ya pasó producción (está en instalación o completado), es verde
+                                    if (currentIndex > prodIndex) return '#10B981';
+
+                                    // Si está EN producción, depende del booleano específico
+                                    if (currentIndex === prodIndex) {
+                                        return proyecto.estadoSubEtapas?.[subStage]?.completado ? '#10B981' : '#CBD5E1';
+                                    }
+
+                                    // Si está antes de producción, gris
+                                    return '#CBD5E1';
+                                };
+
+                                return (
+                                    <>
+                                        {/* Diseño -> Compras */}
+                                        <line x1="10" y1="40" x2="30" y2="40" stroke={getStrokeColor('diseno')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+
+                                        {/* Stepper Bifurcado (tiene ambas ramas) */}
+                                        {tieneAmbas && (
+                                            <>
+                                                {/* Compras -> Manufactura (Recto/Ortogonal) */}
+                                                <path d="M 30 40 L 40 40 L 40 20 L 50 20" fill="none" stroke={getStrokeColor('compras')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+
+                                                {/* Compras -> Herrería (Recto/Ortogonal) */}
+                                                <path d="M 30 40 L 40 40 L 40 60 L 50 60" fill="none" stroke={getStrokeColor('compras')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+
+                                                {/* Manufactura -> Instalación (Recto/Ortogonal) */}
+                                                <path d="M 50 20 L 60 20 L 60 40 L 70 40" fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+
+                                                {/* Herrería -> Instalación (Recto/Ortogonal) */}
+                                                <path d="M 50 60 L 60 60 L 60 40 L 70 40" fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+                                            </>
+                                        )}
+
+                                        {/* Stepper con solo Manufactura (línea por arriba, herrería desactivada) */}
+                                        {tieneManufactura && !tieneHerreria && (
+                                            <>
+                                                {/* Compras -> Manufactura (Recto/Ortogonal) */}
+                                                <path d="M 30 40 L 40 40 L 40 20 L 50 20" fill="none" stroke={getStrokeColor('compras')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+
+                                                {/* Manufactura -> Instalación (Recto/Ortogonal) */}
+                                                <path d="M 50 20 L 60 20 L 60 40 L 70 40" fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+                                            </>
+                                        )}
+
+                                        {/* Stepper con solo Herrería (línea por abajo, manufactura desactivada) */}
+                                        {!tieneManufactura && tieneHerreria && (
+                                            <>
+                                                {/* Compras -> Herrería (Recto/Ortogonal) */}
+                                                <path d="M 30 40 L 40 40 L 40 60 L 50 60" fill="none" stroke={getStrokeColor('compras')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+
+                                                {/* Herrería -> Instalación (Recto/Ortogonal) */}
+                                                <path d="M 50 60 L 60 60 L 60 40 L 70 40" fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+                                            </>
+                                        )}
+
+                                        {/* Si no tiene ninguna (fallback: línea directa) */}
+                                        {!tieneManufactura && !tieneHerreria && (
+                                            <line x1="30" y1="40" x2="70" y2="40" stroke={getStrokeColor('compras')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+                                        )}
+
+                                        {/* Instalación -> Completado */}
+                                        <line x1="70" y1="40" x2="90" y2="40" stroke={getStrokeColor('instalacion')} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+                                    </>
+                                );
+                            })()}
+                        </svg>
+
+                        {/* --- NODOS DEL STEPPER --- */}
+
+                        {/* 1. DISEÑO (10%, 50%) */}
+                        <div className="absolute top-[40%] left-[10%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 1 ? 'bg-green-500 text-white' :
+                                proyecto.etapa_actual === 'diseno' ? 'bg-white ring-4 ring-violet-200 text-violet-600' : 'bg-white border-2 border-gray-200 text-gray-400'
+                                }`}>
+                                {ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 1 ? <CheckCircle2 size={24} /> : <Package size={20} />}
+                            </div>
+                            <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Diseño</span>
                         </div>
-                        <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Herrería</span>
-                    </div>
+
+                        {/* 2. COMPRAS (30%, 50%) */}
+                        <div className="absolute top-[40%] left-[30%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 2 ? 'bg-green-500 text-white' :
+                                proyecto.etapa_actual === 'compras' ? 'bg-white ring-4 ring-emerald-200 text-emerald-600' : 'bg-white border-2 border-gray-200 text-gray-400'
+                                }`}>
+                                {ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 2 ? <CheckCircle2 size={24} /> : <ShoppingCart size={20} />}
+                            </div>
+                            <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Compras</span>
+                        </div>
+
+                        {/* 3A. MANUFACTURA (50%, 25%) - Solo si tiene archivos de manufactura */}
+                        {proyecto.tiene_manufactura !== false && (
+                            <div className="absolute top-[20%] left-[50%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${(proyecto.estadoSubEtapas?.manufactura?.completado || ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) ? 'bg-green-500 text-white' :
+                                    proyecto.etapa_actual === 'produccion' ? 'bg-white ring-4 ring-amber-200 text-amber-500' : 'bg-white border-2 border-gray-200 text-gray-400'
+                                    }`}>
+                                    {(proyecto.estadoSubEtapas?.manufactura?.completado || ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) ? <CheckCircle2 size={24} /> : <Factory size={20} />}
+                                </div>
+                                <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Manufactura</span>
+                            </div>
+                        )}
+
+                        {/* 3B. HERRERÍA (50%, 75%) - Solo si tiene archivos de herrería */}
+                        {proyecto.tiene_herreria !== false && (
+                            <div className="absolute top-[60%] left-[50%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${(proyecto.estadoSubEtapas?.herreria?.completado || ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) ? 'bg-green-500 text-white' :
+                                    proyecto.etapa_actual === 'produccion' ? 'bg-white ring-4 ring-red-200 text-red-500' : 'bg-white border-2 border-gray-200 text-gray-400'
+                                    }`}>
+                                    {(proyecto.estadoSubEtapas?.herreria?.completado || ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) ? <CheckCircle2 size={24} /> : <Factory size={20} />}
+                                </div>
+                                <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Herrería</span>
+                            </div>
+                        )}
+
+                        {/* 4. INSTALACIÓN (70%, 50%) */}
+                        <div className="absolute top-[40%] left-[70%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 4 ? 'bg-green-500 text-white' :
+                                proyecto.etapa_actual === 'instalacion' ? 'bg-white ring-4 ring-blue-200 text-blue-500' : 'bg-white border-2 border-gray-200 text-gray-400'
+                                }`}>
+                                {ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 4 ? <CheckCircle2 size={24} /> : <Truck size={20} />}
+                            </div>
+                            <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Instalación</span>
+                        </div>
+
+                        {/* 5. COMPLETADO (90%, 50%) */}
+                        <div className="absolute top-[40%] left-[90%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${proyecto.etapa_actual === 'completado' ? 'bg-green-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-400'
+                                }`}>
+                                <CheckCircle2 size={24} />
+                            </div>
+                            <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Fin</span>
+                        </div>
+                    </>
                 )}
-
-                {/* 4. INSTALACIÓN (70%, 50%) */}
-                <div className="absolute top-[40%] left-[70%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 4 ? 'bg-green-500 text-white' :
-                        proyecto.etapa_actual === 'instalacion' ? 'bg-white ring-4 ring-blue-200 text-blue-500' : 'bg-white border-2 border-gray-200 text-gray-400'
-                        }`}>
-                        {ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 4 ? <CheckCircle2 size={24} /> : <Truck size={20} />}
-                    </div>
-                    <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Instalación</span>
-                </div>
-
-                {/* 5. COMPLETADO (90%, 50%) */}
-                <div className="absolute top-[40%] left-[90%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${proyecto.etapa_actual === 'completado' ? 'bg-green-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-400'
-                        }`}>
-                        <CheckCircle2 size={24} />
-                    </div>
-                    <span className="absolute top-14 text-xs font-bold text-gray-600 bg-gray-50 px-1">Fin</span>
-                </div>
             </div>
 
             {/* Sub-etapas Detalle (solo si está en producción) */}
