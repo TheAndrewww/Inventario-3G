@@ -17,7 +17,8 @@ import {
     Download,
     Maximize2,
     Minimize2,
-    RotateCw
+    RotateCw,
+    ZoomIn
 } from 'lucide-react';
 import produccionService from '../services/produccion.service';
 import { Loader, Modal, Button } from '../components/common';
@@ -72,7 +73,7 @@ const ETAPAS_CONFIG = {
 const ETAPAS_ORDEN = ['pendiente', 'diseno', 'compras', 'produccion', 'instalacion', 'completado'];
 
 // Componente de línea de tiempo para un proyecto - Diseño Stepper Profesional
-const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orientacion = 'horizontal' }) => {
+const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orientacion = 'horizontal', tamano = 'mediano' }) => {
     const [loading, setLoading] = useState(false);
     const diasRestantes = proyecto.diasRestantes;
     const esGarantia = proyecto.tipo_proyecto?.toUpperCase() === 'GTIA';
@@ -125,16 +126,42 @@ const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orienta
     // Solo mostrar etapas principales (sin pendiente)
     const etapasVisibles = ETAPAS_ORDEN.filter(e => e !== 'pendiente');
 
-    // Ajustar clases según modo fullscreen
-    const cardClasses = isFullscreen && orientacion === 'horizontal'
-        ? `${colorTipo.bg} ${colorTipo.border} rounded-xl shadow-md overflow-hidden transition-all hover:shadow-lg ${esUrgente ? 'ring-2 ring-red-400' : ''}`
-        : `${colorTipo.bg} ${colorTipo.border} rounded-2xl shadow-lg overflow-hidden mb-5 transition-all hover:shadow-xl ${esUrgente ? 'ring-2 ring-red-400' : ''}`;
+    // Clases según tamaño (solo aplica en fullscreen horizontal)
+    const getCardClasses = () => {
+        if (!isFullscreen || orientacion !== 'horizontal') {
+            return `${colorTipo.bg} ${colorTipo.border} rounded-2xl shadow-lg overflow-hidden mb-5 transition-all hover:shadow-xl ${esUrgente ? 'ring-2 ring-red-400' : ''}`;
+        }
+
+        const baseClasses = `${colorTipo.bg} ${colorTipo.border} overflow-hidden transition-all ${esUrgente ? 'ring-2 ring-red-400' : ''}`;
+
+        if (tamano === 'pequeno') {
+            return `${baseClasses} rounded-lg shadow-sm hover:shadow-md`;
+        } else if (tamano === 'grande') {
+            return `${baseClasses} rounded-2xl shadow-lg hover:shadow-xl`;
+        }
+        return `${baseClasses} rounded-xl shadow-md hover:shadow-lg`;
+    };
+
+    // Padding según tamaño
+    const getPadding = () => {
+        if (!isFullscreen || orientacion !== 'horizontal') return 'px-6 py-4';
+        if (tamano === 'pequeno') return 'px-3 py-2';
+        if (tamano === 'grande') return 'px-8 py-5';
+        return 'px-5 py-3';
+    };
+
+    // Tamaño de texto según tamaño
+    const getTitleSize = () => {
+        if (!isFullscreen || orientacion !== 'horizontal') return 'text-lg';
+        if (tamano === 'pequeno') return 'text-sm';
+        if (tamano === 'grande') return 'text-xl';
+        return 'text-base';
+    };
 
     return (
-        <div className={cardClasses}
-        >
+        <div className={getCardClasses()}>
             {/* Header con gradiente sutil */}
-            <div className={`${colorTipo.bg === 'bg-white' ? 'bg-gradient-to-r from-gray-50 to-white' : ''} px-6 py-4 border-b border-gray-100`}>
+            <div className={`${colorTipo.bg === 'bg-white' ? 'bg-gradient-to-r from-gray-50 to-white' : ''} ${getPadding()} border-b border-gray-100`}>
                 <div className="flex items-start justify-between">
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
@@ -645,6 +672,7 @@ const DashboardProduccionPage = () => {
     // Estados para modo fullscreen
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [orientacion, setOrientacion] = useState('horizontal'); // 'horizontal' | 'vertical'
+    const [tamano, setTamano] = useState('mediano'); // 'pequeno' | 'mediano' | 'grande'
 
     const cargarDatos = useCallback(async () => {
         try {
@@ -710,6 +738,15 @@ const DashboardProduccionPage = () => {
     // Función para rotar orientación
     const toggleOrientacion = () => {
         setOrientacion(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
+    };
+
+    // Función para cambiar tamaño
+    const toggleTamano = () => {
+        setTamano(prev => {
+            if (prev === 'pequeno') return 'mediano';
+            if (prev === 'mediano') return 'grande';
+            return 'pequeno';
+        });
     };
 
     const handleCompletar = async (proyectoId) => {
@@ -875,6 +912,16 @@ const DashboardProduccionPage = () => {
                         <RotateCw size={16} />
                     </button>
                     <button
+                        onClick={toggleTamano}
+                        className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
+                        title={`Tamaño: ${tamano} (click para cambiar)`}
+                    >
+                        <ZoomIn size={16} />
+                        <span className="text-xs font-bold">
+                            {tamano === 'pequeno' ? 'P' : tamano === 'mediano' ? 'M' : 'G'}
+                        </span>
+                    </button>
+                    <button
                         onClick={toggleFullscreen}
                         className="p-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                         title="Salir (ESC)"
@@ -902,8 +949,12 @@ const DashboardProduccionPage = () => {
 
             {/* Lista de proyectos como timeline */}
             <div className={`${isFullscreen && orientacion === 'horizontal'
-                    ? 'grid grid-cols-2 xl:grid-cols-3 gap-4'
-                    : 'space-y-4'
+                ? tamano === 'pequeno'
+                    ? 'grid grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3'
+                    : tamano === 'grande'
+                        ? 'grid grid-cols-1 xl:grid-cols-2 gap-4'
+                        : 'grid grid-cols-2 xl:grid-cols-3 gap-4'
+                : 'space-y-4'
                 }`}>
                 {proyectosFiltrados.length === 0 ? (
                     <div className="text-center py-16 bg-white rounded-xl col-span-full">
@@ -923,6 +974,7 @@ const DashboardProduccionPage = () => {
                             onCompletar={handleCompletar}
                             isFullscreen={isFullscreen}
                             orientacion={orientacion}
+                            tamano={tamano}
                         />
                     ))
                 )}
