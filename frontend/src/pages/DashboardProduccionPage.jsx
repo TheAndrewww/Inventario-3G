@@ -877,8 +877,9 @@ const DashboardProduccionPage = () => {
                 top: '50%',
                 left: '50%',
                 marginTop: '-50vw',
-                marginLeft: '-50vh'
-            } : {}}
+                marginLeft: '-50vh',
+                zoom: '67%'
+            } : { zoom: '67%' }}
         >
             {/* Header - oculto en fullscreen */}
             {!isFullscreen && (
