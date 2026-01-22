@@ -404,11 +404,13 @@ ProduccionProyecto.prototype.getDiasRestantes = function () {
     // formato: YYYY-MM-DD
     const [year, month, day] = this.fecha_limite.split('-').map(Number);
 
-    // Obtener fecha de hoy en hora local
-    const hoy = new Date();
-    const hoyYear = hoy.getFullYear();
-    const hoyMonth = hoy.getMonth() + 1;
-    const hoyDay = hoy.getDate();
+    // Obtener fecha de hoy en hora de México (CST -6)
+    const now = new Date();
+    const mexicoOffset = -6 * 60; // -6 horas en minutos
+    const mexicoTime = new Date(now.getTime() + (now.getTimezoneOffset() + mexicoOffset) * 60 * 1000);
+    const hoyYear = mexicoTime.getFullYear();
+    const hoyMonth = mexicoTime.getMonth() + 1;
+    const hoyDay = mexicoTime.getDate();
 
     // Calcular diferencia en días usando UTC para evitar problemas de DST
     const limiteUTC = Date.UTC(year, month - 1, day);
