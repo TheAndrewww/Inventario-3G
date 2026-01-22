@@ -527,8 +527,8 @@ const DashboardProduccionTVPage = () => {
                 <span>{sincronizando ? 'Sincronizando...' : 'En vivo'}</span>
             </div>
 
-            {/* Controls (Bottom Right) */}
-            <div className={`fixed z-50 flex gap-2 ${orientacion === 'vertical' ? 'bottom-4 left-4' : 'bottom-4 right-4'}`}>
+            {/* Controls (Bottom Right) - Hidden until hover */}
+            <div className={`fixed z-50 flex gap-2 transition-opacity duration-300 opacity-0 hover:opacity-100 ${orientacion === 'vertical' ? 'bottom-4 left-4' : 'bottom-4 right-4'}`}>
                 {/* Scale Controls */}
                 <div className="flex bg-gray-900 text-white rounded-lg shadow-xl overflow-hidden border border-gray-700">
                     <button
