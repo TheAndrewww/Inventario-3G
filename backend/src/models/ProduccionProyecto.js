@@ -399,12 +399,23 @@ ProduccionProyecto.prototype.getPorcentajeAvance = function () {
  */
 ProduccionProyecto.prototype.getDiasRestantes = function () {
     if (!this.fecha_limite) return null;
+
+    // Parsear la fecha límite de forma independiente a timezone
+    // formato: YYYY-MM-DD
+    const [year, month, day] = this.fecha_limite.split('-').map(Number);
+
+    // Obtener fecha de hoy en hora local
     const hoy = new Date();
-    hoy.setHours(12, 0, 0, 0);
-    // Agregar T12:00:00 para evitar problemas de timezone
-    const limite = new Date(this.fecha_limite + 'T12:00:00');
-    const diff = limite - hoy;
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    const hoyYear = hoy.getFullYear();
+    const hoyMonth = hoy.getMonth() + 1;
+    const hoyDay = hoy.getDate();
+
+    // Calcular diferencia en días usando UTC para evitar problemas de DST
+    const limiteUTC = Date.UTC(year, month - 1, day);
+    const hoyUTC = Date.UTC(hoyYear, hoyMonth - 1, hoyDay);
+
+    const diffMs = limiteUTC - hoyUTC;
+    return Math.round(diffMs / (1000 * 60 * 60 * 24));
 };
 
 // ===== Métodos estáticos =====
