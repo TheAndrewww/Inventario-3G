@@ -36,7 +36,8 @@ export const obtenerDashboard = async (req, res) => {
                     ...p.toJSON(),
                     diasRestantes: p.getDiasRestantes(),
                     porcentaje: p.getPorcentajeAvance(),
-                    estadoSubEtapas: p.getEstadoSubEtapas()
+                    estadoSubEtapas: p.getEstadoSubEtapas(),
+                    estadoRetraso: p.getEstadoRetraso()
                 })),
                 info: COLORES_AREAS[etapa] || { nombre: etapa, color: '#6B7280' }
             };

@@ -38,7 +38,12 @@ const ProyectoTimeline = ({ proyecto }) => {
     const esMTO = proyecto.tipo_proyecto?.toUpperCase() === 'MTO';
     // GTIA siempre simplificado, MTO simplificado solo si NO es extensivo
     const usaTimelineSimplificado = esGarantia || (esMTO && !proyecto.es_extensivo);
-    const esUrgente = proyecto.prioridad === 1 || esGarantia || (diasRestantes !== null && diasRestantes <= 3);
+
+    // Estado de retraso para proyectos A, B, C
+    const estadoRetraso = proyecto.estadoRetraso || { enRetraso: false };
+    const enRetraso = estadoRetraso.enRetraso;
+
+    const esUrgente = proyecto.prioridad === 1 || esGarantia || (diasRestantes !== null && diasRestantes <= 3) || enRetraso;
     const etapaActualIndex = ETAPAS_ORDEN.indexOf(proyecto.etapa_actual);
     const porcentaje = Math.round((etapaActualIndex / (ETAPAS_ORDEN.length - 1)) * 100);
 
@@ -52,13 +57,17 @@ const ProyectoTimeline = ({ proyecto }) => {
 
     const colorTipo = getColorPorTipo(proyecto.tipo_proyecto);
 
+    // Si está en retraso, override de colores
+    const bgFinal = enRetraso ? 'bg-red-50' : colorTipo.bg;
+    const borderFinal = enRetraso ? 'border-l-4 border-red-500' : colorTipo.border;
+
     // Helper calculate style size
     const s = (val) => `calc(${val}rem * var(--escala, 1))`;
     const px = (val) => `calc(${val}px * var(--escala, 1))`;
 
     return (
         <div
-            className={`${colorTipo.bg} ${colorTipo.border} overflow-hidden transition-all ${esUrgente ? 'ring-2 ring-red-400' : ''} rounded-lg shadow-sm mb-1`}
+            className={`${bgFinal} ${borderFinal} overflow-hidden transition-all ${esUrgente ? 'ring-2 ring-red-400' : ''} rounded-lg shadow-sm mb-1`}
             style={{ marginBottom: px(4) }}
         >
             {/* Header */}
@@ -76,7 +85,15 @@ const ProyectoTimeline = ({ proyecto }) => {
                                 {colorTipo.label}
                             </span>
                         )}
-                        {esUrgente && (
+                        {enRetraso && (
+                            <span
+                                className="inline-flex items-center font-bold rounded-full bg-red-600 text-white animate-pulse"
+                                style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, gap: px(4) }}
+                            >
+                                ⚠️ +{estadoRetraso.diasRetraso}d
+                            </span>
+                        )}
+                        {esUrgente && !enRetraso && (
                             <span
                                 className="inline-flex items-center font-bold rounded-full bg-red-500 text-white animate-pulse"
                                 style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, gap: px(4) }}
@@ -182,16 +199,28 @@ const ProyectoTimeline = ({ proyecto }) => {
                             { stage: 'instalacion', icon: Truck, label: 'Instalación', pos: '8%', idx: 4 },
                             { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: '85%', idx: 5 }
                         ];
+
+                        // Función para determinar color del nodo (simplificado)
+                        const getNodeColorSimple = (node) => {
+                            const esCompletado = node.stage === 'completado' && proyecto.etapa_actual === 'completado';
+                            const esInstalacionActiva = node.stage === 'instalacion' && proyecto.etapa_actual === 'instalacion';
+                            const esInstalacionCompletada = node.stage === 'instalacion' && proyecto.etapa_actual === 'completado';
+
+                            if (esCompletado || esInstalacionCompletada) {
+                                return 'bg-green-500 text-white';
+                            }
+                            if (esInstalacionActiva) {
+                                return 'bg-amber-500 text-white';
+                            }
+                            return 'bg-white border-2 border-gray-200 text-gray-400';
+                        };
+
                         return (
                             <>
                                 {nodes.map((node) => (
                                     <div key={node.stage} className="absolute top-[40%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center" style={{ left: node.pos }}>
                                         <div
-                                            className={`rounded-full flex items-center justify-center shadow-md ${(node.stage === 'instalacion' && (proyecto.etapa_actual === 'instalacion' || proyecto.etapa_actual === 'completado')) ||
-                                                (node.stage === 'completado' && proyecto.etapa_actual === 'completado')
-                                                ? 'bg-green-500 text-white'
-                                                : 'bg-white border-2 border-gray-200 text-gray-400'
-                                                }`}
+                                            className={`rounded-full flex items-center justify-center shadow-md ${getNodeColorSimple(node)}`}
                                             style={{ width: px(56), height: px(56) }}
                                         >
                                             <node.icon style={{ width: px(28), height: px(28) }} />
@@ -211,12 +240,33 @@ const ProyectoTimeline = ({ proyecto }) => {
                             { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS.P4, idx: 4 },
                             { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS.P5, idx: 5 }
                         ];
+
+                        // Función para determinar color del nodo
+                        const getNodeColor = (node) => {
+                            const etapaIndex = ETAPAS_ORDEN.indexOf(proyecto.etapa_actual);
+                            const esEtapaCompletada = etapaIndex > node.idx;
+                            const esEtapaActual = proyecto.etapa_actual === node.stage;
+                            const esCompletado = node.stage === 'completado' && proyecto.etapa_actual === 'completado';
+
+                            if (esCompletado) {
+                                return 'bg-green-500 text-white';
+                            }
+                            if (esEtapaActual) {
+                                // Etapa actual: rojo si en retraso, amarillo/naranja si está en progreso
+                                return enRetraso ? 'bg-red-500 text-white' : 'bg-amber-500 text-white';
+                            }
+                            if (esEtapaCompletada) {
+                                return 'bg-green-500 text-white';
+                            }
+                            return 'bg-white border-2 border-gray-200 text-gray-400';
+                        };
+
                         return (
                             <>
                                 {nodes.map((node) => (
                                     <div key={node.stage} className="absolute top-[40%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center" style={{ left: node.pos }}>
                                         <div
-                                            className={`rounded-full flex items-center justify-center shadow-md ${ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > node.idx || (node.stage === 'completado' && proyecto.etapa_actual === 'completado') ? 'bg-green-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-400'}`}
+                                            className={`rounded-full flex items-center justify-center shadow-md ${getNodeColor(node)}`}
                                             style={{ width: px(56), height: px(56) }}
                                         >
                                             <node.icon style={{ width: px(28), height: px(28) }} />
@@ -229,22 +279,24 @@ const ProyectoTimeline = ({ proyecto }) => {
                     }
                 })()}
             </div>
-            {proyecto.etapa_actual === 'produccion' && proyecto.estadoSubEtapas && !proyecto.estadoSubEtapas.ambosCompletados && (
-                <div
-                    className="bg-amber-50 border-t border-amber-100 flex justify-center text-xl"
-                    style={{ padding: `${px(12)} ${px(24)}`, gap: px(32) }}
-                >
-                    <div className="flex items-center" style={{ gap: px(8) }}>
-                        <div className={`rounded-full ${proyecto.estadoSubEtapas.manufactura?.completado ? 'bg-green-500' : 'bg-gray-300'}`} style={{ width: px(14), height: px(14) }} />
-                        <span className={proyecto.estadoSubEtapas.manufactura?.completado ? 'text-green-700 font-medium line-through' : 'text-gray-500'} style={{ fontSize: s(1.25) }}>Manufactura</span>
+            {
+                proyecto.etapa_actual === 'produccion' && proyecto.estadoSubEtapas && !proyecto.estadoSubEtapas.ambosCompletados && (
+                    <div
+                        className="bg-amber-50 border-t border-amber-100 flex justify-center text-xl"
+                        style={{ padding: `${px(12)} ${px(24)}`, gap: px(32) }}
+                    >
+                        <div className="flex items-center" style={{ gap: px(8) }}>
+                            <div className={`rounded-full ${proyecto.estadoSubEtapas.manufactura?.completado ? 'bg-green-500' : 'bg-gray-300'}`} style={{ width: px(14), height: px(14) }} />
+                            <span className={proyecto.estadoSubEtapas.manufactura?.completado ? 'text-green-700 font-medium line-through' : 'text-gray-500'} style={{ fontSize: s(1.25) }}>Manufactura</span>
+                        </div>
+                        <div className="flex items-center" style={{ gap: px(8) }}>
+                            <div className={`rounded-full ${proyecto.estadoSubEtapas.herreria?.completado ? 'bg-green-500' : 'bg-gray-300'}`} style={{ width: px(14), height: px(14) }} />
+                            <span className={proyecto.estadoSubEtapas.herreria?.completado ? 'text-green-700 font-medium line-through' : 'text-gray-500'} style={{ fontSize: s(1.25) }}>Herrería</span>
+                        </div>
                     </div>
-                    <div className="flex items-center" style={{ gap: px(8) }}>
-                        <div className={`rounded-full ${proyecto.estadoSubEtapas.herreria?.completado ? 'bg-green-500' : 'bg-gray-300'}`} style={{ width: px(14), height: px(14) }} />
-                        <span className={proyecto.estadoSubEtapas.herreria?.completado ? 'text-green-700 font-medium line-through' : 'text-gray-500'} style={{ fontSize: s(1.25) }}>Herrería</span>
-                    </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 
@@ -351,8 +403,25 @@ const DashboardProduccionTVPage = () => {
         return () => clearInterval(interval);
     }, [cargarDatos]);
 
-    // Filtrar completados viejos o irrelevantes (solo últimos 5 completados) y ordenar resto
-    const proyectosActivos = proyectos.filter(p => p.etapa_actual !== 'completado').sort((a, b) => (a.prioridad || 3) - (b.prioridad || 3));
+    // Filtrar completados y ordenar: primero los en retraso, luego por prioridad
+    const proyectosActivos = proyectos
+        .filter(p => p.etapa_actual !== 'completado')
+        .sort((a, b) => {
+            // 1. Proyectos en retraso primero
+            const aRetraso = a.estadoRetraso?.enRetraso ? 1 : 0;
+            const bRetraso = b.estadoRetraso?.enRetraso ? 1 : 0;
+            if (aRetraso !== bRetraso) return bRetraso - aRetraso;
+
+            // 2. Si ambos en retraso, el que tiene más días de retraso primero
+            if (aRetraso && bRetraso) {
+                const aRetrasoDias = a.estadoRetraso?.diasRetraso || 0;
+                const bRetrasoDias = b.estadoRetraso?.diasRetraso || 0;
+                if (aRetrasoDias !== bRetrasoDias) return bRetrasoDias - aRetrasoDias;
+            }
+
+            // 3. Por prioridad
+            return (a.prioridad || 3) - (b.prioridad || 3);
+        });
 
     // Helpers for style
     const px = (val) => `calc(${val}px * var(--escala, 1))`;

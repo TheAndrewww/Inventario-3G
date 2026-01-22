@@ -420,6 +420,67 @@ ProduccionProyecto.prototype.getDiasRestantes = function () {
     return Math.round(diffMs / (1000 * 60 * 60 * 24));
 };
 
+// ===== Tiempos máximos por tipo de proyecto (en días) =====
+const TIEMPOS_POR_TIPO = {
+    'C': { diseno: 1, compras: 2, produccion: 5, instalacion: 6 },   // Acumulados: 1, 1+1=2, 2+3=5, 5+1=6
+    'B': { diseno: 2, compras: 5, produccion: 10, instalacion: 13 }, // Acumulados: 2, 2+3=5, 5+5=10, 10+3=13
+    'A': { diseno: 5, compras: 10, produccion: 20, instalacion: 25 } // Acumulados: 5, 5+5=10, 10+10=20, 20+5=25
+};
+
+/**
+ * Calcula si el proyecto está en retraso según su tipo (A, B, C)
+ * Usa fecha_entrada y compara con el tiempo acumulado permitido para la etapa actual
+ * @returns {{ enRetraso: boolean, diasEnProyecto: number, tiempoPermitido: number | null }}
+ */
+ProduccionProyecto.prototype.getEstadoRetraso = function () {
+    // Solo aplica para tipos A, B, C
+    const tipo = this.tipo_proyecto?.toUpperCase();
+    if (!tipo || !TIEMPOS_POR_TIPO[tipo]) {
+        return { enRetraso: false, diasEnProyecto: 0, tiempoPermitido: null };
+    }
+
+    // Si no hay fecha de entrada, no podemos calcular
+    if (!this.fecha_entrada) {
+        return { enRetraso: false, diasEnProyecto: 0, tiempoPermitido: null };
+    }
+
+    // Si ya está completado, no hay retraso
+    if (this.etapa_actual === 'completado' || this.etapa_actual === 'pendiente') {
+        return { enRetraso: false, diasEnProyecto: 0, tiempoPermitido: null };
+    }
+
+    // Calcular días desde fecha_entrada hasta hoy (usando hora de México)
+    const [year, month, day] = this.fecha_entrada.split('-').map(Number);
+    const now = new Date();
+    const mexicoOffset = -6 * 60;
+    const mexicoTime = new Date(now.getTime() + (now.getTimezoneOffset() + mexicoOffset) * 60 * 1000);
+    const hoyYear = mexicoTime.getFullYear();
+    const hoyMonth = mexicoTime.getMonth() + 1;
+    const hoyDay = mexicoTime.getDate();
+
+    const entradaUTC = Date.UTC(year, month - 1, day);
+    const hoyUTC = Date.UTC(hoyYear, hoyMonth - 1, hoyDay);
+    const diasEnProyecto = Math.round((hoyUTC - entradaUTC) / (1000 * 60 * 60 * 24));
+
+    // Obtener tiempo permitido acumulado para la etapa actual
+    const tiemposAcumulados = TIEMPOS_POR_TIPO[tipo];
+    const tiempoPermitido = tiemposAcumulados[this.etapa_actual] || null;
+
+    // Si no hay tiempo definido para esta etapa, no hay retraso
+    if (tiempoPermitido === null) {
+        return { enRetraso: false, diasEnProyecto, tiempoPermitido: null };
+    }
+
+    const enRetraso = diasEnProyecto > tiempoPermitido;
+
+    return {
+        enRetraso,
+        diasEnProyecto,
+        tiempoPermitido,
+        diasRetraso: enRetraso ? diasEnProyecto - tiempoPermitido : 0
+    };
+};
+
 // ===== Métodos estáticos =====
 
 /**
