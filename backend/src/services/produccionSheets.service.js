@@ -141,6 +141,7 @@ export const leerProyectosProduccion = async (mes = null) => {
         // Columna C: Fecha de ingreso
         // Columna D: Fecha de entrega máxima
         // Columna E: Check de entregado
+        // Columna J: EXTENSIVO (para MTO)
         // Columna K: Tipo de proyecto
         // Datos desde fila 6
 
@@ -178,6 +179,7 @@ export const leerProyectosProduccion = async (mes = null) => {
             const fechaIngreso = parsearFecha(row[1]); // Columna C
             const fechaEntrega = parsearFecha(row[2]); // Columna D
             const entregadoCheck = row[3]?.toString().trim(); // Columna E
+            const extensivoFlag = row[8]?.toString().trim().toUpperCase() || ''; // Columna J (índice 8)
             const tipoProyecto = row[9]?.toString().trim() || ''; // Columna K (índice 9)
 
             // Determinar si está entregado
@@ -190,12 +192,16 @@ export const leerProyectosProduccion = async (mes = null) => {
                 entregadoCheck === 'x'
             );
 
+            // Determinar si es EXTENSIVO (solo aplica para MTO)
+            const esExtensivo = extensivoFlag === 'EXTENSIVO';
+
             const proyecto = {
                 nombre,
                 fechaIngreso,
                 fechaEntrega,
                 estaEntregado,
                 tipoProyecto,
+                esExtensivo,
                 filaOriginal: i + 6, // Para referencia (fila real en el sheet)
                 spreadsheetRowId: `${mes}_${i + 6}` // ID único para sincronización
             };
@@ -279,6 +285,11 @@ export const sincronizarConDB = async (mes = null) => {
                     cambios.tipo_proyecto = proyecto.tipoProyecto.toUpperCase();
                 }
 
+                // Actualizar es_extensivo si cambió
+                if (existente.es_extensivo !== proyecto.esExtensivo) {
+                    cambios.es_extensivo = proyecto.esExtensivo;
+                }
+
                 if (Object.keys(cambios).length > 0) {
                     await existente.update(cambios);
                     actualizados++;
@@ -293,6 +304,7 @@ export const sincronizarConDB = async (mes = null) => {
                     etapa_actual: proyecto.estaEntregado ? 'completado' : 'diseno',
                     spreadsheet_row_id: proyecto.spreadsheetRowId,
                     tipo_proyecto: proyecto.tipoProyecto ? proyecto.tipoProyecto.toUpperCase() : null,
+                    es_extensivo: proyecto.esExtensivo,
                     prioridad: 3, // Prioridad normal por defecto
                     activo: true
                 });

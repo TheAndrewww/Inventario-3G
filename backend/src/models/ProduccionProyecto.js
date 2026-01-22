@@ -222,6 +222,14 @@ const ProduccionProyecto = sequelize.define('ProduccionProyecto', {
         comment: 'Tipo de proyecto: MTO, GTIA, A, B, C, etc. Para determinar color de card'
     },
 
+    // ===== Flag para MTO extensivo =====
+    es_extensivo: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Si el proyecto MTO es EXTENSIVO (columna J del spreadsheet)'
+    },
+
     // ===== Estado general =====
     activo: {
         type: DataTypes.BOOLEAN,
@@ -392,9 +400,9 @@ ProduccionProyecto.prototype.getPorcentajeAvance = function () {
 ProduccionProyecto.prototype.getDiasRestantes = function () {
     if (!this.fecha_limite) return null;
     const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const limite = new Date(this.fecha_limite);
-    limite.setHours(0, 0, 0, 0);
+    hoy.setHours(12, 0, 0, 0);
+    // Agregar T12:00:00 para evitar problemas de timezone
+    const limite = new Date(this.fecha_limite + 'T12:00:00');
     const diff = limite - hoy;
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
 };

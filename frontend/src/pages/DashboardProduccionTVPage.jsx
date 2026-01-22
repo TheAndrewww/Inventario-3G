@@ -35,6 +35,9 @@ const ETAPAS_ORDEN = ['pendiente', 'diseno', 'compras', 'produccion', 'instalaci
 const ProyectoTimeline = ({ proyecto }) => {
     const diasRestantes = proyecto.diasRestantes;
     const esGarantia = proyecto.tipo_proyecto?.toUpperCase() === 'GTIA';
+    const esMTO = proyecto.tipo_proyecto?.toUpperCase() === 'MTO';
+    // GTIA siempre simplificado, MTO simplificado solo si NO es extensivo
+    const usaTimelineSimplificado = esGarantia || (esMTO && !proyecto.es_extensivo);
     const esUrgente = proyecto.prioridad === 1 || esGarantia || (diasRestantes !== null && diasRestantes <= 3);
     const etapaActualIndex = ETAPAS_ORDEN.indexOf(proyecto.etapa_actual);
     const porcentaje = Math.round((etapaActualIndex / (ETAPAS_ORDEN.length - 1)) * 100);
@@ -75,7 +78,7 @@ const ProyectoTimeline = ({ proyecto }) => {
                         )}
                         {esUrgente && (
                             <span
-                                className="inline-flex items-center font-bold rounded-full bg-red-500 text-white"
+                                className="inline-flex items-center font-bold rounded-full bg-red-500 text-white animate-pulse"
                                 style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, gap: px(4) }}
                             >
                                 !
@@ -141,50 +144,89 @@ const ProyectoTimeline = ({ proyecto }) => {
                         className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center origin-right rounded-xl shadow-md ${diasRestantes < 0 ? 'bg-red-100 text-red-700 border border-red-200' : diasRestantes <= 3 ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-white text-gray-700 border border-gray-200'}`}
                         style={{ padding: `${px(12)} ${px(16)}`, gap: px(2) }}
                     >
+                        <span className="text-gray-500 uppercase tracking-wide" style={{ fontSize: s(0.65) }}>Límite</span>
                         <Calendar style={{ width: s(1.25), height: s(1.25), marginBottom: px(4) }} />
-                        <span className="font-bold" style={{ fontSize: s(1.5) }}>{new Date(proyecto.fecha_limite).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</span>
+                        <span className="font-bold" style={{ fontSize: s(1.5) }}>{new Date(proyecto.fecha_limite + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</span>
                         <span className={`font-semibold ${diasRestantes < 0 ? 'text-red-600' : diasRestantes <= 3 ? 'text-amber-600' : 'text-gray-500'}`} style={{ fontSize: s(1.125) }}>{diasRestantes < 0 ? 'Venc' : diasRestantes === 0 ? 'Hoy' : `${diasRestantes}d`}</span>
                     </div>
                 )}
 
                 <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" viewBox="0 0 100 100" preserveAspectRatio="none">
                     {(() => {
-                        const POS = { P1: 8, P2: 24, P3: 40, P4: 56, P5: 72 };
-                        const getStrokeColor = (baseStage) => ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > ETAPAS_ORDEN.indexOf(baseStage) ? '#10B981' : '#CBD5E1';
-                        return (
-                            <>
-                                <line x1={POS.P1} y1="40" x2={POS.P2} y2="40" stroke={getStrokeColor('diseno')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                <line x1={POS.P2} y1="40" x2={POS.P4} y2="40" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                <line x1={POS.P4} y1="40" x2={POS.P5} y2="40" stroke={getStrokeColor('instalacion')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                            </>
-                        )
+                        if (usaTimelineSimplificado) {
+                            // GTIA y MTO (no extensivo): Solo una línea entre Instalación y Fin
+                            const getStrokeColor = () => proyecto.etapa_actual === 'completado' ? '#10B981' : '#CBD5E1';
+                            return (
+                                <line x1="8" y1="40" x2="85" y2="40" stroke={getStrokeColor()} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                            );
+                        } else {
+                            // Normal: líneas completas
+                            const POS = { P1: 8, P2: 27, P3: 46, P4: 65, P5: 85 };
+                            const getStrokeColor = (baseStage) => ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > ETAPAS_ORDEN.indexOf(baseStage) ? '#10B981' : '#CBD5E1';
+                            return (
+                                <>
+                                    <line x1={POS.P1} y1="40" x2={POS.P2} y2="40" stroke={getStrokeColor('diseno')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                    <line x1={POS.P2} y1="40" x2={POS.P4} y2="40" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                    <line x1={POS.P4} y1="40" x2={POS.P5} y2="40" stroke={getStrokeColor('instalacion')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                </>
+                            );
+                        }
                     })()}
                 </svg>
 
                 {/* Nodes */}
                 {(() => {
-                    const POS = { P1: '8%', P2: '24%', P3: '40%', P4: '56%', P5: '72%' };
-                    return (
-                        <>
-                            {[
-                                { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS.P1, idx: 1 },
-                                { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS.P2, idx: 2 },
-                                { stage: 'produccion', icon: Factory, label: 'Prod.', pos: POS.P3, idx: 3 },
-                                { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS.P4, idx: 4 },
-                                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS.P5, idx: 5 }
-                            ].map((node, i) => (
-                                <div key={node.stage} className="absolute top-[40%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center" style={{ left: node.pos }}>
-                                    <div
-                                        className={`rounded-full flex items-center justify-center shadow-md ${ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > node.idx || (node.stage === 'completado' && proyecto.etapa_actual === 'completado') ? 'bg-green-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-400'}`}
-                                        style={{ width: px(56), height: px(56) }}
-                                    >
-                                        <node.icon style={{ width: px(28), height: px(28) }} />
+                    if (usaTimelineSimplificado) {
+                        // GTIA y MTO (no extensivo): Solo Instalación y Fin, mismo largo que timeline completa
+                        const nodes = [
+                            { stage: 'instalacion', icon: Truck, label: 'Instalación', pos: '8%', idx: 4 },
+                            { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: '85%', idx: 5 }
+                        ];
+                        return (
+                            <>
+                                {nodes.map((node) => (
+                                    <div key={node.stage} className="absolute top-[40%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center" style={{ left: node.pos }}>
+                                        <div
+                                            className={`rounded-full flex items-center justify-center shadow-md ${(node.stage === 'instalacion' && (proyecto.etapa_actual === 'instalacion' || proyecto.etapa_actual === 'completado')) ||
+                                                (node.stage === 'completado' && proyecto.etapa_actual === 'completado')
+                                                ? 'bg-green-500 text-white'
+                                                : 'bg-white border-2 border-gray-200 text-gray-400'
+                                                }`}
+                                            style={{ width: px(56), height: px(56) }}
+                                        >
+                                            <node.icon style={{ width: px(28), height: px(28) }} />
+                                        </div>
+                                        <span className="absolute font-bold text-gray-600 bg-gray-50 px-1" style={{ top: px(64), fontSize: s(1.5) }}>{node.label}</span>
                                     </div>
-                                    <span className="absolute font-bold text-gray-600 bg-gray-50 px-1" style={{ top: px(64), fontSize: s(1.5) }}>{node.label}</span>
-                                </div>
-                            ))}
-                        </>
-                    )
+                                ))}
+                            </>
+                        );
+                    } else {
+                        // Normal: timeline completa
+                        const POS = { P1: '8%', P2: '27%', P3: '46%', P4: '65%', P5: '85%' };
+                        const nodes = [
+                            { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS.P1, idx: 1 },
+                            { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS.P2, idx: 2 },
+                            { stage: 'produccion', icon: Factory, label: 'Prod.', pos: POS.P3, idx: 3 },
+                            { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS.P4, idx: 4 },
+                            { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS.P5, idx: 5 }
+                        ];
+                        return (
+                            <>
+                                {nodes.map((node) => (
+                                    <div key={node.stage} className="absolute top-[40%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center" style={{ left: node.pos }}>
+                                        <div
+                                            className={`rounded-full flex items-center justify-center shadow-md ${ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > node.idx || (node.stage === 'completado' && proyecto.etapa_actual === 'completado') ? 'bg-green-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-400'}`}
+                                            style={{ width: px(56), height: px(56) }}
+                                        >
+                                            <node.icon style={{ width: px(28), height: px(28) }} />
+                                        </div>
+                                        <span className="absolute font-bold text-gray-600 bg-gray-50 px-1" style={{ top: px(64), fontSize: s(1.5) }}>{node.label}</span>
+                                    </div>
+                                ))}
+                            </>
+                        );
+                    }
                 })()}
             </div>
             {proyecto.etapa_actual === 'produccion' && proyecto.estadoSubEtapas && !proyecto.estadoSubEtapas.ambosCompletados && (
@@ -215,11 +257,10 @@ const EstadisticasHeaderTV = ({ estadisticas }) => {
         { label: 'En Compras', value: estadisticas.compras || 0, color: ETAPAS_CONFIG.compras.color, icon: ShoppingCart },
         { label: 'En Producción', value: estadisticas.produccion || 0, color: ETAPAS_CONFIG.produccion.color, icon: Factory },
         { label: 'En Instalación', value: estadisticas.instalacion || 0, color: ETAPAS_CONFIG.instalacion.color, icon: Truck },
-        { label: 'Completados', value: estadisticas.completado || 0, color: ETAPAS_CONFIG.completado.color, icon: CheckCircle2 },
     ];
 
     return (
-        <div className="grid grid-cols-5 mb-6" style={{ gap: px(8) }}>
+        <div className="grid grid-cols-4 mb-6" style={{ gap: px(8) }}>
             {items.map(item => {
                 const Icon = item.icon;
                 return (

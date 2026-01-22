@@ -180,6 +180,21 @@ const startServer = async () => {
             } catch (e) {
                 console.log('⚠️ No se pudo verificar/agregar tipo_proyecto:', e.message);
             }
+
+            // Verificar columna es_extensivo en desarrollo también
+            try {
+                const [esExtensivoCheck] = await sequelize.query(
+                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'produccion_proyectos' AND column_name = 'es_extensivo'"
+                );
+
+                if (parseInt(esExtensivoCheck[0]?.count || 0) === 0) {
+                    console.log('🔄 Agregando columna es_extensivo...');
+                    await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS es_extensivo BOOLEAN DEFAULT FALSE NOT NULL");
+                    console.log('✅ Columna es_extensivo agregada');
+                }
+            } catch (e) {
+                console.log('⚠️ No se pudo verificar/agregar es_extensivo:', e.message);
+            }
         } else {
             // En producción, ejecutar setup automático si no hay tablas
             const [results] = await sequelize.query(
@@ -321,6 +336,17 @@ const startServer = async () => {
                     console.log('🔄 Agregando columna tipo_proyecto...');
                     await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN tipo_proyecto VARCHAR(20)");
                     console.log('✅ Columna tipo_proyecto agregada');
+                }
+
+                // Verificar si existe la columna es_extensivo
+                const [esExtensivoCheck] = await sequelize.query(
+                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'produccion_proyectos' AND column_name = 'es_extensivo'"
+                );
+
+                if (parseInt(esExtensivoCheck[0].count) === 0) {
+                    console.log('🔄 Agregando columna es_extensivo...');
+                    await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN es_extensivo BOOLEAN DEFAULT FALSE NOT NULL");
+                    console.log('✅ Columna es_extensivo agregada');
                 }
             }
 
