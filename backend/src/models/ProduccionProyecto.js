@@ -395,7 +395,32 @@ ProduccionProyecto.prototype.getPorcentajeAvance = function () {
 };
 
 /**
- * Calcula días restantes hasta fecha límite
+ * Helper: Calcula días hábiles (Lunes a Sábado) entre dos fechas
+ * Excluye los domingos.
+ * Retorna negativo si fechaInicio > fechaFin.
+ */
+function calcularDiasHabiles(timestampInicio, timestampFin) {
+    let start = new Date(Math.min(timestampInicio, timestampFin));
+    let end = new Date(Math.max(timestampInicio, timestampFin));
+    start.setUTCHours(0, 0, 0, 0);
+    end.setUTCHours(0, 0, 0, 0);
+
+    let diasHabiles = 0;
+    let current = new Date(start);
+
+    while (current.getTime() < end.getTime()) {
+        current.setUTCDate(current.getUTCDate() + 1);
+        const day = current.getUTCDay();
+        if (day !== 0) { // 0 = Domingo. Excluir Domingo.
+            diasHabiles++;
+        }
+    }
+
+    return timestampInicio <= timestampFin ? diasHabiles : -diasHabiles;
+}
+
+/**
+ * Calcula días restantes hasta fecha límite (Días Hábiles)
  */
 ProduccionProyecto.prototype.getDiasRestantes = function () {
     if (!this.fecha_limite) return null;
@@ -412,12 +437,11 @@ ProduccionProyecto.prototype.getDiasRestantes = function () {
     const hoyMonth = mexicoTime.getMonth() + 1;
     const hoyDay = mexicoTime.getDate();
 
-    // Calcular diferencia en días usando UTC para evitar problemas de DST
+    // Calcular diferencia en días hábiles
     const limiteUTC = Date.UTC(year, month - 1, day);
     const hoyUTC = Date.UTC(hoyYear, hoyMonth - 1, hoyDay);
 
-    const diffMs = limiteUTC - hoyUTC;
-    return Math.round(diffMs / (1000 * 60 * 60 * 24));
+    return calcularDiasHabiles(hoyUTC, limiteUTC);
 };
 
 // ===== Tiempos máximos por tipo de proyecto (en días) =====
@@ -460,7 +484,9 @@ ProduccionProyecto.prototype.getEstadoRetraso = function () {
 
     const entradaUTC = Date.UTC(year, month - 1, day);
     const hoyUTC = Date.UTC(hoyYear, hoyMonth - 1, hoyDay);
-    const diasEnProyecto = Math.round((hoyUTC - entradaUTC) / (1000 * 60 * 60 * 24));
+
+    // Usar días hábiles (excluyendo domingos)
+    const diasEnProyecto = calcularDiasHabiles(entradaUTC, hoyUTC);
 
     // Obtener tiempo permitido acumulado para la etapa actual
     const tiemposAcumulados = TIEMPOS_POR_TIPO[tipo];
