@@ -43,7 +43,15 @@ const ProyectoTimeline = ({ proyecto }) => {
     const estadoRetraso = proyecto.estadoRetraso || { enRetraso: false };
     const enRetraso = estadoRetraso.enRetraso;
 
-    const esUrgente = proyecto.prioridad === 1 || esGarantia || (diasRestantes !== null && diasRestantes <= 3) || enRetraso;
+    // Regla de urgencia:
+    // 1. Prioridad 1
+    // 2. Garantía
+    // 3. Menos de 3 días restantes (EXEPTO MTO)
+    // 4. MTO solo si ya se pasó la fecha (diasRestantes < 0)
+    // 5. En retraso (tipos A, B, C)
+    const urgenciaPorFecha = diasRestantes !== null && (esMTO ? diasRestantes < 0 : diasRestantes <= 3);
+
+    const esUrgente = proyecto.prioridad === 1 || esGarantia || urgenciaPorFecha || enRetraso;
 
     // Verificar si tiene producción (manufactura o herrería)
     const tieneProduccion = proyecto.tiene_manufactura || proyecto.tiene_herreria;
@@ -236,7 +244,8 @@ const ProyectoTimeline = ({ proyecto }) => {
                                 return proyectoCompletado ? 'bg-green-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-400';
                             }
                             if (node.stage === 'instalacion') {
-                                return proyectoCompletado ? 'bg-green-500 text-white' : 'bg-amber-500 text-white';
+                                // Instalación activa: verde si no está completado
+                                return proyectoCompletado ? 'bg-green-500 text-white' : 'bg-green-500 text-white';
                             }
                             return 'bg-white border-2 border-gray-200 text-gray-400';
                         };
@@ -298,8 +307,8 @@ const ProyectoTimeline = ({ proyecto }) => {
                                 return 'bg-green-500 text-white';
                             }
                             if (esEtapaActual) {
-                                // Etapa actual: rojo si en retraso, amarillo/naranja si está en progreso
-                                return enRetraso ? 'bg-red-500 text-white' : 'bg-amber-500 text-white';
+                                // Etapa actual: rojo si en retraso, verde si está en progreso
+                                return enRetraso ? 'bg-red-500 text-white' : 'bg-green-500 text-white';
                             }
                             if (esEtapaCompletada) {
                                 return 'bg-green-500 text-white';
