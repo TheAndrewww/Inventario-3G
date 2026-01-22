@@ -166,15 +166,17 @@ const ProyectoTimeline = ({ proyecto }) => {
                 </div>
 
                 <div className="flex flex-col items-center" style={{ marginLeft: px(12) }}>
-                    <div className="relative" style={{ width: px(64), height: px(64) }}>
-                        <svg className="transform -rotate-90" style={{ width: px(64), height: px(64) }}>
-                            <circle cx="50%" cy="50%" r="45%" stroke="#E5E7EB" strokeWidth="10%" fill="none" />
-                            <circle cx="50%" cy="50%" r="45%" stroke={porcentaje > 0 ? ETAPAS_CONFIG[proyecto.etapa_actual]?.color : 'transparent'} strokeWidth="10%" fill="none" strokeLinecap={porcentaje > 0 ? "round" : "butt"} strokeDasharray={`${porcentaje * 2.8} 280`} className="transition-all duration-500" />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="font-bold text-gray-700" style={{ fontSize: s(1.1) }}>{porcentaje}%</span>
+                    {!usaTimelineSimplificado && (
+                        <div className="relative" style={{ width: px(64), height: px(64) }}>
+                            <svg className="transform -rotate-90" style={{ width: px(64), height: px(64) }}>
+                                <circle cx="50%" cy="50%" r="45%" stroke="#E5E7EB" strokeWidth="10%" fill="none" />
+                                <circle cx="50%" cy="50%" r="45%" stroke={porcentaje > 0 ? ETAPAS_CONFIG[proyecto.etapa_actual]?.color : 'transparent'} strokeWidth="10%" fill="none" strokeLinecap={porcentaje > 0 ? "round" : "butt"} strokeDasharray={`${porcentaje * 2.8} 280`} className="transition-all duration-500" />
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="font-bold text-gray-700" style={{ fontSize: s(1.1) }}>{porcentaje}%</span>
+                            </div>
                         </div>
-                    </div>
+                    )}
                     {proyecto.fecha_limite && (
                         <div
                             className={`text-center font-medium ${diasRestantes <= 3 ? 'text-red-600' : 'text-gray-500'}`}
