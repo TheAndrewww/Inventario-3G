@@ -244,8 +244,13 @@ const ProyectoTimeline = ({ proyecto }) => {
                                 return proyectoCompletado ? 'bg-green-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-400';
                             }
                             if (node.stage === 'instalacion') {
-                                // Instalación activa: verde si no está completado
-                                return proyectoCompletado ? 'bg-green-500 text-white' : 'bg-green-500 text-white';
+                                if (proyectoCompletado) return 'bg-green-500 text-white';
+
+                                // Si está activo: GTIA siempre rojo, MTO rojo si vencido
+                                if (esGarantia) return 'bg-red-500 text-white';
+                                if (esMTO && diasRestantes !== null && diasRestantes < 0) return 'bg-red-500 text-white';
+
+                                return 'bg-green-500 text-white';
                             }
                             return 'bg-white border-2 border-gray-200 text-gray-400';
                         };
@@ -307,7 +312,8 @@ const ProyectoTimeline = ({ proyecto }) => {
                                 return 'bg-green-500 text-white';
                             }
                             if (esEtapaActual) {
-                                // Etapa actual: rojo si en retraso, verde si está en progreso
+                                // MTO vencido o proyecto A/B/C en retraso -> Rojo
+                                if (esMTO && diasRestantes !== null && diasRestantes < 0) return 'bg-red-500 text-white';
                                 return enRetraso ? 'bg-red-500 text-white' : 'bg-green-500 text-white';
                             }
                             if (esEtapaCompletada) {
