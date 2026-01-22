@@ -45,15 +45,30 @@ const ProyectoTimeline = ({ proyecto }) => {
 
     const esUrgente = proyecto.prioridad === 1 || esGarantia || (diasRestantes !== null && diasRestantes <= 3) || enRetraso;
 
+    // Verificar si tiene producción (manufactura o herrería)
+    const tieneProduccion = proyecto.tiene_manufactura || proyecto.tiene_herreria;
+
     // Calcular porcentaje según tipo de timeline
     let porcentaje;
     if (usaTimelineSimplificado) {
         // MTO/GTIA: solo 2 etapas (instalacion=50%, completado=100%)
         porcentaje = proyecto.etapa_actual === 'completado' ? 100 : 50;
     } else {
-        // Normal: 5 etapas
-        const etapaActualIndex = ETAPAS_ORDEN.indexOf(proyecto.etapa_actual);
-        porcentaje = Math.round((etapaActualIndex / (ETAPAS_ORDEN.length - 1)) * 100);
+        if (tieneProduccion) {
+            // Normal: 5 etapas
+            const etapaActualIndex = ETAPAS_ORDEN.indexOf(proyecto.etapa_actual);
+            porcentaje = Math.round((etapaActualIndex / (ETAPAS_ORDEN.length - 1)) * 100);
+        } else {
+            // Sin producción: 4 etapas (Diseño, Compras, Instalación, Fin)
+            const etapasSinProd = ['diseno', 'compras', 'instalacion', 'completado'];
+            let idx = etapasSinProd.indexOf(proyecto.etapa_actual);
+
+            // Si por error está en 'produccion' pero no debería, lo mapeamos a 'compras'
+            if (idx === -1 && proyecto.etapa_actual === 'produccion') idx = 1;
+            if (idx === -1) idx = 0; // Fallback
+
+            porcentaje = Math.round((idx / (etapasSinProd.length - 1)) * 100);
+        }
     }
 
     const getColorPorTipo = (tipo) => {
@@ -117,10 +132,13 @@ const ProyectoTimeline = ({ proyecto }) => {
                                 color: ETAPAS_CONFIG[proyecto.etapa_actual]?.color,
                                 fontSize: s(0.75),
                                 padding: `${px(2)} ${px(8)}`,
-                                gap: px(4)
+                                gap: px(4),
+                                border: `1px solid ${ETAPAS_CONFIG[proyecto.etapa_actual]?.color}30`
                             }}
                         >
-                            {ETAPAS_CONFIG[proyecto.etapa_actual]?.nombre}
+                            {usaTimelineSimplificado && proyecto.etapa_actual !== 'completado'
+                                ? 'INSTALACIÓN'
+                                : ETAPAS_CONFIG[proyecto.etapa_actual]?.nombre}
                         </span>
                     </div>
 
@@ -240,14 +258,34 @@ const ProyectoTimeline = ({ proyecto }) => {
                         );
                     } else {
                         // Normal: timeline completa
-                        const POS = { P1: '8%', P2: '27%', P3: '46%', P4: '65%', P5: '85%' };
-                        const nodes = [
-                            { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS.P1, idx: 1 },
-                            { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS.P2, idx: 2 },
-                            { stage: 'produccion', icon: Factory, label: 'Prod.', pos: POS.P3, idx: 3 },
-                            { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS.P4, idx: 4 },
-                            { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS.P5, idx: 5 }
-                        ];
+                        // tieneProduccion ya calculado al inicio
+
+                        let nodes = [];
+
+                        if (tieneProduccion) {
+                            // 5 etapas
+                            const POS5 = { P1: '8%', P2: '27%', P3: '46%', P4: '65%', P5: '85%' };
+                            nodes = [
+                                { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS5.P1, idx: 1 },
+                                { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS5.P2, idx: 2 },
+                                { stage: 'produccion', icon: Factory, label: 'Prod.', pos: POS5.P3, idx: 3 },
+                                { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS5.P4, idx: 4 },
+                                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS5.P5, idx: 5 }
+                            ];
+                        } else {
+                            // 4 etapas (sin producción) - Redistribuir espacios
+                            // Redistribución uniforme entre 8% y 85%
+                            // Total span = 77%. 3 espacios. Intervalo = 25.66%
+                            // P1: 8%, P2: 33.6%, P3: 59.3%, P4: 85%
+                            const POS4 = { P1: '8%', P2: '34%', P3: '60%', P4: '85%' };
+                            nodes = [
+                                { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS4.P1, idx: 1 },
+                                { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS4.P2, idx: 2 },
+                                // Se salta producción (idx 3)
+                                { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS4.P3, idx: 4 },
+                                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS4.P4, idx: 5 }
+                            ];
+                        }
 
                         // Función para determinar color del nodo
                         const getNodeColor = (node) => {
