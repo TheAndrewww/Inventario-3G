@@ -44,8 +44,17 @@ const ProyectoTimeline = ({ proyecto }) => {
     const enRetraso = estadoRetraso.enRetraso;
 
     const esUrgente = proyecto.prioridad === 1 || esGarantia || (diasRestantes !== null && diasRestantes <= 3) || enRetraso;
-    const etapaActualIndex = ETAPAS_ORDEN.indexOf(proyecto.etapa_actual);
-    const porcentaje = Math.round((etapaActualIndex / (ETAPAS_ORDEN.length - 1)) * 100);
+
+    // Calcular porcentaje según tipo de timeline
+    let porcentaje;
+    if (usaTimelineSimplificado) {
+        // MTO/GTIA: solo 2 etapas (instalacion=50%, completado=100%)
+        porcentaje = proyecto.etapa_actual === 'completado' ? 100 : 50;
+    } else {
+        // Normal: 5 etapas
+        const etapaActualIndex = ETAPAS_ORDEN.indexOf(proyecto.etapa_actual);
+        porcentaje = Math.round((etapaActualIndex / (ETAPAS_ORDEN.length - 1)) * 100);
+    }
 
     const getColorPorTipo = (tipo) => {
         if (!tipo) return { bg: 'bg-white', border: '', label: '' };
@@ -201,16 +210,15 @@ const ProyectoTimeline = ({ proyecto }) => {
                         ];
 
                         // Función para determinar color del nodo (simplificado)
+                        // Para MTO/GTIA: instalación=en progreso (ámbar) si no completado, verde si completado
                         const getNodeColorSimple = (node) => {
-                            const esCompletado = node.stage === 'completado' && proyecto.etapa_actual === 'completado';
-                            const esInstalacionActiva = node.stage === 'instalacion' && proyecto.etapa_actual === 'instalacion';
-                            const esInstalacionCompletada = node.stage === 'instalacion' && proyecto.etapa_actual === 'completado';
+                            const proyectoCompletado = proyecto.etapa_actual === 'completado';
 
-                            if (esCompletado || esInstalacionCompletada) {
-                                return 'bg-green-500 text-white';
+                            if (node.stage === 'completado') {
+                                return proyectoCompletado ? 'bg-green-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-400';
                             }
-                            if (esInstalacionActiva) {
-                                return 'bg-amber-500 text-white';
+                            if (node.stage === 'instalacion') {
+                                return proyectoCompletado ? 'bg-green-500 text-white' : 'bg-amber-500 text-white';
                             }
                             return 'bg-white border-2 border-gray-200 text-gray-400';
                         };
