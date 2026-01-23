@@ -521,19 +521,20 @@ export const obtenerDistribucionEquipos = async (mes = 'NOVIEMBRE') => {
 };
 
 /**
- * Leer anuncios desde un rango del calendario
+ * Leer anuncios desde el calendario buscando la palabra "ANUNCIOS"
+ * Los anuncios están siempre en columnas W, X, Y, Z
+ * La función busca la palabra "ANUNCIOS" y lee las filas siguientes
  * @param {string} mes - Nombre del mes (ENERO, FEBRERO, etc.)
- * @param {string} rango - Rango de celdas (ej: W50:Z52). Por defecto W20:Z23
  * @returns {Promise<Object>} - Lista de anuncios del calendario
  */
-export const leerAnunciosCalendario = async (mes, rango = 'W20:Z23') => {
+export const leerAnunciosCalendario = async (mes) => {
   try {
-    console.log(`📢 Leyendo anuncios del mes: ${mes}, rango: ${rango}`);
+    console.log(`📢 Buscando anuncios del mes: ${mes}`);
 
     const sheets = await authenticate();
 
-    // Leer el rango especificado
-    const range = `${mes}!${rango}`;
+    // Leer un rango amplio de columnas W:Z (filas 1 a 100)
+    const range = `${mes}!W1:Z100`;
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -543,7 +544,7 @@ export const leerAnunciosCalendario = async (mes, rango = 'W20:Z23') => {
     const rows = response.data.values || [];
 
     if (rows.length === 0) {
-      console.log('⚠️  No se encontraron anuncios en el rango W33:Z35');
+      console.log('⚠️ No se encontraron datos en las columnas W:Z');
       return {
         success: true,
         data: {
@@ -553,18 +554,53 @@ export const leerAnunciosCalendario = async (mes, rango = 'W20:Z23') => {
       };
     }
 
-    // Procesar cada fila como un anuncio
-    // Estructura esperada: [Columna W, X, Y, Z]
-    const anuncios = rows
-      .filter(row => row && row.length > 0 && row[0]) // Filtrar filas vacías
-      .map((row, index) => ({
-        numero: index + 1,
+    // Buscar la fila que contiene "ANUNCIOS"
+    let filaAnuncios = -1;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (row && row.length > 0) {
+        // Buscar "ANUNCIOS" en cualquier celda de la fila
+        const contieneAnuncios = row.some(cell =>
+          cell && cell.toString().toUpperCase().includes('ANUNCIOS')
+        );
+        if (contieneAnuncios) {
+          filaAnuncios = i;
+          console.log(`✅ Palabra "ANUNCIOS" encontrada en fila ${i + 1}`);
+          break;
+        }
+      }
+    }
+
+    if (filaAnuncios === -1) {
+      console.log('⚠️ No se encontró la palabra "ANUNCIOS" en las columnas W:Z');
+      return {
+        success: true,
+        data: {
+          anuncios: [],
+          total: 0
+        },
+        warning: 'No se encontró la palabra "ANUNCIOS" en el calendario'
+      };
+    }
+
+    // Leer las filas siguientes a "ANUNCIOS" (hasta encontrar una fila vacía o máximo 10 filas)
+    const anuncios = [];
+    for (let i = filaAnuncios + 1; i < rows.length && i < filaAnuncios + 11; i++) {
+      const row = rows[i];
+
+      // Si la fila está vacía o la primera celda está vacía, dejamos de leer
+      if (!row || row.length === 0 || !row[0] || row[0].toString().trim() === '') {
+        break;
+      }
+
+      anuncios.push({
+        numero: anuncios.length + 1,
         textoAnuncio: row[0] || '', // Columna W
         proyecto: row[1] || '',     // Columna X
-        equipo: row[2] || '',        // Columna Y
-        categoria: row[3] || ''      // Columna Z
-      }))
-      .filter(anuncio => anuncio.textoAnuncio.trim() !== ''); // Filtrar anuncios sin texto
+        equipo: row[2] || '',       // Columna Y
+        categoria: row[3] || ''     // Columna Z
+      });
+    }
 
     console.log(`✅ Anuncios encontrados: ${anuncios.length}`);
     anuncios.forEach((a, i) => {
@@ -575,7 +611,8 @@ export const leerAnunciosCalendario = async (mes, rango = 'W20:Z23') => {
       success: true,
       data: {
         anuncios: anuncios,
-        total: anuncios.length
+        total: anuncios.length,
+        filaEncontrada: filaAnuncios + 1
       }
     };
 

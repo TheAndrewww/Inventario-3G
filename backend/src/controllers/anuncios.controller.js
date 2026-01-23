@@ -190,28 +190,28 @@ export const generarAnuncioManual = async (req, res) => {
 };
 
 /**
- * Generar anuncios desde calendario (rango dinámico)
+ * Generar anuncios desde calendario (detección automática)
  * POST /api/anuncios/generar-desde-calendario
- * Body: { rango: "W50:Z52" } (opcional, default: W20:Z23)
+ * Busca automáticamente la palabra "ANUNCIOS" en columnas W-Z
  */
 export const generarAnunciosDesdeCalendario = async (req, res) => {
   try {
     const hoy = new Date();
     const mes = MESES[hoy.getMonth()];
-    const { rango = 'W20:Z23' } = req.body;
 
-    console.log(`🎯 Generando anuncios desde calendario para ${mes}, rango: ${rango}`);
+    console.log(`🎯 Generando anuncios desde calendario para ${mes} (detección automática)`);
 
-    // Leer anuncios del rango especificado
-    const resultado = await leerAnunciosCalendario(mes, rango);
+    // Leer anuncios buscando la palabra "ANUNCIOS"
+    const resultado = await leerAnunciosCalendario(mes);
     const anunciosCalendario = resultado.data.anuncios;
 
     if (anunciosCalendario.length === 0) {
       return res.json({
         success: true,
         data: [],
-        message: `No hay anuncios en el rango ${rango} del calendario`,
-        anunciosEncontrados: 0
+        message: resultado.warning || 'No hay anuncios en el calendario',
+        anunciosEncontrados: 0,
+        filaEncontrada: resultado.data.filaEncontrada || null
       });
     }
 
