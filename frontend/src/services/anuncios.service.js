@@ -120,6 +120,24 @@ export const desactivarAnuncio = async (id, token) => {
   }
 };
 
+/**
+ * Regenerar anuncio individual (requiere autenticación)
+ * Genera una nueva imagen para el anuncio usando la misma frase
+ */
+export const regenerarAnuncio = async (id, token) => {
+  try {
+    const response = await anunciosAPI.post(`/${id}/regenerar`, {}, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error al regenerar anuncio:', error);
+    throw error;
+  }
+};
+
 export default {
   obtenerAnunciosActivos,
   obtenerAnunciosHoy,
@@ -127,5 +145,7 @@ export default {
   generarAnuncioManual,
   generarAnunciosDesdeCalendario,
   obtenerEstadisticas,
-  desactivarAnuncio
+  desactivarAnuncio,
+  regenerarAnuncio
 };
+

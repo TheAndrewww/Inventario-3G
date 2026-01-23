@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import CarouselAnuncios from '../components/anuncios/CarouselAnuncios';
-import { obtenerAnunciosHoy, incrementarVistaAnuncio } from '../services/anuncios.service';
+import { obtenerAnunciosHoy, incrementarVistaAnuncio, regenerarAnuncio, generarAnunciosDesdeCalendario } from '../services/anuncios.service';
 import { toast, Toaster } from 'react-hot-toast';
-import { Maximize2, Minimize2, RefreshCw } from 'lucide-react';
+import { Maximize2, Minimize2, RefreshCw, Settings, X, RotateCcw, Sparkles } from 'lucide-react';
 
 /**
  * Página pública para mostrar anuncios en pantallas
  * Optimizada para pantallas completas y uso 24/7
- * Incluye botón de fullscreen para Android TV
+ * Incluye botón de fullscreen para Android TV y menú de administración
  */
 const AnunciosPublicosPage = () => {
   const [anuncios, setAnuncios] = useState([]);
@@ -16,6 +16,13 @@ const AnunciosPublicosPage = () => {
   const [ultimaActualizacion, setUltimaActualizacion] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
+  const [regenerandoId, setRegenerandoId] = useState(null);
+  const [generandoTodos, setGenerandoTodos] = useState(false);
+
+  // Verificar si el usuario está autenticado (admin)
+  const token = localStorage.getItem('token');
+  const isAdmin = !!token;
 
   // Cargar anuncios
   const cargarAnuncios = async (mostrarToast = false) => {
@@ -52,6 +59,60 @@ const AnunciosPublicosPage = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Regenerar un anuncio individual
+  const handleRegenerar = async (anuncioId) => {
+    if (!token) {
+      toast.error('Debes iniciar sesión');
+      return;
+    }
+
+    try {
+      setRegenerandoId(anuncioId);
+      toast.loading('Regenerando anuncio con IA...', { id: 'regenerar' });
+
+      const response = await regenerarAnuncio(anuncioId, token);
+
+      if (response.success) {
+        toast.success('Anuncio regenerado exitosamente', { id: 'regenerar' });
+        await cargarAnuncios(false);
+      } else {
+        toast.error(response.message || 'Error al regenerar', { id: 'regenerar' });
+      }
+    } catch (err) {
+      console.error('Error al regenerar:', err);
+      toast.error('Error al regenerar anuncio', { id: 'regenerar' });
+    } finally {
+      setRegenerandoId(null);
+    }
+  };
+
+  // Generar todos los anuncios del día
+  const handleGenerarTodos = async () => {
+    if (!token) {
+      toast.error('Debes iniciar sesión');
+      return;
+    }
+
+    try {
+      setGenerandoTodos(true);
+      toast.loading('Generando anuncios desde calendario...', { id: 'generar' });
+
+      const response = await generarAnunciosDesdeCalendario(token);
+
+      if (response.success) {
+        toast.success(`${response.anunciosGenerados || 0} anuncios generados`, { id: 'generar' });
+        await cargarAnuncios(false);
+      } else {
+        toast.error(response.message || 'Error al generar', { id: 'generar' });
+      }
+    } catch (err) {
+      console.error('Error al generar todos:', err);
+      toast.error('Error al generar anuncios', { id: 'generar' });
+    } finally {
+      setGenerandoTodos(false);
     }
   };
 
@@ -204,7 +265,112 @@ const AnunciosPublicosPage = () => {
           >
             <RefreshCw size={28} className={loading ? 'animate-spin' : ''} />
           </button>
+
+          {/* Botón de administración (solo si está autenticado) */}
+          {isAdmin && (
+            <button
+              onClick={() => setShowAdminMenu(!showAdminMenu)}
+              className={`bg-black/70 backdrop-blur-md text-white p-3 rounded-xl border transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500 ${showAdminMenu ? 'border-orange-500 bg-orange-600/30' : 'border-white/20 hover:bg-black/90 hover:border-orange-500'
+                }`}
+              title="Administración de anuncios"
+            >
+              <Settings size={28} />
+            </button>
+          )}
         </div>
+
+        {/* Menú de administración */}
+        {showAdminMenu && isAdmin && (
+          <div className="absolute top-20 left-4 z-50 bg-gray-900/95 backdrop-blur-md rounded-2xl border border-white/20 p-4 w-80 max-h-[70vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white font-bold text-lg">Administrar Anuncios</h3>
+              <button
+                onClick={() => setShowAdminMenu(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Botón para generar todos */}
+            <button
+              onClick={handleGenerarTodos}
+              disabled={generandoTodos}
+              className="w-full mb-4 flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-600/50 text-white py-2 px-4 rounded-lg transition-colors"
+            >
+              {generandoTodos ? (
+                <>
+                  <RefreshCw size={18} className="animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={18} />
+                  Generar Todos del Día
+                </>
+              )}
+            </button>
+
+            <div className="border-t border-white/10 pt-4">
+              <h4 className="text-gray-400 text-sm mb-3">Anuncios Actuales ({anuncios.length})</h4>
+
+              {anuncios.length === 0 ? (
+                <p className="text-gray-500 text-sm">No hay anuncios para mostrar</p>
+              ) : (
+                <div className="space-y-3">
+                  {anuncios.map((anuncio, index) => (
+                    <div
+                      key={anuncio.id}
+                      className="bg-black/50 rounded-lg p-3 border border-white/10"
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Miniatura */}
+                        <div className="w-16 h-16 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
+                          {anuncio.imagen_url && (
+                            <img
+                              src={anuncio.imagen_url}
+                              alt={`Anuncio ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm font-medium truncate">
+                            {anuncio.frase || `Anuncio ${index + 1}`}
+                          </p>
+                          <p className="text-gray-500 text-xs mt-1">
+                            {anuncio.proyecto_nombre || 'Sin proyecto'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Botón regenerar */}
+                      <button
+                        onClick={() => handleRegenerar(anuncio.id)}
+                        disabled={regenerandoId === anuncio.id}
+                        className="w-full mt-2 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-700/50 text-white py-1.5 px-3 rounded-lg text-sm transition-colors"
+                      >
+                        {regenerandoId === anuncio.id ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" />
+                            Regenerando...
+                          </>
+                        ) : (
+                          <>
+                            <RotateCcw size={14} />
+                            Regenerar Imagen
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Carousel de anuncios */}
         <CarouselAnuncios anuncios={anuncios} />
@@ -224,4 +390,3 @@ const AnunciosPublicosPage = () => {
 };
 
 export default AnunciosPublicosPage;
-

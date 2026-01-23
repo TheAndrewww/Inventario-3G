@@ -6,7 +6,8 @@ import {
   generarAnunciosDesdeCalendario,
   incrementarVista,
   desactivarAnuncio,
-  obtenerEstadisticas
+  obtenerEstadisticas,
+  regenerarAnuncio
 } from '../controllers/anuncios.controller.js';
 import { verificarToken } from '../middleware/auth.middleware.js';
 
@@ -78,6 +79,13 @@ router.post('/generar', generarAnuncioManual);
 router.post('/generar-desde-calendario', generarAnunciosDesdeCalendario);
 
 /**
+ * POST /api/anuncios/:id/regenerar
+ * Regenerar la imagen de un anuncio específico
+ * Acceso: Administrador
+ */
+router.post('/:id/regenerar', regenerarAnuncio);
+
+/**
  * PUT /api/anuncios/:id/desactivar
  * Desactivar un anuncio
  * Acceso: Administrador
@@ -85,3 +93,4 @@ router.post('/generar-desde-calendario', generarAnunciosDesdeCalendario);
 router.put('/:id/desactivar', desactivarAnuncio);
 
 export default router;
+

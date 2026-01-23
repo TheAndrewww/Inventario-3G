@@ -392,6 +392,72 @@ export const obtenerEstadisticas = async (req, res) => {
   }
 };
 
+/**
+ * Regenerar un anuncio individual
+ * POST /api/anuncios/:id/regenerar
+ * Genera una nueva imagen para un anuncio existente usando la misma frase
+ */
+export const regenerarAnuncio = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Obtener el anuncio actual
+    const [anuncioActual] = await db.query(
+      'SELECT * FROM anuncios WHERE id = :id',
+      { replacements: { id }, type: QueryTypes.SELECT }
+    );
+
+    if (!anuncioActual) {
+      return res.status(404).json({
+        success: false,
+        message: 'Anuncio no encontrado'
+      });
+    }
+
+    console.log(`🔄 Regenerando anuncio ID ${id}: "${anuncioActual.frase}"`);
+
+    // Descargar imagen de Tensito
+    console.log('🤖 Descargando imagen de Tensito...');
+    const tensito = await obtenerImagenTensito();
+
+    // Generar nueva imagen con la misma frase
+    console.log(`🎨 Generando nueva imagen para: "${anuncioActual.frase}"`);
+    const imagenDataUrl = await generarImagenAnuncio(
+      anuncioActual.frase,
+      tensito.base64,
+      tensito.mimeType
+    );
+    console.log(`✅ Nueva imagen generada para anuncio ID ${id}`);
+
+    // Actualizar el anuncio con la nueva imagen
+    const updateQuery = `
+      UPDATE anuncios 
+      SET imagen_url = :imagenUrl, updated_at = NOW()
+      WHERE id = :id
+      RETURNING *
+    `;
+
+    const [result] = await db.query(updateQuery, {
+      replacements: { id, imagenUrl: imagenDataUrl },
+      type: QueryTypes.SELECT
+    });
+
+    res.json({
+      success: true,
+      data: result[0] || anuncioActual,
+      message: 'Anuncio regenerado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error al regenerar anuncio:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al regenerar anuncio',
+      error: error.message
+    });
+  }
+};
+
 export default {
   obtenerAnunciosActivos,
   obtenerAnunciosHoy,
@@ -399,5 +465,6 @@ export default {
   generarAnunciosDesdeCalendario,
   incrementarVista,
   desactivarAnuncio,
-  obtenerEstadisticas
+  obtenerEstadisticas,
+  regenerarAnuncio
 };
