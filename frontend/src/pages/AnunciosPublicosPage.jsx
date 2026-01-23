@@ -1,11 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import CarouselAnuncios from '../components/anuncios/CarouselAnuncios';
-import { obtenerAnunciosHoy, incrementarVistaAnuncio, regenerarAnuncio, generarAnunciosDesdeCalendario } from '../services/anuncios.service';
+import { obtenerAnunciosHoy, incrementarVistaAnuncio, regenerarAnuncio, generarAnunciosDesdeCalendario, leerAnunciosCalendario } from '../services/anuncios.service';
 import { toast, Toaster } from 'react-hot-toast';
-import { Maximize2, Minimize2, RefreshCw, Settings, X, RotateCcw, Sparkles, HardDrive } from 'lucide-react';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+import { Maximize2, Minimize2, RefreshCw, Settings, X, RotateCcw, Sparkles, FileText, ImageOff } from 'lucide-react';
 
 /**
  * Página pública para mostrar anuncios en pantallas
@@ -14,6 +11,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
  */
 const AnunciosPublicosPage = () => {
   const [anuncios, setAnuncios] = useState([]);
+  const [anunciosCalendario, setAnunciosCalendario] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [ultimaActualizacion, setUltimaActualizacion] = useState(null);
@@ -22,13 +20,14 @@ const AnunciosPublicosPage = () => {
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [regenerandoId, setRegenerandoId] = useState(null);
   const [generandoTodos, setGenerandoTodos] = useState(false);
-  const [sincronizandoDrive, setSincronizandoDrive] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
+  const [generandoIndividual, setGenerandoIndividual] = useState(null);
 
   // Verificar si el usuario está autenticado (admin)
   const token = localStorage.getItem('token');
   const isAdmin = !!token;
 
-  // Cargar anuncios
+  // Cargar anuncios (los que ya están en BD)
   const cargarAnuncios = async (mostrarToast = false) => {
     try {
       setLoading(true);
@@ -66,7 +65,37 @@ const AnunciosPublicosPage = () => {
     }
   };
 
-  // Regenerar un anuncio individual
+  // Sincronizar con calendario (leer sin generar)
+  const handleSincronizarCalendario = async () => {
+    if (!token) {
+      toast.error('Debes iniciar sesión');
+      return;
+    }
+
+    try {
+      setSincronizando(true);
+      toast.loading('Leyendo anuncios del calendario...', { id: 'sync' });
+
+      const response = await leerAnunciosCalendario(token);
+
+      if (response.success && response.data) {
+        setAnunciosCalendario(response.data.anunciosCalendario || []);
+        toast.success(
+          `${response.data.totalEnCalendario} anuncios encontrados (${response.data.totalGenerados} generados)`,
+          { id: 'sync' }
+        );
+      } else {
+        toast.error(response.message || 'Error al leer', { id: 'sync' });
+      }
+    } catch (err) {
+      console.error('Error al sincronizar:', err);
+      toast.error('Error al leer calendario', { id: 'sync' });
+    } finally {
+      setSincronizando(false);
+    }
+  };
+
+  // Regenerar un anuncio individual (ya generado)
   const handleRegenerar = async (anuncioId) => {
     if (!token) {
       toast.error('Debes iniciar sesión');
@@ -82,6 +111,7 @@ const AnunciosPublicosPage = () => {
       if (response.success) {
         toast.success('Anuncio regenerado exitosamente', { id: 'regenerar' });
         await cargarAnuncios(false);
+        await handleSincronizarCalendario();
       } else {
         toast.error(response.message || 'Error al regenerar', { id: 'regenerar' });
       }
@@ -90,6 +120,35 @@ const AnunciosPublicosPage = () => {
       toast.error('Error al regenerar anuncio', { id: 'regenerar' });
     } finally {
       setRegenerandoId(null);
+    }
+  };
+
+  // Generar un anuncio individual (no generado aún)
+  const handleGenerarIndividual = async (textoAnuncio, index) => {
+    if (!token) {
+      toast.error('Debes iniciar sesión');
+      return;
+    }
+
+    try {
+      setGenerandoIndividual(index);
+      toast.loading('Generando anuncio con IA...', { id: 'generar-ind' });
+
+      // Generar todos del calendario (la lógica del backend solo genera los nuevos)
+      const response = await generarAnunciosDesdeCalendario(token);
+
+      if (response.success) {
+        toast.success('Anuncio generado exitosamente', { id: 'generar-ind' });
+        await cargarAnuncios(false);
+        await handleSincronizarCalendario();
+      } else {
+        toast.error(response.message || 'Error al generar', { id: 'generar-ind' });
+      }
+    } catch (err) {
+      console.error('Error al generar:', err);
+      toast.error('Error al generar anuncio', { id: 'generar-ind' });
+    } finally {
+      setGenerandoIndividual(null);
     }
   };
 
@@ -109,6 +168,7 @@ const AnunciosPublicosPage = () => {
       if (response.success) {
         toast.success(`${response.anunciosGenerados || 0} anuncios generados`, { id: 'generar' });
         await cargarAnuncios(false);
+        await handleSincronizarCalendario();
       } else {
         toast.error(response.message || 'Error al generar', { id: 'generar' });
       }
@@ -117,43 +177,6 @@ const AnunciosPublicosPage = () => {
       toast.error('Error al generar anuncios', { id: 'generar' });
     } finally {
       setGenerandoTodos(false);
-    }
-  };
-
-  // Sincronizar con Google Drive
-  const handleSincronizarDrive = async () => {
-    if (!token) {
-      toast.error('Debes iniciar sesión');
-      return;
-    }
-
-    try {
-      setSincronizandoDrive(true);
-      toast.loading('Sincronizando con Google Drive...', { id: 'sync-drive' });
-
-      const response = await axios.post(
-        `${API_URL}/produccion/sincronizar-drive`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-
-      if (response.data.success) {
-        toast.success(
-          `Sincronizado: ${response.data.exitosos || 0} proyectos`,
-          { id: 'sync-drive' }
-        );
-      } else {
-        toast.error(response.data.message || 'Error al sincronizar', { id: 'sync-drive' });
-      }
-    } catch (err) {
-      console.error('Error al sincronizar con Drive:', err);
-      toast.error('Error al sincronizar con Drive', { id: 'sync-drive' });
-    } finally {
-      setSincronizandoDrive(false);
     }
   };
 
@@ -184,7 +207,6 @@ const AnunciosPublicosPage = () => {
       timeout = setTimeout(() => setShowControls(false), 5000);
     };
 
-    // También mostrar controles con teclado (para controles remotos de TV)
     const handleKeyDown = () => {
       setShowControls(true);
       clearTimeout(timeout);
@@ -195,7 +217,6 @@ const AnunciosPublicosPage = () => {
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('touchstart', handleMouseMove);
 
-    // Inicialmente ocultar después de 5 segundos
     timeout = setTimeout(() => setShowControls(false), 5000);
 
     return () => {
@@ -220,7 +241,6 @@ const AnunciosPublicosPage = () => {
   useEffect(() => {
     cargarAnuncios(false);
 
-    // Auto-refresh cada hora para detectar nuevos anuncios
     const interval = setInterval(() => {
       cargarAnuncios(false);
     }, 60 * 60 * 1000);
@@ -254,6 +274,14 @@ const AnunciosPublicosPage = () => {
       </div>
     );
   }
+
+  // Lista combinada: usa anunciosCalendario si tiene datos, sino usa anuncios de BD
+  const listaAnuncios = anunciosCalendario.length > 0 ? anunciosCalendario : anuncios.map(a => ({
+    textoAnuncio: a.frase,
+    generado: true,
+    id: a.id,
+    imagen_url: a.imagen_url
+  }));
 
   return (
     <>
@@ -289,7 +317,6 @@ const AnunciosPublicosPage = () => {
 
         {/* Botones de control para Android TV */}
         <div className={`absolute top-4 left-4 z-50 flex gap-2 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-          {/* Botón de pantalla completa */}
           <button
             onClick={toggleFullscreen}
             className="bg-black/70 backdrop-blur-md text-white p-3 rounded-xl border border-white/20 hover:bg-black/90 hover:border-orange-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
@@ -298,7 +325,6 @@ const AnunciosPublicosPage = () => {
             {isFullscreen ? <Minimize2 size={28} /> : <Maximize2 size={28} />}
           </button>
 
-          {/* Botón de refrescar */}
           <button
             onClick={() => cargarAnuncios(true)}
             className="bg-black/70 backdrop-blur-md text-white p-3 rounded-xl border border-white/20 hover:bg-black/90 hover:border-orange-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
@@ -307,7 +333,6 @@ const AnunciosPublicosPage = () => {
             <RefreshCw size={28} className={loading ? 'animate-spin' : ''} />
           </button>
 
-          {/* Botón de administración (solo si está autenticado) */}
           {isAdmin && (
             <button
               onClick={() => setShowAdminMenu(!showAdminMenu)}
@@ -320,107 +345,131 @@ const AnunciosPublicosPage = () => {
           )}
         </div>
 
-        {/* Menú de administración */}
+        {/* Menú de administración - AHORA MÁS GRANDE */}
         {showAdminMenu && isAdmin && (
-          <div className="absolute top-20 left-4 z-50 bg-gray-900/95 backdrop-blur-md rounded-2xl border border-white/20 p-4 w-80 max-h-[70vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-bold text-lg">Administrar Anuncios</h3>
+          <div className="absolute top-20 left-4 z-50 bg-gray-900/95 backdrop-blur-md rounded-2xl border border-white/20 p-5 w-[420px] max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-white font-bold text-xl">Administrar Anuncios</h3>
               <button
                 onClick={() => setShowAdminMenu(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-white p-1"
               >
-                <X size={20} />
+                <X size={24} />
               </button>
             </div>
 
-            {/* Botón para generar todos */}
-            <button
-              onClick={handleGenerarTodos}
-              disabled={generandoTodos}
-              className="w-full mb-4 flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-600/50 text-white py-2 px-4 rounded-lg transition-colors"
-            >
-              {generandoTodos ? (
-                <>
-                  <RefreshCw size={18} className="animate-spin" />
-                  Generando...
-                </>
-              ) : (
-                <>
-                  <Sparkles size={18} />
-                  Generar Todos del Día
-                </>
-              )}
-            </button>
+            {/* Botones de acción */}
+            <div className="space-y-3 mb-5">
+              {/* Sincronizar con Calendario */}
+              <button
+                onClick={handleSincronizarCalendario}
+                disabled={sincronizando}
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white py-3 px-4 rounded-xl transition-colors text-base font-medium"
+              >
+                {sincronizando ? (
+                  <>
+                    <RefreshCw size={20} className="animate-spin" />
+                    Leyendo calendario...
+                  </>
+                ) : (
+                  <>
+                    <FileText size={20} />
+                    Sincronizar con Calendario
+                  </>
+                )}
+              </button>
 
-            {/* Botón para sincronizar con Drive */}
-            <button
-              onClick={handleSincronizarDrive}
-              disabled={sincronizandoDrive}
-              className="w-full mb-4 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white py-2 px-4 rounded-lg transition-colors"
-            >
-              {sincronizandoDrive ? (
-                <>
-                  <RefreshCw size={18} className="animate-spin" />
-                  Sincronizando...
-                </>
-              ) : (
-                <>
-                  <HardDrive size={18} />
-                  Sincronizar con Drive
-                </>
-              )}
-            </button>
+              {/* Generar Todos */}
+              <button
+                onClick={handleGenerarTodos}
+                disabled={generandoTodos}
+                className="w-full flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-600/50 text-white py-3 px-4 rounded-xl transition-colors text-base font-medium"
+              >
+                {generandoTodos ? (
+                  <>
+                    <RefreshCw size={20} className="animate-spin" />
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={20} />
+                    Generar Todos del Día
+                  </>
+                )}
+              </button>
+            </div>
 
             <div className="border-t border-white/10 pt-4">
-              <h4 className="text-gray-400 text-sm mb-3">Anuncios Actuales ({anuncios.length})</h4>
+              <h4 className="text-gray-300 text-base mb-4 font-medium">
+                Anuncios del Calendario ({listaAnuncios.length})
+              </h4>
 
-              {anuncios.length === 0 ? (
-                <p className="text-gray-500 text-sm">No hay anuncios para mostrar</p>
+              {listaAnuncios.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-gray-500 text-base">No hay anuncios</p>
+                  <p className="text-gray-600 text-sm mt-1">Sincroniza con el calendario para ver anuncios</p>
+                </div>
               ) : (
-                <div className="space-y-3">
-                  {anuncios.map((anuncio, index) => (
+                <div className="space-y-4">
+                  {listaAnuncios.map((anuncio, index) => (
                     <div
-                      key={anuncio.id}
-                      className="bg-black/50 rounded-lg p-3 border border-white/10"
+                      key={anuncio.id || index}
+                      className={`rounded-xl p-4 border ${anuncio.generado
+                          ? 'bg-black/50 border-green-500/30'
+                          : 'bg-black/50 border-yellow-500/30'
+                        }`}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-4">
                         {/* Miniatura */}
-                        <div className="w-16 h-16 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
-                          {anuncio.imagen_url && (
+                        <div className="w-20 h-20 bg-gray-800 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
+                          {anuncio.generado && anuncio.imagen_url ? (
                             <img
                               src={anuncio.imagen_url}
                               alt={`Anuncio ${index + 1}`}
                               className="w-full h-full object-cover"
                             />
+                          ) : (
+                            <ImageOff size={32} className="text-gray-600" />
                           )}
                         </div>
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-medium truncate">
-                            {anuncio.frase || `Anuncio ${index + 1}`}
+                          <p className="text-white text-base font-medium line-clamp-2">
+                            {anuncio.textoAnuncio || anuncio.frase}
                           </p>
-                          <p className="text-gray-500 text-xs mt-1">
-                            {anuncio.proyecto_nombre || 'Sin proyecto'}
-                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            {anuncio.generado ? (
+                              <span className="text-green-400 text-sm flex items-center gap-1">
+                                ✓ Generado
+                              </span>
+                            ) : (
+                              <span className="text-yellow-400 text-sm flex items-center gap-1">
+                                ⏳ Pendiente
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Botón regenerar */}
+                      {/* Botón de acción */}
                       <button
-                        onClick={() => handleRegenerar(anuncio.id)}
-                        disabled={regenerandoId === anuncio.id}
-                        className="w-full mt-2 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-700/50 text-white py-1.5 px-3 rounded-lg text-sm transition-colors"
+                        onClick={() => anuncio.generado
+                          ? handleRegenerar(anuncio.id)
+                          : handleGenerarIndividual(anuncio.textoAnuncio, index)
+                        }
+                        disabled={regenerandoId === anuncio.id || generandoIndividual === index}
+                        className="w-full mt-3 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-700/50 text-white py-2.5 px-4 rounded-lg text-sm transition-colors"
                       >
-                        {regenerandoId === anuncio.id ? (
+                        {(regenerandoId === anuncio.id || generandoIndividual === index) ? (
                           <>
-                            <RefreshCw size={14} className="animate-spin" />
-                            Regenerando...
+                            <RefreshCw size={16} className="animate-spin" />
+                            {anuncio.generado ? 'Regenerando...' : 'Generando...'}
                           </>
                         ) : (
                           <>
-                            <RotateCcw size={14} />
-                            Regenerar Imagen
+                            {anuncio.generado ? <RotateCcw size={16} /> : <Sparkles size={16} />}
+                            {anuncio.generado ? 'Regenerar Imagen' : 'Generar Imagen'}
                           </>
                         )}
                       </button>

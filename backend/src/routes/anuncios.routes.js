@@ -7,7 +7,8 @@ import {
   incrementarVista,
   desactivarAnuncio,
   obtenerEstadisticas,
-  regenerarAnuncio
+  regenerarAnuncio,
+  leerAnunciosDelCalendario
 } from '../controllers/anuncios.controller.js';
 import { verificarToken } from '../middleware/auth.middleware.js';
 
@@ -58,6 +59,13 @@ router.use(verificarToken);
 router.get('/stats', obtenerEstadisticas);
 
 /**
+ * GET /api/anuncios/leer-calendario
+ * Leer anuncios del calendario SIN generarlos
+ * Acceso: Administrador
+ */
+router.get('/leer-calendario', leerAnunciosDelCalendario);
+
+/**
  * POST /api/anuncios/generar
  * Generar un anuncio manualmente
  * Acceso: Administrador, Diseñador
@@ -93,4 +101,5 @@ router.post('/:id/regenerar', regenerarAnuncio);
 router.put('/:id/desactivar', desactivarAnuncio);
 
 export default router;
+
 

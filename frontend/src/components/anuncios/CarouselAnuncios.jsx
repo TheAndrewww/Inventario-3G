@@ -14,7 +14,7 @@ const CarouselAnuncios = ({ anuncios = [] }) => {
 
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % anuncios.length);
-    }, 8000);
+    }, 16000);
 
     return () => clearInterval(interval);
   }, [anuncios.length]);
@@ -44,15 +44,13 @@ const CarouselAnuncios = ({ anuncios = [] }) => {
         return (
           <div
             key={anuncio.id}
-            className={`absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out ${
-              isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'
-            }`}
+            className={`absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'
+              }`}
           >
             {/* Dynamic Background con efecto Ken Burns */}
             <div
-              className={`absolute inset-0 bg-cover bg-center transition-transform duration-[8000ms] ease-linear ${
-                isActive ? 'scale-110' : 'scale-100'
-              }`}
+              className={`absolute inset-0 bg-cover bg-center transition-transform duration-[16000ms] ease-linear ${isActive ? 'scale-110' : 'scale-100'
+                }`}
               style={{
                 backgroundImage: `url(${anuncio.imagen_url})`,
                 opacity: 0.4,
@@ -65,17 +63,15 @@ const CarouselAnuncios = ({ anuncios = [] }) => {
               <img
                 src={anuncio.imagen_url}
                 alt={anuncio.frase}
-                className={`w-full h-full object-cover shadow-2xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-1000 ease-out ${
-                  isActive ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'
-                }`}
+                className={`w-full h-full object-cover shadow-2xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-1000 ease-out ${isActive ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'
+                  }`}
               />
             </div>
 
             {/* Overlay de texto con animación slide-in */}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-8 md:p-16">
-              <div className={`transition-all duration-1000 delay-300 ease-out ${
-                isActive ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'
-              }`}>
+              <div className={`transition-all duration-1000 delay-300 ease-out ${isActive ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'
+                }`}>
                 <p className="text-white text-2xl md:text-4xl font-extrabold tracking-wide uppercase border-l-8 border-orange-500 pl-6 drop-shadow-md leading-tight">
                   {anuncio.frase}
                 </p>
@@ -105,7 +101,7 @@ const CarouselAnuncios = ({ anuncios = [] }) => {
           to { transform: scaleX(1); }
         }
         .animate-progress {
-          animation: progress 8000ms linear forwards;
+          animation: progress 16000ms linear forwards;
         }
       `}</style>
     </div>

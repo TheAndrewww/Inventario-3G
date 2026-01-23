@@ -138,6 +138,24 @@ export const regenerarAnuncio = async (id, token) => {
   }
 };
 
+/**
+ * Leer anuncios del calendario SIN generarlos (requiere autenticación)
+ * Retorna anuncios del spreadsheet marcando cuáles están generados
+ */
+export const leerAnunciosCalendario = async (token) => {
+  try {
+    const response = await anunciosAPI.get('/leer-calendario', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error al leer anuncios del calendario:', error);
+    throw error;
+  }
+};
+
 export default {
   obtenerAnunciosActivos,
   obtenerAnunciosHoy,
@@ -146,6 +164,8 @@ export default {
   generarAnunciosDesdeCalendario,
   obtenerEstadisticas,
   desactivarAnuncio,
-  regenerarAnuncio
+  regenerarAnuncio,
+  leerAnunciosCalendario
 };
+
 

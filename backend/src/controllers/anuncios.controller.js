@@ -458,6 +458,78 @@ export const regenerarAnuncio = async (req, res) => {
   }
 };
 
+/**
+ * Leer anuncios del calendario SIN generar imágenes
+ * GET /api/anuncios/leer-calendario
+ * Retorna los anuncios del spreadsheet y los compara con los ya generados en BD
+ */
+export const leerAnunciosDelCalendario = async (req, res) => {
+  try {
+    const hoy = new Date();
+    const mes = MESES[hoy.getMonth()];
+
+    console.log(`📖 Leyendo anuncios del calendario para ${mes} (solo lectura)`);
+
+    // Leer anuncios del spreadsheet
+    const resultado = await leerAnunciosCalendario(mes);
+    const anunciosCalendario = resultado.data.anuncios;
+
+    // Obtener anuncios ya generados de hoy de la BD
+    const [anunciosGenerados] = await db.query(
+      `SELECT id, frase, imagen_url, proyecto_nombre, equipo, fecha, activo 
+       FROM anuncios 
+       WHERE fecha = CURRENT_DATE AND activo = true
+       ORDER BY created_at DESC`,
+      { type: QueryTypes.SELECT }
+    );
+
+    // Crear un mapa de frases generadas para comparar
+    const frasesGeneradas = new Map();
+    if (Array.isArray(anunciosGenerados)) {
+      anunciosGenerados.forEach(a => {
+        if (a.frase) {
+          frasesGeneradas.set(a.frase.toLowerCase().trim(), a);
+        }
+      });
+    }
+
+    // Combinar: marcar cuáles están generados y cuáles no
+    const anunciosCombinados = anunciosCalendario.map(anuncioSheet => {
+      const fraseNormalizada = anuncioSheet.textoAnuncio.toLowerCase().trim();
+      const generado = frasesGeneradas.get(fraseNormalizada);
+
+      return {
+        textoAnuncio: anuncioSheet.textoAnuncio,
+        proyecto: anuncioSheet.proyecto,
+        equipo: anuncioSheet.equipo,
+        categoria: anuncioSheet.categoria,
+        generado: !!generado,
+        id: generado?.id || null,
+        imagen_url: generado?.imagen_url || null
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        anunciosCalendario: anunciosCombinados,
+        totalEnCalendario: anunciosCalendario.length,
+        totalGenerados: Array.isArray(anunciosGenerados) ? anunciosGenerados.length : 0,
+        filaEncontrada: resultado.data.filaEncontrada
+      },
+      mes: mes
+    });
+
+  } catch (error) {
+    console.error('❌ Error al leer anuncios del calendario:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al leer anuncios del calendario',
+      error: error.message
+    });
+  }
+};
+
 export default {
   obtenerAnunciosActivos,
   obtenerAnunciosHoy,
@@ -466,5 +538,7 @@ export default {
   incrementarVista,
   desactivarAnuncio,
   obtenerEstadisticas,
-  regenerarAnuncio
+  regenerarAnuncio,
+  leerAnunciosDelCalendario
 };
+
