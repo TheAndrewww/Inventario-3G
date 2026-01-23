@@ -190,25 +190,27 @@ export const generarAnuncioManual = async (req, res) => {
 };
 
 /**
- * Generar anuncios desde calendario (celdas W20:Z23)
+ * Generar anuncios desde calendario (rango dinámico)
  * POST /api/anuncios/generar-desde-calendario
+ * Body: { rango: "W50:Z52" } (opcional, default: W20:Z23)
  */
 export const generarAnunciosDesdeCalendario = async (req, res) => {
   try {
     const hoy = new Date();
     const mes = MESES[hoy.getMonth()];
+    const { rango = 'W20:Z23' } = req.body;
 
-    console.log(`🎯 Generando anuncios desde calendario para ${mes}`);
+    console.log(`🎯 Generando anuncios desde calendario para ${mes}, rango: ${rango}`);
 
-    // Leer anuncios del rango W20:Z23
-    const resultado = await leerAnunciosCalendario(mes);
+    // Leer anuncios del rango especificado
+    const resultado = await leerAnunciosCalendario(mes, rango);
     const anunciosCalendario = resultado.data.anuncios;
 
     if (anunciosCalendario.length === 0) {
       return res.json({
         success: true,
         data: [],
-        message: 'No hay anuncios en el rango W20:Z23 del calendario',
+        message: `No hay anuncios en el rango ${rango} del calendario`,
         anunciosEncontrados: 0
       });
     }

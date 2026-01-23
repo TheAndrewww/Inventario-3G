@@ -521,18 +521,19 @@ export const obtenerDistribucionEquipos = async (mes = 'NOVIEMBRE') => {
 };
 
 /**
- * Leer anuncios desde el rango W33:Z35 del calendario
+ * Leer anuncios desde un rango del calendario
  * @param {string} mes - Nombre del mes (ENERO, FEBRERO, etc.)
+ * @param {string} rango - Rango de celdas (ej: W50:Z52). Por defecto W20:Z23
  * @returns {Promise<Object>} - Lista de anuncios del calendario
  */
-export const leerAnunciosCalendario = async (mes) => {
+export const leerAnunciosCalendario = async (mes, rango = 'W20:Z23') => {
   try {
-    console.log(`📢 Leyendo anuncios del mes: ${mes}`);
+    console.log(`📢 Leyendo anuncios del mes: ${mes}, rango: ${rango}`);
 
     const sheets = await authenticate();
 
-    // Leer el rango W33:Z35 (3 filas x 4 columnas)
-    const range = `${mes}!W33:Z35`;
+    // Leer el rango especificado
+    const range = `${mes}!${rango}`;
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
