@@ -2,7 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import CarouselAnuncios from '../components/anuncios/CarouselAnuncios';
 import { obtenerAnunciosHoy, incrementarVistaAnuncio, regenerarAnuncio, generarAnunciosDesdeCalendario } from '../services/anuncios.service';
 import { toast, Toaster } from 'react-hot-toast';
-import { Maximize2, Minimize2, RefreshCw, Settings, X, RotateCcw, Sparkles } from 'lucide-react';
+import { Maximize2, Minimize2, RefreshCw, Settings, X, RotateCcw, Sparkles, HardDrive } from 'lucide-react';
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 /**
  * Página pública para mostrar anuncios en pantallas
@@ -19,6 +22,7 @@ const AnunciosPublicosPage = () => {
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [regenerandoId, setRegenerandoId] = useState(null);
   const [generandoTodos, setGenerandoTodos] = useState(false);
+  const [sincronizandoDrive, setSincronizandoDrive] = useState(false);
 
   // Verificar si el usuario está autenticado (admin)
   const token = localStorage.getItem('token');
@@ -113,6 +117,43 @@ const AnunciosPublicosPage = () => {
       toast.error('Error al generar anuncios', { id: 'generar' });
     } finally {
       setGenerandoTodos(false);
+    }
+  };
+
+  // Sincronizar con Google Drive
+  const handleSincronizarDrive = async () => {
+    if (!token) {
+      toast.error('Debes iniciar sesión');
+      return;
+    }
+
+    try {
+      setSincronizandoDrive(true);
+      toast.loading('Sincronizando con Google Drive...', { id: 'sync-drive' });
+
+      const response = await axios.post(
+        `${API_URL}/produccion/sincronizar-drive`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.data.success) {
+        toast.success(
+          `Sincronizado: ${response.data.exitosos || 0} proyectos`,
+          { id: 'sync-drive' }
+        );
+      } else {
+        toast.error(response.data.message || 'Error al sincronizar', { id: 'sync-drive' });
+      }
+    } catch (err) {
+      console.error('Error al sincronizar con Drive:', err);
+      toast.error('Error al sincronizar con Drive', { id: 'sync-drive' });
+    } finally {
+      setSincronizandoDrive(false);
     }
   };
 
@@ -307,6 +348,25 @@ const AnunciosPublicosPage = () => {
                 <>
                   <Sparkles size={18} />
                   Generar Todos del Día
+                </>
+              )}
+            </button>
+
+            {/* Botón para sincronizar con Drive */}
+            <button
+              onClick={handleSincronizarDrive}
+              disabled={sincronizandoDrive}
+              className="w-full mb-4 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white py-2 px-4 rounded-lg transition-colors"
+            >
+              {sincronizandoDrive ? (
+                <>
+                  <RefreshCw size={18} className="animate-spin" />
+                  Sincronizando...
+                </>
+              ) : (
+                <>
+                  <HardDrive size={18} />
+                  Sincronizar con Drive
                 </>
               )}
             </button>
