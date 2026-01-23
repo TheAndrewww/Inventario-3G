@@ -166,7 +166,8 @@ export const generarAnuncioIndividual = async (textoAnuncio, proyecto, equipo, t
       {
         headers: {
           Authorization: `Bearer ${token}`
-        }
+        },
+        timeout: 120000 // 2 minutos para generación con IA
       }
     );
     return response.data;

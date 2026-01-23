@@ -583,15 +583,17 @@ export const generarAnuncioIndividual = async (req, res) => {
     console.log(`🎨 Generando anuncio individual: "${textoAnuncio}"`);
 
     // Descargar imagen de Tensito
+    console.log('🤖 Descargando imagen de Tensito...');
     const tensito = await obtenerImagenTensito();
+    console.log('✅ Tensito descargado');
 
     // Generar imagen con IA
+    console.log('🖼️ Generando imagen con IA...');
     const imagenDataUrl = await generarImagenAnuncio(
       textoAnuncio,
       tensito.base64,
       tensito.mimeType
     );
-
     console.log(`✅ Imagen generada para: "${textoAnuncio}"`);
 
     // Insertar en base de datos
@@ -609,7 +611,8 @@ export const generarAnuncioIndividual = async (req, res) => {
       RETURNING *
     `;
 
-    const [result] = await db.query(query, {
+    console.log('💾 Guardando en base de datos...');
+    const result = await db.query(query, {
       replacements: {
         fecha: hoy.toISOString().split('T')[0],
         frase: textoAnuncio,
@@ -618,17 +621,20 @@ export const generarAnuncioIndividual = async (req, res) => {
         equipo: equipo || null,
         tipoAnuncio: 'calendario'
       },
-      type: QueryTypes.SELECT
+      type: QueryTypes.INSERT
     });
+
+    console.log('✅ Anuncio guardado en BD');
 
     res.json({
       success: true,
-      data: result[0],
+      data: result[0] ? result[0][0] : null,
       message: 'Anuncio generado exitosamente'
     });
 
   } catch (error) {
     console.error('❌ Error al generar anuncio individual:', error);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Error al generar anuncio',
