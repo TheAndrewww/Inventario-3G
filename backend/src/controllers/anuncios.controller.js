@@ -462,6 +462,7 @@ export const regenerarAnuncio = async (req, res) => {
  * Leer anuncios del calendario SIN generar imágenes
  * GET /api/anuncios/leer-calendario
  * Retorna los anuncios del spreadsheet y los compara con los ya generados en BD
+ * También DESACTIVA anuncios de BD que ya no estén en el spreadsheet
  */
 export const leerAnunciosDelCalendario = async (req, res) => {
   try {
@@ -475,7 +476,7 @@ export const leerAnunciosDelCalendario = async (req, res) => {
     const anunciosCalendario = resultado.data.anuncios;
 
     // Obtener anuncios ya generados de hoy de la BD
-    const [anunciosGenerados] = await db.query(
+    const anunciosGenerados = await db.query(
       `SELECT id, frase, imagen_url, proyecto_nombre, equipo, fecha, activo 
        FROM anuncios 
        WHERE fecha = CURRENT_DATE AND activo = true
@@ -483,14 +484,42 @@ export const leerAnunciosDelCalendario = async (req, res) => {
       { type: QueryTypes.SELECT }
     );
 
+    // Crear set de frases del calendario (normalizadas)
+    const frasesEnCalendario = new Set();
+    anunciosCalendario.forEach(a => {
+      if (a.textoAnuncio) {
+        frasesEnCalendario.add(a.textoAnuncio.toLowerCase().trim());
+      }
+    });
+
     // Crear un mapa de frases generadas para comparar
     const frasesGeneradas = new Map();
+    const anunciosADesactivar = [];
+
     if (Array.isArray(anunciosGenerados)) {
       anunciosGenerados.forEach(a => {
         if (a.frase) {
-          frasesGeneradas.set(a.frase.toLowerCase().trim(), a);
+          const fraseNorm = a.frase.toLowerCase().trim();
+          frasesGeneradas.set(fraseNorm, a);
+
+          // Si el anuncio generado NO está en el calendario, marcarlo para desactivar
+          if (!frasesEnCalendario.has(fraseNorm)) {
+            anunciosADesactivar.push(a.id);
+          }
         }
       });
+    }
+
+    // Desactivar anuncios que ya no están en el calendario
+    if (anunciosADesactivar.length > 0) {
+      console.log(`🗑️ Desactivando ${anunciosADesactivar.length} anuncios que ya no están en el calendario`);
+      await db.query(
+        `UPDATE anuncios SET activo = false WHERE id IN (:ids)`,
+        {
+          replacements: { ids: anunciosADesactivar },
+          type: QueryTypes.UPDATE
+        }
+      );
     }
 
     // Combinar: marcar cuáles están generados y cuáles no
@@ -509,12 +538,17 @@ export const leerAnunciosDelCalendario = async (req, res) => {
       };
     });
 
+    const totalGeneradosActivos = Array.isArray(anunciosGenerados)
+      ? anunciosGenerados.length - anunciosADesactivar.length
+      : 0;
+
     res.json({
       success: true,
       data: {
         anunciosCalendario: anunciosCombinados,
         totalEnCalendario: anunciosCalendario.length,
-        totalGenerados: Array.isArray(anunciosGenerados) ? anunciosGenerados.length : 0,
+        totalGenerados: totalGeneradosActivos,
+        anunciosDesactivados: anunciosADesactivar.length,
         filaEncontrada: resultado.data.filaEncontrada
       },
       mes: mes
@@ -530,6 +564,79 @@ export const leerAnunciosDelCalendario = async (req, res) => {
   }
 };
 
+/**
+ * Generar un solo anuncio desde texto (con Tensito)
+ * POST /api/anuncios/generar-individual
+ * Body: { textoAnuncio, proyecto, equipo }
+ */
+export const generarAnuncioIndividual = async (req, res) => {
+  try {
+    const { textoAnuncio, proyecto, equipo } = req.body;
+
+    if (!textoAnuncio) {
+      return res.status(400).json({
+        success: false,
+        message: 'El texto del anuncio es requerido'
+      });
+    }
+
+    console.log(`🎨 Generando anuncio individual: "${textoAnuncio}"`);
+
+    // Descargar imagen de Tensito
+    const tensito = await obtenerImagenTensito();
+
+    // Generar imagen con IA
+    const imagenDataUrl = await generarImagenAnuncio(
+      textoAnuncio,
+      tensito.base64,
+      tensito.mimeType
+    );
+
+    console.log(`✅ Imagen generada para: "${textoAnuncio}"`);
+
+    // Insertar en base de datos
+    const hoy = new Date();
+    const query = `
+      INSERT INTO anuncios (
+        fecha,
+        frase,
+        imagen_url,
+        proyecto_nombre,
+        equipo,
+        tipo_anuncio,
+        activo
+      ) VALUES (:fecha, :frase, :imagenUrl, :proyectoNombre, :equipo, :tipoAnuncio, true)
+      RETURNING *
+    `;
+
+    const [result] = await db.query(query, {
+      replacements: {
+        fecha: hoy.toISOString().split('T')[0],
+        frase: textoAnuncio,
+        imagenUrl: imagenDataUrl,
+        proyectoNombre: proyecto || null,
+        equipo: equipo || null,
+        tipoAnuncio: 'calendario'
+      },
+      type: QueryTypes.SELECT
+    });
+
+    res.json({
+      success: true,
+      data: result[0],
+      message: 'Anuncio generado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error al generar anuncio individual:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar anuncio',
+      error: error.message
+    });
+  }
+};
+
 export default {
   obtenerAnunciosActivos,
   obtenerAnunciosHoy,
@@ -539,6 +646,8 @@ export default {
   desactivarAnuncio,
   obtenerEstadisticas,
   regenerarAnuncio,
-  leerAnunciosDelCalendario
+  leerAnunciosDelCalendario,
+  generarAnuncioIndividual
 };
+
 

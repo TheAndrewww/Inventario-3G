@@ -156,6 +156,26 @@ export const leerAnunciosCalendario = async (token) => {
   }
 };
 
+/**
+ * Generar un anuncio individual desde texto (requiere autenticación)
+ */
+export const generarAnuncioIndividual = async (textoAnuncio, proyecto, equipo, token) => {
+  try {
+    const response = await anunciosAPI.post('/generar-individual',
+      { textoAnuncio, proyecto, equipo },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error al generar anuncio individual:', error);
+    throw error;
+  }
+};
+
 export default {
   obtenerAnunciosActivos,
   obtenerAnunciosHoy,
@@ -165,7 +185,9 @@ export default {
   obtenerEstadisticas,
   desactivarAnuncio,
   regenerarAnuncio,
-  leerAnunciosCalendario
+  leerAnunciosCalendario,
+  generarAnuncioIndividual
 };
+
 
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import CarouselAnuncios from '../components/anuncios/CarouselAnuncios';
-import { obtenerAnunciosHoy, incrementarVistaAnuncio, regenerarAnuncio, generarAnunciosDesdeCalendario, leerAnunciosCalendario } from '../services/anuncios.service';
+import { obtenerAnunciosHoy, incrementarVistaAnuncio, regenerarAnuncio, generarAnunciosDesdeCalendario, leerAnunciosCalendario, generarAnuncioIndividual } from '../services/anuncios.service';
 import { toast, Toaster } from 'react-hot-toast';
 import { Maximize2, Minimize2, RefreshCw, Settings, X, RotateCcw, Sparkles, FileText, ImageOff } from 'lucide-react';
 
@@ -124,7 +124,7 @@ const AnunciosPublicosPage = () => {
   };
 
   // Generar un anuncio individual (no generado aún)
-  const handleGenerarIndividual = async (textoAnuncio, index) => {
+  const handleGenerarIndividual = async (anuncio, index) => {
     if (!token) {
       toast.error('Debes iniciar sesión');
       return;
@@ -134,8 +134,13 @@ const AnunciosPublicosPage = () => {
       setGenerandoIndividual(index);
       toast.loading('Generando anuncio con IA...', { id: 'generar-ind' });
 
-      // Generar todos del calendario (la lógica del backend solo genera los nuevos)
-      const response = await generarAnunciosDesdeCalendario(token);
+      // Generar solo este anuncio específico
+      const response = await generarAnuncioIndividual(
+        anuncio.textoAnuncio,
+        anuncio.proyecto,
+        anuncio.equipo,
+        token
+      );
 
       if (response.success) {
         toast.success('Anuncio generado exitosamente', { id: 'generar-ind' });
@@ -415,8 +420,8 @@ const AnunciosPublicosPage = () => {
                     <div
                       key={anuncio.id || index}
                       className={`rounded-xl p-4 border ${anuncio.generado
-                          ? 'bg-black/50 border-green-500/30'
-                          : 'bg-black/50 border-yellow-500/30'
+                        ? 'bg-black/50 border-green-500/30'
+                        : 'bg-black/50 border-yellow-500/30'
                         }`}
                     >
                       <div className="flex items-start gap-4">
@@ -456,7 +461,7 @@ const AnunciosPublicosPage = () => {
                       <button
                         onClick={() => anuncio.generado
                           ? handleRegenerar(anuncio.id)
-                          : handleGenerarIndividual(anuncio.textoAnuncio, index)
+                          : handleGenerarIndividual(anuncio, index)
                         }
                         disabled={regenerandoId === anuncio.id || generandoIndividual === index}
                         className="w-full mt-3 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-700/50 text-white py-2.5 px-4 rounded-lg text-sm transition-colors"

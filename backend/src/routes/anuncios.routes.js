@@ -8,7 +8,8 @@ import {
   desactivarAnuncio,
   obtenerEstadisticas,
   regenerarAnuncio,
-  leerAnunciosDelCalendario
+  leerAnunciosDelCalendario,
+  generarAnuncioIndividual
 } from '../controllers/anuncios.controller.js';
 import { verificarToken } from '../middleware/auth.middleware.js';
 
@@ -80,6 +81,13 @@ router.get('/leer-calendario', leerAnunciosDelCalendario);
 router.post('/generar', generarAnuncioManual);
 
 /**
+ * POST /api/anuncios/generar-individual
+ * Generar un solo anuncio desde texto con Tensito
+ * Acceso: Administrador
+ */
+router.post('/generar-individual', generarAnuncioIndividual);
+
+/**
  * POST /api/anuncios/generar-desde-calendario
  * Generar anuncios automáticamente desde el calendario del día
  * Acceso: Administrador
@@ -101,5 +109,6 @@ router.post('/:id/regenerar', regenerarAnuncio);
 router.put('/:id/desactivar', desactivarAnuncio);
 
 export default router;
+
 
 
