@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory } from 'lucide-react';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -104,6 +104,12 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       icon: Truck,
       label: 'Proveedores',
       roles: ['administrador', 'compras', 'encargado']
+    },
+    {
+      path: '/control-campana',
+      icon: Flag,
+      label: 'Control Campaña',
+      roles: ['administrador', 'diseñador', 'encargado']
     },
     {
       path: '/reportes',

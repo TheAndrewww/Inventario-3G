@@ -20,6 +20,7 @@ import ProduccionProyecto from './ProduccionProyecto.js';
 import TipoHerramientaRenta from './TipoHerramientaRenta.js';
 import UnidadHerramientaRenta from './UnidadHerramientaRenta.js';
 import HistorialAsignacionHerramienta from './HistorialAsignacionHerramienta.js';
+import CampanaControl from './CampanaControl.js';
 
 // Definir relaciones
 
@@ -544,7 +545,8 @@ export {
     UnidadHerramientaRenta,
     HistorialAsignacionHerramienta,
     Camioneta,
-    StockMinimoCamioneta
+    StockMinimoCamioneta,
+    CampanaControl
 };
 
 export default {
@@ -569,5 +571,7 @@ export default {
     ProduccionProyecto,
     TipoHerramientaRenta,
     UnidadHerramientaRenta,
-    HistorialAsignacionHerramienta
+    UnidadHerramientaRenta,
+    HistorialAsignacionHerramienta,
+    CampanaControl
 };

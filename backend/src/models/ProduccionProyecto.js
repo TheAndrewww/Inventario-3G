@@ -260,6 +260,23 @@ ProduccionProyecto.prototype.completarEtapaActual = async function (usuarioId, o
     const ahora = new Date();
     const etapaActual = this.etapa_actual;
 
+    // Detectar si es MTO/GTIA con timeline simplificado
+    const tipoProyecto = this.tipo_proyecto?.toUpperCase();
+    const esGTIA = tipoProyecto === 'GTIA';
+    const esMTONoExtensivo = tipoProyecto === 'MTO' && !this.es_extensivo;
+    const usaTimelineSimplificado = esGTIA || esMTONoExtensivo;
+
+    // Para MTO/GTIA con timeline simplificado: van directo a completado
+    if (usaTimelineSimplificado && etapaActual !== 'completado') {
+        this.etapa_actual = 'completado';
+        this.fecha_completado = ahora;
+        this.instalacion_completado_en = ahora;
+        this.instalacion_completado_por = usuarioId;
+        await this.save();
+        return this;
+    }
+
+    // Flujo normal para proyectos A, B, C y MTO extensivo
     const flujo = {
         'pendiente': { siguiente: 'diseno', campo: 'diseno_completado_en', campoPor: 'diseno_completado_por', obs: 'observaciones_diseno' },
         'diseno': { siguiente: 'compras', campo: 'compras_completado_en', campoPor: 'compras_completado_por', obs: 'observaciones_compras' },
@@ -551,23 +568,43 @@ ProduccionProyecto.obtenerResumenDashboard = async function () {
         completado: []
     };
 
+    // Contadores para estadísticas (considerando regla MTO/GTIA)
+    const estadisticas = {
+        total: proyectos.length,
+        pendiente: 0,
+        diseno: 0,
+        compras: 0,
+        produccion: 0,
+        instalacion: 0,
+        completado: 0,
+        enProceso: 0
+    };
+
     proyectos.forEach(p => {
+        const tipoProyecto = p.tipo_proyecto?.toUpperCase();
+        const esGTIA = tipoProyecto === 'GTIA';
+        const esMTONoExtensivo = tipoProyecto === 'MTO' && !p.es_extensivo;
+
+        // Agrupar en resumen según etapa real
         resumen[p.etapa_actual].push(p);
+
+        // Para estadísticas: MTO/GTIA no extensivo siempre cuentan como instalación
+        // (excepto si ya están completados)
+        let etapaParaEstadistica = p.etapa_actual;
+
+        if ((esGTIA || esMTONoExtensivo) && p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente') {
+            etapaParaEstadistica = 'instalacion';
+        }
+
+        estadisticas[etapaParaEstadistica]++;
     });
+
+    estadisticas.enProceso = estadisticas.total - estadisticas.pendiente - estadisticas.completado;
 
     return {
         proyectos,
         resumen,
-        estadisticas: {
-            total: proyectos.length,
-            pendiente: resumen.pendiente.length,
-            diseno: resumen.diseno.length,
-            compras: resumen.compras.length,
-            produccion: resumen.produccion.length,
-            instalacion: resumen.instalacion.length,
-            completado: resumen.completado.length,
-            enProceso: proyectos.length - resumen.pendiente.length - resumen.completado.length
-        }
+        estadisticas
     };
 };
 

@@ -82,7 +82,7 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
 
         // Primero obtener las carpetas de meses
         const carpetasMeses = await listarSubcarpetas(PRODUCCION_FOLDER_ID);
-        console.log(`📁 Carpetas de meses encontradas: ${carpetasMeses.length}`);
+
 
         // Normalizar nombre para búsqueda (quitar acentos, mayúsculas)
         const nombreNormalizado = nombreProyecto
@@ -114,7 +114,7 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
                 if (carpetaNormalizada === nombreNormalizado ||
                     carpetaNormalizada.includes(nombreNormalizado) ||
                     nombreNormalizado.includes(carpetaNormalizada)) {
-                    console.log(`✅ Carpeta encontrada: "${carpeta.name}" en mes "${carpetaMes.name}"`);
+
                     return {
                         id: carpeta.id,
                         name: carpeta.name,
@@ -124,7 +124,7 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
             }
         }
 
-        console.log(`⚠️ No se encontró carpeta para proyecto: "${nombreProyecto}"`);
+
         return null;
     } catch (error) {
         console.error('❌ Error al buscar carpeta de proyecto:', error);
@@ -152,7 +152,7 @@ export const clasificarArchivosPDF = async (carpetaId) => {
         });
 
         const archivos = response.data.files || [];
-        console.log(`📄 PDFs encontrados: ${archivos.length}`);
+
 
         const resultado = {
             herreria: [],
@@ -176,10 +176,10 @@ export const clasificarArchivosPDF = async (carpetaId) => {
                     tamaño: archivo.size,
                     creado: archivo.createdTime
                 });
-                console.log(`  🔴 Herrería: ${archivo.name}`);
+
             } else if (nombreNormalizado.startsWith('TICKET')) {
                 resultado.ignorados.push(archivo.name);
-                console.log(`  ⏭️ Ignorado: ${archivo.name}`);
+
             } else {
                 resultado.manufactura.push({
                     id: archivo.id,
@@ -189,7 +189,7 @@ export const clasificarArchivosPDF = async (carpetaId) => {
                     tamaño: archivo.size,
                     creado: archivo.createdTime
                 });
-                console.log(`  🟠 Manufactura: ${archivo.name}`);
+
             }
         }
 
@@ -239,9 +239,34 @@ export const obtenerLinksArchivo = async (archivoId) => {
  */
 export const sincronizarProyecto = async (proyecto) => {
     try {
-        console.log(`\n🔄 Sincronizando proyecto: "${proyecto.nombre}"`);
 
-        // Buscar la carpeta del proyecto
+
+        // OPTIMIZACIÓN: Saltar proyectos que no necesitan búsqueda en Drive
+        // GTIA nunca necesita carpeta, MTO solo si es extensivo
+        const tipoProyecto = proyecto.tipo_proyecto?.toUpperCase();
+        const esGTIA = tipoProyecto === 'GTIA';
+        const esMTONoExtensivo = tipoProyecto === 'MTO' && !proyecto.es_extensivo;
+
+        if (esGTIA || esMTONoExtensivo) {
+
+
+            // Marcar como procesado sin carpeta (tienen_manufactura y tiene_herreria en false)
+            await proyecto.update({
+                tiene_manufactura: false,
+                tiene_herreria: false,
+                drive_sync_at: new Date()
+            });
+
+            return {
+                success: true,
+                message: `Proyecto ${tipoProyecto} - no requiere carpeta en Drive`,
+                proyecto: proyecto.nombre,
+                tieneManufactura: false,
+                tieneHerreria: false
+            };
+        }
+
+        // Buscar la carpeta del proyecto (solo para A, B, C y MTO extensivo)
         const carpeta = await buscarCarpetaProyecto(proyecto.nombre);
 
         if (!carpeta) {
@@ -268,7 +293,7 @@ export const sincronizarProyecto = async (proyecto) => {
         // Actualizar el proyecto
         await proyecto.update(datosActualizacion);
 
-        console.log(`✅ Proyecto sincronizado: Manufactura=${clasificacion.tieneManufactura}, Herrería=${clasificacion.tieneHerreria}`);
+
 
         return {
             success: true,

@@ -94,6 +94,7 @@ import herramientasRentaRoutes from './src/routes/herramientasRenta.routes.js';
 import anunciosRoutes from './src/routes/anuncios.routes.js';
 import miEquipoRoutes from './src/routes/miEquipo.routes.js';
 import produccionRoutes from './src/routes/produccion.routes.js';
+import campanaControlRoutes from './src/routes/campanaControlRoutes.js';
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -120,7 +121,9 @@ app.get('/', (req, res) => {
             herramientasRenta: '/api/herramientas-renta',
             anuncios: '/api/anuncios',
             miEquipo: '/api/mi-equipo',
-            produccion: '/api/produccion'
+            miEquipo: '/api/mi-equipo',
+            produccion: '/api/produccion',
+            campanaControl: '/api/campana-control'
         }
     });
 });
@@ -142,6 +145,7 @@ app.use('/api/herramientas-renta', herramientasRentaRoutes);
 app.use('/api/anuncios', anunciosRoutes);
 app.use('/api/mi-equipo', miEquipoRoutes);
 app.use('/api/produccion', produccionRoutes);
+app.use('/api/campana-control', campanaControlRoutes);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
 

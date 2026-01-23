@@ -29,6 +29,7 @@ import MiEquipoPage from './pages/MiEquipoPage';
 import DashboardProduccionPage from './pages/DashboardProduccionPage';
 import TerminalAreaPage from './pages/TerminalAreaPage';
 import DashboardProduccionTVPage from './pages/DashboardProduccionTVPage';
+import ControlCampanaPage from './pages/ControlCampanaPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 
 function App() {
@@ -104,6 +105,7 @@ function App() {
                       <Route path="monitor-pedidos" element={<MonitorPedidosPage />} />
                       <Route path="mi-equipo" element={<MiEquipoPage />} />
                       <Route path="produccion" element={<DashboardProduccionPage />} />
+                      <Route path="control-campana" element={<ControlCampanaPage />} />
                       <Route path="perfil" element={<PerfilPage />} />
 
                       {/* Ruta 404 para rutas privadas no encontradas */}
