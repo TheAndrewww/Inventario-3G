@@ -345,7 +345,6 @@ const ProyectoTimeline = ({ proyecto }) => {
                                 { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS5.P2, idx: 2, topPercent: '40%' },
                             ];
 
-                            // Agregar nodos de Manufactura y Herrería según corresponda
                             if (tieneManufacturaLocal) {
                                 nodes.push({
                                     stage: 'manufactura',
@@ -354,7 +353,8 @@ const ProyectoTimeline = ({ proyecto }) => {
                                     pos: POS5.P3,
                                     idx: 3,
                                     topPercent: tieneHerreriaLocal ? '20%' : '40%',
-                                    isSubStage: true
+                                    isSubStage: true,
+                                    labelPosition: tieneHerreriaLocal ? 'top' : 'bottom'
                                 });
                             }
                             if (tieneHerreriaLocal) {
@@ -365,7 +365,8 @@ const ProyectoTimeline = ({ proyecto }) => {
                                     pos: POS5.P3,
                                     idx: 3,
                                     topPercent: tieneManufacturaLocal ? '60%' : '40%',
-                                    isSubStage: true
+                                    isSubStage: true,
+                                    labelPosition: 'bottom'
                                 });
                             }
 
@@ -438,7 +439,13 @@ const ProyectoTimeline = ({ proyecto }) => {
                                         </div>
                                         <span
                                             className="absolute font-bold text-gray-600 bg-gray-50 px-1"
-                                            style={{ top: node.isSubStage ? px(50) : px(64), fontSize: node.isSubStage ? s(1.1) : s(1.5) }}
+                                            style={{
+                                                ...(node.labelPosition === 'top'
+                                                    ? { bottom: node.isSubStage ? px(50) : px(64) }
+                                                    : { top: node.isSubStage ? px(50) : px(64) }
+                                                ),
+                                                fontSize: node.isSubStage ? s(1.1) : s(1.5)
+                                            }}
                                         >
                                             {node.label}
                                         </span>
