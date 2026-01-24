@@ -211,11 +211,11 @@ const ProyectoTimeline = ({ proyecto }) => {
                             // GTIA y MTO (no extensivo): Solo una línea entre Instalación y Fin
                             const getStrokeColor = () => proyecto.etapa_actual === 'completado' ? '#10B981' : '#CBD5E1';
                             return (
-                                <line x1="8" y1="40" x2="85" y2="40" stroke={getStrokeColor()} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                <line x1="10" y1="40" x2="90" y2="40" stroke={getStrokeColor()} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                             );
                         } else {
                             // Normal: líneas con bifurcación para herrería/manufactura
-                            const POS = { P1: 8, P2: 27, P3: 46, P4: 65, P5: 85 };
+                            const POS = { P1: 10, P2: 30, P3: 50, P4: 70, P5: 90 };
                             const getStrokeColor = (baseStage) => ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > ETAPAS_ORDEN.indexOf(baseStage) ? '#10B981' : '#CBD5E1';
 
                             // Determinar qué tiene el proyecto
@@ -289,8 +289,8 @@ const ProyectoTimeline = ({ proyecto }) => {
                     if (usaTimelineSimplificado) {
                         // GTIA y MTO (no extensivo): Solo Instalación y Fin, mismo largo que timeline completa
                         const nodes = [
-                            { stage: 'instalacion', icon: Truck, label: 'Instalación', pos: '8%', idx: 4 },
-                            { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: '85%', idx: 5 }
+                            { stage: 'instalacion', icon: Truck, label: 'Instalación', pos: '10%', idx: 4 },
+                            { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: '90%', idx: 5 }
                         ];
 
                         // Función para determinar color del nodo (simplificado)
@@ -336,7 +336,7 @@ const ProyectoTimeline = ({ proyecto }) => {
 
                         if (tieneProduccion) {
                             // 5 etapas base, pero producción se divide en Manufactura y Herrería
-                            const POS5 = { P1: '8%', P2: '27%', P3: '46%', P4: '65%', P5: '85%' };
+                            const POS5 = { P1: '10%', P2: '30%', P3: '50%', P4: '70%', P5: '90%' };
                             const tieneManufacturaLocal = proyecto.tiene_manufactura !== false;
                             const tieneHerreriaLocal = proyecto.tiene_herreria !== false;
 
@@ -379,7 +379,7 @@ const ProyectoTimeline = ({ proyecto }) => {
                             // Redistribución uniforme entre 8% y 85%
                             // Total span = 77%. 3 espacios. Intervalo = 25.66%
                             // P1: 8%, P2: 33.6%, P3: 59.3%, P4: 85%
-                            const POS4 = { P1: '8%', P2: '34%', P3: '60%', P4: '85%' };
+                            const POS4 = { P1: '10%', P2: '36%', P3: '64%', P4: '90%' };
                             nodes = [
                                 { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS4.P1, idx: 1, topPercent: '40%' },
                                 { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS4.P2, idx: 2, topPercent: '40%' },
@@ -456,24 +456,7 @@ const ProyectoTimeline = ({ proyecto }) => {
                     }
                 })()}
             </div>
-            {
-                proyecto.etapa_actual === 'produccion' && proyecto.estadoSubEtapas && !proyecto.estadoSubEtapas.ambosCompletados && (
-                    <div
-                        className="bg-amber-50 border-t border-amber-100 flex justify-center text-xl"
-                        style={{ padding: `${px(12)} ${px(24)}`, gap: px(32) }}
-                    >
-                        <div className="flex items-center" style={{ gap: px(8) }}>
-                            <div className={`rounded-full ${proyecto.estadoSubEtapas.manufactura?.completado ? 'bg-green-500' : 'bg-gray-300'}`} style={{ width: px(14), height: px(14) }} />
-                            <span className={proyecto.estadoSubEtapas.manufactura?.completado ? 'text-green-700 font-medium line-through' : 'text-gray-500'} style={{ fontSize: s(1.25) }}>Manufactura</span>
-                        </div>
-                        <div className="flex items-center" style={{ gap: px(8) }}>
-                            <div className={`rounded-full ${proyecto.estadoSubEtapas.herreria?.completado ? 'bg-green-500' : 'bg-gray-300'}`} style={{ width: px(14), height: px(14) }} />
-                            <span className={proyecto.estadoSubEtapas.herreria?.completado ? 'text-green-700 font-medium line-through' : 'text-gray-500'} style={{ fontSize: s(1.25) }}>Herrería</span>
-                        </div>
-                    </div>
-                )
-            }
-        </div >
+        </div>
     );
 };
 
