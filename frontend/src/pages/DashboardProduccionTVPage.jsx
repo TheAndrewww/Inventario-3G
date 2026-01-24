@@ -247,27 +247,27 @@ const ProyectoTimeline = ({ proyecto }) => {
                                     {tieneProduccion && tieneAmbas && (
                                         <>
                                             {/* Línea superior: Manufactura */}
-                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 25 L ${splitEnd} 25`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                            <path d={`M ${splitEnd} 25 L ${POS.P4 - 5} 25 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 18 L ${splitEnd} 18`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 18 L ${POS.P4 - 5} 18 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                                             {/* Línea inferior: Herrería */}
-                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 55 L ${splitEnd} 55`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                            <path d={`M ${splitEnd} 55 L ${POS.P4 - 5} 55 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 62 L ${splitEnd} 62`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 62 L ${POS.P4 - 5} 62 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                                         </>
                                     )}
 
                                     {/* Solo Manufactura */}
                                     {tieneProduccion && tieneManufacturaLocal && !tieneHerreriaLocal && (
                                         <>
-                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 25 L ${splitEnd} 25`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                            <path d={`M ${splitEnd} 25 L ${POS.P4 - 5} 25 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 18 L ${splitEnd} 18`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 18 L ${POS.P4 - 5} 18 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                                         </>
                                     )}
 
                                     {/* Solo Herrería */}
                                     {tieneProduccion && !tieneManufacturaLocal && tieneHerreriaLocal && (
                                         <>
-                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 55 L ${splitEnd} 55`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                            <path d={`M ${splitEnd} 55 L ${POS.P4 - 5} 55 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 62 L ${splitEnd} 62`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 62 L ${POS.P4 - 5} 62 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                                         </>
                                     )}
 
@@ -353,7 +353,7 @@ const ProyectoTimeline = ({ proyecto }) => {
                                     label: 'Mfra.',
                                     pos: POS5.P3_TOP,
                                     idx: 3,
-                                    yOffset: tieneHerreriaLocal ? -18 : 0,
+                                    yOffset: tieneHerreriaLocal ? -32 : 0,
                                     isSubStage: true
                                 });
                             }
@@ -364,7 +364,7 @@ const ProyectoTimeline = ({ proyecto }) => {
                                     label: 'Herr.',
                                     pos: POS5.P3_BOTTOM,
                                     idx: 3,
-                                    yOffset: tieneManufacturaLocal ? 18 : 0,
+                                    yOffset: tieneManufacturaLocal ? 32 : 0,
                                     isSubStage: true
                                 });
                             }
