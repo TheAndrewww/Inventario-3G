@@ -1,7 +1,7 @@
 import db from '../config/database.js';
 import { QueryTypes } from 'sequelize';
 import { generarImagenAnuncio, generarFrasesDesdeProyectos, obtenerImagenTensito } from '../services/geminiAnuncios.service.js';
-import { subirImagenAnuncio } from '../services/cloudinaryAnuncios.service.js';
+import { subirImagenAnuncio, eliminarImagenAnuncio } from '../services/cloudinaryAnuncios.service.js';
 import { leerCalendarioMes, obtenerProyectosDia, leerAnunciosCalendario } from '../services/googleSheets.service.js';
 
 const MESES = [
@@ -242,7 +242,15 @@ export const generarAnunciosDesdeCalendario = async (req, res) => {
         );
         console.log(`✅ Imagen generada con IA para: "${anuncio.textoAnuncio}"`);
 
-        // Insertar en base de datos con la imagen generada
+        // Subir imagen a Cloudinary para respaldo
+        console.log(`☁️ Subiendo imagen a Cloudinary...`);
+        const cloudinaryUrl = await subirImagenAnuncio(imagenDataUrl, {
+          folder: 'anuncios',
+          public_id: `anuncio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        });
+        console.log(`✅ Imagen subida a Cloudinary: ${cloudinaryUrl}`);
+
+        // Insertar en base de datos con la URL de Cloudinary
         const query = `
           INSERT INTO anuncios (
             fecha,
@@ -260,7 +268,7 @@ export const generarAnunciosDesdeCalendario = async (req, res) => {
           replacements: {
             fecha: hoy.toISOString().split('T')[0],
             frase: anuncio.textoAnuncio,
-            imagenUrl: imagenDataUrl, // Usar imagen generada por IA
+            imagenUrl: cloudinaryUrl, // Usar URL de Cloudinary en lugar de data URL
             proyectoNombre: anuncio.proyecto || null,
             equipo: anuncio.equipo || null,
             tipoAnuncio: 'calendario'
@@ -429,7 +437,29 @@ export const regenerarAnuncio = async (req, res) => {
     );
     console.log(`✅ Nueva imagen generada para anuncio ID ${id}`);
 
-    // Actualizar el anuncio con la nueva imagen
+    // Subir nueva imagen a Cloudinary
+    console.log(`☁️ Subiendo nueva imagen a Cloudinary...`);
+    const cloudinaryUrl = await subirImagenAnuncio(imagenDataUrl, {
+      folder: 'anuncios',
+      public_id: `anuncio_${id}_regen_${Date.now()}`
+    });
+    console.log(`✅ Nueva imagen subida a Cloudinary: ${cloudinaryUrl}`);
+
+    // Intentar eliminar imagen anterior de Cloudinary si era una URL de Cloudinary
+    if (anuncioActual.imagen_url && anuncioActual.imagen_url.includes('cloudinary.com')) {
+      try {
+        // Extraer public_id de la URL de Cloudinary
+        const urlParts = anuncioActual.imagen_url.split('/');
+        const publicIdWithExt = urlParts.slice(-2).join('/').replace('/anuncios/', 'anuncios/');
+        const publicId = publicIdWithExt.replace(/\.[^/.]+$/, '');
+        console.log(`🗑️ Eliminando imagen anterior de Cloudinary: ${publicId}`);
+        await eliminarImagenAnuncio(publicId);
+      } catch (deleteError) {
+        console.warn(`⚠️ No se pudo eliminar imagen anterior: ${deleteError.message}`);
+      }
+    }
+
+    // Actualizar el anuncio con la nueva URL de Cloudinary
     const updateQuery = `
       UPDATE anuncios 
       SET imagen_url = :imagenUrl, updated_at = NOW()
@@ -438,7 +468,7 @@ export const regenerarAnuncio = async (req, res) => {
     `;
 
     const [result] = await db.query(updateQuery, {
-      replacements: { id, imagenUrl: imagenDataUrl },
+      replacements: { id, imagenUrl: cloudinaryUrl },
       type: QueryTypes.SELECT
     });
 
@@ -596,7 +626,15 @@ export const generarAnuncioIndividual = async (req, res) => {
     );
     console.log(`✅ Imagen generada para: "${textoAnuncio}"`);
 
-    // Insertar en base de datos
+    // Subir imagen a Cloudinary para respaldo
+    console.log(`☁️ Subiendo imagen a Cloudinary...`);
+    const cloudinaryUrl = await subirImagenAnuncio(imagenDataUrl, {
+      folder: 'anuncios',
+      public_id: `anuncio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    });
+    console.log(`✅ Imagen subida a Cloudinary: ${cloudinaryUrl}`);
+
+    // Insertar en base de datos con URL de Cloudinary
     const hoy = new Date();
     const query = `
       INSERT INTO anuncios (
@@ -616,7 +654,7 @@ export const generarAnuncioIndividual = async (req, res) => {
       replacements: {
         fecha: hoy.toISOString().split('T')[0],
         frase: textoAnuncio,
-        imagenUrl: imagenDataUrl,
+        imagenUrl: cloudinaryUrl, // Usar URL de Cloudinary en lugar de data URL
         proyectoNombre: proyecto || null,
         equipo: equipo || null,
         tipoAnuncio: 'calendario'
