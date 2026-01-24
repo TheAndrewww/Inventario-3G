@@ -437,18 +437,18 @@ const ProyectoTimeline = ({ proyecto }) => {
                                         >
                                             <node.icon style={{ width: node.isSubStage ? px(22) : px(28), height: node.isSubStage ? px(22) : px(28) }} />
                                         </div>
-                                        <span
-                                            className="absolute font-bold text-gray-600 bg-gray-50 px-1"
-                                            style={{
-                                                ...(node.labelPosition === 'top'
-                                                    ? { bottom: node.isSubStage ? px(50) : px(64) }
-                                                    : { top: node.isSubStage ? px(50) : px(64) }
-                                                ),
-                                                fontSize: node.isSubStage ? s(1.1) : s(1.5)
-                                            }}
-                                        >
-                                            {node.label}
-                                        </span>
+                                        {/* Ocultar etiquetas de sub-etapas cuando hay ambas (el icono es suficiente) */}
+                                        {node.labelPosition !== 'top' && (
+                                            <span
+                                                className="absolute font-bold text-gray-600 bg-gray-50 px-1"
+                                                style={{
+                                                    top: node.isSubStage ? px(50) : px(64),
+                                                    fontSize: node.isSubStage ? s(1.1) : s(1.5)
+                                                }}
+                                            >
+                                                {node.label}
+                                            </span>
+                                        )}
                                     </div>
                                 ))}
                             </>
