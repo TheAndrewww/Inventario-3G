@@ -247,27 +247,27 @@ const ProyectoTimeline = ({ proyecto }) => {
                                     {tieneProduccion && tieneAmbas && (
                                         <>
                                             {/* Línea superior: Manufactura */}
-                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 18 L ${splitEnd} 18`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                            <path d={`M ${splitEnd} 18 L ${POS.P4 - 5} 18 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 20 L ${splitEnd} 20`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 20 L ${POS.P4 - 5} 20 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                                             {/* Línea inferior: Herrería */}
-                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 62 L ${splitEnd} 62`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                            <path d={`M ${splitEnd} 62 L ${POS.P4 - 5} 62 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 60 L ${splitEnd} 60`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 60 L ${POS.P4 - 5} 60 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                                         </>
                                     )}
 
                                     {/* Solo Manufactura */}
                                     {tieneProduccion && tieneManufacturaLocal && !tieneHerreriaLocal && (
                                         <>
-                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 18 L ${splitEnd} 18`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                            <path d={`M ${splitEnd} 18 L ${POS.P4 - 5} 18 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 20 L ${splitEnd} 20`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 20 L ${POS.P4 - 5} 20 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                                         </>
                                     )}
 
                                     {/* Solo Herrería */}
                                     {tieneProduccion && !tieneManufacturaLocal && tieneHerreriaLocal && (
                                         <>
-                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 62 L ${splitEnd} 62`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                            <path d={`M ${splitEnd} 62 L ${POS.P4 - 5} 62 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 60 L ${splitEnd} 60`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 60 L ${POS.P4 - 5} 60 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                                         </>
                                     )}
 
@@ -336,13 +336,13 @@ const ProyectoTimeline = ({ proyecto }) => {
 
                         if (tieneProduccion) {
                             // 5 etapas base, pero producción se divide en Manufactura y Herrería
-                            const POS5 = { P1: '8%', P2: '27%', P3_TOP: '46%', P3_BOTTOM: '46%', P4: '65%', P5: '85%' };
+                            const POS5 = { P1: '8%', P2: '27%', P3: '46%', P4: '65%', P5: '85%' };
                             const tieneManufacturaLocal = proyecto.tiene_manufactura !== false;
                             const tieneHerreriaLocal = proyecto.tiene_herreria !== false;
 
                             nodes = [
-                                { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS5.P1, idx: 1, yOffset: 0 },
-                                { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS5.P2, idx: 2, yOffset: 0 },
+                                { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS5.P1, idx: 1, topPercent: '40%' },
+                                { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS5.P2, idx: 2, topPercent: '40%' },
                             ];
 
                             // Agregar nodos de Manufactura y Herrería según corresponda
@@ -351,9 +351,9 @@ const ProyectoTimeline = ({ proyecto }) => {
                                     stage: 'manufactura',
                                     icon: Factory,
                                     label: 'Mfra.',
-                                    pos: POS5.P3_TOP,
+                                    pos: POS5.P3,
                                     idx: 3,
-                                    yOffset: tieneHerreriaLocal ? -32 : 0,
+                                    topPercent: tieneHerreriaLocal ? '20%' : '40%',
                                     isSubStage: true
                                 });
                             }
@@ -362,16 +362,16 @@ const ProyectoTimeline = ({ proyecto }) => {
                                     stage: 'herreria',
                                     icon: Factory,
                                     label: 'Herr.',
-                                    pos: POS5.P3_BOTTOM,
+                                    pos: POS5.P3,
                                     idx: 3,
-                                    yOffset: tieneManufacturaLocal ? 32 : 0,
+                                    topPercent: tieneManufacturaLocal ? '60%' : '40%',
                                     isSubStage: true
                                 });
                             }
 
                             nodes.push(
-                                { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS5.P4, idx: 4, yOffset: 0 },
-                                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS5.P5, idx: 5, yOffset: 0 }
+                                { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS5.P4, idx: 4, topPercent: '40%' },
+                                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS5.P5, idx: 5, topPercent: '40%' }
                             );
                         } else {
                             // 4 etapas (sin producción) - Redistribuir espacios
@@ -380,11 +380,11 @@ const ProyectoTimeline = ({ proyecto }) => {
                             // P1: 8%, P2: 33.6%, P3: 59.3%, P4: 85%
                             const POS4 = { P1: '8%', P2: '34%', P3: '60%', P4: '85%' };
                             nodes = [
-                                { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS4.P1, idx: 1 },
-                                { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS4.P2, idx: 2 },
+                                { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS4.P1, idx: 1, topPercent: '40%' },
+                                { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS4.P2, idx: 2, topPercent: '40%' },
                                 // Se salta producción (idx 3)
-                                { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS4.P3, idx: 4 },
-                                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS4.P4, idx: 5 }
+                                { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS4.P3, idx: 4, topPercent: '40%' },
+                                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS4.P4, idx: 5, topPercent: '40%' }
                             ];
                         }
 
@@ -427,7 +427,7 @@ const ProyectoTimeline = ({ proyecto }) => {
                                         className="absolute -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center"
                                         style={{
                                             left: node.pos,
-                                            top: `calc(40% + ${node.yOffset || 0}px)`
+                                            top: node.topPercent || '40%'
                                         }}
                                     >
                                         <div
