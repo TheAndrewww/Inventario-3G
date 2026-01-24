@@ -503,7 +503,9 @@ ProduccionProyecto.prototype.getEstadoRetraso = function () {
     const hoyUTC = Date.UTC(hoyYear, hoyMonth - 1, hoyDay);
 
     // Usar días hábiles (excluyendo domingos)
-    const diasEnProyecto = calcularDiasHabiles(entradaUTC, hoyUTC);
+    // Restamos 1 día para dar margen de "subida de medidas" al inicio del proyecto
+    const diasEnProyectoRaw = calcularDiasHabiles(entradaUTC, hoyUTC);
+    const diasEnProyecto = Math.max(0, diasEnProyectoRaw - 1);
 
     // Obtener tiempo permitido acumulado para la etapa actual
     const tiemposAcumulados = TIEMPOS_POR_TIPO[tipo];
@@ -511,16 +513,18 @@ ProduccionProyecto.prototype.getEstadoRetraso = function () {
 
     // Si no hay tiempo definido para esta etapa, no hay retraso
     if (tiempoPermitido === null) {
-        return { enRetraso: false, diasEnProyecto, tiempoPermitido: null };
+        return { enRetraso: false, diasEnProyecto, tiempoPermitido: null, diasRestantesEtapa: null };
     }
 
     const enRetraso = diasEnProyecto > tiempoPermitido;
+    const diasRestantesEtapa = tiempoPermitido - diasEnProyecto; // Positivo = días que faltan, Negativo = días de retraso
 
     return {
         enRetraso,
         diasEnProyecto,
         tiempoPermitido,
-        diasRetraso: enRetraso ? diasEnProyecto - tiempoPermitido : 0
+        diasRetraso: enRetraso ? diasEnProyecto - tiempoPermitido : 0,
+        diasRestantesEtapa // Para ordenamiento: menor = más urgente
     };
 };
 

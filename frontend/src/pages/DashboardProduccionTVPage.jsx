@@ -483,7 +483,15 @@ const DashboardProduccionTVPage = () => {
             }
 
             // 3. Por prioridad
-            return (a.prioridad || 3) - (b.prioridad || 3);
+            const aPrioridad = a.prioridad || 3;
+            const bPrioridad = b.prioridad || 3;
+            if (aPrioridad !== bPrioridad) return aPrioridad - bPrioridad;
+
+            // 4. Por días restantes de etapa (menor = más urgente, aparece primero)
+            // Para MTO/GTIA sin estadoRetraso, usar diasRestantes como fallback
+            const aDiasEtapa = a.estadoRetraso?.diasRestantesEtapa ?? a.diasRestantes ?? 999;
+            const bDiasEtapa = b.estadoRetraso?.diasRestantesEtapa ?? b.diasRestantes ?? 999;
+            return aDiasEtapa - bDiasEtapa;
         });
 
     // Helpers for style
