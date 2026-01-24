@@ -167,7 +167,7 @@ export const clasificarArchivosPDF = async (carpetaId) => {
                 .replace(/[\u0300-\u036f]/g, '')
                 .toUpperCase();
 
-            if (nombreNormalizado.startsWith('HERRERIA')) {
+            if (nombreNormalizado.includes('HERRERIA')) {
                 resultado.herreria.push({
                     id: archivo.id,
                     nombre: archivo.name,

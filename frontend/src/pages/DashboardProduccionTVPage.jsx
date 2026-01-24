@@ -214,13 +214,69 @@ const ProyectoTimeline = ({ proyecto }) => {
                                 <line x1="8" y1="40" x2="85" y2="40" stroke={getStrokeColor()} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                             );
                         } else {
-                            // Normal: líneas completas
+                            // Normal: líneas con bifurcación para herrería/manufactura
                             const POS = { P1: 8, P2: 27, P3: 46, P4: 65, P5: 85 };
                             const getStrokeColor = (baseStage) => ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > ETAPAS_ORDEN.indexOf(baseStage) ? '#10B981' : '#CBD5E1';
+
+                            // Determinar qué tiene el proyecto
+                            const tieneManufacturaLocal = proyecto.tiene_manufactura !== false;
+                            const tieneHerreriaLocal = proyecto.tiene_herreria !== false;
+                            const tieneAmbas = tieneManufacturaLocal && tieneHerreriaLocal;
+
+                            // Colores para sub-etapas
+                            const getSubStageStroke = (subStage) => {
+                                if (ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) return '#10B981'; // Ya pasó producción
+                                if (proyecto.etapa_actual === 'produccion') {
+                                    const completado = proyecto.estadoSubEtapas?.[subStage]?.completado;
+                                    return completado ? '#10B981' : '#CBD5E1';
+                                }
+                                return '#CBD5E1';
+                            };
+
+                            // Posicionamiento
+                            const splitStart = POS.P2;
+                            const splitEnd = POS.P3;
+                            const splitMid = (splitStart + splitEnd) / 2;
+
                             return (
                                 <>
+                                    {/* Diseño -> Compras */}
                                     <line x1={POS.P1} y1="40" x2={POS.P2} y2="40" stroke={getStrokeColor('diseno')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                    <line x1={POS.P2} y1="40" x2={POS.P4} y2="40" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+
+                                    {/* Bifurcación para Manufactura y Herrería */}
+                                    {tieneProduccion && tieneAmbas && (
+                                        <>
+                                            {/* Línea superior: Manufactura */}
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 25 L ${splitEnd} 25`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 25 L ${POS.P4 - 5} 25 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            {/* Línea inferior: Herrería */}
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 55 L ${splitEnd} 55`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 55 L ${POS.P4 - 5} 55 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                        </>
+                                    )}
+
+                                    {/* Solo Manufactura */}
+                                    {tieneProduccion && tieneManufacturaLocal && !tieneHerreriaLocal && (
+                                        <>
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 25 L ${splitEnd} 25`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 25 L ${POS.P4 - 5} 25 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                        </>
+                                    )}
+
+                                    {/* Solo Herrería */}
+                                    {tieneProduccion && !tieneManufacturaLocal && tieneHerreriaLocal && (
+                                        <>
+                                            <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 55 L ${splitEnd} 55`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                            <path d={`M ${splitEnd} 55 L ${POS.P4 - 5} 55 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                        </>
+                                    )}
+
+                                    {/* Sin producción: línea directa */}
+                                    {!tieneProduccion && (
+                                        <line x1={POS.P2} y1="40" x2={POS.P4} y2="40" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                                    )}
+
+                                    {/* Instalación -> Completado */}
                                     <line x1={POS.P4} y1="40" x2={POS.P5} y2="40" stroke={getStrokeColor('instalacion')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                                 </>
                             );
@@ -279,15 +335,44 @@ const ProyectoTimeline = ({ proyecto }) => {
                         let nodes = [];
 
                         if (tieneProduccion) {
-                            // 5 etapas
-                            const POS5 = { P1: '8%', P2: '27%', P3: '46%', P4: '65%', P5: '85%' };
+                            // 5 etapas base, pero producción se divide en Manufactura y Herrería
+                            const POS5 = { P1: '8%', P2: '27%', P3_TOP: '46%', P3_BOTTOM: '46%', P4: '65%', P5: '85%' };
+                            const tieneManufacturaLocal = proyecto.tiene_manufactura !== false;
+                            const tieneHerreriaLocal = proyecto.tiene_herreria !== false;
+
                             nodes = [
-                                { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS5.P1, idx: 1 },
-                                { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS5.P2, idx: 2 },
-                                { stage: 'produccion', icon: Factory, label: 'Prod.', pos: POS5.P3, idx: 3 },
-                                { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS5.P4, idx: 4 },
-                                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS5.P5, idx: 5 }
+                                { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS5.P1, idx: 1, yOffset: 0 },
+                                { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS5.P2, idx: 2, yOffset: 0 },
                             ];
+
+                            // Agregar nodos de Manufactura y Herrería según corresponda
+                            if (tieneManufacturaLocal) {
+                                nodes.push({
+                                    stage: 'manufactura',
+                                    icon: Factory,
+                                    label: 'Mfra.',
+                                    pos: POS5.P3_TOP,
+                                    idx: 3,
+                                    yOffset: tieneHerreriaLocal ? -18 : 0,
+                                    isSubStage: true
+                                });
+                            }
+                            if (tieneHerreriaLocal) {
+                                nodes.push({
+                                    stage: 'herreria',
+                                    icon: Factory,
+                                    label: 'Herr.',
+                                    pos: POS5.P3_BOTTOM,
+                                    idx: 3,
+                                    yOffset: tieneManufacturaLocal ? 18 : 0,
+                                    isSubStage: true
+                                });
+                            }
+
+                            nodes.push(
+                                { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS5.P4, idx: 4, yOffset: 0 },
+                                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS5.P5, idx: 5, yOffset: 0 }
+                            );
                         } else {
                             // 4 etapas (sin producción) - Redistribuir espacios
                             // Redistribución uniforme entre 8% y 85%
@@ -310,6 +395,16 @@ const ProyectoTimeline = ({ proyecto }) => {
                             const esEtapaActual = proyecto.etapa_actual === node.stage;
                             const esCompletado = node.stage === 'completado' && proyecto.etapa_actual === 'completado';
 
+                            // Manejo especial para sub-etapas (manufactura/herreria)
+                            if (node.isSubStage) {
+                                if (etapaIndex > 3) return 'bg-green-500 text-white'; // Ya pasó producción
+                                if (proyecto.etapa_actual === 'produccion') {
+                                    const completado = proyecto.estadoSubEtapas?.[node.stage]?.completado;
+                                    return completado ? 'bg-green-500 text-white' : 'bg-amber-500 text-white';
+                                }
+                                return 'bg-white border-2 border-gray-200 text-gray-400';
+                            }
+
                             if (esCompletado) {
                                 return 'bg-green-500 text-white';
                             }
@@ -327,14 +422,26 @@ const ProyectoTimeline = ({ proyecto }) => {
                         return (
                             <>
                                 {nodes.map((node) => (
-                                    <div key={node.stage} className="absolute top-[40%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center" style={{ left: node.pos }}>
+                                    <div
+                                        key={node.stage}
+                                        className="absolute -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center"
+                                        style={{
+                                            left: node.pos,
+                                            top: `calc(40% + ${node.yOffset || 0}px)`
+                                        }}
+                                    >
                                         <div
                                             className={`rounded-full flex items-center justify-center shadow-md ${getNodeColor(node)}`}
-                                            style={{ width: px(56), height: px(56) }}
+                                            style={{ width: node.isSubStage ? px(44) : px(56), height: node.isSubStage ? px(44) : px(56) }}
                                         >
-                                            <node.icon style={{ width: px(28), height: px(28) }} />
+                                            <node.icon style={{ width: node.isSubStage ? px(22) : px(28), height: node.isSubStage ? px(22) : px(28) }} />
                                         </div>
-                                        <span className="absolute font-bold text-gray-600 bg-gray-50 px-1" style={{ top: px(64), fontSize: s(1.5) }}>{node.label}</span>
+                                        <span
+                                            className="absolute font-bold text-gray-600 bg-gray-50 px-1"
+                                            style={{ top: node.isSubStage ? px(50) : px(64), fontSize: node.isSubStage ? s(1.1) : s(1.5) }}
+                                        >
+                                            {node.label}
+                                        </span>
                                     </div>
                                 ))}
                             </>
