@@ -68,21 +68,7 @@ const CarouselAnuncios = ({ anuncios = [] }) => {
               />
             </div>
 
-            {/* Overlay de texto con animación slide-in */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-8 md:p-16">
-              <div className={`transition-all duration-1000 delay-300 ease-out ${isActive ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'
-                }`}>
-                <p className="text-white text-2xl md:text-4xl font-extrabold tracking-wide uppercase border-l-8 border-orange-500 pl-6 drop-shadow-md leading-tight">
-                  {anuncio.frase}
-                </p>
-                {anuncio.proyecto_nombre && (
-                  <p className="text-gray-300 text-xl md:text-2xl font-semibold mt-4 pl-6">
-                    {anuncio.proyecto_nombre}
-                    {anuncio.equipo && ` - ${anuncio.equipo}`}
-                  </p>
-                )}
-              </div>
-            </div>
+            {/* Overlay de texto removido por solicitud del usuario */}
           </div>
         );
       })}
