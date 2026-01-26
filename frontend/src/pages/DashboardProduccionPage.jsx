@@ -16,7 +16,9 @@ import {
     Circle,
     Download,
     Monitor,
-    ExternalLink
+    ExternalLink,
+    Cloud,
+    Database
 } from 'lucide-react';
 import produccionService from '../services/produccion.service';
 import { Loader, Modal, Button } from '../components/common';
@@ -926,8 +928,7 @@ const DashboardProduccionPage = () => {
             const response = await produccionService.sincronizarConSheets();
             if (response.success) {
                 toast.success(
-                    `Sincronizado: ${response.data.creados} nuevos, ${response.data.actualizados} actualizados`,
-                    { duration: 5000 }
+                    `Sincronizado: ${response.data.creados} nuevos, ${response.data.actualizados} actualizados`
                 );
                 setUltimaSync(new Date());
                 cargarDatos();
@@ -935,6 +936,30 @@ const DashboardProduccionPage = () => {
         } catch (error) {
             console.error('Error al sincronizar:', error);
             toast.error('Error al sincronizar con Google Sheets');
+        } finally {
+            setSincronizando(false);
+        }
+    };
+
+    const handleSincronizarDrive = async () => {
+        try {
+            setSincronizando(true);
+            toast.loading('Sincronizando con Drive (esto puede tardar unos segundos)...', { id: 'sync-drive' });
+
+            const response = await produccionService.sincronizarTodosDrive();
+
+            if (response.success) {
+                toast.success(
+                    `Drive actualizado: ${response.data.exitosos} proyectos procesados`,
+                    { id: 'sync-drive' }
+                );
+                cargarDatos();
+            } else {
+                toast.error('Error al sincronizar con Drive', { id: 'sync-drive' });
+            }
+        } catch (error) {
+            console.error('Error al sincronizar Drive:', error);
+            toast.error('Error de conexión con Drive', { id: 'sync-drive' });
         } finally {
             setSincronizando(false);
         }
@@ -1030,6 +1055,29 @@ const DashboardProduccionPage = () => {
                             <span>Vista TV</span>
                             <ExternalLink size={14} className="opacity-50" />
                         </a>
+
+                        <div className="h-8 w-px bg-gray-300 mx-2 hidden lg:block"></div>
+
+                        {/* Botones de Sincronización Manual */}
+                        <button
+                            onClick={handleSincronizar}
+                            disabled={sincronizando}
+                            className="flex items-center gap-2 px-3 py-2 bg-white text-green-700 border border-green-200 rounded-lg hover:bg-green-50 transition-colors disabled:opacity-50 text-sm font-medium"
+                            title="Actualizar nuevos proyectos desde Google Sheets"
+                        >
+                            <Database size={16} />
+                            {sincronizando ? '...' : 'Sync Sheets'}
+                        </button>
+
+                        <button
+                            onClick={handleSincronizarDrive}
+                            disabled={sincronizando}
+                            className="flex items-center gap-2 px-3 py-2 bg-white text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50 text-sm font-medium"
+                            title="Actualizar carpetas y archivos desde Google Drive"
+                        >
+                            <Cloud size={16} />
+                            {sincronizando ? '...' : 'Sync Drive'}
+                        </button>
                     </div>
                 </div>
             </div>
