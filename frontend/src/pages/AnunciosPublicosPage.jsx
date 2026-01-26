@@ -28,7 +28,7 @@ const AnunciosPublicosPage = () => {
     total: 0,
     completados: 0,
     actual: null,
-    estados: {} // { index: 'pendiente' | 'generando' | 'completado' | 'error' }
+    estados: {} // { indexLista: 'pendiente' | 'generando' | 'completado' | 'error' }
   });
 
   // Verificar si el usuario está autenticado (admin)
@@ -89,32 +89,36 @@ const AnunciosPublicosPage = () => {
 
       if (!response.success || !response.data) {
         toast.error(response.message || 'Error al leer', { id: 'sync' });
+        setSincronizando(false);
         return;
       }
 
       const anunciosLeidos = response.data.anunciosCalendario || [];
       setAnunciosCalendario(anunciosLeidos);
 
-      // Identificar pendientes
-      const pendientes = anunciosLeidos.filter(a => !a.generado);
+      // Identificar pendientes GUARDANDO SU ÍNDICE ORIGINAL
+      const pendientesConIndex = anunciosLeidos
+        .map((a, index) => ({ ...a, originalIndex: index }))
+        .filter(a => !a.generado);
 
-      if (pendientes.length === 0) {
+      if (pendientesConIndex.length === 0) {
         toast.success(`${anunciosLeidos.length} anuncios sincronizados, todos generados`, { id: 'sync' });
         await cargarAnuncios(false);
+        setSincronizando(false);
         return;
       }
 
-      toast.success(`${anunciosLeidos.length} anuncios, generando ${pendientes.length} nuevos...`, { id: 'sync' });
+      toast.success(`Generando ${pendientesConIndex.length} anuncios nuevos...`, { id: 'sync' });
 
       // Paso 2: Iniciar generación con progreso
       const estadosIniciales = {};
-      pendientes.forEach((_, idx) => {
-        estadosIniciales[idx] = 'pendiente';
+      pendientesConIndex.forEach(item => {
+        estadosIniciales[item.originalIndex] = 'pendiente';
       });
 
       setProgresoGeneracion({
         activo: true,
-        total: pendientes.length,
+        total: pendientesConIndex.length,
         completados: 0,
         actual: null,
         estados: estadosIniciales
@@ -123,48 +127,55 @@ const AnunciosPublicosPage = () => {
       // Paso 3: Generar uno por uno
       let completados = 0;
 
-      for (let i = 0; i < pendientes.length; i++) {
-        const anuncio = pendientes[i];
+      for (const item of pendientesConIndex) {
+        const { originalIndex, textoAnuncio, proyecto, equipo } = item;
 
         // Actualizar estado a "generando"
         setProgresoGeneracion(prev => ({
           ...prev,
-          actual: i,
-          estados: { ...prev.estados, [i]: 'generando' }
+          actual: originalIndex,
+          estados: { ...prev.estados, [originalIndex]: 'generando' }
         }));
 
         try {
-          await generarAnuncioIndividual(
-            anuncio.textoAnuncio,
-            anuncio.proyecto,
-            anuncio.equipo,
+          const resultado = await generarAnuncioIndividual(
+            textoAnuncio,
+            proyecto,
+            equipo,
             token
           );
 
-          completados++;
+          if (resultado.success && resultado.data) {
+            completados++;
 
-          // Actualizar estado a "completado"
-          setProgresoGeneracion(prev => ({
-            ...prev,
-            completados,
-            estados: { ...prev.estados, [i]: 'completado' }
-          }));
+            // Actualizar estado a "completado"
+            setProgresoGeneracion(prev => ({
+              ...prev,
+              completados,
+              estados: { ...prev.estados, [originalIndex]: 'completado' }
+            }));
 
-          // Actualizar lista de anuncios en el carousel
-          await cargarAnuncios(false);
-
-          // También actualizar la lista del menú
-          const nuevoResponse = await leerAnunciosCalendario(token);
-          if (nuevoResponse.success && nuevoResponse.data) {
-            setAnunciosCalendario(nuevoResponse.data.anunciosCalendario || []);
+            // Actualizar localmente el anuncio en la lista para mostrar la imagen ya
+            setAnunciosCalendario(prev => {
+              const nuevaLista = [...prev];
+              nuevaLista[originalIndex] = {
+                ...nuevaLista[originalIndex],
+                generado: true,
+                id: resultado.data.id,
+                imagen_url: resultado.data.imagen_url
+              };
+              return nuevaLista;
+            });
+          } else {
+            throw new Error(resultado.message || 'Error desconocido');
           }
 
         } catch (err) {
-          console.error(`Error generando anuncio ${i}:`, err);
+          console.error(`Error generando anuncio index ${originalIndex}:`, err);
           // Actualizar estado a "error"
           setProgresoGeneracion(prev => ({
             ...prev,
-            estados: { ...prev.estados, [i]: 'error' }
+            estados: { ...prev.estados, [originalIndex]: 'error' }
           }));
         }
       }
@@ -176,7 +187,14 @@ const AnunciosPublicosPage = () => {
         actual: null
       }));
 
-      toast.success(`¡${completados} anuncios generados!`);
+      // Actualizar carousel final
+      await cargarAnuncios(false);
+
+      if (completados === pendientesConIndex.length) {
+        toast.success(`¡Todos los anuncios generados! (${completados})`);
+      } else {
+        toast.success(`Proceso terminado: ${completados} generados, ${pendientesConIndex.length - completados} errores`);
+      }
 
     } catch (err) {
       console.error('Error al sincronizar:', err);
@@ -201,7 +219,10 @@ const AnunciosPublicosPage = () => {
 
       if (response.success && response.data) {
         setAnunciosCalendario(response.data.anunciosCalendario || []);
+        // No recargamos el carousel aquí para no mezclar, o sí?
+        // Mejor sí para limpiar desactivados
         await cargarAnuncios(false);
+
         const pendientes = (response.data.anunciosCalendario || []).filter(a => !a.generado).length;
         toast.success(
           `${response.data.totalEnCalendario} anuncios (${pendientes} pendientes)`,
@@ -234,7 +255,7 @@ const AnunciosPublicosPage = () => {
       if (response.success) {
         toast.success('Anuncio regenerado exitosamente', { id: 'regenerar' });
         await cargarAnuncios(false);
-        await handleSoloSincronizar();
+        await handleSoloSincronizar(); // Refrescar lista admin
       } else {
         toast.error(response.message || 'Error al regenerar', { id: 'regenerar' });
       }
@@ -264,10 +285,22 @@ const AnunciosPublicosPage = () => {
         token
       );
 
-      if (response.success) {
+      if (response.success && response.data) {
         toast.success('Anuncio generado exitosamente', { id: 'generar-ind' });
+
+        // Actualizar localmente
+        setAnunciosCalendario(prev => {
+          const nuevaLista = [...prev];
+          nuevaLista[index] = {
+            ...nuevaLista[index],
+            generado: true,
+            id: response.data.id,
+            imagen_url: response.data.imagen_url
+          };
+          return nuevaLista;
+        });
+
         await cargarAnuncios(false);
-        await handleSoloSincronizar();
       } else {
         toast.error(response.message || 'Error al generar', { id: 'generar-ind' });
       }
@@ -532,7 +565,7 @@ const AnunciosPublicosPage = () => {
               ) : (
                 <div className="space-y-4">
                   {listaAnuncios.map((anuncio, index) => {
-                    // Determinar estado del item
+                    // Determinar estado del item usando el índice REAL en la lista
                     const estadoProgreso = progresoGeneracion.estados[index];
                     const estaGenerando = estadoProgreso === 'generando';
                     const estaCompletado = estadoProgreso === 'completado';
