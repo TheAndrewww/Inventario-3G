@@ -117,6 +117,10 @@ const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orienta
         }
     }
 
+    // Definiciones de modo (movidas al inicio para ser usadas en POS)
+    const esCompacto = isFullscreen && (orientacion === 'vertical' || tamano === 'pequeno');
+    const esVertical = isFullscreen && orientacion === 'vertical';
+
     // Definiciones de timeline (movidas al scope principal)
     const POS = esVertical
         ? { P1: 8, P2: 24, P3: 40, P4: 56, P5: 72 }
@@ -222,11 +226,7 @@ const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orienta
         return 'text-base';
     };
 
-    // ¿Es modo compacto? (vertical o pequeño)
-    const esCompacto = isFullscreen && (orientacion === 'vertical' || tamano === 'pequeno');
 
-    // ¿Es modo vertical? (para ajustes más agresivos)
-    const esVertical = isFullscreen && orientacion === 'vertical';
 
     return (
         <div className={getCardClasses()}>
