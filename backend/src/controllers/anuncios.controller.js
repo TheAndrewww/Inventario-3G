@@ -498,21 +498,37 @@ export const leerAnunciosDelCalendario = async (req, res) => {
   try {
     const hoy = new Date();
     const mes = MESES[hoy.getMonth()];
+    const fechaHoy = hoy.toISOString().split('T')[0];
 
     console.log(`📖 Leyendo anuncios del calendario para ${mes} (solo lectura)`);
+    console.log(`📅 Fecha de hoy: ${fechaHoy}`);
 
     // Leer anuncios del spreadsheet
     const resultado = await leerAnunciosCalendario(mes);
-    const anunciosCalendario = resultado.data.anuncios;
+    const anunciosCalendario = resultado.data.anuncios || [];
+    console.log(`📋 Anuncios en spreadsheet: ${anunciosCalendario.length}`);
 
     // Obtener anuncios ya generados de hoy de la BD
     const anunciosGenerados = await db.query(
       `SELECT id, frase, imagen_url, proyecto_nombre, equipo, fecha, activo 
        FROM anuncios 
-       WHERE fecha = CURRENT_DATE AND activo = true
+       WHERE fecha = :fecha AND activo = true
        ORDER BY created_at DESC`,
-      { type: QueryTypes.SELECT }
+      {
+        replacements: { fecha: fechaHoy },
+        type: QueryTypes.SELECT
+      }
     );
+
+    console.log(`💾 Anuncios activos en BD para hoy: ${anunciosGenerados?.length || 0}`);
+
+    // Debug: mostrar frases de BD
+    if (anunciosGenerados && anunciosGenerados.length > 0) {
+      console.log('📝 Frases en BD:');
+      anunciosGenerados.forEach((a, i) => {
+        console.log(`   ${i + 1}. "${a.frase?.substring(0, 50)}..."`);
+      });
+    }
 
     // Crear set de frases del calendario (COMPARACIÓN EXACTA)
     const frasesEnCalendario = new Set();
@@ -522,11 +538,13 @@ export const leerAnunciosDelCalendario = async (req, res) => {
       }
     });
 
+    console.log(`📋 Frases únicas en calendario: ${frasesEnCalendario.size}`);
+
     // Crear un mapa de frases generadas para comparar (EXACTO)
     const frasesGeneradas = new Map();
     const anunciosADesactivar = [];
 
-    if (Array.isArray(anunciosGenerados)) {
+    if (Array.isArray(anunciosGenerados) && anunciosGenerados.length > 0) {
       anunciosGenerados.forEach(a => {
         if (a.frase) {
           const fraseExacta = a.frase.trim();
@@ -534,7 +552,10 @@ export const leerAnunciosDelCalendario = async (req, res) => {
 
           // Si el anuncio generado NO está EXACTAMENTE en el calendario, desactivar
           if (!frasesEnCalendario.has(fraseExacta)) {
+            console.log(`❌ Frase en BD no encontrada en calendario: "${fraseExacta.substring(0, 40)}..."`);
             anunciosADesactivar.push(a.id);
+          } else {
+            console.log(`✅ Frase coincide exactamente: "${fraseExacta.substring(0, 40)}..."`);
           }
         }
       });
@@ -542,7 +563,7 @@ export const leerAnunciosDelCalendario = async (req, res) => {
 
     // Desactivar anuncios que ya no están en el calendario
     if (anunciosADesactivar.length > 0) {
-      console.log(`🗑️ Desactivando ${anunciosADesactivar.length} anuncios que ya no coinciden exactamente`);
+      console.log(`🗑️ Desactivando ${anunciosADesactivar.length} anuncios que ya no coinciden`);
       await db.query(
         `UPDATE anuncios SET activo = false WHERE id IN (:ids)`,
         {
@@ -550,11 +571,14 @@ export const leerAnunciosDelCalendario = async (req, res) => {
           type: QueryTypes.UPDATE
         }
       );
+      console.log(`✅ Anuncios desactivados correctamente`);
+    } else {
+      console.log(`ℹ️ No hay anuncios para desactivar`);
     }
 
     // Combinar: marcar cuáles están generados y cuáles no (EXACTO)
     const anunciosCombinados = anunciosCalendario.map(anuncioSheet => {
-      const fraseExacta = anuncioSheet.textoAnuncio.trim();
+      const fraseExacta = anuncioSheet.textoAnuncio?.trim() || '';
       const generado = frasesGeneradas.get(fraseExacta);
 
       return {
@@ -567,6 +591,9 @@ export const leerAnunciosDelCalendario = async (req, res) => {
         imagen_url: generado?.imagen_url || null
       };
     });
+
+    const pendientes = anunciosCombinados.filter(a => !a.generado).length;
+    console.log(`📊 Resumen: ${anunciosCombinados.length} total, ${anunciosCombinados.length - pendientes} generados, ${pendientes} pendientes`);
 
     const totalGeneradosActivos = Array.isArray(anunciosGenerados)
       ? anunciosGenerados.length - anunciosADesactivar.length
@@ -586,6 +613,7 @@ export const leerAnunciosDelCalendario = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error al leer anuncios del calendario:', error);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Error al leer anuncios del calendario',
