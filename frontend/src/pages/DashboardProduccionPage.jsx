@@ -117,6 +117,15 @@ const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orienta
         }
     }
 
+    // Definiciones de timeline (movidas al scope principal)
+    const POS = esVertical
+        ? { P1: 8, P2: 24, P3: 40, P4: 56, P5: 72 }
+        : { P1: 10, P2: 30, P3: 50, P4: 70, P5: 90 };
+
+    const tieneManufacturaLocal = proyecto.tiene_manufactura !== false;
+    const tieneHerreriaLocal = proyecto.tiene_herreria !== false;
+    const tieneAmbas = tieneManufacturaLocal && tieneHerreriaLocal;
+
     // Obtener color de fondo según tipo de proyecto
     const getColorPorTipo = (tipo) => {
         if (!tipo) return { bg: 'bg-white', border: '', label: '' };
@@ -368,15 +377,7 @@ const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orienta
                             );
                         }
 
-                        // Posiciones dinámicas según orientación
-                        const POS = esVertical
-                            ? { P1: 8, P2: 24, P3: 40, P4: 56, P5: 72 }
-                            : { P1: 10, P2: 30, P3: 50, P4: 70, P5: 90 };
 
-                        // Detectar qué ramas tiene el proyecto (desde Drive)
-                        const tieneManufacturaLocal = proyecto.tiene_manufactura !== false;
-                        const tieneHerreriaLocal = proyecto.tiene_herreria !== false;
-                        const tieneAmbas = tieneManufacturaLocal && tieneHerreriaLocal;
 
                         // Función helper para determinar color de línea base
                         const getStrokeColor = (baseStage) => {
