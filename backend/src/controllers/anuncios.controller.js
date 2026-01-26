@@ -514,26 +514,26 @@ export const leerAnunciosDelCalendario = async (req, res) => {
       { type: QueryTypes.SELECT }
     );
 
-    // Crear set de frases del calendario (normalizadas)
+    // Crear set de frases del calendario (COMPARACIÓN EXACTA)
     const frasesEnCalendario = new Set();
     anunciosCalendario.forEach(a => {
       if (a.textoAnuncio) {
-        frasesEnCalendario.add(a.textoAnuncio.toLowerCase().trim());
+        frasesEnCalendario.add(a.textoAnuncio.trim());
       }
     });
 
-    // Crear un mapa de frases generadas para comparar
+    // Crear un mapa de frases generadas para comparar (EXACTO)
     const frasesGeneradas = new Map();
     const anunciosADesactivar = [];
 
     if (Array.isArray(anunciosGenerados)) {
       anunciosGenerados.forEach(a => {
         if (a.frase) {
-          const fraseNorm = a.frase.toLowerCase().trim();
-          frasesGeneradas.set(fraseNorm, a);
+          const fraseExacta = a.frase.trim();
+          frasesGeneradas.set(fraseExacta, a);
 
-          // Si el anuncio generado NO está en el calendario, marcarlo para desactivar
-          if (!frasesEnCalendario.has(fraseNorm)) {
+          // Si el anuncio generado NO está EXACTAMENTE en el calendario, desactivar
+          if (!frasesEnCalendario.has(fraseExacta)) {
             anunciosADesactivar.push(a.id);
           }
         }
@@ -542,7 +542,7 @@ export const leerAnunciosDelCalendario = async (req, res) => {
 
     // Desactivar anuncios que ya no están en el calendario
     if (anunciosADesactivar.length > 0) {
-      console.log(`🗑️ Desactivando ${anunciosADesactivar.length} anuncios que ya no están en el calendario`);
+      console.log(`🗑️ Desactivando ${anunciosADesactivar.length} anuncios que ya no coinciden exactamente`);
       await db.query(
         `UPDATE anuncios SET activo = false WHERE id IN (:ids)`,
         {
@@ -552,10 +552,10 @@ export const leerAnunciosDelCalendario = async (req, res) => {
       );
     }
 
-    // Combinar: marcar cuáles están generados y cuáles no
+    // Combinar: marcar cuáles están generados y cuáles no (EXACTO)
     const anunciosCombinados = anunciosCalendario.map(anuncioSheet => {
-      const fraseNormalizada = anuncioSheet.textoAnuncio.toLowerCase().trim();
-      const generado = frasesGeneradas.get(fraseNormalizada);
+      const fraseExacta = anuncioSheet.textoAnuncio.trim();
+      const generado = frasesGeneradas.get(fraseExacta);
 
       return {
         textoAnuncio: anuncioSheet.textoAnuncio,

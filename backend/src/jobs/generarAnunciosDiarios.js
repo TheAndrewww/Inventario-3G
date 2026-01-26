@@ -1,8 +1,8 @@
 import cron from 'node-cron';
 import db from '../config/database.js';
-import { leerCalendarioMes } from '../services/googleSheets.service.js';
-import { generarImagenAnuncio, generarFrasesDesdeProyectos } from '../services/geminiAnuncios.service.js';
-import { subirImagenAnuncio } from '../services/cloudinaryAnuncios.service.js';
+import { QueryTypes } from 'sequelize';
+import { leerAnunciosCalendario } from '../services/googleSheets.service.js';
+import { generarImagenAnuncio, obtenerImagenTensito } from '../services/geminiAnuncios.service.js';
 
 const MESES = [
   'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
@@ -10,19 +10,22 @@ const MESES = [
 ];
 
 /**
- * Job para generar anuncios automáticamente todos los días a las 12:00 AM (medianoche)
+ * Job para sincronizar y generar anuncios automáticamente cada hora
+ * - Compara textos exactos entre spreadsheet y BD
+ * - Desactiva anuncios que ya no coinciden
+ * - Genera imágenes para anuncios nuevos
  */
 export const iniciarJobAnuncios = () => {
-  // Ejecutar todos los días a las 12:00 AM medianoche (hora de México)
-  cron.schedule('0 0 * * *', async () => {
+  // Ejecutar cada hora en el minuto 0
+  cron.schedule('0 * * * *', async () => {
     console.log('');
     console.log('🤖 ========================================');
-    console.log('🤖 JOB AUTOMÁTICO: Generación de Anuncios');
+    console.log('🤖 JOB AUTOMÁTICO: Sincronización de Anuncios');
     console.log(`🤖 Hora: ${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}`);
     console.log('🤖 ========================================');
 
     try {
-      await generarAnunciosDelDia();
+      await sincronizarYGenerarAnuncios();
       console.log('✅ Job completado exitosamente');
     } catch (error) {
       console.error('❌ Error en job de anuncios:', error);
@@ -35,134 +38,163 @@ export const iniciarJobAnuncios = () => {
   });
 
   console.log('⏰ Job de anuncios programado:');
-  console.log('   - Horario: 12:00 AM (medianoche) diario');
+  console.log('   - Horario: Cada hora (minuto 0)');
   console.log('   - Zona horaria: America/Mexico_City');
   console.log('');
 
-  // También permitir ejecución manual
-  return generarAnunciosDelDia;
+  // Permitir ejecución manual
+  return sincronizarYGenerarAnuncios;
 };
 
 /**
- * Función principal que genera los anuncios del día
+ * Función principal que sincroniza y genera anuncios
  */
-async function generarAnunciosDelDia() {
+async function sincronizarYGenerarAnuncios() {
   const hoy = new Date();
   const mes = MESES[hoy.getMonth()];
-  const dia = hoy.getDate();
   const fechaStr = hoy.toISOString().split('T')[0];
 
-  console.log(`📅 Generando anuncios para: ${dia} de ${mes} (${fechaStr})`);
+  console.log(`📅 Sincronizando anuncios para: ${fechaStr}`);
 
-  // Paso 1: Verificar si ya existen anuncios para hoy
-  const [anunciosExistentes] = await db.query(
-    'SELECT COUNT(*) as count FROM anuncios WHERE fecha = :fecha',
-    { replacements: { fecha: fechaStr } }
-  );
+  // Paso 1: Leer anuncios del spreadsheet (sección ANUNCIOS)
+  console.log('📊 Leyendo anuncios del calendario...');
+  let anunciosCalendario = [];
 
-  if (parseInt(anunciosExistentes[0].count) > 0) {
-    console.log(`⚠️ Ya existen ${anunciosExistentes[0].count} anuncios para hoy`);
-    console.log('   Saltando generación automática');
-    return;
-  }
-
-  // Paso 2: Obtener proyectos del día desde Google Sheets
-  console.log('📊 Consultando calendario de proyectos...');
-
-  let proyectos = [];
   try {
-    const calendarioData = await leerCalendarioMes(mes);
-    proyectos = calendarioData.data.proyectos.filter(p => p.dia === dia);
-    console.log(`✅ Proyectos encontrados: ${proyectos.length}`);
+    const resultado = await leerAnunciosCalendario(mes);
+    anunciosCalendario = resultado.data.anuncios || [];
+    console.log(`✅ ${anunciosCalendario.length} anuncios encontrados en spreadsheet`);
   } catch (error) {
-    console.error('⚠️ Error al leer calendario:', error.message);
-    console.log('   Generando anuncio genérico...');
-  }
-
-  // Paso 3: Si no hay proyectos, crear anuncio genérico
-  if (proyectos.length === 0) {
-    console.log('📢 Generando anuncio genérico (sin proyectos específicos)');
-
-    const fraseGenerica = '3G VELARIAS - INNOVACIÓN EN TENSOESTRUCTURAS';
-    const imagenPlaceholder = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1763171532/logo_web_blanco_j8xeyh.png';
-
-    await db.query(`
-      INSERT INTO anuncios (
-        fecha,
-        frase,
-        imagen_url,
-        tipo_anuncio,
-        activo
-      ) VALUES (:fecha, :frase, :imagen, 'generico', true)
-    `, { replacements: { fecha: fechaStr, frase: fraseGenerica, imagen: imagenPlaceholder } });
-
-    console.log('✅ Anuncio genérico creado');
+    console.error('❌ Error al leer calendario:', error.message);
     return;
   }
 
-  // Paso 4: Generar anuncios para cada proyecto
-  console.log(`🎨 Generando ${proyectos.length} anuncios...`);
+  if (anunciosCalendario.length === 0) {
+    console.log('⚠️ No hay anuncios en el calendario. Desactivando todos los activos de hoy...');
+    await db.query(
+      `UPDATE anuncios SET activo = false WHERE fecha = :fecha AND activo = true`,
+      { replacements: { fecha: fechaStr }, type: QueryTypes.UPDATE }
+    );
+    return;
+  }
 
-  const frases = generarFrasesDesdeProyectos(proyectos);
-  const anunciosCreados = [];
+  // Paso 2: Obtener anuncios activos de hoy de la BD
+  const anunciosBD = await db.query(
+    `SELECT id, frase, imagen_url FROM anuncios WHERE fecha = :fecha AND activo = true`,
+    { replacements: { fecha: fechaStr }, type: QueryTypes.SELECT }
+  );
+  console.log(`📦 ${anunciosBD.length} anuncios activos en BD`);
 
-  for (let i = 0; i < proyectos.length; i++) {
-    const proyecto = proyectos[i];
-    const frase = frases[i];
+  // Paso 3: Crear set de frases del calendario (texto EXACTO)
+  const frasesCalendario = new Set();
+  const anunciosNuevos = [];
 
-    console.log(`   ${i + 1}/${proyectos.length}: ${proyecto.nombre}`);
+  anunciosCalendario.forEach(a => {
+    const fraseExacta = a.textoAnuncio?.trim();
+    if (fraseExacta) {
+      frasesCalendario.add(fraseExacta);
+    }
+  });
 
+  // Paso 4: Crear mapa de frases en BD para comparar
+  const frasesBD = new Map();
+  anunciosBD.forEach(a => {
+    if (a.frase) {
+      frasesBD.set(a.frase.trim(), a);
+    }
+  });
+
+  // Paso 5: Identificar anuncios a desactivar (ya no están en calendario)
+  const idsADesactivar = [];
+  anunciosBD.forEach(a => {
+    const fraseExacta = a.frase?.trim();
+    if (!frasesCalendario.has(fraseExacta)) {
+      idsADesactivar.push(a.id);
+      console.log(`🗑️ Anuncio "${fraseExacta?.substring(0, 30)}..." ya no está en calendario`);
+    }
+  });
+
+  // Paso 6: Identificar anuncios nuevos (no generados aún)
+  anunciosCalendario.forEach(a => {
+    const fraseExacta = a.textoAnuncio?.trim();
+    if (fraseExacta && !frasesBD.has(fraseExacta)) {
+      anunciosNuevos.push(a);
+      console.log(`✨ Nuevo anuncio: "${fraseExacta.substring(0, 30)}..."`);
+    }
+  });
+
+  // Paso 7: Desactivar anuncios obsoletos
+  if (idsADesactivar.length > 0) {
+    console.log(`🗑️ Desactivando ${idsADesactivar.length} anuncios obsoletos...`);
+    await db.query(
+      `UPDATE anuncios SET activo = false WHERE id IN (:ids)`,
+      { replacements: { ids: idsADesactivar }, type: QueryTypes.UPDATE }
+    );
+  }
+
+  // Paso 8: Generar imágenes para anuncios nuevos
+  if (anunciosNuevos.length > 0) {
+    console.log(`🎨 Generando ${anunciosNuevos.length} anuncios nuevos...`);
+
+    // Descargar Tensito una sola vez
+    let tensito = null;
     try {
-      // Generar descripción con IA (opcional)
-      // const descripcionIA = await generarImagenAnuncio(frase);
-
-      // Por ahora, usar imagen placeholder
-      // TODO: Integrar generación real de imágenes con IA
-      const imagenUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1763171532/logo_web_blanco_j8xeyh.png';
-
-      // Guardar en base de datos
-      const [result] = await db.query(`
-        INSERT INTO anuncios (
-          fecha,
-          frase,
-          imagen_url,
-          proyecto_nombre,
-          equipo,
-          tipo_anuncio,
-          activo
-        ) VALUES (:fecha, :frase, :imagen, :proyecto, :equipo, 'proyecto', true)
-        RETURNING id, frase
-      `, {
-        replacements: {
-          fecha: fechaStr,
-          frase: frase,
-          imagen: imagenUrl,
-          proyecto: proyecto.nombre,
-          equipo: proyecto.equipoHora
-        }
-      });
-
-      anunciosCreados.push(result[0]);
-      console.log(`      ✅ Anuncio ID ${result[0].id} creado`);
-
+      console.log('🤖 Descargando imagen de Tensito...');
+      tensito = await obtenerImagenTensito();
     } catch (error) {
-      console.error(`      ❌ Error al crear anuncio: ${error.message}`);
+      console.error('❌ Error al obtener Tensito:', error.message);
+      return;
+    }
+
+    for (let i = 0; i < anunciosNuevos.length; i++) {
+      const anuncio = anunciosNuevos[i];
+      const textoAnuncio = anuncio.textoAnuncio.trim();
+
+      console.log(`   ${i + 1}/${anunciosNuevos.length}: "${textoAnuncio.substring(0, 40)}..."`);
+
+      try {
+        // Generar imagen con IA
+        const imagenDataUrl = await generarImagenAnuncio(
+          textoAnuncio,
+          tensito.base64,
+          tensito.mimeType
+        );
+
+        // Guardar en BD
+        await db.query(`
+          INSERT INTO anuncios (
+            fecha, frase, imagen_url, proyecto_nombre, equipo, tipo_anuncio, activo
+          ) VALUES (:fecha, :frase, :imagenUrl, :proyecto, :equipo, 'calendario', true)
+        `, {
+          replacements: {
+            fecha: fechaStr,
+            frase: textoAnuncio,
+            imagenUrl: imagenDataUrl,
+            proyecto: anuncio.proyecto || null,
+            equipo: anuncio.equipo || null
+          },
+          type: QueryTypes.INSERT
+        });
+
+        console.log(`      ✅ Generado y guardado`);
+      } catch (error) {
+        console.error(`      ❌ Error: ${error.message}`);
+      }
     }
   }
 
+  // Resumen
   console.log('');
-  console.log(`🎉 Resumen:`);
-  console.log(`   - Proyectos procesados: ${proyectos.length}`);
-  console.log(`   - Anuncios creados: ${anunciosCreados.length}`);
-  console.log(`   - Fecha: ${fechaStr}`);
-
-  return anunciosCreados;
+  console.log('📊 Resumen:');
+  console.log(`   - Anuncios en calendario: ${anunciosCalendario.length}`);
+  console.log(`   - Desactivados: ${idsADesactivar.length}`);
+  console.log(`   - Nuevos generados: ${anunciosNuevos.length}`);
 }
 
 /**
- * Función para generar anuncios manualmente (útil para testing)
+ * Función para ejecución manual
  */
-export const generarAnunciosManual = generarAnunciosDelDia;
+export const generarAnunciosManual = sincronizarYGenerarAnuncios;
 
 export default {
   iniciarJobAnuncios,
