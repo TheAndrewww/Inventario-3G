@@ -433,16 +433,16 @@ const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orienta
                                 {/* Solo Manufactura */}
                                 {tieneManufacturaLocal && !tieneHerreriaLocal && (
                                     <>
-                                        <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 20 L ${splitEnd} 20`} fill="none" stroke={getStrokeColor('compras')} strokeWidth={esVertical ? "2" : "4"} vectorEffect="non-scaling-stroke" />
-                                        <path d={`M ${splitEnd} 20 L ${POS.P4 - 10} 20 L ${POS.P4 - 10} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth={esVertical ? "2" : "4"} vectorEffect="non-scaling-stroke" />
+                                        <line x1={POS.P2} y1="40" x2={POS.P3} y2="40" stroke={getStrokeColor('compras')} strokeWidth={esVertical ? "2" : "4"} vectorEffect="non-scaling-stroke" />
+                                        <line x1={POS.P3} y1="40" x2={POS.P4} y2="40" stroke={getSubStageStroke('manufactura')} strokeWidth={esVertical ? "2" : "4"} vectorEffect="non-scaling-stroke" />
                                     </>
                                 )}
 
                                 {/* Solo Herrería */}
                                 {!tieneManufacturaLocal && tieneHerreriaLocal && (
                                     <>
-                                        <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 60 L ${splitEnd} 60`} fill="none" stroke={getStrokeColor('compras')} strokeWidth={esVertical ? "2" : "4"} vectorEffect="non-scaling-stroke" />
-                                        <path d={`M ${splitEnd} 60 L ${POS.P4 - 10} 60 L ${POS.P4 - 10} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth={esVertical ? "2" : "4"} vectorEffect="non-scaling-stroke" />
+                                        <line x1={POS.P2} y1="40" x2={POS.P3} y2="40" stroke={getStrokeColor('compras')} strokeWidth={esVertical ? "2" : "4"} vectorEffect="non-scaling-stroke" />
+                                        <line x1={POS.P3} y1="40" x2={POS.P4} y2="40" stroke={getSubStageStroke('herreria')} strokeWidth={esVertical ? "2" : "4"} vectorEffect="non-scaling-stroke" />
                                     </>
                                 )}
 
@@ -573,7 +573,7 @@ const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orienta
 
                             {/* 3A. MANUFACTURA */}
                             {proyecto.tiene_manufactura !== false && (
-                                <div className="absolute top-[20%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center" style={{ left: POS.P3 }}>
+                                <div className={`absolute ${tieneHerreriaLocal ? 'top-[20%]' : 'top-[40%]'} -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center`} style={{ left: POS.P3 }}>
                                     <div className={`${esVertical ? 'w-14 h-14' : 'w-12 h-12'} rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${(proyecto.estadoSubEtapas?.manufactura?.completado || ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) ? 'bg-green-500 text-white' :
                                         proyecto.etapa_actual === 'produccion' ? (enRetraso ? 'bg-red-500 text-white' : 'bg-white ring-4 ring-amber-200 text-amber-500') : 'bg-white border-2 border-gray-200 text-gray-400'
                                         }`}>
@@ -585,7 +585,7 @@ const ProyectoTimeline = ({ proyecto, onCompletar, isFullscreen = false, orienta
 
                             {/* 3B. HERRERÍA */}
                             {proyecto.tiene_herreria !== false && (
-                                <div className="absolute top-[60%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center" style={{ left: POS.P3 }}>
+                                <div className={`absolute ${tieneManufacturaLocal ? 'top-[60%]' : 'top-[40%]'} -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center`} style={{ left: POS.P3 }}>
                                     <div className={`${esVertical ? 'w-14 h-14' : 'w-12 h-12'} rounded-full flex items-center justify-center shadow-md transition-colors duration-300 ${(proyecto.estadoSubEtapas?.herreria?.completado || ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) ? 'bg-green-500 text-white' :
                                         proyecto.etapa_actual === 'produccion' ? (enRetraso ? 'bg-red-500 text-white' : 'bg-white ring-4 ring-red-200 text-red-500') : 'bg-white border-2 border-gray-200 text-gray-400'
                                         }`}>
