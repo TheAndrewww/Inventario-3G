@@ -11,6 +11,7 @@ const QUARTERS = [
 ];
 
 const AREAS = [
+    { id: 'ventas', name: 'VENTAS', color: 'bg-gray-100 text-gray-800' },
     { id: 'ventas_dlba', name: 'VENTAS DLBA', color: 'bg-gray-100 text-gray-800' },
     { id: 'ventas_vrj', name: 'VENTAS VRJ', color: 'bg-gray-100 text-gray-800' },
     { id: 'diseno', name: 'DISEÑO', color: 'bg-gray-100 text-gray-800' },
