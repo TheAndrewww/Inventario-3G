@@ -61,7 +61,7 @@ export const updateCell = async (req, res) => {
             });
         }
 
-        const validAreas = ['diseno', 'manufactura', 'herreria', 'equipo1', 'equipo2', 'equipo3', 'equipo4'];
+        const validAreas = ['ventas', 'ventas_dlba', 'ventas_vrj', 'diseno', 'manufactura', 'herreria', 'equipo1', 'equipo2', 'equipo3', 'equipo4'];
         if (!validAreas.includes(area)) {
             return res.status(400).json({
                 success: false,
@@ -136,7 +136,7 @@ export const getTotals = async (req, res) => {
             totals.byQuarter[q] = { good: 0, bad: 0 };
         }
 
-        const areas = ['diseno', 'manufactura', 'herreria', 'equipo1', 'equipo2', 'equipo3', 'equipo4'];
+        const areas = ['ventas', 'ventas_dlba', 'ventas_vrj', 'diseno', 'manufactura', 'herreria', 'equipo1', 'equipo2', 'equipo3', 'equipo4'];
         areas.forEach(area => {
             totals.byArea[area] = {};
             for (let q = 1; q <= 4; q++) {
