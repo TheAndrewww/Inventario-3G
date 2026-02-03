@@ -61,11 +61,11 @@ const DashboardProduccionTVPage = () => {
         return () => clearInterval(interval);
     }, [cargarDatos]);
 
-    // Filtrar completados y ordenar: primero los en retraso, luego por prioridad
+    // Filtrar activos y ordenar por urgencia
     const proyectosActivos = proyectos
-        .filter(p => p.etapa_actual !== 'completado')
+        .filter(p => p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
         .sort((a, b) => {
-            // 1. Proyectos en retraso primero
+            // 1. En retraso primero (tipos A/B/C que superaron tiempo por etapa)
             const aRetraso = a.estadoRetraso?.enRetraso ? 1 : 0;
             const bRetraso = b.estadoRetraso?.enRetraso ? 1 : 0;
             if (aRetraso !== bRetraso) return bRetraso - aRetraso;
@@ -77,12 +77,17 @@ const DashboardProduccionTVPage = () => {
                 if (aRetrasoDias !== bRetrasoDias) return bRetrasoDias - aRetrasoDias;
             }
 
-            // 3. Por prioridad
+            // 3. Vencidos (fecha límite superada)
+            const aVencido = a.diasRestantes !== null && a.diasRestantes < 0;
+            const bVencido = b.diasRestantes !== null && b.diasRestantes < 0;
+            if (aVencido !== bVencido) return aVencido ? -1 : 1;
+
+            // 4. Por prioridad
             const aPrioridad = a.prioridad || 3;
             const bPrioridad = b.prioridad || 3;
             if (aPrioridad !== bPrioridad) return aPrioridad - bPrioridad;
 
-            // 4. Por días restantes de etapa (menor = más urgente, aparece primero)
+            // 5. Tiebreaker: diasRestantesEtapa (menor = más urgente)
             const aDiasEtapa = a.estadoRetraso?.diasRestantesEtapa ?? a.diasRestantes ?? 999;
             const bDiasEtapa = b.estadoRetraso?.diasRestantesEtapa ?? b.diasRestantes ?? 999;
             return aDiasEtapa - bDiasEtapa;
