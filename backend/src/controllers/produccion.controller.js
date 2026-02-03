@@ -468,9 +468,9 @@ export const obtenerEstadisticas = async (req, res) => {
  */
 export const sincronizarConSheets = async (req, res) => {
     try {
-        const { mes } = req.body; // Opcional, si no se especifica usa el mes actual
+        const { mes } = req.body; // Opcional; sin valor sincroniza todos los meses hasta el actual
 
-        console.log(`🔄 Iniciando sincronización con Google Sheets ${mes ? `(mes: ${mes})` : '(mes actual)'}...`);
+        console.log(`🔄 Iniciando sincronización con Google Sheets ${mes ? `(mes: ${mes})` : '(todos los meses hasta el actual)'}...`);
 
         const resultado = await produccionSheetsService.sincronizarConDB(mes);
 
@@ -478,7 +478,7 @@ export const sincronizarConSheets = async (req, res) => {
             success: true,
             message: resultado.message,
             data: {
-                mes: resultado.mes,
+                meses: resultado.meses,
                 creados: resultado.creados,
                 actualizados: resultado.actualizados,
                 total: resultado.total

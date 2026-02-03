@@ -928,8 +928,9 @@ const DashboardProduccionPage = () => {
             setSincronizando(true);
             const response = await produccionService.sincronizarConSheets();
             if (response.success) {
+                const mesesInfo = response.data.meses?.length > 1 ? ` (${response.data.meses.length} meses)` : '';
                 toast.success(
-                    `Sincronizado: ${response.data.creados} nuevos, ${response.data.actualizados} actualizados`
+                    `Sincronizado${mesesInfo}: ${response.data.creados} nuevos, ${response.data.actualizados} actualizados`
                 );
                 setUltimaSync(new Date());
                 cargarDatos();

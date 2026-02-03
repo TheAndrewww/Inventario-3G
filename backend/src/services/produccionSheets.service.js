@@ -230,98 +230,142 @@ export const leerProyectosProduccion = async (mes = null) => {
 };
 
 /**
- * Sincronizar proyectos del spreadsheet con la base de datos
- * @param {string} mes - Mes a sincronizar (opcional, por defecto el actual)
+ * Sincronizar proyectos de un solo mes con la base de datos.
+ * Función interna, no exportada.
+ * @param {string} mes - Nombre del mes (ENERO, FEBRERO, etc.)
+ * @returns {{ creados: number, actualizados: number, total: number }}
+ */
+const sincronizarMes = async (mes) => {
+    const resultado = await leerProyectosProduccion(mes);
+
+    if (!resultado.success || resultado.data.length === 0) {
+        return { creados: 0, actualizados: 0, total: 0 };
+    }
+
+    let creados = 0;
+    let actualizados = 0;
+
+    for (const proyecto of resultado.data) {
+        const existente = await ProduccionProyecto.findOne({
+            where: { spreadsheet_row_id: proyecto.spreadsheetRowId }
+        });
+
+        if (existente) {
+            const cambios = {};
+
+            if (existente.nombre !== proyecto.nombre) {
+                cambios.nombre = proyecto.nombre;
+            }
+
+            if (proyecto.fechaIngreso && existente.fecha_entrada !== proyecto.fechaIngreso) {
+                cambios.fecha_entrada = proyecto.fechaIngreso;
+            }
+
+            if (proyecto.fechaEntrega && existente.fecha_limite !== proyecto.fechaEntrega) {
+                cambios.fecha_limite = proyecto.fechaEntrega;
+            }
+
+            if (proyecto.estaEntregado && existente.etapa_actual !== 'completado') {
+                cambios.etapa_actual = 'completado';
+                cambios.fecha_completado = new Date();
+            }
+
+            if (proyecto.tipoProyecto && existente.tipo_proyecto !== proyecto.tipoProyecto.toUpperCase()) {
+                cambios.tipo_proyecto = proyecto.tipoProyecto.toUpperCase();
+            }
+
+            if (existente.es_extensivo !== proyecto.esExtensivo) {
+                cambios.es_extensivo = proyecto.esExtensivo;
+            }
+
+            if (Object.keys(cambios).length > 0) {
+                await existente.update(cambios);
+                actualizados++;
+                console.log(`📝 Actualizado: "${proyecto.nombre}" (${mes}) - Cambios: ${Object.keys(cambios).join(', ')}`);
+            }
+        } else {
+            await ProduccionProyecto.create({
+                nombre: proyecto.nombre,
+                fecha_entrada: proyecto.fechaIngreso,
+                fecha_limite: proyecto.fechaEntrega,
+                etapa_actual: proyecto.estaEntregado ? 'completado' : 'diseno',
+                spreadsheet_row_id: proyecto.spreadsheetRowId,
+                tipo_proyecto: proyecto.tipoProyecto ? proyecto.tipoProyecto.toUpperCase() : null,
+                es_extensivo: proyecto.esExtensivo,
+                prioridad: 3,
+                activo: true
+            });
+            creados++;
+            console.log(`✨ Creado: "${proyecto.nombre}" (${mes}) - ${proyecto.tipoProyecto || 'sin tipo'}`);
+        }
+    }
+
+    return { creados, actualizados, total: resultado.data.length };
+};
+
+/**
+ * Sincronizar proyectos del spreadsheet con la base de datos.
+ * - Si se pasa un mes específico, sincroniza solo esa pestaña.
+ * - Si no se pasa mes, sincroniza todas las pestañas desde ENERO hasta el mes actual,
+ *   de modo que los proyectos rezagados de meses anteriores también se actualizan.
+ * @param {string} mes - Mes específico a sincronizar (opcional)
  */
 export const sincronizarConDB = async (mes = null) => {
     try {
-        // Leer proyectos del spreadsheet
-        const resultado = await leerProyectosProduccion(mes);
+        // Mes específico solicitado → una sola pestaña
+        if (mes) {
+            console.log(`🔄 Sincronizando mes específico: ${mes}...`);
+            const resultado = await sincronizarMes(mes);
+            console.log(`✅ Sincronización completada (${mes}): ${resultado.creados} creados, ${resultado.actualizados} actualizados`);
 
-        if (!resultado.success || resultado.data.length === 0) {
             return {
                 success: true,
-                message: 'No hay proyectos para sincronizar',
-                creados: 0,
-                actualizados: 0,
-                total: 0
+                message: `Sincronización completada (${mes})`,
+                meses: [mes],
+                creados: resultado.creados,
+                actualizados: resultado.actualizados,
+                total: resultado.total
             };
         }
 
-        let creados = 0;
-        let actualizados = 0;
+        // Sin mes → iterar desde enero hasta el mes actual
+        const ahora = new Date();
+        const mesActualIndex = ahora.getMonth(); // 0 = enero
+        const mesesCandidatos = MESES.slice(0, mesActualIndex + 1);
 
-        for (const proyecto of resultado.data) {
-            // Buscar si ya existe por spreadsheet_row_id
-            const existente = await ProduccionProyecto.findOne({
-                where: { spreadsheet_row_id: proyecto.spreadsheetRowId }
-            });
+        console.log(`🔄 Sincronizando meses: ${mesesCandidatos.join(', ')}...`);
 
-            if (existente) {
-                // Actualizar si cambió algo importante
-                const cambios = {};
+        let totalCreados = 0;
+        let totalActualizados = 0;
+        let totalProyectos = 0;
+        const mesesSincronizados = [];
 
-                if (existente.nombre !== proyecto.nombre) {
-                    cambios.nombre = proyecto.nombre;
+        for (const m of mesesCandidatos) {
+            try {
+                const resultado = await sincronizarMes(m);
+                totalCreados += resultado.creados;
+                totalActualizados += resultado.actualizados;
+                totalProyectos += resultado.total;
+                mesesSincronizados.push(m);
+            } catch (error) {
+                // Pestaña inexistente en el spreadsheet → se omite sin cortar el bucle
+                if (error.message?.includes('no existe')) {
+                    console.log(`⚠️ Pestaña "${m}" no encontrada en el spreadsheet, se omitió`);
+                    continue;
                 }
-
-                // Actualizar fecha_entrada si existe en el sheet y es diferente o estaba vacía
-                if (proyecto.fechaIngreso && existente.fecha_entrada !== proyecto.fechaIngreso) {
-                    cambios.fecha_entrada = proyecto.fechaIngreso;
-                }
-
-                // Actualizar fecha_limite si existe en el sheet y es diferente o estaba vacía
-                if (proyecto.fechaEntrega && existente.fecha_limite !== proyecto.fechaEntrega) {
-                    cambios.fecha_limite = proyecto.fechaEntrega;
-                }
-
-                if (proyecto.estaEntregado && existente.etapa_actual !== 'completado') {
-                    cambios.etapa_actual = 'completado';
-                    cambios.fecha_completado = new Date();
-                }
-
-                // Actualizar tipo_proyecto si cambió
-                if (proyecto.tipoProyecto && existente.tipo_proyecto !== proyecto.tipoProyecto.toUpperCase()) {
-                    cambios.tipo_proyecto = proyecto.tipoProyecto.toUpperCase();
-                }
-
-                // Actualizar es_extensivo si cambió
-                if (existente.es_extensivo !== proyecto.esExtensivo) {
-                    cambios.es_extensivo = proyecto.esExtensivo;
-                }
-
-                if (Object.keys(cambios).length > 0) {
-                    await existente.update(cambios);
-                    actualizados++;
-                    console.log(`📝 Actualizado: "${proyecto.nombre}" - Cambios: ${Object.keys(cambios).join(', ')}`);
-                }
-            } else {
-                // Crear nuevo proyecto
-                await ProduccionProyecto.create({
-                    nombre: proyecto.nombre,
-                    fecha_entrada: proyecto.fechaIngreso,
-                    fecha_limite: proyecto.fechaEntrega,
-                    etapa_actual: proyecto.estaEntregado ? 'completado' : 'diseno',
-                    spreadsheet_row_id: proyecto.spreadsheetRowId,
-                    tipo_proyecto: proyecto.tipoProyecto ? proyecto.tipoProyecto.toUpperCase() : null,
-                    es_extensivo: proyecto.esExtensivo,
-                    prioridad: 3, // Prioridad normal por defecto
-                    activo: true
-                });
-                creados++;
-                console.log(`✨ Creado: "${proyecto.nombre}" (${proyecto.tipoProyecto || 'sin tipo'})`);
+                throw error;
             }
         }
 
-        console.log(`🔄 Sincronización completada: ${creados} creados, ${actualizados} actualizados`);
+        console.log(`✅ Sincronización completada: ${totalCreados} creados, ${totalActualizados} actualizados en ${mesesSincronizados.length} mes(es)`);
 
         return {
             success: true,
-            message: `Sincronización completada`,
-            mes: resultado.mes,
-            creados,
-            actualizados,
-            total: resultado.data.length
+            message: `Sincronización completada (${mesesSincronizados.length} mes${mesesSincronizados.length !== 1 ? 'es' : ''})`,
+            meses: mesesSincronizados,
+            creados: totalCreados,
+            actualizados: totalActualizados,
+            total: totalProyectos
         };
 
     } catch (error) {
