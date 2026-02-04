@@ -287,7 +287,6 @@ const PedidoPage = () => {
 
           // Generar PDF (descarga automática + retorna base64)
           const pdfBase64 = await generateTicketPDF(pedidoData);
-          toast.info(`DEBUG: base64=${!!pdfBase64} proyecto="${pedidoData.proyecto}" ticket="${pedidoData.ticket_id}"`);
 
           // Subir ticket a la carpeta del proyecto en Drive
           if (pdfBase64 && pedidoData.proyecto) {
