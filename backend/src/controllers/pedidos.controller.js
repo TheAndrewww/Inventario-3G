@@ -1,7 +1,8 @@
-import { Movimiento, DetalleMovimiento, Articulo, Usuario, Categoria, Ubicacion, Equipo, SolicitudCompra, OrdenCompra, Proveedor, ArticuloProveedor, TipoHerramientaRenta } from '../models/index.js';
+import { Movimiento, DetalleMovimiento, Articulo, Usuario, Categoria, Ubicacion, Equipo, SolicitudCompra, OrdenCompra, Proveedor, ArticuloProveedor, TipoHerramientaRenta, ProduccionProyecto } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { crearNotificacion, notificarPorRol } from './notificaciones.controller.js';
+import { buscarCarpetaProyecto, uploadTicket } from '../services/googleDrive.service.js';
 import admin from 'firebase-admin';
 
 /**
@@ -94,7 +95,7 @@ export const crearPedido = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { articulos, proyecto, equipo_id, camioneta_id, ubicacion_destino_id, observaciones } = req.body;
+    const { articulos, proyecto, equipo_id, camioneta_id, ubicacion_destino_id, observaciones, supervisor_id } = req.body;
     const usuario_id = req.usuario.id;
     const usuario_rol = req.usuario.rol;
 
@@ -387,6 +388,7 @@ export const crearPedido = async (req, res) => {
       fecha_hora: new Date(),
       usuario_id,
       proyecto: proyecto || null,
+      supervisor_id: supervisor_id || null,
       estado: estado_inicial,
       observaciones: observaciones || null,
       total_piezas: articulos.reduce((sum, art) => sum + art.cantidad, 0)
@@ -2507,6 +2509,69 @@ export const marcarPedidoEntregadoDirecto = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al marcar pedido como entregado',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Subir ticket PDF a la carpeta del proyecto en Google Drive
+ * El frontend genera el PDF y envía el contenido en base64
+ */
+export const uploadTicketToDrive = async (req, res) => {
+  try {
+    const { ticket_id, proyecto, pdf_base64 } = req.body;
+
+    if (!ticket_id || !proyecto || !pdf_base64) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requieren ticket_id, proyecto y pdf_base64'
+      });
+    }
+
+    // 1. Buscar drive_folder_id en la base de datos (más rápido que Drive API)
+    const proyectoObj = await ProduccionProyecto.findOne({
+      where: { nombre: proyecto, activo: true },
+      attributes: ['id', 'nombre', 'drive_folder_id']
+    });
+
+    let carpetaId = proyectoObj?.drive_folder_id;
+
+    // 2. Fallback: buscar directamente en Drive por nombre
+    if (!carpetaId) {
+      const carpeta = await buscarCarpetaProyecto(proyecto);
+      if (carpeta) {
+        carpetaId = carpeta.id;
+        // Guardar para futuras búsquedas
+        if (proyectoObj) {
+          await proyectoObj.update({ drive_folder_id: carpeta.id });
+        }
+      }
+    }
+
+    if (!carpetaId) {
+      return res.status(404).json({
+        success: false,
+        message: `Carpeta del proyecto "${proyecto}" no encontrada en Drive`
+      });
+    }
+
+    // 3. Convertir base64 a Buffer y subir
+    const pdfBuffer = Buffer.from(pdf_base64, 'base64');
+    const fileName = `Ticket-${ticket_id}.pdf`;
+
+    const archivo = await uploadTicket(carpetaId, pdfBuffer, fileName);
+
+    res.json({
+      success: true,
+      message: `Ticket ${ticket_id} subido a la carpeta del proyecto`,
+      data: { archivo }
+    });
+  } catch (error) {
+    console.error('Error al subir ticket a Drive:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al subir ticket a Drive',
       error: error.message
     });
   }

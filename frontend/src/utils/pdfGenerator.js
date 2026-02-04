@@ -260,11 +260,17 @@ export const generateTicketPDF = async (pedido) => {
       doc.setGState(doc.GState({ opacity: 1 }));
     }
 
+    // Obtener base64 antes de salvar (para subir a Drive)
+    const pdfBase64 = doc.output('base64');
+
     // Descargar PDF
     doc.save(`Ticket-${pedido.ticket_id}.pdf`);
     toast.success('Ticket descargado correctamente');
+
+    return pdfBase64;
   } catch (error) {
     console.error('Error al generar PDF:', error);
     toast.error('Error al generar el PDF');
+    return null;
   }
 };

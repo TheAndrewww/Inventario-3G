@@ -8,6 +8,9 @@ import pedidosService from '../services/pedidos.service';
 import camionetasService from '../services/camionetas.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import articulosService from '../services/articulos.service';
+import produccionService from '../services/produccion.service';
+import usuariosService from '../services/usuarios.service';
+import { flattenProyectos } from '../utils/produccion';
 import EAN13Scanner from '../components/scanner/EAN13Scanner';
 import ArticuloFormModal from '../components/articulos/ArticuloFormModal';
 import toast from 'react-hot-toast';
@@ -42,6 +45,11 @@ const PedidoPage = () => {
   const [ubicaciones, setUbicaciones] = useState([]);
   const [ubicacionDestino, setUbicacionDestino] = useState('');
   const [cargandoUbicaciones, setCargandoUbicaciones] = useState(false);
+  const [proyectosProduccion, setProyectosProduccion] = useState([]);
+  const [cargandoProyectos, setCargandoProyectos] = useState(false);
+  const [encargados, setEncargados] = useState([]);
+  const [encargadoSeleccionado, setEncargadoSeleccionado] = useState('');
+  const [cargandoEncargados, setCargandoEncargados] = useState(false);
 
   // Estados para búsqueda rápida
   const [busqueda, setBusqueda] = useState('');
@@ -124,6 +132,54 @@ const PedidoPage = () => {
 
     cargarUbicaciones();
   }, []);
+
+  // Cargar proyectos activos de producción (para diseñador/admin)
+  useEffect(() => {
+    const cargarProyectos = async () => {
+      if (user?.rol !== 'almacen') {
+        try {
+          setCargandoProyectos(true);
+          const response = await produccionService.obtenerDashboard();
+          if (response.success) {
+            const todos = flattenProyectos(response.data.resumen);
+            setProyectosProduccion(todos.filter(p =>
+              p.etapa_actual !== 'completado' && (
+                (p.tipo_proyecto !== 'MTO' && p.tipo_proyecto !== 'GTIA') ||
+                (p.tipo_proyecto === 'MTO' && p.es_extensivo)
+              )
+            ));
+          }
+        } catch (error) {
+          console.error('Error al cargar proyectos:', error);
+        } finally {
+          setCargandoProyectos(false);
+        }
+      }
+    };
+
+    cargarProyectos();
+  }, [user]);
+
+  // Cargar encargados (para diseñador/admin/compras)
+  useEffect(() => {
+    const cargarEncargados = async () => {
+      if (user?.rol !== 'almacen') {
+        try {
+          setCargandoEncargados(true);
+          const response = await usuariosService.obtenerEncargados();
+          if (response.success) {
+            setEncargados(response.data.encargados || []);
+          }
+        } catch (error) {
+          console.error('Error al cargar encargados:', error);
+        } finally {
+          setCargandoEncargados(false);
+        }
+      }
+    };
+
+    cargarEncargados();
+  }, [user]);
 
   const handleCantidadChange = (id, value) => {
     const cantidad = parseInt(value);
@@ -209,6 +265,9 @@ const PedidoPage = () => {
           // Si no hay ubicación destino, el proyecto es obligatorio
           data.proyecto = proyecto.trim();
         }
+        if (encargadoSeleccionado) {
+          data.supervisor_id = parseInt(encargadoSeleccionado);
+        }
       }
 
       const response = await pedidosService.crear(data);
@@ -223,16 +282,28 @@ const PedidoPage = () => {
       try {
         const pedidoCreado = response.data.pedido;
         if (pedidoCreado && pedidoCreado.id) {
-          // Obtener detalles completos incluyendo artículos
           const pedidoCompleto = await pedidosService.obtenerPorId(pedidoCreado.id);
+          const pedidoData = pedidoCompleto.data.pedido;
 
-          // Generar PDF automáticamente
-          // La respuesta tiene la estructura: { success: true, data: { pedido: {...} } }
-          await generateTicketPDF(pedidoCompleto.data.pedido);
+          // Generar PDF (descarga automática + retorna base64)
+          const pdfBase64 = await generateTicketPDF(pedidoData);
+
+          // Subir ticket a la carpeta del proyecto en Drive
+          if (pdfBase64 && pedidoData.proyecto) {
+            try {
+              await pedidosService.uploadTicketDrive({
+                ticket_id: pedidoData.ticket_id,
+                proyecto: pedidoData.proyecto,
+                pdf_base64: pdfBase64
+              });
+            } catch (driveError) {
+              console.error('Error al subir ticket a Drive:', driveError);
+              // No bloquear si falla la subida a Drive
+            }
+          }
         }
       } catch (pdfError) {
         console.error('Error al generar PDF:', pdfError);
-        // No bloquear el flujo si falla el PDF
         toast.error('El pedido se creó pero hubo un error al generar el PDF');
       }
 
@@ -242,6 +313,7 @@ const PedidoPage = () => {
       setEquipoSeleccionado('');
       setCamionetaSeleccionada('');
       setUbicacionDestino('');
+      setEncargadoSeleccionado('');
 
       navigate('/historial');
     } catch (error) {
@@ -730,22 +802,50 @@ const PedidoPage = () => {
                       <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                         <div className="flex items-center gap-2">
                           <Package size={14} />
-                          <span>Nombre del Proyecto *</span>
+                          <span>Proyecto *</span>
                         </div>
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={proyecto}
                         onChange={(e) => setProyecto(e.target.value)}
-                        placeholder="Ej: Instalación Centro Comercial..."
                         className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                        disabled={cargandoProyectos}
                         required={!ubicacionDestino}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Requerido solo si no seleccionaste una ubicación arriba
-                      </p>
+                      >
+                        <option value="">Selecciona un proyecto...</option>
+                        {proyectosProduccion.map(p => (
+                          <option key={p.id} value={p.nombre}>
+                            {p.nombre}{p.cliente ? ` — ${p.cliente}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {proyectosProduccion.length === 0 && !cargandoProyectos && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          No hay proyectos activos en producción
+                        </p>
+                      )}
                     </div>
                   )}
+
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
+                      <div className="flex items-center gap-2">
+                        <Users size={14} />
+                        <span>Encargado (Opcional)</span>
+                      </div>
+                    </label>
+                    <select
+                      value={encargadoSeleccionado}
+                      onChange={(e) => setEncargadoSeleccionado(e.target.value)}
+                      className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                      disabled={cargandoEncargados}
+                    >
+                      <option value="">Sin encargado</option>
+                      {encargados.map(e => (
+                        <option key={e.id} value={e.id}>{e.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
                 </>
               )}
 

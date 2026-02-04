@@ -158,6 +158,14 @@ const pedidosService = {
   entregarDirecto: async (pedidoId) => {
     const response = await api.put(`/pedidos/${pedidoId}/entregar-directo`);
     return response.data;
+  },
+
+  /**
+   * Subir ticket PDF a la carpeta del proyecto en Drive
+   */
+  uploadTicketDrive: async ({ ticket_id, proyecto, pdf_base64 }) => {
+    const response = await api.post('/pedidos/ticket-drive', { ticket_id, proyecto, pdf_base64 });
+    return response.data;
   }
 };
 

@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { Readable } from 'stream';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -22,7 +23,8 @@ const authenticate = async () => {
                 credentials,
                 scopes: [
                     'https://www.googleapis.com/auth/drive.readonly',
-                    'https://www.googleapis.com/auth/drive.metadata.readonly'
+                    'https://www.googleapis.com/auth/drive.metadata.readonly',
+                    'https://www.googleapis.com/auth/drive.file'
                 ],
             };
         }
@@ -32,7 +34,8 @@ const authenticate = async () => {
                 keyFile: path.join(__dirname, '../../google-credentials.json'),
                 scopes: [
                     'https://www.googleapis.com/auth/drive.readonly',
-                    'https://www.googleapis.com/auth/drive.metadata.readonly'
+                    'https://www.googleapis.com/auth/drive.metadata.readonly',
+                    'https://www.googleapis.com/auth/drive.file'
                 ],
             };
         }
@@ -314,10 +317,44 @@ export const sincronizarProyecto = async (proyecto) => {
     }
 };
 
+/**
+ * Subir un archivo PDF a una carpeta de Drive
+ * @param {string} carpetaId - ID de la carpeta destino
+ * @param {Buffer} pdfBuffer - Buffer del PDF
+ * @param {string} fileName - Nombre del archivo
+ * @returns {Promise<Object>} - Datos del archivo creado en Drive
+ */
+export const uploadTicket = async (carpetaId, pdfBuffer, fileName) => {
+    try {
+        const drive = await authenticate();
+        const stream = Readable.from(pdfBuffer);
+
+        const response = await drive.files.create({
+            requestBody: {
+                name: fileName,
+                mimeType: 'application/pdf',
+                parents: [carpetaId]
+            },
+            media: {
+                mimeType: 'application/pdf',
+                body: stream
+            },
+            fields: 'id, name, webViewLink'
+        });
+
+        console.log(`✅ Ticket "${fileName}" subido a Drive (carpeta ${carpetaId})`);
+        return response.data;
+    } catch (error) {
+        console.error('❌ Error al subir ticket a Drive:', error.message);
+        throw error;
+    }
+};
+
 export default {
     buscarCarpetaProyecto,
     clasificarArchivosPDF,
     obtenerLinksArchivo,
     sincronizarProyecto,
+    uploadTicket,
     PRODUCCION_FOLDER_ID
 };

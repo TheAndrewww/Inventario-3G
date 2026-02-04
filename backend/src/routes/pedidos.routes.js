@@ -18,7 +18,8 @@ import {
   recibirPedido,
   rechazarPedidoListoParaEntrega,
   listarSupervisores,
-  marcarPedidoEntregadoDirecto
+  marcarPedidoEntregadoDirecto,
+  uploadTicketToDrive
 } from '../controllers/pedidos.controller.js';
 import {
   verificarToken,
@@ -39,6 +40,18 @@ router.post(
   verificarToken,
   verificarRol('diseñador', 'administrador', 'almacen'),
   crearPedido
+);
+
+/**
+ * @route   POST /api/pedidos/ticket-drive
+ * @desc    Subir ticket PDF a la carpeta del proyecto en Drive
+ * @access  Diseñador, Administrador
+ */
+router.post(
+  '/ticket-drive',
+  verificarToken,
+  verificarRol('diseñador', 'administrador'),
+  uploadTicketToDrive
 );
 
 /**

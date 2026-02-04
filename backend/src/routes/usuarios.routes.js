@@ -26,12 +26,12 @@ router.get(
 /**
  * @route   GET /api/usuarios/encargados
  * @desc    Obtener solo encargados activos
- * @access  Administrador, Encargado
+ * @access  Administrador, Encargado, Diseñador, Compras
  */
 router.get(
   '/encargados',
   verificarToken,
-  verificarRol('administrador', 'encargado'),
+  verificarRol('administrador', 'encargado', 'diseñador', 'compras'),
   obtenerEncargados
 );
 
