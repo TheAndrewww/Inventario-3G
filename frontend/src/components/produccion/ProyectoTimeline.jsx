@@ -12,6 +12,7 @@ import {
     RefreshCw,
     ChevronRight
 } from 'lucide-react';
+import { s, px } from '../../utils/produccion';
 
 export const ETAPAS_CONFIG = {
     pendiente: { nombre: 'Pendiente', color: '#9CA3AF', bgColor: 'bg-gray-400', icon: Circle, orden: 0 },
@@ -41,7 +42,7 @@ const ProyectoTimeline = ({ proyecto, onCompletar }) => {
     const estadoRetraso = proyecto.estadoRetraso || { enRetraso: false };
     const enRetraso = estadoRetraso.enRetraso;
 
-    const urgenciaPorFecha = diasRestantes !== null && (esMTO ? diasRestantes < 0 : diasRestantes <= 3);
+    const urgenciaPorFecha = diasRestantes !== null && diasRestantes <= 3;
     const esUrgente = proyecto.prioridad === 1 || esGarantia || urgenciaPorFecha || enRetraso;
 
     const tieneProduccion = proyecto.tiene_manufactura || proyecto.tiene_herreria;
@@ -73,10 +74,6 @@ const ProyectoTimeline = ({ proyecto, onCompletar }) => {
     const colorTipo = getColorPorTipo(proyecto.tipo_proyecto);
     const bgFinal = enRetraso ? 'bg-red-50' : colorTipo.bg;
     const borderFinal = enRetraso ? 'border-l-4 border-red-500' : colorTipo.border;
-
-    // Helpers de escalado (funcionan con --escala de la TV; en el dashboard normal defaultean a 1)
-    const s = (val) => `calc(${val}rem * var(--escala, 1))`;
-    const px = (val) => `calc(${val}px * var(--escala, 1))`;
 
     // --- Avanzar etapa ---
     const handleCompletar = async () => {

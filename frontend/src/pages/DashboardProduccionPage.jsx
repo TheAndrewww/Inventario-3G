@@ -4,10 +4,12 @@ import {
     Monitor,
     ExternalLink,
     Cloud,
-    Database
+    Database,
+    Plus
 } from 'lucide-react';
 import produccionService from '../services/produccion.service';
 import { Loader, Modal, Button } from '../components/common';
+import { sortProyectosPorUrgencia, flattenProyectos } from '../utils/produccion';
 import toast from 'react-hot-toast';
 import ProyectoTimeline from '../components/produccion/ProyectoTimeline';
 import EstadisticasHeader from '../components/produccion/EstadisticasHeader';
@@ -162,19 +164,14 @@ const DashboardProduccionPage = () => {
     const [filtro, setFiltro] = useState('activos');
     const [sincronizando, setSincronizando] = useState(false);
     const [ultimaSync, setUltimaSync] = useState(null);
+    const [modalOpen, setModalOpen] = useState(false);
 
     const cargarDatos = useCallback(async () => {
         try {
             setLoading(true);
             const response = await produccionService.obtenerDashboard();
             if (response.success) {
-                // Combinar todos los proyectos de todas las etapas
-                const todosProyectos = [];
-                Object.keys(response.data.resumen).forEach(etapa => {
-                    const proyectosEtapa = response.data.resumen[etapa]?.proyectos || [];
-                    todosProyectos.push(...proyectosEtapa);
-                });
-                setProyectos(todosProyectos);
+                setProyectos(flattenProyectos(response.data.resumen));
                 setEstadisticas(response.data.estadisticas);
             }
         } catch (error) {
@@ -247,7 +244,7 @@ const DashboardProduccionPage = () => {
 
             const response = await produccionService.sincronizarTodosDrive();
 
-            if (response.success) {
+            if (response?.success) {
                 toast.success(
                     `Drive actualizado: ${response.data.exitosos} proyectos procesados`,
                     { id: 'sync-drive' }
@@ -264,8 +261,7 @@ const DashboardProduccionPage = () => {
         }
     };
 
-    // Filtros
-    const proyectosFiltrados = proyectos.filter(p => {
+    const proyectosFiltrados = sortProyectosPorUrgencia(proyectos.filter(p => {
         switch (filtro) {
             case 'activos':
                 return p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente';
@@ -276,37 +272,8 @@ const DashboardProduccionPage = () => {
             default:
                 return true;
         }
-    }).sort((a, b) => {
-        // 1. En retraso primero (tipos A/B/C que superaron tiempo por etapa)
-        const aRetraso = a.estadoRetraso?.enRetraso ? 1 : 0;
-        const bRetraso = b.estadoRetraso?.enRetraso ? 1 : 0;
-        if (aRetraso !== bRetraso) return bRetraso - aRetraso;
+    }));
 
-        // 2. Si ambos en retraso, el que tiene más días de retraso primero
-        if (aRetraso && bRetraso) {
-            const aRetrasoDias = a.estadoRetraso?.diasRetraso || 0;
-            const bRetrasoDias = b.estadoRetraso?.diasRetraso || 0;
-            if (aRetrasoDias !== bRetrasoDias) return bRetrasoDias - aRetrasoDias;
-        }
-
-        // 3. Vencidos (fecha límite superada)
-        const aVencido = a.diasRestantes !== null && a.diasRestantes < 0;
-        const bVencido = b.diasRestantes !== null && b.diasRestantes < 0;
-        if (aVencido !== bVencido) return aVencido ? -1 : 1;
-
-        // 4. Por prioridad
-        const aPrioridad = a.prioridad || 3;
-        const bPrioridad = b.prioridad || 3;
-        if (aPrioridad !== bPrioridad) return aPrioridad - bPrioridad;
-
-        // 5. Tiebreaker: diasRestantesEtapa (menor = más urgente)
-        const aDiasEtapa = a.estadoRetraso?.diasRestantesEtapa ?? a.diasRestantes ?? 999;
-        const bDiasEtapa = b.estadoRetraso?.diasRestantesEtapa ?? b.diasRestantes ?? 999;
-        return aDiasEtapa - bDiasEtapa;
-    });
-
-    // Nuevo Proyecto Modal
-    const [modalOpen, setModalOpen] = useState(false);
     const handleCrearProyecto = async (data) => {
         try {
             const response = await produccionService.crearProyecto(data);
@@ -382,6 +349,16 @@ const DashboardProduccionPage = () => {
                         >
                             <Cloud size={16} />
                             {sincronizando ? '...' : 'Sync Drive'}
+                        </button>
+
+                        <div className="h-8 w-px bg-gray-300 mx-1 hidden lg:block"></div>
+
+                        <button
+                            onClick={() => setModalOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm font-medium"
+                        >
+                            <Plus size={16} />
+                            Nuevo Proyecto
                         </button>
                     </div>
                 </div>

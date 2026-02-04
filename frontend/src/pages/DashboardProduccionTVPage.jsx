@@ -5,6 +5,7 @@ import { Loader } from '../components/common';
 import toast, { Toaster } from 'react-hot-toast';
 import ProyectoTimeline from '../components/produccion/ProyectoTimeline';
 import EstadisticasHeader from '../components/produccion/EstadisticasHeader';
+import { sortProyectosPorUrgencia, flattenProyectos, px, s } from '../utils/produccion';
 
 const DashboardProduccionTVPage = () => {
     const [loading, setLoading] = useState(true);
@@ -38,12 +39,7 @@ const DashboardProduccionTVPage = () => {
             setLoading(true);
             const response = await produccionService.obtenerDashboardPublico();
             if (response.success) {
-                const todosProyectos = [];
-                Object.keys(response.data.resumen).forEach(etapa => {
-                    const proyectosEtapa = response.data.resumen[etapa]?.proyectos || [];
-                    todosProyectos.push(...proyectosEtapa);
-                });
-                setProyectos(todosProyectos);
+                setProyectos(flattenProyectos(response.data.resumen));
                 setEstadisticas(response.data.estadisticas);
             }
         } catch (error) {
@@ -61,40 +57,9 @@ const DashboardProduccionTVPage = () => {
         return () => clearInterval(interval);
     }, [cargarDatos]);
 
-    // Filtrar activos y ordenar por urgencia
-    const proyectosActivos = proyectos
-        .filter(p => p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
-        .sort((a, b) => {
-            // 1. En retraso primero (tipos A/B/C que superaron tiempo por etapa)
-            const aRetraso = a.estadoRetraso?.enRetraso ? 1 : 0;
-            const bRetraso = b.estadoRetraso?.enRetraso ? 1 : 0;
-            if (aRetraso !== bRetraso) return bRetraso - aRetraso;
-
-            // 2. Si ambos en retraso, el que tiene más días de retraso primero
-            if (aRetraso && bRetraso) {
-                const aRetrasoDias = a.estadoRetraso?.diasRetraso || 0;
-                const bRetrasoDias = b.estadoRetraso?.diasRetraso || 0;
-                if (aRetrasoDias !== bRetrasoDias) return bRetrasoDias - aRetrasoDias;
-            }
-
-            // 3. Vencidos (fecha límite superada)
-            const aVencido = a.diasRestantes !== null && a.diasRestantes < 0;
-            const bVencido = b.diasRestantes !== null && b.diasRestantes < 0;
-            if (aVencido !== bVencido) return aVencido ? -1 : 1;
-
-            // 4. Por prioridad
-            const aPrioridad = a.prioridad || 3;
-            const bPrioridad = b.prioridad || 3;
-            if (aPrioridad !== bPrioridad) return aPrioridad - bPrioridad;
-
-            // 5. Tiebreaker: diasRestantesEtapa (menor = más urgente)
-            const aDiasEtapa = a.estadoRetraso?.diasRestantesEtapa ?? a.diasRestantes ?? 999;
-            const bDiasEtapa = b.estadoRetraso?.diasRestantesEtapa ?? b.diasRestantes ?? 999;
-            return aDiasEtapa - bDiasEtapa;
-        });
-
-    // Helpers for style
-    const px = (val) => `calc(${val}px * var(--escala, 1))`;
+    const proyectosActivos = sortProyectosPorUrgencia(
+        proyectos.filter(p => p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
+    );
 
     if (loading && proyectos.length === 0) {
         return <div className="flex items-center justify-center h-screen"><Loader size="lg" /></div>;
@@ -125,7 +90,7 @@ const DashboardProduccionTVPage = () => {
                             <ProyectoTimeline key={proyecto.id} proyecto={proyecto} />
                         ))}
                         {proyectosActivos.length === 0 && (
-                            <div className="text-center text-gray-500 font-bold" style={{ padding: px(80), fontSize: `calc(1.5rem * var(--escala, 1))` }}>
+                            <div className="text-center text-gray-500 font-bold" style={{ padding: px(80), fontSize: s(1.5) }}>
                                 No hay proyectos activos en producción
                             </div>
                         )}

@@ -1,10 +1,9 @@
 import React from 'react';
 import { Package, ShoppingCart, Factory, Truck } from 'lucide-react';
 import { ETAPAS_CONFIG } from './ProyectoTimeline';
+import { s, px } from '../../utils/produccion';
 
 const EstadisticasHeader = ({ estadisticas }) => {
-    const s = (val) => `calc(${val}rem * var(--escala, 1))`;
-    const px = (val) => `calc(${val}px * var(--escala, 1))`;
 
     const items = [
         { label: 'En Diseño',      value: estadisticas.diseno || 0,     color: ETAPAS_CONFIG.diseno.color,     icon: Package },
