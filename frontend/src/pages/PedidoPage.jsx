@@ -296,9 +296,10 @@ const PedidoPage = () => {
                 proyecto: pedidoData.proyecto,
                 pdf_base64: pdfBase64
               });
+              toast.success(`Ticket ${pedidoData.ticket_id} guardado en Drive`);
             } catch (driveError) {
               console.error('Error al subir ticket a Drive:', driveError);
-              // No bloquear si falla la subida a Drive
+              toast.error(`No se subió el ticket a Drive: ${driveError.response?.data?.message || driveError.message}`);
             }
           }
         }

@@ -23,7 +23,9 @@ const Notificacion = sequelize.define('Notificacion', {
       'solicitud_urgente',
       'pedido_aprobado',
       'pedido_rechazado',
-      'stock_bajo'
+      'stock_bajo',
+      'pedido_pendiente',
+      'pedido_pendiente_aprobacion'
     ),
     allowNull: false
   },
