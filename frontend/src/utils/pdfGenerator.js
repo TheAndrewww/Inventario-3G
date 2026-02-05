@@ -261,7 +261,7 @@ export const generateTicketPDF = async (pedido) => {
     }
 
     // Obtener base64 antes de salvar (para subir a Drive)
-    const pdfBase64 = doc.output('base64');
+    const pdfBase64 = doc.output('datauristring').split(';base64,')[1];
 
     // Descargar PDF
     doc.save(`Ticket-${pedido.ticket_id}.pdf`);
