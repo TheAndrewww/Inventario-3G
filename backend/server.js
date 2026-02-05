@@ -23,35 +23,47 @@ const allowedOrigins = [
     'http://localhost:5174',
     'http://localhost:5175',
     'http://192.168.100.26:5173', // Acceso desde red local (móviles)
+    'https://inventario-3-g.vercel.app', // Producción Vercel (explícito)
 ];
 
-// Agregar URL de producción si existe
+// Agregar URL de producción si existe en env
 if (process.env.FRONTEND_URL) {
     allowedOrigins.push(process.env.FRONTEND_URL);
     // Agregar también la versión con https
-    allowedOrigins.push(process.env.FRONTEND_URL.replace('http://', 'https://'));
+    if (process.env.FRONTEND_URL.startsWith('http://')) {
+        allowedOrigins.push(process.env.FRONTEND_URL.replace('http://', 'https://'));
+    }
 }
 
 console.log('🔒 CORS - Orígenes permitidos:', allowedOrigins);
 
 app.use(cors({
     origin: function (origin, callback) {
-        console.log('🔍 CORS - Origen recibido:', origin);
+        // Permite peticiones sin origen (ej: Postman, curl)
+        if (!origin) {
+            return callback(null, true);
+        }
 
-        // Permite peticiones si el origen está en la lista
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
+        // Permite si está en la lista explícita
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
         }
+
         // Permite cualquier URL de Vercel (*.vercel.app)
-        else if (origin && origin.includes('.vercel.app')) {
+        if (origin.endsWith('.vercel.app')) {
             console.log('✅ CORS - Origen de Vercel permitido:', origin);
-            callback(null, true);
+            return callback(null, true);
         }
-        else {
-            console.log('❌ CORS - Origen rechazado:', origin);
-            console.log('❌ CORS - Lista permitida:', allowedOrigins);
-            callback(new Error('CORS no permitido para este origen'));
+
+        // Permite cualquier URL de Railway (*.railway.app) - para testing
+        if (origin.endsWith('.railway.app')) {
+            console.log('✅ CORS - Origen de Railway permitido:', origin);
+            return callback(null, true);
         }
+
+        console.log('❌ CORS - Origen rechazado:', origin);
+        console.log('❌ CORS - Lista permitida:', allowedOrigins);
+        callback(new Error('CORS no permitido para este origen'));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

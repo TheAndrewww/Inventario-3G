@@ -339,7 +339,11 @@ export const uploadTicket = async (carpetaId, pdfBuffer, fileName) => {
                 mimeType: 'application/pdf',
                 body: stream
             },
-            fields: 'id, name, webViewLink'
+            fields: 'id, name, webViewLink',
+            // Soporte para Shared Drives y carpetas compartidas
+            // Esto permite que el Service Account suba archivos a carpetas
+            // donde tiene permisos de edición pero no es dueño
+            supportsAllDrives: true
         });
 
         console.log(`✅ Ticket "${fileName}" subido a Drive (carpeta ${carpetaId})`);
