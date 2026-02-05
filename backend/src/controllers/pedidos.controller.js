@@ -2569,9 +2569,15 @@ export const uploadTicketToDrive = async (req, res) => {
     });
   } catch (error) {
     console.error('Error al subir ticket a Drive:', error);
+
+    let message = 'Error al subir ticket a Drive';
+    if (error.message?.includes('storage quota')) {
+      message = 'Ticket no subido: la carpeta PRODUCCION debe moverse a un Shared Drive de Google para permitir subidas automáticas';
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Error al subir ticket a Drive',
+      message,
       error: error.message
     });
   }
