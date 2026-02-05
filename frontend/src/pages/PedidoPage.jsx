@@ -281,12 +281,14 @@ const PedidoPage = () => {
       // Obtener detalles completos del pedido para generar PDF
       try {
         const pedidoCreado = response.data.pedido;
+        toast.success(`D1: creado.id=${pedidoCreado?.id} keys=${Object.keys(response.data || {}).join(',')}`);
         if (pedidoCreado && pedidoCreado.id) {
           const pedidoCompleto = await pedidosService.obtenerPorId(pedidoCreado.id);
           const pedidoData = pedidoCompleto.data.pedido;
 
           // Generar PDF (descarga automática + retorna base64)
           const pdfBase64 = await generateTicketPDF(pedidoData);
+          toast.success(`D2: base64=${!!pdfBase64} proyecto="${pedidoData?.proyecto?.substring(0,20)}"`);
 
           // Subir ticket a la carpeta del proyecto en Drive
           if (pdfBase64 && pedidoData.proyecto) {
