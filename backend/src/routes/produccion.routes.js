@@ -7,6 +7,7 @@ import {
     validarCodigoArea,
     crearProyecto,
     actualizarProyecto,
+    togglePausa,
     eliminarProyecto,
     obtenerEstadisticas,
     sincronizarConSheets,
@@ -138,6 +139,13 @@ router.post('/', verificarRol('administrador', 'almacenista'), crearProyecto);
  * Acceso: Administrador, Almacenista
  */
 router.put('/:id', verificarRol('administrador', 'almacenista'), actualizarProyecto);
+
+/**
+ * POST /api/produccion/:id/toggle-pausa
+ * Pausar o reanudar proyecto
+ * Acceso: Administrador
+ */
+router.post('/:id/toggle-pausa', verificarRol('administrador'), togglePausa);
 
 /**
  * DELETE /api/produccion/:id

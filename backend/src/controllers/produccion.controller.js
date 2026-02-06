@@ -82,13 +82,19 @@ export const obtenerPorArea = async (req, res) => {
         let proyectos;
 
         // Manufactura y Herrería son sub-áreas de Producción
+        // ETAPAS PARALELAS: Mostrar proyectos que:
+        // 1. Están en etapa 'produccion' y no tienen la sub-etapa completada, O
+        // 2. Tienen archivos de manufactura/herreria en Drive (independientemente de la etapa actual)
         if (area === 'manufactura') {
-            // Obtener proyectos en producción que NO tienen manufactura completada
+            // Obtener proyectos que tienen manufactura pendiente o tienen archivos de manufactura
             proyectos = await ProduccionProyecto.findAll({
                 where: {
-                    etapa_actual: 'produccion',
                     activo: true,
-                    manufactura_completado: false
+                    manufactura_completado: false,
+                    [Op.or]: [
+                        { etapa_actual: 'produccion' },
+                        { tiene_manufactura: true } // Tiene archivos de manufactura en Drive
+                    ]
                 },
                 order: [
                     ['prioridad', 'ASC'],
@@ -96,12 +102,15 @@ export const obtenerPorArea = async (req, res) => {
                 ]
             });
         } else if (area === 'herreria') {
-            // Obtener proyectos en producción que NO tienen herrería completada
+            // Obtener proyectos que tienen herrería pendiente o tienen archivos de herrería
             proyectos = await ProduccionProyecto.findAll({
                 where: {
-                    etapa_actual: 'produccion',
                     activo: true,
-                    herreria_completado: false
+                    herreria_completado: false,
+                    [Op.or]: [
+                        { etapa_actual: 'produccion' },
+                        { tiene_herreria: true } // Tiene archivos de herrería en Drive
+                    ]
                 },
                 order: [
                     ['prioridad', 'ASC'],
@@ -221,12 +230,9 @@ export const completarSubEtapa = async (req, res) => {
             });
         }
 
-        if (proyecto.etapa_actual !== 'produccion') {
-            return res.status(400).json({
-                success: false,
-                message: 'El proyecto no está en la etapa de Producción'
-            });
-        }
+        // ETAPAS PARALELAS: Permitir completar sub-etapas incluso si el proyecto 
+        // no está formalmente en 'produccion' (ej: archivos subidos antes de terminar diseño)
+        // Ya no validamos etapa_actual === 'produccion'
 
         let usuarioId = null;
         if (req.usuario) {
@@ -368,6 +374,57 @@ export const actualizarProyecto = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al actualizar proyecto',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * POST /api/produccion/:id/toggle-pausa
+ * Pausar o reanudar un proyecto (estado congelado)
+ */
+export const togglePausa = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { motivo } = req.body;
+
+        const proyecto = await ProduccionProyecto.findByPk(id);
+
+        if (!proyecto) {
+            return res.status(404).json({
+                success: false,
+                message: 'Proyecto no encontrado'
+            });
+        }
+
+        const nuevoPausado = !proyecto.pausado;
+
+        await proyecto.update({
+            pausado: nuevoPausado,
+            pausado_en: nuevoPausado ? new Date() : null,
+            pausado_motivo: nuevoPausado ? (motivo || 'Sin motivo especificado') : null
+        });
+
+        const accion = nuevoPausado ? 'pausado' : 'reanudado';
+        console.log(`⏸️ Proyecto "${proyecto.nombre}" ${accion}`);
+
+        res.json({
+            success: true,
+            message: `Proyecto ${accion} exitosamente`,
+            data: {
+                proyecto: {
+                    ...proyecto.toJSON(),
+                    diasRestantes: proyecto.getDiasRestantes(),
+                    porcentaje: proyecto.getPorcentajeAvance()
+                },
+                pausado: nuevoPausado
+            }
+        });
+    } catch (error) {
+        console.error('Error al pausar/reanudar proyecto:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al pausar/reanudar proyecto',
             error: error.message
         });
     }

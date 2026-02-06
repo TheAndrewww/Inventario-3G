@@ -90,6 +90,11 @@ const ProduccionProyecto = sequelize.define('ProduccionProyecto', {
         references: { model: 'usuarios', key: 'id' },
         comment: 'Usuario que marcó Compras como completado'
     },
+    compras_en_proceso: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        comment: 'True si hay órdenes de compra pendientes para este proyecto'
+    },
 
     produccion_completado_en: {
         type: DataTypes.DATE,
@@ -139,6 +144,24 @@ const ProduccionProyecto = sequelize.define('ProduccionProyecto', {
     observaciones_instalacion: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+
+    // ===== Estado de pausa (Congelado) =====
+    pausado: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Proyecto en pausa/congelado - no muestra como atrasado'
+    },
+    pausado_en: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Timestamp cuando se pausó el proyecto'
+    },
+    pausado_motivo: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: 'Motivo de la pausa'
     },
 
     // ===== Sub-etapas de Producción (Paralelas) =====
@@ -551,10 +574,17 @@ ProduccionProyecto.obtenerPorEtapa = async function (etapa) {
  */
 ProduccionProyecto.obtenerResumenDashboard = async function () {
     const sequelize = await import('sequelize');
-    const { literal } = sequelize;
+    const { literal, Op } = sequelize;
 
     const proyectos = await this.findAll({
-        where: { activo: true },
+        where: {
+            activo: true,
+            // Excluir proyectos cancelados
+            [Op.or]: [
+                { tipo_proyecto: null },
+                { tipo_proyecto: { [Op.notILike]: 'CANCELADO%' } }
+            ]
+        },
         order: [
             // GTIA (garantías) primero
             [literal("CASE WHEN tipo_proyecto = 'GTIA' THEN 0 ELSE 1 END"), 'ASC'],

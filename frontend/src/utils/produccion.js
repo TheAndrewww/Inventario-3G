@@ -1,5 +1,6 @@
 /**
  * Ordena proyectos por urgencia (criterio único para Dashboard y TV).
+ *   0. Proyectos pausados van al final (después de todos los activos)
  *   1. En retraso primero (estadoRetraso.enRetraso — solo tipos A/B/C)
  *   2. Más días de retraso cuando ambos están en retraso
  *   3. Vencidos (diasRestantes < 0)
@@ -10,6 +11,11 @@
  */
 export const sortProyectosPorUrgencia = (proyectos) =>
     [...proyectos].sort((a, b) => {
+        // Proyectos pausados van al final
+        const aPausado = a.pausado ? 1 : 0;
+        const bPausado = b.pausado ? 1 : 0;
+        if (aPausado !== bPausado) return aPausado - bPausado;
+
         const aRetraso = a.estadoRetraso?.enRetraso ? 1 : 0;
         const bRetraso = b.estadoRetraso?.enRetraso ? 1 : 0;
         if (aRetraso !== bRetraso) return bRetraso - aRetraso;

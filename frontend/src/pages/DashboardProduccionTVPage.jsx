@@ -1,18 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
-import produccionService from '../services/produccion.service';
 import { Loader } from '../components/common';
-import toast, { Toaster } from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
 import ProyectoTimeline from '../components/produccion/ProyectoTimeline';
 import EstadisticasHeader from '../components/produccion/EstadisticasHeader';
-import { sortProyectosPorUrgencia, flattenProyectos, px, s } from '../utils/produccion';
+import { useProduccionData } from '../hooks/useProduccionData';
+import { sortProyectosPorUrgencia } from '../utils/produccion';
+import { px } from '../utils/produccion';
 
 const DashboardProduccionTVPage = () => {
-    const [loading, setLoading] = useState(true);
-    const [proyectos, setProyectos] = useState([]);
-    const [estadisticas, setEstadisticas] = useState({});
+    // Hook para datos (modo público, refresh cada 1 min)
+    const { proyectos, estadisticas, loading } = useProduccionData({
+        autoSync: false,
+        refreshInterval: 60 * 1000,
+        isPublic: true
+    });
 
-    // Zoom & Orientation State
+    // Zoom y Orientación (persistidos en localStorage)
     const [zoomLevel, setZoomLevel] = useState(() => {
         const savedZoom = localStorage.getItem('dashboardTVScale');
         return savedZoom ? parseFloat(savedZoom) : 1;
@@ -34,31 +38,12 @@ const DashboardProduccionTVPage = () => {
     const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
     const toggleOrientacion = () => setOrientacion(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
 
-    const cargarDatos = useCallback(async () => {
-        try {
-            setLoading(true);
-            const response = await produccionService.obtenerDashboardPublico();
-            if (response.success) {
-                setProyectos(flattenProyectos(response.data.resumen));
-                setEstadisticas(response.data.estadisticas);
-            }
-        } catch (error) {
-            console.error('Error al cargar dashboard:', error);
-            toast.error('Error al cargar el dashboard');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        cargarDatos();
-        // Refresh every 1 minute
-        const interval = setInterval(cargarDatos, 60 * 1000);
-        return () => clearInterval(interval);
-    }, [cargarDatos]);
-
-    const proyectosActivos = sortProyectosPorUrgencia(
-        proyectos.filter(p => p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
+    // Proyectos activos ordenados por urgencia
+    const proyectosActivos = useMemo(() =>
+        sortProyectosPorUrgencia(
+            proyectos.filter(p => p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
+        ),
+        [proyectos]
     );
 
     if (loading && proyectos.length === 0) {
@@ -90,7 +75,7 @@ const DashboardProduccionTVPage = () => {
                             <ProyectoTimeline key={proyecto.id} proyecto={proyecto} />
                         ))}
                         {proyectosActivos.length === 0 && (
-                            <div className="text-center text-gray-500 font-bold" style={{ padding: px(80), fontSize: s(1.5) }}>
+                            <div className="text-center text-gray-500 font-bold" style={{ padding: px(80), fontSize: `calc(1.5rem * var(--escala, 1))` }}>
                                 No hay proyectos activos en producción
                             </div>
                         )}
@@ -98,7 +83,7 @@ const DashboardProduccionTVPage = () => {
                 </div>
             </div>
 
-            {/* En vivo indicator (Bottom Left) */}
+            {/* En vivo indicator */}
             <div
                 className={`fixed z-40 bg-white/80 backdrop-blur-sm rounded-full font-medium text-gray-500 shadow-sm border border-gray-100 flex items-center ${orientacion === 'vertical' ? 'bottom-4 right-4' : 'bottom-4 left-4'}`}
                 style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem', gap: '0.5rem' }}
@@ -106,36 +91,24 @@ const DashboardProduccionTVPage = () => {
                 <span>En vivo</span>
             </div>
 
-            {/* Controls (Bottom Right) - Hidden until hover */}
+            {/* Controls */}
             <div className={`fixed z-50 flex gap-2 transition-opacity duration-300 opacity-0 hover:opacity-100 ${orientacion === 'vertical' ? 'bottom-4 left-4' : 'bottom-4 right-4'}`}>
                 {/* Scale Controls */}
                 <div className="flex bg-gray-900 text-white rounded-lg shadow-xl overflow-hidden border border-gray-700">
-                    <button
-                        onClick={handleZoomOut}
-                        className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors"
-                        title="Reducir Escala"
-                    >
+                    <button onClick={handleZoomOut} className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors" title="Reducir Escala">
                         <ZoomOut size={20} />
                     </button>
                     <div className="px-3 py-1 text-sm font-bold flex items-center justify-center min-w-[50px] border-x border-gray-700 bg-gray-800">
                         {Math.round(zoomLevel * 100)}%
                     </div>
-                    <button
-                        onClick={handleZoomIn}
-                        className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors"
-                        title="Aumentar Escala"
-                    >
+                    <button onClick={handleZoomIn} className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors" title="Aumentar Escala">
                         <ZoomIn size={20} />
                     </button>
                 </div>
 
                 {/* Rotation Toggle */}
                 <div className="flex bg-gray-900 text-white rounded-lg shadow-xl overflow-hidden border border-gray-700">
-                    <button
-                        onClick={toggleOrientacion}
-                        className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors"
-                        title={`Cambiar a modo ${orientacion === 'horizontal' ? 'vertical' : 'horizontal'}`}
-                    >
+                    <button onClick={toggleOrientacion} className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors" title={`Cambiar a modo ${orientacion === 'horizontal' ? 'vertical' : 'horizontal'}`}>
                         <RotateCw size={20} />
                     </button>
                 </div>

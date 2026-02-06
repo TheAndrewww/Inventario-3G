@@ -66,6 +66,11 @@ export const completarSubEtapa = async (proyectoId, subEtapa) => {
     return response.data;
 };
 
+export const togglePausa = async (proyectoId, motivo = '') => {
+    const response = await api.post(`/produccion/${proyectoId}/toggle-pausa`, { motivo });
+    return response.data;
+};
+
 export const completarSubEtapaTerminal = async (proyectoId, subEtapa) => {
     const response = await api.post(`/produccion/terminal/${proyectoId}/completar-subetapa`, { subEtapa });
     return response.data;
@@ -129,6 +134,7 @@ export default {
     completarEtapaTerminal,
     completarSubEtapa,
     completarSubEtapaTerminal,
+    togglePausa,
     crearProyecto,
     actualizarProyecto,
     eliminarProyecto,

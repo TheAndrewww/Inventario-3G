@@ -563,6 +563,46 @@ export const crearPedido = async (req, res) => {
     }
     // ----------------------------------------
 
+    // --- INTEGRACIÓN ETAPAS PARALELAS: Actualizar estado de compras del proyecto ---
+    if (proyecto && tipo_pedido === 'proyecto') {
+      try {
+        // Buscar el proyecto de producción por nombre
+        const proyectoProduccion = await ProduccionProyecto.findOne({
+          where: {
+            nombre: proyecto,
+            activo: true
+          }
+        });
+
+        if (proyectoProduccion) {
+          if (solicitudesCreadas.length > 0) {
+            // Hay solicitudes de compra pendientes → marcar compras "en proceso" (naranja)
+            await proyectoProduccion.update({
+              compras_en_proceso: true,
+              compras_completado_en: null,
+              compras_completado_por: null
+            });
+            console.log(`📦 Proyecto ${proyecto}: Compras marcado EN PROCESO (${solicitudesCreadas.length} solicitudes pendientes)`);
+          } else {
+            // No hay solicitudes → stock suficiente → marcar compras como completado (verde)
+            // Solo si no está ya completado
+            if (!proyectoProduccion.compras_completado_en) {
+              await proyectoProduccion.update({
+                compras_en_proceso: false,
+                compras_completado_en: new Date(),
+                compras_completado_por: usuario_id
+              });
+              console.log(`✅ Proyecto ${proyecto}: Compras marcado COMPLETADO (stock suficiente)`);
+            }
+          }
+        }
+      } catch (proyectoError) {
+        console.error('Error al actualizar estado de compras del proyecto:', proyectoError);
+        // No bloqueamos la respuesta si falla esta actualización
+      }
+    }
+    // -----------------------------------------------------------------------------
+
     res.status(201).json({
       success: true,
       message: mensaje,

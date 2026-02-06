@@ -143,7 +143,9 @@ const PedidoPage = () => {
           if (response.success) {
             const todos = flattenProyectos(response.data.resumen);
             setProyectosProduccion(todos.filter(p =>
-              p.etapa_actual !== 'completado' && (
+              p.etapa_actual !== 'completado' &&
+              !p.tipo_proyecto?.toUpperCase().startsWith('CANCELADO') &&
+              (
                 (p.tipo_proyecto !== 'MTO' && p.tipo_proyecto !== 'GTIA') ||
                 (p.tipo_proyecto === 'MTO' && p.es_extensivo)
               )
@@ -506,11 +508,10 @@ const PedidoPage = () => {
                 </div>
                 <button
                   onClick={() => setShowScanner(!showScanner)}
-                  className={`px-4 py-3 rounded-lg border-2 transition-colors ${
-                    showScanner
+                  className={`px-4 py-3 rounded-lg border-2 transition-colors ${showScanner
                       ? 'bg-red-700 text-white border-red-700'
                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                  }`}
+                    }`}
                   title="Escanear código de barras"
                 >
                   <Barcode size={20} />

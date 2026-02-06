@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, lazy, Suspense } from 'react';
 import {
     Package,
     Monitor,
@@ -7,14 +7,14 @@ import {
     Database,
     Plus
 } from 'lucide-react';
-import produccionService from '../services/produccion.service';
 import { Loader, Modal, Button } from '../components/common';
-import { sortProyectosPorUrgencia, flattenProyectos } from '../utils/produccion';
 import toast from 'react-hot-toast';
 import ProyectoTimeline from '../components/produccion/ProyectoTimeline';
 import EstadisticasHeader from '../components/produccion/EstadisticasHeader';
+import { useProduccionData } from '../hooks/useProduccionData';
+import { useProduccionFilters } from '../hooks/useProduccionFilters';
 
-// Modal para nuevo proyecto
+// ============ Modal para nuevo proyecto ============
 const ModalNuevoProyecto = ({ isOpen, onClose, onCrear }) => {
     const [formData, setFormData] = useState({
         nombre: '',
@@ -34,9 +34,11 @@ const ModalNuevoProyecto = ({ isOpen, onClose, onCrear }) => {
 
         setLoading(true);
         try {
-            await onCrear(formData);
-            setFormData({ nombre: '', cliente: '', descripcion: '', prioridad: 3, fecha_limite: '' });
-            onClose();
+            const success = await onCrear(formData);
+            if (success) {
+                setFormData({ nombre: '', cliente: '', descripcion: '', prioridad: 3, fecha_limite: '' });
+                onClose();
+            }
         } finally {
             setLoading(false);
         }
@@ -129,163 +131,43 @@ const ModalNuevoProyecto = ({ isOpen, onClose, onCrear }) => {
     );
 };
 
-// Filtros
-const FiltrosProyectos = ({ filtro, setFiltro }) => {
-    const opciones = [
-        { value: 'todos', label: 'Todos' },
-        { value: 'activos', label: 'En Proceso' },
-        { value: 'urgentes', label: '🔴 Urgentes' },
-        { value: 'completados', label: '✅ Completados' }
-    ];
+// ============ Filtros ============
+const FiltrosProyectos = ({ filtro, setFiltro, opciones }) => (
+    <div className="flex gap-2 mb-4">
+        {opciones.map(op => (
+            <button
+                key={op.value}
+                onClick={() => setFiltro(op.value)}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${filtro === op.value
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+            >
+                {op.label}
+            </button>
+        ))}
+    </div>
+);
 
-    return (
-        <div className="flex gap-2 mb-4">
-            {opciones.map(op => (
-                <button
-                    key={op.value}
-                    onClick={() => setFiltro(op.value)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all ${filtro === op.value
-                        ? 'bg-gray-900 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                >
-                    {op.label}
-                </button>
-            ))}
-        </div>
-    );
-};
-
-// Página principal del Dashboard
+// ============ Página principal ============
 const DashboardProduccionPage = () => {
-    const [loading, setLoading] = useState(true);
-    const [proyectos, setProyectos] = useState([]);
-    const [estadisticas, setEstadisticas] = useState({});
-    const [filtro, setFiltro] = useState('activos');
-    const [sincronizando, setSincronizando] = useState(false);
-    const [ultimaSync, setUltimaSync] = useState(null);
     const [modalOpen, setModalOpen] = useState(false);
 
-    const cargarDatos = useCallback(async () => {
-        try {
-            setLoading(true);
-            const response = await produccionService.obtenerDashboard();
-            if (response.success) {
-                setProyectos(flattenProyectos(response.data.resumen));
-                setEstadisticas(response.data.estadisticas);
-            }
-        } catch (error) {
-            console.error('Error al cargar dashboard:', error);
-            toast.error('Error al cargar el dashboard');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    // Hooks personalizados
+    const {
+        proyectos,
+        estadisticas,
+        loading,
+        sincronizando,
+        ultimaSync,
+        sincronizarSheets,
+        sincronizarDrive,
+        completarEtapa,
+        crearProyecto,
+        togglePausa
+    } = useProduccionData({ autoSync: true, refreshInterval: 5 * 60 * 1000 });
 
-    useEffect(() => {
-        // Sincronizar automáticamente al cargar
-        const sincronizarYCargar = async () => {
-            try {
-                setSincronizando(true);
-                await produccionService.sincronizarConSheets();
-                setUltimaSync(new Date());
-            } catch (error) {
-                console.error('Error en sincronización automática:', error);
-            } finally {
-                setSincronizando(false);
-            }
-            await cargarDatos();
-        };
-
-        sincronizarYCargar();
-
-        // Auto-refresh: 5 minutos normal
-        const interval = setInterval(sincronizarYCargar, 5 * 60 * 1000);
-        return () => clearInterval(interval);
-    }, [cargarDatos]);
-
-    const handleCompletar = async (proyectoId) => {
-        try {
-            const response = await produccionService.completarEtapa(proyectoId);
-            if (response.success) {
-                toast.success(response.message);
-                cargarDatos();
-            }
-        } catch (error) {
-            console.error('Error al completar etapa:', error);
-            toast.error('Error al completar etapa');
-        }
-    };
-
-    const handleSincronizar = async () => {
-        try {
-            setSincronizando(true);
-            const response = await produccionService.sincronizarConSheets();
-            if (response.success) {
-                const mesesInfo = response.data.meses?.length > 1 ? ` (${response.data.meses.length} meses)` : '';
-                toast.success(
-                    `Sincronizado${mesesInfo}: ${response.data.creados} nuevos, ${response.data.actualizados} actualizados`
-                );
-                setUltimaSync(new Date());
-                cargarDatos();
-            }
-        } catch (error) {
-            console.error('Error al sincronizar:', error);
-            toast.error('Error al sincronizar con Google Sheets');
-        } finally {
-            setSincronizando(false);
-        }
-    };
-
-    const handleSincronizarDrive = async () => {
-        try {
-            setSincronizando(true);
-            toast.loading('Sincronizando con Drive (esto puede tardar unos segundos)...', { id: 'sync-drive' });
-
-            const response = await produccionService.sincronizarTodosDrive();
-
-            if (response?.success) {
-                toast.success(
-                    `Drive actualizado: ${response.data.exitosos} proyectos procesados`,
-                    { id: 'sync-drive' }
-                );
-                cargarDatos();
-            } else {
-                toast.error('Error al sincronizar con Drive', { id: 'sync-drive' });
-            }
-        } catch (error) {
-            console.error('Error al sincronizar Drive:', error);
-            toast.error('Error de conexión con Drive', { id: 'sync-drive' });
-        } finally {
-            setSincronizando(false);
-        }
-    };
-
-    const proyectosFiltrados = sortProyectosPorUrgencia(proyectos.filter(p => {
-        switch (filtro) {
-            case 'activos':
-                return p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente';
-            case 'urgentes':
-                return p.prioridad === 1 || (p.diasRestantes !== null && p.diasRestantes <= 3);
-            case 'completados':
-                return p.etapa_actual === 'completado';
-            default:
-                return true;
-        }
-    }));
-
-    const handleCrearProyecto = async (data) => {
-        try {
-            const response = await produccionService.crearProyecto(data);
-            if (response.success) {
-                toast.success('Proyecto creado exitosamente');
-                cargarDatos();
-            }
-        } catch (error) {
-            console.error('Error al crear proyecto:', error);
-            toast.error('Error al crear proyecto');
-        }
-    };
+    const { filtro, setFiltro, proyectosFiltrados, opciones } = useProduccionFilters(proyectos);
 
     if (loading && proyectos.length === 0) {
         return (
@@ -330,9 +212,8 @@ const DashboardProduccionPage = () => {
 
                         <div className="h-8 w-px bg-gray-300 mx-2 hidden lg:block"></div>
 
-                        {/* Botones de Sincronización Manual */}
                         <button
-                            onClick={handleSincronizar}
+                            onClick={sincronizarSheets}
                             disabled={sincronizando}
                             className="flex items-center gap-2 px-3 py-2 bg-white text-green-700 border border-green-200 rounded-lg hover:bg-green-50 transition-colors disabled:opacity-50 text-sm font-medium"
                             title="Actualizar nuevos proyectos desde Google Sheets"
@@ -342,7 +223,7 @@ const DashboardProduccionPage = () => {
                         </button>
 
                         <button
-                            onClick={handleSincronizarDrive}
+                            onClick={sincronizarDrive}
                             disabled={sincronizando}
                             className="flex items-center gap-2 px-3 py-2 bg-white text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50 text-sm font-medium"
                             title="Actualizar carpetas y archivos desde Google Drive"
@@ -368,7 +249,7 @@ const DashboardProduccionPage = () => {
             <EstadisticasHeader estadisticas={estadisticas} />
 
             {/* Filtros */}
-            <FiltrosProyectos filtro={filtro} setFiltro={setFiltro} />
+            <FiltrosProyectos filtro={filtro} setFiltro={setFiltro} opciones={opciones} />
 
             {/* Lista de Proyectos */}
             <div className="space-y-6">
@@ -385,7 +266,8 @@ const DashboardProduccionPage = () => {
                         <ProyectoTimeline
                             key={proyecto.id}
                             proyecto={proyecto}
-                            onCompletar={handleCompletar}
+                            onCompletar={completarEtapa}
+                            onTogglePausa={togglePausa}
                         />
                     ))
                 )}
@@ -394,7 +276,7 @@ const DashboardProduccionPage = () => {
             <ModalNuevoProyecto
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
-                onCrear={handleCrearProyecto}
+                onCrear={crearProyecto}
             />
         </div>
     );
