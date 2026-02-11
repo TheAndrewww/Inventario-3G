@@ -60,6 +60,11 @@ export const completarEtapa = async (proyectoId, observaciones = '') => {
     return response.data;
 };
 
+export const regresarEtapa = async (proyectoId) => {
+    const response = await api.post(`/produccion/${proyectoId}/regresar-etapa`);
+    return response.data;
+};
+
 // Sub-etapas de Producción (Manufactura y Herrería)
 export const completarSubEtapa = async (proyectoId, subEtapa) => {
     const response = await api.post(`/produccion/${proyectoId}/completar-subetapa`, { subEtapa });
@@ -139,6 +144,7 @@ export default {
     actualizarProyecto,
     eliminarProyecto,
     completarEtapa,
+    regresarEtapa,
     sincronizarConSheets,
     obtenerMesesDisponibles,
     previewProyectosSheets,

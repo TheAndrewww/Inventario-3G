@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  print-agent:
+    build: .
+    container_name: print-agent
+    restart: unless-stopped
+
+    # network_mode: host para acceso a impresora en red local
+    network_mode: host
+
+    volumes:
+      # Credenciales de Firebase (read-only)
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+      # Directorio temporal para PDFs
+      - ./temp:/app/temp
+
+    environment:
+      - TZ=America/Mexico_City
+      - NODE_ENV=production
+      # Configurar IP de la impresora (ajustar según tu red)
+      - PRINTER_IP=${PRINTER_IP:-192.168.100.50}
+      - PRINTER_PORT=${PRINTER_PORT:-9100}
+
+    # Límites de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

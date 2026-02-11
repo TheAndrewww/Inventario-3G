@@ -4,6 +4,7 @@ import { Op } from 'sequelize';
 import { crearNotificacion } from '../controllers/notificaciones.controller.js';
 import { iniciarJobAnuncios } from '../jobs/generarAnunciosDiarios.js';
 import { iniciarJobSincronizacion } from '../jobs/sincronizarDrive.job.js';
+import { iniciarJobSincronizacionSheets } from '../jobs/sincronizarSheets.job.js';
 
 /**
  * Verificar órdenes de compra vencidas y enviar notificaciones
@@ -106,5 +107,6 @@ export const iniciarCronJobs = () => {
   verificarOrdenesVencidas();
   iniciarJobAnuncios();
   iniciarJobSincronizacion();
+  iniciarJobSincronizacionSheets();
   console.log('✅ Todos los cron jobs han sido iniciados');
 };

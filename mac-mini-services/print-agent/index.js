@@ -9,17 +9,27 @@
  */
 
 import admin from 'firebase-admin';
-import { exec } from 'child_process';
+import net from 'net';
 import { readFileSync, writeFileSync, unlinkSync, mkdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import PDFDocument from 'pdfkit';
+import sharp from 'sharp';
+import { pdf } from 'pdf-to-img';
 
 // Configuración
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const PRINTER_NAME = process.env.PRINTER_NAME || 'TicketPrinter';
+const PRINTER_IP = process.env.PRINTER_IP || '192.168.100.50';
+const PRINTER_PORT = parseInt(process.env.PRINTER_PORT || '9100');
 const TEMP_DIR = join(__dirname, 'temp');
+
+// Heartbeat para healthcheck de Docker
+setInterval(() => {
+  writeFileSync('/tmp/print_heartbeat', Date.now().toString());
+}, 30000);
+// Escribir heartbeat inicial
+writeFileSync('/tmp/print_heartbeat', Date.now().toString());
 
 // Crear directorio temporal si no existe
 if (!existsSync(TEMP_DIR)) {
@@ -42,7 +52,7 @@ admin.initializeApp({
 
 const db = admin.firestore();
 console.log('🔥 Conectado a Firebase');
-console.log(`🖨️  Impresora configurada: ${PRINTER_NAME}`);
+console.log(`🖨️  Impresora de red: ${PRINTER_IP}:${PRINTER_PORT}`);
 console.log('👂 Escuchando trabajos de impresión...\n');
 
 // ===== GENERADOR DE PDF PARA TICKETS =====
@@ -362,20 +372,122 @@ async function generarPDFPedido(datos) {
   });
 }
 
-// ===== FUNCIÓN DE IMPRESIÓN =====
+// ===== FUNCIONES DE IMPRESIÓN ESC/POS =====
 
-function imprimirArchivo(filePath) {
-  return new Promise((resolve, reject) => {
-    const command = `lp -d "${PRINTER_NAME}" -o fit-to-page "${filePath}"`;
+/**
+ * Convierte un buffer de imagen a comandos ESC/POS para impresora térmica
+ * @param {Buffer} imageBuffer - Buffer de imagen PNG en blanco y negro
+ * @param {number} width - Ancho de la imagen en píxeles
+ */
+function imageToEscPos(imageBuffer, width, height) {
+  const commands = [];
 
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`❌ Error al imprimir: ${error.message}`);
-        reject(error);
-        return;
+  // ESC @ - Inicializar impresora
+  commands.push(Buffer.from([0x1B, 0x40]));
+
+  // Centrar imagen
+  commands.push(Buffer.from([0x1B, 0x61, 0x01]));
+
+  // GS v 0 - Imprimir imagen raster
+  // Formato: GS v 0 m xL xH yL yH d1...dk
+  const bytesPerLine = Math.ceil(width / 8);
+  const xL = bytesPerLine & 0xFF;
+  const xH = (bytesPerLine >> 8) & 0xFF;
+  const yL = height & 0xFF;
+  const yH = (height >> 8) & 0xFF;
+
+  commands.push(Buffer.from([0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH]));
+  commands.push(imageBuffer);
+
+  // Alimentar papel y cortar
+  commands.push(Buffer.from([0x1B, 0x64, 0x05])); // Feed 5 líneas
+  commands.push(Buffer.from([0x1D, 0x56, 0x00])); // Corte total
+
+  return Buffer.concat(commands);
+}
+
+/**
+ * Convierte PDF a imagen y luego a comandos ESC/POS
+ */
+async function pdfToEscPos(pdfBuffer) {
+  // Guardar PDF temporalmente
+  const tempPdfPath = join(TEMP_DIR, `temp_${Date.now()}.pdf`);
+  writeFileSync(tempPdfPath, pdfBuffer);
+
+  try {
+    // Convertir PDF a imagen
+    const document = await pdf(tempPdfPath, { scale: 2.0 });
+    let allCommands = [];
+
+    for await (const image of document) {
+      // Convertir a escala de grises, redimensionar al ancho de ticket (576 px para 80mm)
+      const ticketWidth = 576;
+
+      const processedImage = await sharp(image)
+        .resize(ticketWidth, null, { fit: 'inside' })
+        .grayscale()
+        .threshold(128)
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      const { data, info } = processedImage;
+
+      // Convertir a formato de bits (1 bit por píxel)
+      const bytesPerLine = Math.ceil(info.width / 8);
+      const bitmapData = Buffer.alloc(bytesPerLine * info.height);
+
+      for (let y = 0; y < info.height; y++) {
+        for (let x = 0; x < info.width; x++) {
+          const pixelIndex = y * info.width + x;
+          const pixelValue = data[pixelIndex];
+
+          // Si el píxel es oscuro (< 128), encender el bit
+          if (pixelValue < 128) {
+            const byteIndex = y * bytesPerLine + Math.floor(x / 8);
+            const bitPosition = 7 - (x % 8);
+            bitmapData[byteIndex] |= (1 << bitPosition);
+          }
+        }
       }
-      console.log(`✅ Impreso correctamente: ${stdout || 'OK'}`);
-      resolve(stdout);
+
+      // Generar comandos ESC/POS
+      const escPosData = imageToEscPos(bitmapData, info.width, info.height);
+      allCommands.push(escPosData);
+    }
+
+    return Buffer.concat(allCommands);
+  } finally {
+    // Limpiar archivo temporal
+    try { unlinkSync(tempPdfPath); } catch (e) { }
+  }
+}
+
+/**
+ * Envía comandos ESC/POS a la impresora via socket
+ */
+function enviarAImpresora(escPosBuffer) {
+  return new Promise((resolve, reject) => {
+    const client = new net.Socket();
+
+    client.connect(PRINTER_PORT, PRINTER_IP, () => {
+      console.log(`   📡 Conectado a impresora ${PRINTER_IP}:${PRINTER_PORT}`);
+      client.write(escPosBuffer);
+      client.end();
+    });
+
+    client.on('close', () => {
+      console.log('   ✅ Datos enviados a impresora');
+      resolve();
+    });
+
+    client.on('error', (err) => {
+      console.error(`   ❌ Error de conexión: ${err.message}`);
+      reject(err);
+    });
+
+    client.setTimeout(15000, () => {
+      client.destroy();
+      reject(new Error('Timeout conectando a impresora'));
     });
   });
 }
@@ -414,16 +526,13 @@ async function procesarTrabajo(jobId, job) {
       throw new Error(`Tipo de trabajo no soportado: ${job.tipo}`);
     }
 
-    // Guardar PDF temporal
-    const tempFile = join(TEMP_DIR, `print_${jobId}.pdf`);
-    writeFileSync(tempFile, pdfBuffer);
-    console.log(`   💾 PDF guardado: ${tempFile}`);
+    // Convertir PDF a ESC/POS
+    console.log(`   🔄 Convirtiendo a formato de impresora...`);
+    const escPosData = await pdfToEscPos(pdfBuffer);
 
-    // Imprimir
-    await imprimirArchivo(tempFile);
-
-    // Eliminar archivo temporal
-    unlinkSync(tempFile);
+    // Enviar a impresora
+    console.log(`   📤 Enviando a impresora...`);
+    await enviarAImpresora(escPosData);
 
     // Actualizar estado en Firebase
     await db.collection('cola_impresion').doc(jobId).update({

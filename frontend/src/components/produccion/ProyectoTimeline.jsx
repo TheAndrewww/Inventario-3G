@@ -17,7 +17,7 @@ export { ETAPAS_ORDEN } from './constants';
  * @param {function} props.onCompletar - Callback para avanzar etapa (opcional)
  * @param {function} props.onTogglePausa - Callback para pausar/reanudar (opcional)
  */
-const ProyectoTimeline = memo(({ proyecto, onCompletar, onTogglePausa }) => {
+const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa }) => {
     // Memoizar cálculos de estilo del contenedor
     const containerStyles = useMemo(() => {
         const diasRestantes = proyecto.diasRestantes;
@@ -35,11 +35,21 @@ const ProyectoTimeline = memo(({ proyecto, onCompletar, onTogglePausa }) => {
         }
 
         const urgenciaPorFecha = diasRestantes !== null && diasRestantes <= 3;
-        const esUrgente = proyecto.prioridad === 1 || esGarantia || urgenciaPorFecha || enRetraso;
+        let esUrgente = proyecto.prioridad === 1 || esGarantia || urgenciaPorFecha || enRetraso;
+
+        // Lógica visual específica para Instalación
+        if (proyecto.etapa_actual === 'instalacion') {
+            // "ya es como si hubiera terminado" -> No marcar urgencia ni retraso visual
+            esUrgente = false;
+        }
 
         const colorTipo = getColorPorTipo(proyecto.tipo_proyecto);
-        const bgFinal = enRetraso ? 'bg-red-50' : colorTipo.bg;
-        const borderFinal = enRetraso ? 'border-l-4 border-red-500' : colorTipo.border;
+
+        // Si es Instalación, NUNCA mostrar como retraso (rojo), siempre color normal (verde/azul)
+        const mostrarComoRetraso = enRetraso && proyecto.etapa_actual !== 'instalacion';
+
+        const bgFinal = mostrarComoRetraso ? 'bg-red-50' : colorTipo.bg;
+        const borderFinal = mostrarComoRetraso ? 'border-l-4 border-red-500' : colorTipo.border;
 
         return {
             className: `${bgFinal} ${borderFinal} overflow-hidden transition-all ${esUrgente ? 'ring-2 ring-red-400' : ''} rounded-lg shadow-sm`,
@@ -52,7 +62,7 @@ const ProyectoTimeline = memo(({ proyecto, onCompletar, onTogglePausa }) => {
         <div className={containerStyles.className} style={containerStyles.style}>
             <TimelineHeader proyecto={proyecto} isPaused={containerStyles.isPaused} />
             <TimelineStepper proyecto={proyecto} isPaused={containerStyles.isPaused} />
-            <TimelineFooter proyecto={proyecto} onCompletar={onCompletar} onTogglePausa={onTogglePausa} isPaused={containerStyles.isPaused} />
+            <TimelineFooter proyecto={proyecto} onCompletar={onCompletar} onRegresar={onRegresar} onTogglePausa={onTogglePausa} isPaused={containerStyles.isPaused} onCompletarSubEtapa={onCompletarSubEtapa} />
         </div>
     );
 });

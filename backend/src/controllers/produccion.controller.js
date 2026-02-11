@@ -206,6 +206,57 @@ export const completarEtapa = async (req, res) => {
 };
 
 /**
+ * POST /api/produccion/:id/regresar-etapa
+ * Regresar a la etapa anterior
+ */
+export const regresarEtapa = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        let usuarioId = null;
+        if (req.usuario) {
+            usuarioId = req.usuario.id;
+        }
+
+        const proyecto = await ProduccionProyecto.findByPk(id);
+
+        if (!proyecto) {
+            return res.status(404).json({
+                success: false,
+                message: 'Proyecto no encontrado'
+            });
+        }
+
+        const etapaAnterior = proyecto.etapa_actual;
+        await proyecto.regresarEtapa(usuarioId);
+
+        console.log(`⏪ Proyecto "${proyecto.nombre}" regresó de ${etapaAnterior} a ${proyecto.etapa_actual}`);
+
+        res.json({
+            success: true,
+            message: `Regresó a etapa "${proyecto.etapa_actual}"`,
+            data: {
+                proyecto: {
+                    ...proyecto.toJSON(),
+                    diasRestantes: proyecto.getDiasRestantes(),
+                    porcentaje: proyecto.getPorcentajeAvance(),
+                    estadoRetraso: proyecto.getEstadoRetraso()
+                },
+                etapaAnterior,
+                etapaNueva: proyecto.etapa_actual
+            }
+        });
+    } catch (error) {
+        console.error('Error al regresar etapa:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error al regresar etapa',
+            error: error.message
+        });
+    }
+};
+
+/**
  * POST /api/produccion/:id/completar-subetapa
  * Completar una sub-etapa de producción (manufactura o herrería)
  */

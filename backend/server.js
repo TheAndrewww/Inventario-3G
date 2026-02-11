@@ -175,9 +175,20 @@ app.use((err, req, res, next) => {
 // Función para iniciar el servidor
 const startServer = async () => {
     try {
-        // Verificar conexión a base de datos
-        await sequelize.authenticate();
-        console.log('✅ Conexión a base de datos establecida correctamente');
+        // Verificar conexión a base de datos con reintentos
+        let retries = 5;
+        while (retries > 0) {
+            try {
+                await sequelize.authenticate();
+                console.log('✅ Conexión a base de datos establecida correctamente');
+                break;
+            } catch (error) {
+                retries -= 1;
+                console.error(`❌ Error de conexión (intentos restantes: ${retries}):`, error.message);
+                if (retries === 0) throw error;
+                await new Promise(resolve => setTimeout(resolve, 5000)); // Esperar 5s
+            }
+        }
 
         // Sincronizar modelos
         if (process.env.NODE_ENV === 'development') {

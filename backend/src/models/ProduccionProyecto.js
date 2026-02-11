@@ -335,6 +335,44 @@ ProduccionProyecto.prototype.completarEtapaActual = async function (usuarioId, o
 };
 
 /**
+ * Regresa a la etapa anterior
+ * @param {number} usuarioId - ID del usuario que revierte la etapa
+ */
+ProduccionProyecto.prototype.regresarEtapa = async function (usuarioId) {
+    const etapaActual = this.etapa_actual;
+
+    // Flujo inverso: etapa actual → etapa anterior + campos a limpiar
+    const flujoInverso = {
+        'compras': { anterior: 'diseno', limpiarCampo: 'diseno_completado_en', limpiarPor: 'diseno_completado_por' },
+        'produccion': { anterior: 'compras', limpiarCampo: 'compras_completado_en', limpiarPor: 'compras_completado_por' },
+        'instalacion': { anterior: 'produccion', limpiarCampo: 'produccion_completado_en', limpiarPor: 'produccion_completado_por' },
+        'completado': { anterior: 'instalacion', limpiarCampo: 'instalacion_completado_en', limpiarPor: 'instalacion_completado_por' }
+    };
+
+    const config = flujoInverso[etapaActual];
+    if (!config) {
+        throw new Error(`No se puede regresar desde la etapa "${etapaActual}"`);
+    }
+
+    // Limpiar campo de completado de la etapa anterior (ya que ahora vuelve a estar activa)
+    if (config.limpiarCampo) {
+        this[config.limpiarCampo] = null;
+        this[config.limpiarPor] = null;
+    }
+
+    // Si estaba completado, limpiar fecha de completado
+    if (etapaActual === 'completado') {
+        this.fecha_completado = null;
+    }
+
+    // Regresar a la etapa anterior
+    this.etapa_actual = config.anterior;
+
+    await this.save();
+    return this;
+};
+
+/**
  * Completar una sub-etapa de Producción (Manufactura o Herrería)
  * @param {string} subEtapa - 'manufactura' o 'herreria'
  * @param {number} usuarioId - ID del usuario que completa

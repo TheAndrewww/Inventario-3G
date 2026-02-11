@@ -8,6 +8,7 @@ import {
     crearProyecto,
     actualizarProyecto,
     togglePausa,
+    regresarEtapa,
     eliminarProyecto,
     obtenerEstadisticas,
     sincronizarConSheets,
@@ -125,6 +126,13 @@ router.post('/:id/completar-etapa', completarEtapa);
  * Acceso: Usuarios autenticados
  */
 router.post('/:id/completar-subetapa', completarSubEtapa);
+
+/**
+ * POST /api/produccion/:id/regresar-etapa
+ * Regresar a la etapa anterior
+ * Acceso: Usuarios autenticados
+ */
+router.post('/:id/regresar-etapa', regresarEtapa);
 
 /**
  * POST /api/produccion

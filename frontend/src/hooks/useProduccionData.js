@@ -113,6 +113,20 @@ export const useProduccionData = ({
         }
     }, [cargarDatos]);
 
+    // Regresar a etapa anterior
+    const regresarEtapa = useCallback(async (proyectoId) => {
+        try {
+            const response = await produccionService.regresarEtapa(proyectoId);
+            if (response.success) {
+                toast.success(response.message);
+                await cargarDatos();
+            }
+        } catch (error) {
+            console.error('Error al regresar etapa:', error);
+            toast.error(error.response?.data?.message || 'Error al regresar etapa');
+        }
+    }, [cargarDatos]);
+
     // Crear nuevo proyecto
     const crearProyecto = useCallback(async (data) => {
         try {
@@ -127,6 +141,20 @@ export const useProduccionData = ({
             toast.error('Error al crear proyecto');
         }
         return false;
+    }, [cargarDatos]);
+
+    // Completar sub-etapa de producción (manufactura o herrería)
+    const completarSubEtapa = useCallback(async (proyectoId, subEtapa) => {
+        try {
+            const response = await produccionService.completarSubEtapa(proyectoId, subEtapa);
+            if (response.success) {
+                toast.success(response.message);
+                await cargarDatos();
+            }
+        } catch (error) {
+            console.error('Error al completar sub-etapa:', error);
+            toast.error(error.response?.data?.message || 'Error al completar sub-etapa');
+        }
     }, [cargarDatos]);
 
     // Pausar/reanudar proyecto
@@ -190,6 +218,8 @@ export const useProduccionData = ({
         sincronizarSheets,
         sincronizarDrive,
         completarEtapa,
+        regresarEtapa,
+        completarSubEtapa,
         crearProyecto,
         togglePausa
     };

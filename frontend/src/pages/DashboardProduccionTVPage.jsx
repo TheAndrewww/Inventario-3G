@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, Snowflake } from 'lucide-react';
 import { Loader } from '../components/common';
 import { Toaster } from 'react-hot-toast';
 import ProyectoTimeline from '../components/produccion/ProyectoTimeline';
@@ -38,11 +38,17 @@ const DashboardProduccionTVPage = () => {
     const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
     const toggleOrientacion = () => setOrientacion(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
 
-    // Proyectos activos ordenados por urgencia
+    // Proyectos activos ordenados por urgencia (excluyendo pausados)
     const proyectosActivos = useMemo(() =>
         sortProyectosPorUrgencia(
-            proyectos.filter(p => p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
+            proyectos.filter(p => p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente' && !p.pausado)
         ),
+        [proyectos]
+    );
+
+    // Proyectos congelados (pausados)
+    const proyectosCongelados = useMemo(() =>
+        proyectos.filter(p => p.pausado),
         [proyectos]
     );
 
@@ -68,7 +74,26 @@ const DashboardProduccionTVPage = () => {
             >
                 {/* Scrollable Area */}
                 <div className="h-full w-full overflow-auto" style={{ padding: px(16) }}>
-                    <EstadisticasHeader estadisticas={estadisticas} />
+                    <div className="flex gap-4 mb-6">
+                        <div className="flex-1">
+                            <EstadisticasHeader estadisticas={estadisticas} />
+                        </div>
+                        {proyectosCongelados.length > 0 && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm flex flex-col min-w-[300px] max-w-[400px]">
+                                <div className="flex items-center gap-2 mb-2 text-blue-700 font-bold border-b border-blue-100 pb-2">
+                                    <Snowflake size={20} />
+                                    <span>Proyectos Congelados ({proyectosCongelados.length})</span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto pr-2 space-y-1" style={{ maxHeight: px(220) }}>
+                                    {proyectosCongelados.map(p => (
+                                        <div key={p.id} className="text-sm text-blue-800 bg-white/50 px-2 py-1 rounded border border-blue-100 truncate">
+                                            {p.nombre}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="pb-20" style={{ gap: px(16), display: 'flex', flexDirection: 'column' }}>
                         {proyectosActivos.map(proyecto => (

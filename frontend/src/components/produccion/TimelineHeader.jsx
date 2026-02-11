@@ -14,8 +14,21 @@ const TimelineHeader = memo(({ proyecto }) => {
     const timelineSimplificado = usaTimelineSimplificado(proyecto);
 
     const estadoRetraso = proyecto.estadoRetraso || { enRetraso: false };
-    const enRetraso = estadoRetraso.enRetraso;
-    const urgenciaPorFecha = diasRestantes !== null && diasRestantes <= 3;
+    let enRetraso = estadoRetraso.enRetraso;
+
+    // Lógica especial para Instalación: Ignorar "retraso" de etapas previas.
+    // "ya es como si hubiera terminado" -> No mostrar badge de atraso ni urgencia por fecha
+    if (proyecto.etapa_actual === 'instalacion') {
+        enRetraso = false;
+    }
+
+    let urgenciaPorFecha = diasRestantes !== null && diasRestantes <= 3;
+    if (proyecto.etapa_actual === 'instalacion') {
+        const diasRestantesCheck = diasRestantes ?? 999;
+        // Solo urgente si faltan <= 2 días
+        urgenciaPorFecha = diasRestantesCheck <= 2;
+    }
+
     const esUrgente = proyecto.prioridad === 1 || esGarantia || urgenciaPorFecha || enRetraso;
 
     const colorTipo = getColorPorTipo(proyecto.tipo_proyecto);
@@ -42,7 +55,7 @@ const TimelineHeader = memo(({ proyecto }) => {
                             className="inline-flex items-center font-bold rounded-full bg-red-600 text-white animate-pulse"
                             style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, gap: px(4) }}
                         >
-                            ⚠️ +{estadoRetraso.diasRetraso}d
+                            ⚠️ {estadoRetraso.diasRetraso}d atraso
                         </span>
                     )}
                     {esUrgente && !enRetraso && (
@@ -86,7 +99,7 @@ const TimelineHeader = memo(({ proyecto }) => {
             <div className="flex flex-col items-center" style={{ marginLeft: px(12) }}>
                 {!timelineSimplificado && (
                     <div className="relative" style={{ width: px(64), height: px(64) }}>
-                        <svg className="transform -rotate-90" style={{ width: px(64), height: px(64) }}>
+                        <svg className="transform -rotate-90" viewBox="0 0 100 100" style={{ width: px(64), height: px(64) }}>
                             <circle cx="50%" cy="50%" r="45%" stroke="#E5E7EB" strokeWidth="10%" fill="none" />
                             <circle
                                 cx="50%" cy="50%" r="45%"
@@ -104,12 +117,20 @@ const TimelineHeader = memo(({ proyecto }) => {
                 )}
                 {proyecto.fecha_limite && (
                     <div
-                        className={`text-center font-medium ${diasRestantes !== null && diasRestantes <= 3 ? 'text-red-600' : 'text-gray-500'}`}
+                        className={`text-center font-medium ${diasRestantes !== null && (diasRestantes <= 3 && proyecto.etapa_actual !== 'instalacion' || (proyecto.etapa_actual === 'instalacion' && diasRestantes <= 2))
+                            ? 'text-red-600' : 'text-gray-500'
+                            }`}
                         style={{ marginTop: px(4), fontSize: s(0.75) }}
                     >
                         <div className="flex items-center" style={{ gap: px(4) }}>
                             <Clock style={{ width: s(0.7), height: s(0.7) }} />
-                            {diasRestantes !== null && diasRestantes < 0 ? 'Vencido' : diasRestantes === 0 ? 'Hoy' : `${diasRestantes}d`}
+                            {
+                                diasRestantes !== null && diasRestantes < 0
+                                    ? 'Vencido'
+                                    : diasRestantes === 0
+                                        ? 'Hoy'
+                                        : `${diasRestantes}d`
+                            }
                         </div>
                     </div>
                 )}

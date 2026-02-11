@@ -13,6 +13,8 @@
   "dependencies": {
     "dotenv": "^17.2.3",
     "firebase-admin": "^13.6.0",
-    "pdfkit": "^0.17.2"
+    "pdfkit": "^0.17.2",
+    "sharp": "^0.33.0",
+    "pdf-to-img": "^4.0.0"
   }
 }

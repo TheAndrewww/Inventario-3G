@@ -163,6 +163,8 @@ const DashboardProduccionPage = () => {
         sincronizarSheets,
         sincronizarDrive,
         completarEtapa,
+        regresarEtapa,
+        completarSubEtapa,
         crearProyecto,
         togglePausa
     } = useProduccionData({ autoSync: true, refreshInterval: 5 * 60 * 1000 });
@@ -267,6 +269,8 @@ const DashboardProduccionPage = () => {
                             key={proyecto.id}
                             proyecto={proyecto}
                             onCompletar={completarEtapa}
+                            onRegresar={regresarEtapa}
+                            onCompletarSubEtapa={completarSubEtapa}
                             onTogglePausa={togglePausa}
                         />
                     ))
