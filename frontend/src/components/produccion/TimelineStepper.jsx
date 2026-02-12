@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { s, px, addBusinessDays, formatDateShort } from '../../utils/produccion';
+import { s, px, addBusinessDays, formatDateShort, calcularDiasHabiles, getHoyStr } from '../../utils/produccion';
 import {
     Package,
     ShoppingCart,
@@ -11,12 +11,18 @@ import {
     Calendar
 } from 'lucide-react';
 
-import { ETAPAS_CONFIG, ETAPAS_ORDEN, TIEMPOS_POR_TIPO, usaTimelineSimplificado } from './constants';
+import { ETAPAS_CONFIG, ETAPAS_ORDEN, TIEMPOS_POR_TIPO, DIAS_INDIVIDUALES_POR_TIPO, usaTimelineSimplificado } from './constants';
 
 /**
- * Calcula los días restantes para cada etapa individual de un proyecto.
- * Retorna un objeto { diseno: N, compras: N, produccion: N, instalacion: N }
- * donde N es positivo (a tiempo), 0 (hoy), o negativo (retraso).
+ * Calcula los días restantes y fechas límite para cada etapa de un proyecto.
+ * Retorna un objeto { diseno: { dias, fechaLimite }, compras: {...}, produccion: {...}, instalacion: {...} }
+ * donde dias es positivo (a tiempo), 0 (hoy), o negativo (retraso).
+ *
+ * REGLA DE RECÁLCULO: Si Diseño se atrasa (diseno_completado_en existe y fue tarde),
+ * las fechas de Compras/Producción/Instalación se recalculan:
+ *   Caso 1: Si hay margen suficiente hasta fecha_limite → fechas hacia adelante desde diseno_completado_en
+ *   Caso 2: Si NO hay margen → fechas hacia atrás desde fecha_limite (puede dar negativos)
+ *
  * Retorna null si el proyecto no tiene reglas de tiempo (MTO/GTIA/sin tipo).
  */
 const calcularDiasPorEtapa = (proyecto) => {
@@ -24,22 +30,120 @@ const calcularDiasPorEtapa = (proyecto) => {
     if (!tipo || !TIEMPOS_POR_TIPO[tipo]) return null;
     if (!proyecto.estadoRetraso || proyecto.estadoRetraso.tiempoPermitido === null) return null;
 
-    const diasEnProyecto = proyecto.estadoRetraso.diasEnProyecto;
-    const tiempos = TIEMPOS_POR_TIPO[tipo];
-    const etapaActualIdx = ETAPAS_ORDEN.indexOf(proyecto.etapa_actual);
+    const tiemposAcum = TIEMPOS_POR_TIPO[tipo];
+    const diasIndiv = DIAS_INDIVIDUALES_POR_TIPO[tipo];
+    const hoy = getHoyStr();
+    const fechaEntrada = proyecto.fecha_entrada; // 'YYYY-MM-DD'
+    const fechaLimite = proyecto.fecha_limite;     // 'YYYY-MM-DD'
+    const disenoCompletadoEn = proyecto.diseno_completado_en
+        ? proyecto.diseno_completado_en.substring(0, 10) // puede ser ISO timestamp
+        : null;
 
-    const resultado = {};
+    // --- Caso base: calcular fechas originales desde fecha_entrada ---
+    const fechasOriginales = {};
     for (const etapa of ['diseno', 'compras', 'produccion', 'instalacion']) {
-        const etapaIdx = ETAPAS_ORDEN.indexOf(etapa);
-        if (etapaIdx < etapaActualIdx) {
-            // Etapa ya completada — no mostrar
-            resultado[etapa] = null;
-        } else {
-            // Días restantes = tiempo acumulado permitido - días transcurridos
-            resultado[etapa] = tiempos[etapa] - diasEnProyecto;
+        const fechaLim = addBusinessDays(fechaEntrada, tiemposAcum[etapa]);
+        fechasOriginales[etapa] = fechaLim;
+    }
+
+    // Calcular si Diseño se atrasó
+    const fechaLimiteDiseno = fechasOriginales.diseno;
+    const fechaLimiteDisenoStr = fechaLimiteDiseno
+        ? `${fechaLimiteDiseno.getUTCFullYear()}-${String(fechaLimiteDiseno.getUTCMonth() + 1).padStart(2, '0')}-${String(fechaLimiteDiseno.getUTCDate()).padStart(2, '0')}`
+        : null;
+
+    let disenoSeAtraso = false;
+    if (disenoCompletadoEn && fechaLimiteDisenoStr) {
+        // Diseño se atrasó si completó después de su fecha límite original
+        disenoSeAtraso = calcularDiasHabiles(fechaLimiteDisenoStr, disenoCompletadoEn) > 0;
+    }
+
+    // --- Si Diseño NO se atrasó: usar cálculo original ---
+    if (!disenoSeAtraso) {
+        const diasEnProyecto = proyecto.estadoRetraso.diasEnProyecto;
+        const resultado = {};
+        for (const etapa of ['diseno', 'compras', 'produccion', 'instalacion']) {
+            resultado[etapa] = {
+                dias: tiemposAcum[etapa] - diasEnProyecto,
+                fechaLimite: fechasOriginales[etapa]
+            };
+        }
+        return resultado;
+    }
+
+    // --- Diseño SE atrasó: recalcular fechas restantes ---
+    const resultado = {};
+
+    // Diseño: siempre usa fecha original (para mostrar que se atrasó)
+    const diasDesdeEntradaAHoy = calcularDiasHabiles(fechaEntrada, hoy) - 1; // -1 margen de subida
+    resultado.diseno = {
+        dias: tiemposAcum.diseno - Math.max(0, diasDesdeEntradaAHoy),
+        fechaLimite: fechasOriginales.diseno
+    };
+
+    // Determinar cuánto margen hay desde que Diseño terminó hasta fecha_limite
+    const diasNecesariosRestantes = diasIndiv.compras + diasIndiv.produccion + diasIndiv.instalacion;
+    const margenDisponible = fechaLimite ? calcularDiasHabiles(disenoCompletadoEn, fechaLimite) : 999;
+
+    if (margenDisponible >= diasNecesariosRestantes) {
+        // === CASO 1: Hay margen → recalcular hacia adelante desde diseno_completado_en ===
+        let acumulado = 0;
+        for (const etapa of ['compras', 'produccion', 'instalacion']) {
+            acumulado += diasIndiv[etapa];
+            const nuevaFechaLimite = addBusinessDays(disenoCompletadoEn, acumulado);
+            // Días restantes = días hábiles desde hoy hasta la nueva fecha límite
+            const nuevaFechaStr = `${nuevaFechaLimite.getUTCFullYear()}-${String(nuevaFechaLimite.getUTCMonth() + 1).padStart(2, '0')}-${String(nuevaFechaLimite.getUTCDate()).padStart(2, '0')}`;
+            const diasRestantes = calcularDiasHabiles(hoy, nuevaFechaStr);
+            resultado[etapa] = {
+                dias: diasRestantes,
+                fechaLimite: nuevaFechaLimite
+            };
+        }
+    } else {
+        // === CASO 2: NO hay margen → recalcular hacia atrás desde fecha_limite ===
+        // Instalación: debe terminar 1 día antes de fecha_limite (o en fecha_limite)
+        // Producción: debe terminar diasIndiv.instalacion días antes de la fecha de instalación
+        // Compras: debe terminar diasIndiv.produccion días antes de producción
+        const etapasRev = ['instalacion', 'produccion', 'compras'];
+        const fechasHaciaAtras = {};
+
+        let acumDesdeAtras = 0;
+        for (const etapa of etapasRev) {
+            acumDesdeAtras += diasIndiv[etapa];
+            // Restar días hábiles desde fecha_limite
+            const fechaLim = restarDiasHabiles(fechaLimite, acumDesdeAtras - diasIndiv[etapa]);
+            fechasHaciaAtras[etapa] = fechaLim;
+        }
+
+        // Ahora calcular días restantes desde hoy hasta cada fecha recalculada
+        for (const etapa of ['compras', 'produccion', 'instalacion']) {
+            const fechaLim = fechasHaciaAtras[etapa];
+            const fechaLimStr = `${fechaLim.getUTCFullYear()}-${String(fechaLim.getUTCMonth() + 1).padStart(2, '0')}-${String(fechaLim.getUTCDate()).padStart(2, '0')}`;
+            const diasRestantes = calcularDiasHabiles(hoy, fechaLimStr);
+            resultado[etapa] = {
+                dias: diasRestantes,
+                fechaLimite: fechaLim
+            };
         }
     }
+
     return resultado;
+};
+
+/**
+ * Resta días hábiles (Lun-Sab) a una fecha.
+ * Retorna un Date UTC.
+ */
+const restarDiasHabiles = (dateStr, daysToSubtract) => {
+    if (!dateStr) return null;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    let current = new Date(Date.UTC(year, month - 1, day));
+    let removed = 0;
+    while (removed < daysToSubtract) {
+        current.setUTCDate(current.getUTCDate() - 1);
+        if (current.getUTCDay() !== 0) removed++;
+    }
+    return current;
 };
 
 /**
@@ -74,19 +178,40 @@ const TimelineStepper = memo(({ proyecto }) => {
         }
 
         // Posiciones para 5 nodos: 8, 25, 42, 58, 75
+        // Posiciones para 5 nodos: 8, 25, 42, 58, 75
         const POS = { P1: 8, P2: 25, P3: 42, P4: 58, P5: 75 };
-        const getStrokeColor = (baseStage) =>
-            ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > ETAPAS_ORDEN.indexOf(baseStage) ? '#10B981' : '#CBD5E1';
+        const getStrokeColor = (baseStage) => {
+            // Logic for main lines: Check if the DESTINATION stage is reached or completed?
+            // Standard: Connect A to B if A is done.
+            // Mapping baseStage -> targetStage
+            // diseno -> compras
+            // compras -> produccion (split)
+            // ...
+
+            // Simplification: Check exact flag of the "From" stage
+            // If Diseno is done, line to Compras is green.
+            if (baseStage === 'diseno' && proyecto.diseno_completado_en) return '#10B981';
+            if (baseStage === 'compras' && proyecto.compras_completado_en) return '#10B981';
+            if (baseStage === 'instalacion' && proyecto.instalacion_completado_en) return '#10B981';
+
+            // Fallback to sequential index if flags missing (legacy safety)
+            return ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > ETAPAS_ORDEN.indexOf(baseStage) ? '#10B981' : '#CBD5E1';
+        };
 
         const tieneManufacturaLocal = proyecto.tiene_manufactura !== false;
         const tieneHerreriaLocal = proyecto.tiene_herreria !== false;
         const tieneAmbas = tieneManufacturaLocal && tieneHerreriaLocal;
 
         const getSubStageStroke = (subStage) => {
+            // Independent check for sub-stages
+            const isSubStageDone = proyecto.estadoSubEtapas?.[subStage]?.completado ||
+                (subStage === 'manufactura' ? proyecto.manufactura_completado : proyecto.herreria_completado);
+
+            if (isSubStageDone) return '#10B981';
+
+            // Fallback: if actual stage is beyond production
             if (ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > 3) return '#10B981';
-            if (proyecto.etapa_actual === 'produccion') {
-                return proyecto.estadoSubEtapas?.[subStage]?.completado ? '#10B981' : '#CBD5E1';
-            }
+
             return '#CBD5E1';
         };
 
@@ -136,48 +261,46 @@ const TimelineStepper = memo(({ proyecto }) => {
                 <line x1={POS.P4} y1="40" x2={POS.P5} y2="40" stroke={getStrokeColor('instalacion')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
             </>
         );
-    }, [proyecto.etapa_actual, proyecto.tiene_manufactura, proyecto.tiene_herreria, proyecto.estadoSubEtapas, timelineSimplificado, tieneProduccion]);
+    }, [proyecto.etapa_actual, proyecto.tiene_manufactura, proyecto.tiene_herreria, proyecto.estadoSubEtapas, timelineSimplificado, tieneProduccion, proyecto.diseno_completado_en, proyecto.compras_completado_en, proyecto.manufactura_completado, proyecto.herreria_completado, proyecto.instalacion_completado_en]); // Added dependencies
 
     // Memoizar nodos
     const nodos = useMemo(() => {
         const getNodeColor = (node) => {
+            // New Independent Logic
+            let isCompleted = false;
+            if (node.stage === 'diseno' && proyecto.diseno_completado_en) isCompleted = true;
+            if (node.stage === 'compras' && proyecto.compras_completado_en) isCompleted = true;
+            if (node.stage === 'manufactura' && (proyecto.estadoSubEtapas?.manufactura?.completado || proyecto.manufactura_completado)) isCompleted = true;
+            if (node.stage === 'herreria' && (proyecto.estadoSubEtapas?.herreria?.completado || proyecto.herreria_completado)) isCompleted = true;
+            if (node.stage === 'instalacion' && proyecto.instalacion_completado_en) isCompleted = true;
+            if (node.stage === 'completado' && proyecto.etapa_actual === 'completado') isCompleted = true;
+
             const etapaIndex = ETAPAS_ORDEN.indexOf(proyecto.etapa_actual);
 
-            // Si hay retraso, TODAS las etapas actuales y pasadas se ponen en rojo
-            if (enRetraso) {
-                // Si la etapa es pasada o actual
-                if (etapaIndex >= node.idx) {
-                    return 'bg-red-500 text-white';
-                }
+            // 1. Explicitly Completed -> Always Green
+            if (isCompleted) {
+                return 'bg-green-500 text-white';
             }
 
-            // Si es una etapa futura (y no es sub-etapa), asegurar que esté apagada
-            // Esto corrige el caso de regresar etapa: si estamos en Diseño, Compras debe estar gris aunque tenga flags
-            if (!node.isSubStage && etapaIndex < node.idx) {
-                return 'bg-white border-2 border-gray-200 text-gray-400';
-            }
-
-            if (node.isSubStage) {
-                if (etapaIndex > 3) return 'bg-green-500 text-white';
-                if (proyecto.etapa_actual === 'produccion') {
-                    return proyecto.estadoSubEtapas?.[node.stage]?.completado ? 'bg-green-500 text-white' : 'bg-amber-500 text-white';
-                }
-                return 'bg-white border-2 border-gray-200 text-gray-400';
-            }
-
-            // Lógica especial para Compras: mostrar naranja si está en proceso
-            if (node.stage === 'compras') {
-                if (proyecto.compras_completado_en) return 'bg-green-500 text-white'; // Completado
-                if (proyecto.compras_en_proceso) return 'bg-amber-500 text-white'; // En proceso (naranja)
-                // Si no está en proceso ni completado, usar lógica estándar
-            }
-
-            if (node.stage === 'completado' && proyecto.etapa_actual === 'completado') return 'bg-green-500 text-white';
+            // 2. Active Stage (Not completed)
             if (proyecto.etapa_actual === node.stage) {
+                // Check for delay (Red)
+                if (enRetraso) return 'bg-red-500 text-white';
+                // Check for warning (Amber) - Compras in process
+                if (node.stage === 'compras' && proyecto.compras_en_proceso) return 'bg-amber-500 text-white';
+                // Special MTO delay
                 if (esMTO && diasRestantes !== null && diasRestantes < 0) return 'bg-red-500 text-white';
-                return 'bg-green-500 text-white'; // Si no hay retraso (ya validado arriba), es verde
+
+                // Default Active
+                return 'bg-green-500 text-white';
             }
-            if (etapaIndex > node.idx) return 'bg-green-500 text-white';
+
+            // 3. Past Stages (Sequential) that are NOT completed?
+            // If we are independent, they stay Gray if not done.
+            // But if we want to show "skipped" or "breakage", maybe Red?
+            // User request: "Parallel". Implies skipping. So Gray (pending) is appropriate.
+
+            // 4. Future Stages -> Gray
             return 'bg-white border-2 border-gray-200 text-gray-400';
         };
 
@@ -188,6 +311,9 @@ const TimelineStepper = memo(({ proyecto }) => {
                 if (proyectoCompletado) return 'bg-green-500 text-white';
                 if (esGarantia) return 'bg-red-500 text-white';
                 if (esMTO && diasRestantes !== null && diasRestantes < 0) return 'bg-red-500 text-white';
+                // Independent check for installation if simplificado is used?
+                if (proyecto.instalacion_completado_en) return 'bg-green-500 text-white';
+
                 return 'bg-green-500 text-white';
             }
             return 'bg-white border-2 border-gray-200 text-gray-400';
@@ -266,55 +392,55 @@ const TimelineStepper = memo(({ proyecto }) => {
             // Solo en la primera sub-etapa para no duplicar
             let diasEtapa = null;
             let stageForDate = node.stage;
+            let fechaLimiteEtapa = null; // Date object for badge
 
             if (node.stage === 'completado') {
                 // No mostrar en "Fin"
             } else if (node.isSubStage) {
                 if (!subStageCountdownShown) {
-                    diasEtapa = diasPorEtapa?.['produccion'] ?? null;
-                    stageForDate = 'produccion';
-                    if (diasEtapa !== null) subStageCountdownShown = true;
+                    const info = diasPorEtapa?.['produccion'];
+                    if (info) {
+                        diasEtapa = info.dias;
+                        fechaLimiteEtapa = info.fechaLimite;
+                        stageForDate = 'produccion';
+                        subStageCountdownShown = true;
+                    }
                 }
-            } else {
-                diasEtapa = diasPorEtapa?.[node.stage] ?? null;
+            } else if (diasPorEtapa?.[node.stage]) {
+                const info = diasPorEtapa[node.stage];
+                diasEtapa = info.dias;
+                fechaLimiteEtapa = info.fechaLimite;
             }
             const mostrarDias = diasEtapa !== null;
 
             let diasLabel = '';
             let diasColor = '';
+            let fechaLabel = '';
+            let fechaColor = '';
 
             if (mostrarDias) {
-                // Calcular fecha límite de esta etapa
-                // Fecha Límite = Fecha Entrada + (Días Acumulados + 1) Días Hábiles
-                const tipo = proyecto.tipo_proyecto?.toUpperCase();
-                const tiempos = TIEMPOS_POR_TIPO[tipo];
-                // Para sub-etapas, usamos el tiempo de 'produccion'
-                const tiempoLimite = tiempos?.[stageForDate];
-
-                let fechaLimiteFormatted = '';
-                if (tiempoLimite !== undefined && proyecto.fecha_entrada) {
-                    // +1 porque la lógica de retraso resta 1 día al inicio
-                    const fechaLimiteDate = addBusinessDays(proyecto.fecha_entrada, tiempoLimite + 1);
-                    fechaLimiteFormatted = formatDateShort(fechaLimiteDate);
+                // Usar la fecha límite recalculada para el badge
+                if (fechaLimiteEtapa) {
+                    fechaLabel = formatDateShort(fechaLimiteEtapa);
                 }
 
-                if (stageForDate === 'instalacion' && proyecto.etapa_actual === 'instalacion') {
-                    // Lógica especial Instalación: No marcar "atraso" en rojo.
-                    // "ya es como si hubiera terminado" -> Mostrar verde/ámbar siempre.
-                    diasLabel = fechaLimiteFormatted || 'Finalizando';
-                    diasColor = 'bg-green-50 text-green-700 border-green-200';
-                } else if (diasEtapa < 0) {
-                    diasLabel = `${Math.abs(diasEtapa)}d atraso`;
+                // Badge de días: siempre mostrar días restantes o atraso
+                if (diasEtapa < 0) {
+                    diasLabel = `${Math.abs(diasEtapa)}D ATRASO`;
                     diasColor = 'bg-red-100 text-red-700 border-red-200';
+                    fechaColor = 'bg-red-50 text-red-600 border-red-200';
                 } else if (diasEtapa === 0) {
-                    diasLabel = 'Hoy';
+                    diasLabel = 'HOY';
                     diasColor = 'bg-amber-100 text-amber-700 border-amber-200';
+                    fechaColor = 'bg-amber-50 text-amber-600 border-amber-200';
                 } else if (diasEtapa <= 1) {
-                    diasLabel = fechaLimiteFormatted || `${diasEtapa}d`;
+                    diasLabel = `${diasEtapa}D ENTREGA`;
                     diasColor = 'bg-amber-100 text-amber-700 border-amber-200';
+                    fechaColor = 'bg-amber-50 text-amber-600 border-amber-200';
                 } else {
-                    diasLabel = fechaLimiteFormatted || `${diasEtapa}d`;
+                    diasLabel = `${diasEtapa}D ENTREGA`;
                     diasColor = 'bg-green-50 text-green-700 border-green-200';
+                    fechaColor = 'bg-green-50 text-green-600 border-green-200';
                 }
             }
 
@@ -346,13 +472,27 @@ const TimelineStepper = memo(({ proyecto }) => {
                             {node.label}
                         </span>
                     )}
+                    {/* Badges: fecha + días, lado a lado */}
                     {mostrarDias && (
-                        <span
-                            className={`absolute font-bold rounded-full border whitespace-nowrap ${diasColor}`}
-                            style={{ top: node.labelPosition === 'top' ? px(50) : px(-20), fontSize: s(0.85), padding: `${px(1)} ${px(6)}` }}
+                        <div
+                            className="absolute flex flex-row items-center whitespace-nowrap"
+                            style={{ top: node.labelPosition === 'top' ? px(50) : px(-22), gap: px(3) }}
                         >
-                            {diasLabel}
-                        </span>
+                            {fechaLabel && (
+                                <span
+                                    className={`font-bold rounded-full border ${fechaColor}`}
+                                    style={{ fontSize: s(0.75), padding: `${px(1)} ${px(5)}` }}
+                                >
+                                    {fechaLabel}
+                                </span>
+                            )}
+                            <span
+                                className={`font-bold rounded-full border ${diasColor}`}
+                                style={{ fontSize: s(0.75), padding: `${px(1)} ${px(5)}` }}
+                            >
+                                {diasLabel}
+                            </span>
+                        </div>
                     )}
                 </div>
             );
@@ -381,12 +521,12 @@ const TimelineStepper = memo(({ proyecto }) => {
                     </span>
                     <span
                         className={`font-semibold ${diasRestantes !== null && (diasRestantes < 0 && proyecto.etapa_actual !== 'instalacion')
+                            ? 'text-red-600'
+                            : diasRestantes !== null && (diasRestantes <= 2 && proyecto.etapa_actual === 'instalacion')
                                 ? 'text-red-600'
-                                : diasRestantes !== null && (diasRestantes <= 2 && proyecto.etapa_actual === 'instalacion')
-                                    ? 'text-red-600'
-                                    : diasRestantes !== null && diasRestantes <= 3
-                                        ? 'text-amber-600'
-                                        : 'text-gray-500'
+                                : diasRestantes !== null && diasRestantes <= 3
+                                    ? 'text-amber-600'
+                                    : 'text-gray-500'
                             }`}
                         style={{ fontSize: s(1.125) }}
                     >

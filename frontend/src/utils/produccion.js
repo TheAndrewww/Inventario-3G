@@ -120,6 +120,45 @@ export const addBusinessDays = (startDateStr, daysToAdd) => {
 };
 
 /**
+ * Calcula días hábiles (Lun-Sab) entre dos fechas 'YYYY-MM-DD'.
+ * Retorna positivo si endStr > startStr, negativo si al revés.
+ */
+export const calcularDiasHabiles = (startStr, endStr) => {
+    if (!startStr || !endStr) return 0;
+    const parse = (s) => {
+        const [y, m, d] = s.split('-').map(Number);
+        return Date.UTC(y, m - 1, d);
+    };
+    const tsStart = parse(startStr);
+    const tsEnd = parse(endStr);
+    const start = new Date(Math.min(tsStart, tsEnd));
+    const end = new Date(Math.max(tsStart, tsEnd));
+    start.setUTCHours(0, 0, 0, 0);
+    end.setUTCHours(0, 0, 0, 0);
+
+    let dias = 0;
+    const cur = new Date(start);
+    while (cur.getTime() < end.getTime()) {
+        cur.setUTCDate(cur.getUTCDate() + 1);
+        if (cur.getUTCDay() !== 0) dias++;
+    }
+    return tsStart <= tsEnd ? dias : -dias;
+};
+
+/**
+ * Retorna la fecha de hoy (hora México, -6) como 'YYYY-MM-DD'.
+ */
+export const getHoyStr = () => {
+    const now = new Date();
+    const mexicoOffset = -6 * 60;
+    const mx = new Date(now.getTime() + (now.getTimezoneOffset() + mexicoOffset) * 60 * 1000);
+    const y = mx.getFullYear();
+    const m = String(mx.getMonth() + 1).padStart(2, '0');
+    const d = String(mx.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
+/**
  * Formatea una fecha Date a "d MMM" (ej: "23 feb")
  */
 export const formatDateShort = (date) => {

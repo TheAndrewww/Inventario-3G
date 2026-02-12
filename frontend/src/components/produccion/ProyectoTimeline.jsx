@@ -17,7 +17,7 @@ export { ETAPAS_ORDEN } from './constants';
  * @param {function} props.onCompletar - Callback para avanzar etapa (opcional)
  * @param {function} props.onTogglePausa - Callback para pausar/reanudar (opcional)
  */
-const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa }) => {
+const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa }) => {
     // Memoizar cálculos de estilo del contenedor
     const containerStyles = useMemo(() => {
         const diasRestantes = proyecto.diasRestantes;
@@ -62,7 +62,7 @@ const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePaus
         <div className={containerStyles.className} style={containerStyles.style}>
             <TimelineHeader proyecto={proyecto} isPaused={containerStyles.isPaused} />
             <TimelineStepper proyecto={proyecto} isPaused={containerStyles.isPaused} />
-            <TimelineFooter proyecto={proyecto} onCompletar={onCompletar} onRegresar={onRegresar} onTogglePausa={onTogglePausa} isPaused={containerStyles.isPaused} onCompletarSubEtapa={onCompletarSubEtapa} />
+            <TimelineFooter proyecto={proyecto} onCompletar={onCompletar} onRegresar={onRegresar} onTogglePausa={onTogglePausa} isPaused={containerStyles.isPaused} onCompletarSubEtapa={onCompletarSubEtapa} onToggleEtapa={onToggleEtapa} />
         </div>
     );
 });

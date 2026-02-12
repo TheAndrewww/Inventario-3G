@@ -166,7 +166,8 @@ const DashboardProduccionPage = () => {
         regresarEtapa,
         completarSubEtapa,
         crearProyecto,
-        togglePausa
+        togglePausa,
+        toggleEtapa
     } = useProduccionData({ autoSync: true, refreshInterval: 5 * 60 * 1000 });
 
     const { filtro, setFiltro, proyectosFiltrados, opciones } = useProduccionFilters(proyectos);
@@ -272,6 +273,7 @@ const DashboardProduccionPage = () => {
                             onRegresar={regresarEtapa}
                             onCompletarSubEtapa={completarSubEtapa}
                             onTogglePausa={togglePausa}
+                            onToggleEtapa={toggleEtapa}
                         />
                     ))
                 )}

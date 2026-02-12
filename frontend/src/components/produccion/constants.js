@@ -31,6 +31,16 @@ export const TIEMPOS_POR_TIPO = {
 };
 
 /**
+ * Días individuales (NO acumulados) por etapa.
+ * Derivado de TIEMPOS_POR_TIPO restando la etapa previa.
+ */
+export const DIAS_INDIVIDUALES_POR_TIPO = {
+    'C': { diseno: 1, compras: 1, produccion: 3, instalacion: 1 },
+    'B': { diseno: 2, compras: 3, produccion: 5, instalacion: 3 },
+    'A': { diseno: 5, compras: 5, produccion: 10, instalacion: 5 }
+};
+
+/**
  * Obtiene colores y clases según tipo de proyecto
  */
 export const getColorPorTipo = (tipo) => {

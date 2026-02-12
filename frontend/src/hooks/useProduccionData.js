@@ -171,6 +171,21 @@ export const useProduccionData = ({
         }
     }, [cargarDatos]);
 
+    // Toggle etapa específica
+    const toggleEtapa = useCallback(async (proyectoId, etapa, completado) => {
+        try {
+            const response = await produccionService.toggleEtapa(proyectoId, etapa, completado);
+            if (response.success) {
+                await cargarDatos();
+                return true;
+            }
+        } catch (error) {
+            console.error('Error al toggle etapa:', error);
+            toast.error('Error al actualizar etapa');
+            return false;
+        }
+    }, [cargarDatos]);
+
     // Efecto inicial y cleanup
     useEffect(() => {
         mountedRef.current = true;
@@ -221,7 +236,8 @@ export const useProduccionData = ({
         regresarEtapa,
         completarSubEtapa,
         crearProyecto,
-        togglePausa
+        togglePausa,
+        toggleEtapa
     };
 };
 

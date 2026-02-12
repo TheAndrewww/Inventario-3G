@@ -6,7 +6,7 @@ import { ETAPAS_CONFIG, ETAPAS_ORDEN, usaTimelineSimplificado } from './constant
  * Footer de la tarjeta de proyecto
  * Muestra: estado sub-etapas, mensaje completado, botón avanzar, botón pausar
  */
-const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, isPaused }) => {
+const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, isPaused }) => {
     const [loading, setLoading] = useState(false);
     const [regresarLoading, setRegresarLoading] = useState(false);
     const [pauseLoading, setPauseLoading] = useState(false);
@@ -126,103 +126,67 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
             {/* Controles Principales (Avanzar / Sub-etapas / Pausar) */}
             {proyecto.etapa_actual !== 'completado' && (
                 <div className="px-6 py-4 bg-white border-t border-gray-100 flex gap-3 flex-wrap">
-                    {/* Botón regresar etapa */}
-                    {puedeRegresar && (
-                        <button
-                            onClick={handleRegresar}
-                            disabled={regresarLoading}
-                            className="py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-gray-100 hover:bg-gray-200 text-gray-700"
-                            title={`Regresar a ${ETAPAS_CONFIG[ETAPAS_ORDEN[ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) - 1]]?.nombre}`}
-                        >
-                            {regresarLoading ? (
-                                <RefreshCw size={18} className="animate-spin" />
-                            ) : (
-                                <ChevronLeft size={18} />
-                            )}
-                        </button>
+                    {/* Lógica de botones de avance independiente */}
+                    {!isPaused && !timelineSimplificado && onToggleEtapa && (
+                        <div className="w-full flex flex-wrap gap-2 mt-2">
+                            {[
+                                { key: 'diseno', label: 'Diseño', done: !!proyecto.diseno_completado_en, color: 'indigo' },
+                                { key: 'compras', label: 'Compras', done: !!proyecto.compras_completado_en, color: 'emerald' },
+                                { key: 'manufactura', label: 'Manufactura', done: proyecto.estadoSubEtapas?.manufactura?.completado || proyecto.manufactura_completado, color: 'amber' },
+                                { key: 'herreria', label: 'Herrería', done: proyecto.estadoSubEtapas?.herreria?.completado || proyecto.herreria_completado, color: 'red' },
+                                { key: 'instalacion', label: 'Instalación', done: !!proyecto.instalacion_completado_en, color: 'blue' }
+                            ].map((etapa) => (
+                                <button
+                                    key={etapa.key}
+                                    onClick={async () => {
+                                        if (loading) return;
+                                        setLoading(true);
+                                        try {
+                                            await onToggleEtapa(proyecto.id, etapa.key, !etapa.done);
+                                        } finally {
+                                            setLoading(false);
+                                        }
+                                    }}
+                                    disabled={loading}
+                                    className={`flex-1 min-w-[100px] py-2 px-3 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm
+                                        ${etapa.done
+                                            ? `bg-${etapa.color}-100 border-${etapa.color}-200 text-${etapa.color}-700`
+                                            : `bg-white border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700`
+                                        } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    {etapa.done ? <CheckCircle2 size={16} /> : <div className={`w-4 h-4 rounded-full border-2 border-gray-300`} />}
+                                    {etapa.label}
+                                </button>
+                            ))}
+                        </div>
                     )}
 
-                    {/* Botón pausar/reanudar */}
-                    {onTogglePausa && (
-                        <button
-                            onClick={handleTogglePausa}
-                            disabled={pauseLoading}
-                            className={`py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed ${isPaused
-                                ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white'
-                                : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
-                                }`}
-                            title={isPaused ? 'Reanudar proyecto' : 'Pausar proyecto'}
-                        >
-                            {pauseLoading ? (
-                                <RefreshCw size={18} className="animate-spin" />
-                            ) : isPaused ? (
-                                <Play size={18} />
-                            ) : (
-                                <Pause size={18} />
-                            )}
-                        </button>
-                    )}
-
-                    {/* Lógica de botones de avance */}
-                    {!isPaused && (
-                        <>
-                            {/* Caso Producción con sub-etapas pendientes: Mostrar botones divididos */}
-                            {mostrarControlesSubEtapas ? (
-                                <div className="flex-1 flex gap-2">
-                                    {/* Botón Manufactura */}
-                                    <button
-                                        onClick={() => handleCompletarSubEtapa('manufactura')}
-                                        disabled={subEtapas.manufactura.completado || subEtapaLoading === 'manufactura'}
-                                        className={`flex-1 py-3 px-2 rounded-xl font-bold flex items-center justify-center gap-1 shadow transition-all text-xs sm:text-sm ${subEtapas.manufactura.completado
-                                            ? 'bg-green-100 text-green-700 cursor-default'
-                                            : 'bg-amber-100 hover:bg-amber-200 text-amber-800'
-                                            }`}
-                                    >
-                                        {subEtapaLoading === 'manufactura' ? (
-                                            <RefreshCw size={16} className="animate-spin" />
-                                        ) : subEtapas.manufactura.completado ? (
-                                            <CheckCircle2 size={16} />
-                                        ) : null}
-                                        {subEtapas.manufactura.completado ? 'Manufactura OK' : 'Terminar Manufactura'}
-                                    </button>
-
-                                    {/* Botón Herrería */}
-                                    <button
-                                        onClick={() => handleCompletarSubEtapa('herreria')}
-                                        disabled={subEtapas.herreria.completado || subEtapaLoading === 'herreria'}
-                                        className={`flex-1 py-3 px-2 rounded-xl font-bold flex items-center justify-center gap-1 shadow transition-all text-xs sm:text-sm ${subEtapas.herreria.completado
-                                            ? 'bg-green-100 text-green-700 cursor-default'
-                                            : 'bg-red-100 hover:bg-red-200 text-red-800'
-                                            }`}
-                                    >
-                                        {subEtapaLoading === 'herreria' ? (
-                                            <RefreshCw size={16} className="animate-spin" />
-                                        ) : subEtapas.herreria.completado ? (
-                                            <CheckCircle2 size={16} />
-                                        ) : null}
-                                        {subEtapas.herreria.completado ? 'Herrería OK' : 'Terminar Herrería'}
-                                    </button>
-                                </div>
-                            ) : (
-                                /* Caso estándar: Botón único de Avanzar Etapa */
-                                /* Se muestra si NO es Producción, O si es Producción y ya se completaron ambas sub-etapas (o es simplificado) */
-                                onCompletar && proyecto.etapa_actual !== 'instalacion' && (
-                                    <button
-                                        onClick={handleCompletar}
-                                        disabled={loading || (esEtapaProduccion && !subEtapas.ambosCompletados)}
-                                        className="flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {loading ? (
-                                            <RefreshCw size={18} className="animate-spin" />
-                                        ) : (
-                                            <ChevronRight size={18} />
-                                        )}
-                                        Avanzar a {ETAPAS_CONFIG[ETAPAS_ORDEN[ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) + 1]]?.nombre}
-                                    </button>
-                                )
-                            )}
-                        </>
-                    )}
+                    {/* Botones de Regresar y Pausar/Reanudar */}
+                    <div className="w-full flex gap-2 mt-2">
+                        {puedeRegresar && (
+                            <button
+                                onClick={handleRegresar}
+                                disabled={regresarLoading}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200 transition-all"
+                            >
+                                <ChevronLeft size={16} />
+                                {regresarLoading ? 'Regresando...' : 'Regresar'}
+                            </button>
+                        )}
+                        {onTogglePausa && (
+                            <button
+                                onClick={handleTogglePausa}
+                                disabled={pauseLoading}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all border ml-auto ${isPaused
+                                        ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200'
+                                        : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                                    }`}
+                            >
+                                {isPaused ? <Play size={16} /> : <Pause size={16} />}
+                                {pauseLoading ? '...' : isPaused ? 'Reanudar' : 'Pausar'}
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
 

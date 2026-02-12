@@ -16,7 +16,8 @@ import {
     previewProyectosSheets,
     obtenerArchivosDrive,
     sincronizarProyectoDrive,
-    sincronizarTodosDrive
+    sincronizarTodosDrive,
+    toggleEtapa
 } from '../controllers/produccion.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -154,6 +155,13 @@ router.put('/:id', verificarRol('administrador', 'almacenista'), actualizarProye
  * Acceso: Administrador
  */
 router.post('/:id/toggle-pausa', verificarRol('administrador'), togglePausa);
+
+/**
+ * POST /api/produccion/:id/toggle-etapa
+ * Marcar/Desmarcar etapa específica
+ * Acceso: Usuarios autenticados
+ */
+router.post('/:id/toggle-etapa', toggleEtapa);
 
 /**
  * DELETE /api/produccion/:id

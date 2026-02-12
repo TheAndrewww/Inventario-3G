@@ -131,6 +131,11 @@ export const sincronizarTodosDrive = async () => {
     return response.data;
 };
 
+export const toggleEtapa = async (proyectoId, etapa, completado) => {
+    const response = await api.post(`/produccion/${proyectoId}/toggle-etapa`, { etapa, completado });
+    return response.data;
+};
+
 export default {
     obtenerDashboard,
     obtenerEstadisticas,
@@ -153,5 +158,6 @@ export default {
     obtenerArchivosDriveTerminal,
     sincronizarProyectoDrive,
     sincronizarTodosDrive,
-    obtenerDashboardPublico
+    obtenerDashboardPublico,
+    toggleEtapa
 };

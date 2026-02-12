@@ -434,6 +434,10 @@ export const actualizarProyecto = async (req, res) => {
  * POST /api/produccion/:id/toggle-pausa
  * Pausar o reanudar un proyecto (estado congelado)
  */
+/**
+ * POST /api/produccion/:id/toggle-pausa
+ * Pausar o reanudar un proyecto (estado congelado)
+ */
 export const togglePausa = async (req, res) => {
     try {
         const { id } = req.params;
@@ -478,6 +482,102 @@ export const togglePausa = async (req, res) => {
             message: 'Error al pausar/reanudar proyecto',
             error: error.message
         });
+    }
+};
+
+/**
+ * POST /api/produccion/:id/toggle-etapa
+ * Marcar/Desmarcar una etapa específica como completada
+ */
+export const toggleEtapa = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { etapa, completado } = req.body; // 'diseno', 'compras', 'manufactura', 'herreria', 'instalacion'
+
+        const proyecto = await ProduccionProyecto.findByPk(id);
+        if (!proyecto) {
+            return res.status(404).json({ success: false, message: 'Proyecto no encontrado' });
+        }
+
+        let usuarioId = req.usuario ? req.usuario.id : null;
+        const ahora = new Date();
+        const setNull = null;
+
+        // Mapeo de campos
+        const campos = {
+            'diseno': { campo: 'diseno_completado_en', por: 'diseno_completado_por' },
+            'compras': { campo: 'compras_completado_en', por: 'compras_completado_por' },
+            'manufactura': { campo: 'manufactura_completado_en', por: 'manufactura_completado_por', bool: 'manufactura_completado' },
+            'herreria': { campo: 'herreria_completado_en', por: 'herreria_completado_por', bool: 'herreria_completado' },
+            'instalacion': { campo: 'instalacion_completado_en', por: 'instalacion_completado_por' }
+        };
+
+        const config = campos[etapa];
+        if (!config) {
+            return res.status(400).json({ success: false, message: 'Etapa inválida' });
+        }
+
+        // Actualizar timestamps/flags
+        if (completado) {
+            proyecto[config.campo] = ahora;
+            proyecto[config.por] = usuarioId;
+            if (config.bool) proyecto[config.bool] = true;
+        } else {
+            proyecto[config.campo] = null;
+            proyecto[config.por] = null;
+            if (config.bool) proyecto[config.bool] = false;
+        }
+
+        // Recalcular etapa_actual basada en el primer paso NO completado
+        // Orden: Diseno -> Compras -> Produccion (Manufactura AND Herreria) -> Instalacion -> Completado
+        let nuevaEtapa = 'diseno';
+
+        if (proyecto.diseno_completado_en) {
+            nuevaEtapa = 'compras';
+            if (proyecto.compras_completado_en) {
+                nuevaEtapa = 'produccion';
+                // Producción se considera completa si manufactura Y herrería están listas (o si tiene flags manuales, pero usemos las sub-etapas)
+                // Usamos los campos bool si existen, o timestamps
+                const manDone = proyecto.manufactura_completado || !!proyecto.manufactura_completado_en;
+                const herDone = proyecto.herreria_completado || !!proyecto.herreria_completado_en;
+
+                if (manDone && herDone) {
+                    nuevaEtapa = 'instalacion';
+                    if (proyecto.instalacion_completado_en) {
+                        nuevaEtapa = 'completado';
+                    }
+                }
+            }
+        }
+
+        proyecto.etapa_actual = nuevaEtapa;
+
+        // Si completado, actualizar fecha_completado
+        if (nuevaEtapa === 'completado') {
+            if (!proyecto.fecha_completado) proyecto.fecha_completado = ahora;
+        } else {
+            proyecto.fecha_completado = null;
+        }
+
+        await proyecto.save();
+
+        console.log(`✅ Etapa "${etapa}" ${completado ? 'marcada' : 'desmarcada'} para "${proyecto.nombre}". Nueva etapa actual: ${nuevaEtapa}`);
+
+        res.json({
+            success: true,
+            data: {
+                proyecto: {
+                    ...proyecto.toJSON(),
+                    diasRestantes: proyecto.getDiasRestantes(),
+                    porcentaje: proyecto.getPorcentajeAvance(),
+                    estadoSubEtapas: proyecto.getEstadoSubEtapas()
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error al toggle etapa:', error);
+        res.status(500).json({ success: false, message: 'Error al actualizar etapa', error: error.message });
     }
 };
 
