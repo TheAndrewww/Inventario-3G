@@ -21,6 +21,10 @@ const AREAS = [
     { id: 'equipo2', name: 'EQUIPO 2', color: 'bg-green-500 text-white' },
     { id: 'equipo3', name: 'EQUIPO 3', color: 'bg-gray-500 text-white' },
     { id: 'equipo4', name: 'EQUIPO 4', color: 'bg-orange-500 text-white' },
+    { id: 'operacion', name: 'OPERACIÓN', color: 'bg-purple-500 text-white' },
+    { id: 'logistica', name: 'LOGÍSTICA', color: 'bg-teal-500 text-white' },
+    { id: 'almacen', name: 'ALMACÉN', color: 'bg-amber-500 text-white' },
+    { id: 'calidad', name: 'CALIDAD', color: 'bg-cyan-500 text-white' },
 ];
 
 const ControlCampanaPage = () => {

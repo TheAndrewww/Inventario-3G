@@ -135,7 +135,16 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
                                 { key: 'manufactura', label: 'Manufactura', done: proyecto.estadoSubEtapas?.manufactura?.completado || proyecto.manufactura_completado, color: 'amber' },
                                 { key: 'herreria', label: 'Herrería', done: proyecto.estadoSubEtapas?.herreria?.completado || proyecto.herreria_completado, color: 'red' },
                                 { key: 'instalacion', label: 'Instalación', done: !!proyecto.instalacion_completado_en, color: 'blue' }
-                            ].map((etapa) => (
+                            ].filter((etapa) => {
+                                // Ocultar Manufactura/Herrería si el proyecto no las tiene activas
+                                if (etapa.key === 'manufactura') {
+                                    return proyecto.tiene_manufactura || etapa.done;
+                                }
+                                if (etapa.key === 'herreria') {
+                                    return proyecto.tiene_herreria || etapa.done;
+                                }
+                                return true;
+                            }).map((etapa) => (
                                 <button
                                     key={etapa.key}
                                     onClick={async () => {
@@ -178,8 +187,8 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
                                 onClick={handleTogglePausa}
                                 disabled={pauseLoading}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all border ml-auto ${isPaused
-                                        ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200'
-                                        : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                                    ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200'
+                                    : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
                                     }`}
                             >
                                 {isPaused ? <Play size={16} /> : <Pause size={16} />}

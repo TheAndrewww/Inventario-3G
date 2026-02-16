@@ -18,10 +18,16 @@ import { ETAPAS_CONFIG, ETAPAS_ORDEN, TIEMPOS_POR_TIPO, DIAS_INDIVIDUALES_POR_TI
  * Retorna un objeto { diseno: { dias, fechaLimite }, compras: {...}, produccion: {...}, instalacion: {...} }
  * donde dias es positivo (a tiempo), 0 (hoy), o negativo (retraso).
  *
- * REGLA DE RECÁLCULO: Si Diseño se atrasa (diseno_completado_en existe y fue tarde),
- * las fechas de Compras/Producción/Instalación se recalculan:
- *   Caso 1: Si hay margen suficiente hasta fecha_limite → fechas hacia adelante desde diseno_completado_en
- *   Caso 2: Si NO hay margen → fechas hacia atrás desde fecha_limite (puede dar negativos)
+ * REGLA DE RECÁLCULO:
+ *   - Si el proyecto no tiene margen suficiente (tiempo total disponible < días necesarios),
+ *     se calculan las fechas HACIA ATRÁS desde fecha_limite (Caso 2).
+ *     Esto simula: "para cumplir el deadline, cada etapa debería haber terminado en X fecha".
+ *     Resultado: días negativos = atraso respecto a cuándo debería haber terminado.
+ *
+ *   - Si Diseño se atrasó pero SÍ hay margen, se recalculan las etapas restantes
+ *     HACIA ADELANTE desde diseno_completado_en (Caso 1).
+ *
+ *   - Si todo está a tiempo, se usa el cálculo original desde fecha_entrada.
  *
  * Retorna null si el proyecto no tiene reglas de tiempo (MTO/GTIA/sin tipo).
  */
@@ -36,97 +42,94 @@ const calcularDiasPorEtapa = (proyecto) => {
     const fechaEntrada = proyecto.fecha_entrada; // 'YYYY-MM-DD'
     const fechaLimite = proyecto.fecha_limite;     // 'YYYY-MM-DD'
     const disenoCompletadoEn = proyecto.diseno_completado_en
-        ? proyecto.diseno_completado_en.substring(0, 10) // puede ser ISO timestamp
+        ? proyecto.diseno_completado_en.substring(0, 10)
         : null;
 
-    // --- Caso base: calcular fechas originales desde fecha_entrada ---
+    // Helper: convertir Date UTC a string 'YYYY-MM-DD'
+    const dateToStr = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+
+    // --- Calcular fechas originales (hacia adelante desde fecha_entrada) ---
     const fechasOriginales = {};
     for (const etapa of ['diseno', 'compras', 'produccion', 'instalacion']) {
-        const fechaLim = addBusinessDays(fechaEntrada, tiemposAcum[etapa]);
-        fechasOriginales[etapa] = fechaLim;
+        fechasOriginales[etapa] = addBusinessDays(fechaEntrada, tiemposAcum[etapa]);
     }
 
-    // Calcular si Diseño se atrasó
-    const fechaLimiteDiseno = fechasOriginales.diseno;
-    const fechaLimiteDisenoStr = fechaLimiteDiseno
-        ? `${fechaLimiteDiseno.getUTCFullYear()}-${String(fechaLimiteDiseno.getUTCMonth() + 1).padStart(2, '0')}-${String(fechaLimiteDiseno.getUTCDate()).padStart(2, '0')}`
-        : null;
+    // --- CASO 2: Verificar si hay margen suficiente desde hoy hasta fecha_limite ---
+    // Si NO hay margen, calcular TODAS las etapas hacia atrás desde fecha_limite
+    if (fechaLimite) {
+        const totalDiasNecesarios = tiemposAcum.instalacion; // Total acumulado = días totales del proyecto
+        const diasDesdeEntradaALimite = calcularDiasHabiles(fechaEntrada, fechaLimite);
 
+        if (diasDesdeEntradaALimite < totalDiasNecesarios) {
+            // No hay tiempo suficiente → calcular hacia atrás desde fecha_limite
+            const resultado = {};
+            const etapas = ['diseno', 'compras', 'produccion', 'instalacion'];
+
+            for (let i = 0; i < etapas.length; i++) {
+                const etapa = etapas[i];
+                // Días de etapas POSTERIORES (todo lo que viene después de esta etapa)
+                let diasPosteriores = 0;
+                for (let j = i + 1; j < etapas.length; j++) {
+                    diasPosteriores += diasIndiv[etapas[j]];
+                }
+                // Esta etapa debe terminar: fecha_limite - diasPosteriores
+                const fechaDebeTerminar = restarDiasHabiles(fechaLimite, diasPosteriores);
+                // Días restantes = días hábiles desde hoy hasta esa fecha
+                const diasRestantes = calcularDiasHabiles(hoy, dateToStr(fechaDebeTerminar));
+                resultado[etapa] = {
+                    dias: diasRestantes,
+                    fechaLimite: fechaDebeTerminar
+                };
+            }
+            return resultado;
+        }
+    }
+
+    // --- Verificar si Diseño se atrasó ---
+    const fechaLimiteDisenoStr = dateToStr(fechasOriginales.diseno);
     let disenoSeAtraso = false;
     if (disenoCompletadoEn && fechaLimiteDisenoStr) {
-        // Diseño se atrasó si completó después de su fecha límite original
         disenoSeAtraso = calcularDiasHabiles(fechaLimiteDisenoStr, disenoCompletadoEn) > 0;
     }
 
-    // --- Si Diseño NO se atrasó: usar cálculo original ---
-    if (!disenoSeAtraso) {
-        const diasEnProyecto = proyecto.estadoRetraso.diasEnProyecto;
-        const resultado = {};
-        for (const etapa of ['diseno', 'compras', 'produccion', 'instalacion']) {
-            resultado[etapa] = {
-                dias: tiemposAcum[etapa] - diasEnProyecto,
-                fechaLimite: fechasOriginales[etapa]
+    // --- CASO 1: Diseño se atrasó pero hay margen → recalcular hacia adelante ---
+    if (disenoSeAtraso && fechaLimite) {
+        const diasNecesariosRestantes = diasIndiv.compras + diasIndiv.produccion + diasIndiv.instalacion;
+        const margenDisponible = calcularDiasHabiles(disenoCompletadoEn, fechaLimite);
+
+        if (margenDisponible >= diasNecesariosRestantes) {
+            const resultado = {};
+            // Diseño: mostrar atraso con fecha original
+            const diasDesdeEntradaAHoy = calcularDiasHabiles(fechaEntrada, hoy) - 1;
+            resultado.diseno = {
+                dias: tiemposAcum.diseno - Math.max(0, diasDesdeEntradaAHoy),
+                fechaLimite: fechasOriginales.diseno
             };
+
+            // Etapas restantes: hacia adelante desde diseno_completado_en
+            let acumulado = 0;
+            for (const etapa of ['compras', 'produccion', 'instalacion']) {
+                acumulado += diasIndiv[etapa];
+                const nuevaFechaLimite = addBusinessDays(disenoCompletadoEn, acumulado);
+                const diasRestantes = calcularDiasHabiles(hoy, dateToStr(nuevaFechaLimite));
+                resultado[etapa] = {
+                    dias: diasRestantes,
+                    fechaLimite: nuevaFechaLimite
+                };
+            }
+            return resultado;
         }
-        return resultado;
     }
 
-    // --- Diseño SE atrasó: recalcular fechas restantes ---
+    // --- Caso base: todo a tiempo, usar cálculo original ---
+    const diasEnProyecto = proyecto.estadoRetraso.diasEnProyecto;
     const resultado = {};
-
-    // Diseño: siempre usa fecha original (para mostrar que se atrasó)
-    const diasDesdeEntradaAHoy = calcularDiasHabiles(fechaEntrada, hoy) - 1; // -1 margen de subida
-    resultado.diseno = {
-        dias: tiemposAcum.diseno - Math.max(0, diasDesdeEntradaAHoy),
-        fechaLimite: fechasOriginales.diseno
-    };
-
-    // Determinar cuánto margen hay desde que Diseño terminó hasta fecha_limite
-    const diasNecesariosRestantes = diasIndiv.compras + diasIndiv.produccion + diasIndiv.instalacion;
-    const margenDisponible = fechaLimite ? calcularDiasHabiles(disenoCompletadoEn, fechaLimite) : 999;
-
-    if (margenDisponible >= diasNecesariosRestantes) {
-        // === CASO 1: Hay margen → recalcular hacia adelante desde diseno_completado_en ===
-        let acumulado = 0;
-        for (const etapa of ['compras', 'produccion', 'instalacion']) {
-            acumulado += diasIndiv[etapa];
-            const nuevaFechaLimite = addBusinessDays(disenoCompletadoEn, acumulado);
-            // Días restantes = días hábiles desde hoy hasta la nueva fecha límite
-            const nuevaFechaStr = `${nuevaFechaLimite.getUTCFullYear()}-${String(nuevaFechaLimite.getUTCMonth() + 1).padStart(2, '0')}-${String(nuevaFechaLimite.getUTCDate()).padStart(2, '0')}`;
-            const diasRestantes = calcularDiasHabiles(hoy, nuevaFechaStr);
-            resultado[etapa] = {
-                dias: diasRestantes,
-                fechaLimite: nuevaFechaLimite
-            };
-        }
-    } else {
-        // === CASO 2: NO hay margen → recalcular hacia atrás desde fecha_limite ===
-        // Instalación: debe terminar 1 día antes de fecha_limite (o en fecha_limite)
-        // Producción: debe terminar diasIndiv.instalacion días antes de la fecha de instalación
-        // Compras: debe terminar diasIndiv.produccion días antes de producción
-        const etapasRev = ['instalacion', 'produccion', 'compras'];
-        const fechasHaciaAtras = {};
-
-        let acumDesdeAtras = 0;
-        for (const etapa of etapasRev) {
-            acumDesdeAtras += diasIndiv[etapa];
-            // Restar días hábiles desde fecha_limite
-            const fechaLim = restarDiasHabiles(fechaLimite, acumDesdeAtras - diasIndiv[etapa]);
-            fechasHaciaAtras[etapa] = fechaLim;
-        }
-
-        // Ahora calcular días restantes desde hoy hasta cada fecha recalculada
-        for (const etapa of ['compras', 'produccion', 'instalacion']) {
-            const fechaLim = fechasHaciaAtras[etapa];
-            const fechaLimStr = `${fechaLim.getUTCFullYear()}-${String(fechaLim.getUTCMonth() + 1).padStart(2, '0')}-${String(fechaLim.getUTCDate()).padStart(2, '0')}`;
-            const diasRestantes = calcularDiasHabiles(hoy, fechaLimStr);
-            resultado[etapa] = {
-                dias: diasRestantes,
-                fechaLimite: fechaLim
-            };
-        }
+    for (const etapa of ['diseno', 'compras', 'produccion', 'instalacion']) {
+        resultado[etapa] = {
+            dias: tiemposAcum[etapa] - diasEnProyecto,
+            fechaLimite: fechasOriginales[etapa]
+        };
     }
-
     return resultado;
 };
 
