@@ -299,6 +299,11 @@ const TimelineStepper = memo(({ proyecto }) => {
                 // Special MTO delay
                 if (esMTO && diasRestantes !== null && diasRestantes < 0) return 'bg-red-500 text-white';
 
+                // Preparado (instalacion) sin completar -> Naranja (listo para marcar)
+                if (node.stage === 'instalacion' && !proyecto.instalacion_completado_en) {
+                    return 'bg-orange-500 text-white';
+                }
+
                 // Default Active (verde - está trabajando en esta etapa)
                 return 'bg-green-500 text-white';
             }
