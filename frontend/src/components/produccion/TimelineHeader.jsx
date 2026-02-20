@@ -78,7 +78,7 @@ const TimelineHeader = memo(({ proyecto }) => {
                         }}
                     >
                         {timelineSimplificado && proyecto.etapa_actual !== 'completado'
-                            ? 'INSTALACIÓN'
+                            ? ETAPAS_CONFIG.instalacion.nombre.toUpperCase()
                             : ETAPAS_CONFIG[proyecto.etapa_actual]?.nombre}
                     </span>
                 </div>

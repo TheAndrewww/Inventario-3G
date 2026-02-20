@@ -29,6 +29,7 @@ import MiEquipoPage from './pages/MiEquipoPage';
 import DashboardProduccionPage from './pages/DashboardProduccionPage';
 import TerminalAreaPage from './pages/TerminalAreaPage';
 import DashboardProduccionTVPage from './pages/DashboardProduccionTVPage';
+import DashboardPreparadosTVPage from './pages/DashboardPreparadosTVPage';
 import ControlCampanaPage from './pages/ControlCampanaPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 
@@ -42,6 +43,7 @@ function App() {
         <Route path="/anuncios" element={<AnunciosPublicosPage />} />
         <Route path="/calendario-publico" element={<CalendarioPublicoPage />} />
         <Route path="/produccion-tv" element={<DashboardProduccionTVPage />} />
+        <Route path="/preparados-tv" element={<DashboardPreparadosTVPage />} />
         <Route path="/terminal" element={<TerminalAreaPage />} />
         <Route path="/terminal/:area" element={<TerminalAreaPage />} />
 

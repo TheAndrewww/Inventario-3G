@@ -7,6 +7,7 @@ import { sortProyectosPorUrgencia } from '../utils/produccion';
 export const FILTRO_OPCIONES = [
     { value: 'todos', label: 'Todos' },
     { value: 'activos', label: 'En Proceso' },
+    { value: 'preparados', label: '📦 Preparados' },
     { value: 'urgentes', label: '🔴 Urgentes' },
     { value: 'completados', label: '✅ Completados' }
 ];
@@ -25,7 +26,9 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'activos') => {
         const filtrados = proyectos.filter(p => {
             switch (filtro) {
                 case 'activos':
-                    return p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente';
+                    return p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente' && p.etapa_actual !== 'instalacion';
+                case 'preparados':
+                    return p.etapa_actual === 'instalacion';
                 case 'urgentes':
                     return p.prioridad === 1 || (p.diasRestantes !== null && p.diasRestantes <= 3);
                 case 'completados':

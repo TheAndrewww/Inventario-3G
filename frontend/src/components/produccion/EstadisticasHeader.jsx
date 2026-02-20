@@ -1,15 +1,14 @@
 import React from 'react';
-import { Package, ShoppingCart, Factory, Truck } from 'lucide-react';
 import { ETAPAS_CONFIG } from './ProyectoTimeline';
 import { s, px } from '../../utils/produccion';
 
 const EstadisticasHeader = ({ estadisticas }) => {
 
     const items = [
-        { label: 'En Diseño',      value: estadisticas.diseno || 0,     color: ETAPAS_CONFIG.diseno.color,     icon: Package },
-        { label: 'En Compras',     value: estadisticas.compras || 0,    color: ETAPAS_CONFIG.compras.color,    icon: ShoppingCart },
-        { label: 'En Producción',  value: estadisticas.produccion || 0, color: ETAPAS_CONFIG.produccion.color, icon: Factory },
-        { label: 'En Instalación', value: estadisticas.instalacion || 0,color: ETAPAS_CONFIG.instalacion.color,icon: Truck },
+        { label: 'En Diseño',      value: estadisticas.diseno || 0,     color: ETAPAS_CONFIG.diseno.color,     icon: ETAPAS_CONFIG.diseno.icon },
+        { label: 'En Compras',     value: estadisticas.compras || 0,    color: ETAPAS_CONFIG.compras.color,    icon: ETAPAS_CONFIG.compras.icon },
+        { label: 'En Producción',  value: estadisticas.produccion || 0, color: ETAPAS_CONFIG.produccion.color, icon: ETAPAS_CONFIG.produccion.icon },
+        { label: 'Preparado', value: estadisticas.instalacion || 0,color: ETAPAS_CONFIG.instalacion.color,icon: ETAPAS_CONFIG.instalacion.icon },
     ];
 
     return (

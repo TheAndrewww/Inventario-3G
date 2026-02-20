@@ -205,12 +205,24 @@ const DashboardProduccionPage = () => {
                             href="/produccion-tv"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
-                            title="Abrir vista para TV Vertical"
+                            className="flex items-center gap-2 px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm"
+                            title="Vista TV - Producción"
                         >
-                            <Monitor size={18} />
-                            <span>Vista TV</span>
-                            <ExternalLink size={14} className="opacity-50" />
+                            <Monitor size={16} />
+                            <span>TV Producción</span>
+                            <ExternalLink size={12} className="opacity-50" />
+                        </a>
+
+                        <a
+                            href="/preparados-tv"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                            title="Vista TV - Preparados"
+                        >
+                            <Monitor size={16} />
+                            <span>TV Preparados</span>
+                            <ExternalLink size={12} className="opacity-50" />
                         </a>
 
                         <div className="h-8 w-px bg-gray-300 mx-2 hidden lg:block"></div>

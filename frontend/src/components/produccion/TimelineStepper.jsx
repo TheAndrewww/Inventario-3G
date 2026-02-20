@@ -1,13 +1,9 @@
 import React, { memo, useMemo } from 'react';
 import { s, px, addBusinessDays, formatDateShort, calcularDiasHabiles, getHoyStr } from '../../utils/produccion';
 import {
-    Package,
-    ShoppingCart,
     Factory,
     Scissors,
     Wrench,
-    Truck,
-    CheckCircle2,
     Calendar
 } from 'lucide-react';
 
@@ -325,8 +321,8 @@ const TimelineStepper = memo(({ proyecto }) => {
         // Timeline simplificado (posiciones ajustadas: 8% y 75%)
         if (timelineSimplificado) {
             const nodes = [
-                { stage: 'instalacion', icon: Truck, label: 'Instalación', pos: '8%' },
-                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: '75%' }
+                { stage: 'instalacion', icon: ETAPAS_CONFIG.instalacion.icon, label: 'Preparado', pos: '8%' },
+                { stage: 'completado', icon: ETAPAS_CONFIG.completado.icon, label: 'Fin', pos: '75%' }
             ];
 
             return nodes.map((node) => (
@@ -350,8 +346,8 @@ const TimelineStepper = memo(({ proyecto }) => {
             const POS5 = { P1: '8%', P2: '25%', P3: '42%', P4: '58%', P5: '75%' };
 
             nodes = [
-                { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS5.P1, idx: 1, topPercent: '40%' },
-                { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS5.P2, idx: 2, topPercent: '40%' },
+                { stage: 'diseno', icon: ETAPAS_CONFIG.diseno.icon, label: 'Diseño', pos: POS5.P1, idx: 1, topPercent: '40%' },
+                { stage: 'compras', icon: ETAPAS_CONFIG.compras.icon, label: 'Compras', pos: POS5.P2, idx: 2, topPercent: '40%' },
             ];
 
             if (tieneManufacturaLocal) {
@@ -372,17 +368,17 @@ const TimelineStepper = memo(({ proyecto }) => {
             }
 
             nodes.push(
-                { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS5.P4, idx: 4, topPercent: '40%' },
-                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS5.P5, idx: 5, topPercent: '40%' }
+                { stage: 'instalacion', icon: ETAPAS_CONFIG.instalacion.icon, label: 'Prep.', pos: POS5.P4, idx: 4, topPercent: '40%' },
+                { stage: 'completado', icon: ETAPAS_CONFIG.completado.icon, label: 'Fin', pos: POS5.P5, idx: 5, topPercent: '40%' }
             );
         } else {
             // Posiciones para 4 nodos: 8%, 30%, 52%, 75%
             const POS4 = { P1: '8%', P2: '30%', P3: '52%', P4: '75%' };
             nodes = [
-                { stage: 'diseno', icon: Package, label: 'Diseño', pos: POS4.P1, idx: 1, topPercent: '40%' },
-                { stage: 'compras', icon: ShoppingCart, label: 'Compras', pos: POS4.P2, idx: 2, topPercent: '40%' },
-                { stage: 'instalacion', icon: Truck, label: 'Inst.', pos: POS4.P3, idx: 4, topPercent: '40%' },
-                { stage: 'completado', icon: CheckCircle2, label: 'Fin', pos: POS4.P4, idx: 5, topPercent: '40%' }
+                { stage: 'diseno', icon: ETAPAS_CONFIG.diseno.icon, label: 'Diseño', pos: POS4.P1, idx: 1, topPercent: '40%' },
+                { stage: 'compras', icon: ETAPAS_CONFIG.compras.icon, label: 'Compras', pos: POS4.P2, idx: 2, topPercent: '40%' },
+                { stage: 'instalacion', icon: ETAPAS_CONFIG.instalacion.icon, label: 'Prep.', pos: POS4.P3, idx: 4, topPercent: '40%' },
+                { stage: 'completado', icon: ETAPAS_CONFIG.completado.icon, label: 'Fin', pos: POS4.P4, idx: 5, topPercent: '40%' }
             ];
         }
 

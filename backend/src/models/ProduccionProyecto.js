@@ -289,14 +289,22 @@ ProduccionProyecto.prototype.completarEtapaActual = async function (usuarioId, o
     const esMTONoExtensivo = tipoProyecto === 'MTO' && !this.es_extensivo;
     const usaTimelineSimplificado = esGTIA || esMTONoExtensivo;
 
-    // Para MTO/GTIA con timeline simplificado: van directo a completado
-    if (usaTimelineSimplificado && etapaActual !== 'completado') {
-        this.etapa_actual = 'completado';
-        this.fecha_completado = ahora;
-        this.instalacion_completado_en = ahora;
-        this.instalacion_completado_por = usuarioId;
-        await this.save();
-        return this;
+    // Para MTO/GTIA con timeline simplificado: van a instalacion (Preparado), luego a completado
+    if (usaTimelineSimplificado) {
+        if (etapaActual === 'instalacion') {
+            // Si ya están en Preparado, completar el proyecto
+            this.etapa_actual = 'completado';
+            this.fecha_completado = ahora;
+            await this.save();
+            return this;
+        } else if (etapaActual !== 'completado') {
+            // Si están en cualquier otra etapa, moverlos a Preparado
+            this.etapa_actual = 'instalacion';
+            this.instalacion_completado_en = ahora;
+            this.instalacion_completado_por = usuarioId;
+            await this.save();
+            return this;
+        }
     }
 
     // Flujo normal para proyectos A, B, C y MTO extensivo
@@ -407,10 +415,21 @@ ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEt
     // Verificar si ambas sub-etapas están completas para auto-avanzar
     const puedeAvanzar = this.manufactura_completado && this.herreria_completado;
 
+    // Auto-avanzar a instalacion (Preparado) cuando ambas sub-etapas están completas
+    let autoAvanzado = false;
+    if (puedeAvanzar && this.etapa_actual === 'produccion') {
+        this.etapa_actual = 'instalacion';
+        this.instalacion_completado_en = ahora;
+        this.instalacion_completado_por = usuarioId;
+        await this.save();
+        autoAvanzado = true;
+    }
+
     return {
         proyecto: this,
         subEtapaCompletada: subEtapa,
         puedeAvanzarAInstalacion: puedeAvanzar,
+        autoAvanzado,
         estadoSubEtapas: {
             manufactura: this.manufactura_completado,
             herreria: this.herreria_completado

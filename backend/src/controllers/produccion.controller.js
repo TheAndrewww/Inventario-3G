@@ -528,26 +528,28 @@ export const toggleEtapa = async (req, res) => {
             if (config.bool) proyecto[config.bool] = false;
         }
 
-        // Recalcular etapa_actual basada en el primer paso NO completado
-        // Orden: Diseno -> Compras -> Produccion (Manufactura AND Herreria) -> Instalacion -> Completado
+        // Recalcular etapa_actual basada en la etapa más avanzada marcada
+        // Permite marcar etapas de forma independiente sin seguir orden estricto
         let nuevaEtapa = 'diseno';
 
-        if (proyecto.diseno_completado_en) {
-            nuevaEtapa = 'compras';
-            if (proyecto.compras_completado_en) {
-                nuevaEtapa = 'produccion';
-                // Producción se considera completa si manufactura Y herrería están listas (o si tiene flags manuales, pero usemos las sub-etapas)
-                // Usamos los campos bool si existen, o timestamps
-                const manDone = proyecto.manufactura_completado || !!proyecto.manufactura_completado_en;
-                const herDone = proyecto.herreria_completado || !!proyecto.herreria_completado_en;
+        const manDone = proyecto.manufactura_completado || !!proyecto.manufactura_completado_en;
+        const herDone = proyecto.herreria_completado || !!proyecto.herreria_completado_en;
 
-                if (manDone && herDone) {
-                    nuevaEtapa = 'instalacion';
-                    if (proyecto.instalacion_completado_en) {
-                        nuevaEtapa = 'completado';
-                    }
-                }
-            }
+        // Si marca "Preparado" → el proyecto está EN la etapa Preparado (instalacion)
+        if (proyecto.instalacion_completado_en) {
+            nuevaEtapa = 'instalacion';
+        }
+        // Si ambas sub-etapas de producción están completas → Preparado
+        else if (manDone && herDone) {
+            nuevaEtapa = 'instalacion';
+        }
+        // Si alguna sub-etapa está marcada → Producción
+        else if (manDone || herDone || proyecto.compras_completado_en) {
+            nuevaEtapa = 'produccion';
+        }
+        // Si diseño está marcado → Compras
+        else if (proyecto.diseno_completado_en) {
+            nuevaEtapa = 'compras';
         }
 
         proyecto.etapa_actual = nuevaEtapa;
