@@ -265,7 +265,7 @@ const TimelineStepper = memo(({ proyecto }) => {
     // Memoizar nodos
     const nodos = useMemo(() => {
         const getNodeColor = (node) => {
-            // New Independent Logic
+            // Check if this specific node/stage is completed
             let isCompleted = false;
             if (node.stage === 'diseno' && proyecto.diseno_completado_en) isCompleted = true;
             if (node.stage === 'compras' && proyecto.compras_completado_en) isCompleted = true;
@@ -274,15 +274,24 @@ const TimelineStepper = memo(({ proyecto }) => {
             if (node.stage === 'instalacion' && proyecto.instalacion_completado_en) isCompleted = true;
             if (node.stage === 'completado' && proyecto.etapa_actual === 'completado') isCompleted = true;
 
-            const etapaIndex = ETAPAS_ORDEN.indexOf(proyecto.etapa_actual);
+            // Check if this node is in the "active zone" (current working stage)
+            const isInActiveZone = (
+                (proyecto.etapa_actual === 'produccion' && (node.stage === 'manufactura' || node.stage === 'herreria')) ||
+                (proyecto.etapa_actual === node.stage)
+            );
 
-            // 1. Explicitly Completed -> Always Green
+            // 1. Completed AND in active zone -> NARANJA (etapa completada pero proyecto sigue aquí)
+            if (isCompleted && isInActiveZone) {
+                return 'bg-orange-500 text-white';
+            }
+
+            // 2. Completed but NOT in active zone -> Verde (etapa pasada y completada)
             if (isCompleted) {
                 return 'bg-green-500 text-white';
             }
 
-            // 2. Active Stage (Not completed)
-            if (proyecto.etapa_actual === node.stage) {
+            // 3. Active Stage but NOT completed yet
+            if (isInActiveZone) {
                 // Check for delay (Red)
                 if (enRetraso) return 'bg-red-500 text-white';
                 // Check for warning (Amber) - Compras in process
@@ -290,16 +299,11 @@ const TimelineStepper = memo(({ proyecto }) => {
                 // Special MTO delay
                 if (esMTO && diasRestantes !== null && diasRestantes < 0) return 'bg-red-500 text-white';
 
-                // Default Active
+                // Default Active (verde - está trabajando en esta etapa)
                 return 'bg-green-500 text-white';
             }
 
-            // 3. Past Stages (Sequential) that are NOT completed?
-            // If we are independent, they stay Gray if not done.
-            // But if we want to show "skipped" or "breakage", maybe Red?
-            // User request: "Parallel". Implies skipping. So Gray (pending) is appropriate.
-
-            // 4. Future Stages -> Gray
+            // 4. Future Stages or not relevant -> Gray
             return 'bg-white border-2 border-gray-200 text-gray-400';
         };
 
