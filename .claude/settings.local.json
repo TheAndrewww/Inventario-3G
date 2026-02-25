@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(timeout 15 railway logs:*)",
-      "Bash(timeout 12 railway logs:*)"
+      "Bash(timeout 12 railway logs:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(railway --version:*)",
+      "Bash(railway status:*)",
+      "Bash(railway run:*)",
+      "Bash(railway logs:*)",
+      "Bash(railway shell)"
     ],
     "deny": [],
     "ask": []

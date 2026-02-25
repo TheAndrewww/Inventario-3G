@@ -109,6 +109,8 @@ import anunciosRoutes from './src/routes/anuncios.routes.js';
 import miEquipoRoutes from './src/routes/miEquipo.routes.js';
 import produccionRoutes from './src/routes/produccion.routes.js';
 import campanaControlRoutes from './src/routes/campanaControlRoutes.js';
+import conteosCiclicosRoutes from './src/routes/conteosCiclicos.routes.js';
+import descontarAlmacenRoutes from './src/routes/descontarAlmacen.routes.js';
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -137,7 +139,9 @@ app.get('/', (req, res) => {
             miEquipo: '/api/mi-equipo',
             miEquipo: '/api/mi-equipo',
             produccion: '/api/produccion',
-            campanaControl: '/api/campana-control'
+            campanaControl: '/api/campana-control',
+            conteosCiclicos: '/api/conteos-ciclicos',
+            descontarAlmacen: '/api/descontar-almacen'
         }
     });
 });
@@ -160,6 +164,8 @@ app.use('/api/anuncios', anunciosRoutes);
 app.use('/api/mi-equipo', miEquipoRoutes);
 app.use('/api/produccion', produccionRoutes);
 app.use('/api/campana-control', campanaControlRoutes);
+app.use('/api/conteos-ciclicos', conteosCiclicosRoutes);
+app.use('/api/descontar-almacen', descontarAlmacenRoutes);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
 

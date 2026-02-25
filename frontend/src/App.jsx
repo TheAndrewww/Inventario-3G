@@ -31,6 +31,8 @@ import TerminalAreaPage from './pages/TerminalAreaPage';
 import DashboardProduccionTVPage from './pages/DashboardProduccionTVPage';
 import DashboardPreparadosTVPage from './pages/DashboardPreparadosTVPage';
 import ControlCampanaPage from './pages/ControlCampanaPage';
+import ConteoCiclicoPage from './pages/ConteoCiclicoPage';
+import DescontarAlmacenPage from './pages/DescontarAlmacenPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 
 function App() {
@@ -108,6 +110,8 @@ function App() {
                       <Route path="mi-equipo" element={<MiEquipoPage />} />
                       <Route path="produccion" element={<DashboardProduccionPage />} />
                       <Route path="control-campana" element={<ControlCampanaPage />} />
+                      <Route path="conteo-ciclico" element={<ConteoCiclicoPage />} />
+                      <Route path="descontar-almacen" element={<DescontarAlmacenPage />} />
                       <Route path="perfil" element={<PerfilPage />} />
 
                       {/* Ruta 404 para rutas privadas no encontradas */}

@@ -21,6 +21,8 @@ import TipoHerramientaRenta from './TipoHerramientaRenta.js';
 import UnidadHerramientaRenta from './UnidadHerramientaRenta.js';
 import HistorialAsignacionHerramienta from './HistorialAsignacionHerramienta.js';
 import CampanaControl from './CampanaControl.js';
+import ConteoCiclico from './ConteoCiclico.js';
+import ConteoArticulo from './ConteoArticulo.js';
 
 // Definir relaciones
 
@@ -522,6 +524,28 @@ Usuario.hasMany(HistorialAsignacionHerramienta, {
     as: 'historial_asignaciones_registradas'
 });
 
+// ========== RELACIONES CONTEO CÍCLICO ==========
+
+// ConteoCiclico - ConteoArticulo (Uno a Muchos)
+ConteoCiclico.hasMany(ConteoArticulo, {
+    foreignKey: 'conteo_ciclico_id',
+    as: 'articulos'
+});
+ConteoArticulo.belongsTo(ConteoCiclico, {
+    foreignKey: 'conteo_ciclico_id',
+    as: 'conteo'
+});
+
+// ConteoArticulo - Articulo (Muchos a Uno)
+ConteoArticulo.belongsTo(Articulo, {
+    foreignKey: 'articulo_id',
+    as: 'articulo'
+});
+Articulo.hasMany(ConteoArticulo, {
+    foreignKey: 'articulo_id',
+    as: 'conteos'
+});
+
 // Exportar todos los modelos
 export {
     sequelize,
@@ -546,7 +570,9 @@ export {
     HistorialAsignacionHerramienta,
     Camioneta,
     StockMinimoCamioneta,
-    CampanaControl
+    CampanaControl,
+    ConteoCiclico,
+    ConteoArticulo
 };
 
 export default {
@@ -573,5 +599,7 @@ export default {
     UnidadHerramientaRenta,
     UnidadHerramientaRenta,
     HistorialAsignacionHerramienta,
-    CampanaControl
+    CampanaControl,
+    ConteoCiclico,
+    ConteoArticulo
 };
