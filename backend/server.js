@@ -246,6 +246,32 @@ const startServer = async () => {
                 console.log('✅ Base de datos ya inicializada');
             }
 
+            // Migración: conteos_ciclicos schema v2 (agregar fecha, total_asignados)
+            try {
+                const [fechaCol] = await sequelize.query(
+                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'conteos_ciclicos' AND column_name = 'fecha'"
+                );
+                const tieneFecha = parseInt(fechaCol[0]?.count || 0) > 0;
+
+                const [tablaExisteCC] = await sequelize.query(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'conteos_ciclicos'"
+                );
+                const existeTabla = parseInt(tablaExisteCC[0]?.count || 0) > 0;
+
+                if (existeTabla && !tieneFecha) {
+                    console.log('🔄 Migrando conteos_ciclicos a schema v2...');
+                    await sequelize.query('DROP TABLE IF EXISTS conteo_articulos CASCADE');
+                    await sequelize.query('DROP TABLE IF EXISTS conteos_ciclicos CASCADE');
+                    await sequelize.sync({ force: false });
+                    console.log('✅ Tablas conteos_ciclicos y conteo_articulos recreadas con nuevo schema');
+                } else if (!existeTabla) {
+                    await sequelize.sync({ force: false });
+                    console.log('✅ Tablas nuevas creadas (conteos_ciclicos, conteo_articulos)');
+                }
+            } catch (e) {
+                console.log('⚠️ Migración conteos_ciclicos:', e.message);
+            }
+
             // Verificar/crear usuario administrador (solo si no existe)
             const { Usuario } = await import('./src/models/index.js');
 
