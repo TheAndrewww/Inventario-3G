@@ -433,8 +433,18 @@ const startServer = async () => {
                         "SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'rollos_membrana' AND column_name = 'estado'"
                     );
                     const colType = colCheck[0]?.udt_name || '';
+
+                    // Verificar si tiene columna created_at (snake_case, requerido por underscored:true)
+                    const [tsCheck] = await sequelize.query(
+                        "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'rollos_membrana' AND column_name = 'created_at'"
+                    );
+                    const hasCreatedAt = parseInt(tsCheck[0].count) > 0;
+
                     if (colType !== 'enum_rollos_membrana_estado') {
                         console.log(`🔄 Columna estado tiene tipo '${colType}', necesita ENUM. Recreando tabla...`);
+                        needsRecreate = true;
+                    } else if (!hasCreatedAt) {
+                        console.log('🔄 Tabla tiene timestamps camelCase, necesita snake_case. Recreando...');
                         needsRecreate = true;
                     } else {
                         console.log('✅ Tabla rollos_membrana ya existe con schema correcto');
