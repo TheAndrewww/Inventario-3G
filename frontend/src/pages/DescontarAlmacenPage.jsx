@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Warehouse, Search, Package, Minus, ArrowLeft, X, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Warehouse, Search, Package, Minus, ArrowLeft, X, CheckCircle2, AlertTriangle, Layers, Ruler } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
 const API = '/descontar-almacen';
+const API_ROLLOS = '/rollos-membrana';
 
 const DescontarAlmacenPage = () => {
     const [almacenes, setAlmacenes] = useState([]);
@@ -13,13 +14,24 @@ const DescontarAlmacenPage = () => {
     const [loading, setLoading] = useState(true);
     const [loadingArticulos, setLoadingArticulos] = useState(false);
 
-    // Modal de descuento
+    // Modal de descuento normal
     const [articuloDescuento, setArticuloDescuento] = useState(null);
     const [cantidad, setCantidad] = useState('');
     const [observaciones, setObservaciones] = useState('');
     const [descontando, setDescontando] = useState(false);
 
+    // === Rollos de membrana ===
+    const [esMembranas, setEsMembranas] = useState(false);
+    const [rollosArticulo, setRollosArticulo] = useState(null); // artículo seleccionado para ver rollos
+    const [rollos, setRollos] = useState([]);
+    const [loadingRollos, setLoadingRollos] = useState(false);
+    const [rolloSeleccionado, setRolloSeleccionado] = useState(null);
+    const [cantidadRollo, setCantidadRollo] = useState('');
+    const [obsRollo, setObsRollo] = useState('');
+    const [descontandoRollo, setDescontandoRollo] = useState(false);
+
     const cantidadRef = useRef(null);
+    const cantidadRolloRef = useRef(null);
     const searchRef = useRef(null);
 
     useEffect(() => {
@@ -40,6 +52,7 @@ const DescontarAlmacenPage = () => {
 
     const seleccionarAlmacen = (almacen) => {
         setAlmacenSeleccionado(almacen);
+        setEsMembranas(almacen === 'Membranas');
         setBusqueda('');
         cargarArticulos(almacen, '');
     };
@@ -66,7 +79,12 @@ const DescontarAlmacenPage = () => {
         return () => clearTimeout(timer);
     }, [busqueda]);
 
+    // === DESCUENTO NORMAL (no membranas) ===
     const abrirDescuento = (articulo) => {
+        if (esMembranas) {
+            abrirRollos(articulo);
+            return;
+        }
         setArticuloDescuento(articulo);
         setCantidad('');
         setObservaciones('');
@@ -97,7 +115,6 @@ const DescontarAlmacenPage = () => {
 
             toast.success(`-${cantidadNum} ${articuloDescuento.unidad} descontados`, { icon: '✅' });
 
-            // Actualizar artículo en la lista
             setArticulos(prev => prev.map(a => {
                 if (a.id === articuloDescuento.id) {
                     const nuevoStock = parseFloat(a.stock_actual) - cantidadNum;
@@ -116,12 +133,86 @@ const DescontarAlmacenPage = () => {
         }
     };
 
+    // === ROLLOS DE MEMBRANA ===
+    const abrirRollos = async (articulo) => {
+        setRollosArticulo(articulo);
+        setRolloSeleccionado(null);
+        setCantidadRollo('');
+        setObsRollo('');
+        setLoadingRollos(true);
+        try {
+            const res = await api.get(`${API_ROLLOS}/${articulo.id}/rollos`);
+            setRollos((res.data.data?.rollos || []).filter(r => r.estado !== 'agotado'));
+        } catch (error) {
+            toast.error('Error al cargar rollos');
+            setRollos([]);
+        } finally {
+            setLoadingRollos(false);
+        }
+    };
+
+    const seleccionarRollo = (rollo) => {
+        setRolloSeleccionado(rollo);
+        setCantidadRollo('');
+        setObsRollo('');
+        setTimeout(() => cantidadRolloRef.current?.focus(), 100);
+    };
+
+    const confirmarDescuentoRollo = async () => {
+        const amount = parseFloat(cantidadRollo);
+        if (!amount || amount <= 0) {
+            toast.error('Ingresa una cantidad válida');
+            return;
+        }
+        if (amount > parseFloat(rolloSeleccionado.metraje_restante)) {
+            toast.error(`Metraje insuficiente. Disponible: ${parseFloat(rolloSeleccionado.metraje_restante)}m`);
+            return;
+        }
+
+        setDescontandoRollo(true);
+        try {
+            await api.post(`${API_ROLLOS}/rollos/${rolloSeleccionado.id}/descontar`, {
+                cantidad: amount,
+                observaciones: obsRollo || null
+            });
+
+            toast.success(`-${amount}m de "${rolloSeleccionado.identificador}"`, { icon: '✅' });
+
+            // Refrescar rollos
+            setRolloSeleccionado(null);
+            setCantidadRollo('');
+            setObsRollo('');
+            abrirRollos(rollosArticulo);
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Error al descontar');
+        } finally {
+            setDescontandoRollo(false);
+        }
+    };
+
+    const cerrarRollos = () => {
+        setRollosArticulo(null);
+        setRollos([]);
+        setRolloSeleccionado(null);
+    };
+
     const volverAAlmacenes = () => {
         setAlmacenSeleccionado(null);
+        setEsMembranas(false);
         setArticulos([]);
         setBusqueda('');
         setArticuloDescuento(null);
+        cerrarRollos();
     };
+
+    // Helpers
+    const porcentaje = (rollo) => {
+        const t = parseFloat(rollo.metraje_total);
+        const r = parseFloat(rollo.metraje_restante);
+        return t > 0 ? Math.round((r / t) * 100) : 0;
+    };
+
+    const barColor = (pct) => pct > 50 ? 'bg-emerald-500' : pct > 20 ? 'bg-amber-500' : 'bg-red-500';
 
     if (loading) {
         return (
@@ -137,22 +228,33 @@ const DescontarAlmacenPage = () => {
             <div className="flex items-center gap-3 mb-5">
                 {almacenSeleccionado && (
                     <button
-                        onClick={volverAAlmacenes}
+                        onClick={rollosArticulo ? cerrarRollos : volverAAlmacenes}
                         className="p-2 -ml-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
                     >
                         <ArrowLeft size={22} />
                     </button>
                 )}
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-orange-100 rounded-lg">
-                        <Warehouse className="text-orange-600" size={22} />
+                    <div className={`p-2 rounded-lg ${rollosArticulo ? 'bg-purple-100' : 'bg-orange-100'}`}>
+                        {rollosArticulo
+                            ? <Layers className="text-purple-600" size={22} />
+                            : <Warehouse className="text-orange-600" size={22} />
+                        }
                     </div>
                     <div>
                         <h1 className="text-xl font-bold text-gray-900">
-                            {almacenSeleccionado || 'Descuento por Almacén'}
+                            {rollosArticulo
+                                ? rollosArticulo.nombre
+                                : almacenSeleccionado || 'Descuento por Almacén'
+                            }
                         </h1>
                         <p className="text-xs text-gray-500">
-                            {almacenSeleccionado ? 'Selecciona un artículo para descontar' : 'Selecciona un almacén'}
+                            {rollosArticulo
+                                ? 'Selecciona un rollo para descontar metraje'
+                                : almacenSeleccionado
+                                    ? (esMembranas ? 'Selecciona un artículo para ver rollos' : 'Selecciona un artículo para descontar')
+                                    : 'Selecciona un almacén'
+                            }
                         </p>
                     </div>
                 </div>
@@ -168,8 +270,11 @@ const DescontarAlmacenPage = () => {
                             className="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-gray-200 hover:border-orange-300 hover:shadow-md transition-all text-left active:scale-[0.98]"
                         >
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
-                                    <Warehouse size={20} className="text-orange-500" />
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${alm.almacen === 'Membranas' ? 'bg-purple-50' : 'bg-orange-50'}`}>
+                                    {alm.almacen === 'Membranas'
+                                        ? <Layers size={20} className="text-purple-500" />
+                                        : <Warehouse size={20} className="text-orange-500" />
+                                    }
                                 </div>
                                 <div>
                                     <p className="font-semibold text-gray-900">{alm.almacen}</p>
@@ -189,11 +294,11 @@ const DescontarAlmacenPage = () => {
                 </div>
             )}
 
-            {/* ===== VISTA: ARTÍCULOS DEL ALMACÉN ===== */}
-            {almacenSeleccionado && (
+            {/* ===== VISTA: ARTÍCULOS DEL ALMACÉN (sin vista de rollos) ===== */}
+            {almacenSeleccionado && !rollosArticulo && (
                 <>
-                    {/* Modal de descuento */}
-                    {articuloDescuento && (
+                    {/* Modal de descuento normal (no membranas) */}
+                    {articuloDescuento && !esMembranas && (
                         <div className="bg-white rounded-xl shadow-lg border-2 border-orange-200 p-4 mb-4">
                             <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -246,8 +351,8 @@ const DescontarAlmacenPage = () => {
 
                                 {cantidad && parseFloat(cantidad) > 0 && (
                                     <div className={`flex items-center gap-2 p-2 rounded-lg text-sm ${parseFloat(cantidad) > parseFloat(articuloDescuento.stock_actual)
-                                            ? 'bg-red-50 text-red-700'
-                                            : 'bg-orange-50 text-orange-700'
+                                        ? 'bg-red-50 text-red-700'
+                                        : 'bg-orange-50 text-orange-700'
                                         }`}>
                                         {parseFloat(cantidad) > parseFloat(articuloDescuento.stock_actual) ? (
                                             <><AlertTriangle size={14} /> Excede el stock disponible</>
@@ -322,8 +427,11 @@ const DescontarAlmacenPage = () => {
                                     {art.imagen_url ? (
                                         <img src={art.imagen_url} alt="" className="w-10 h-10 object-cover rounded-lg border flex-shrink-0" />
                                     ) : (
-                                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                            <Package size={16} className="text-gray-400" />
+                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${esMembranas ? 'bg-purple-50' : 'bg-gray-100'}`}>
+                                            {esMembranas
+                                                ? <Layers size={16} className="text-purple-400" />
+                                                : <Package size={16} className="text-gray-400" />
+                                            }
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0">
@@ -337,11 +445,154 @@ const DescontarAlmacenPage = () => {
                                         <p className="text-sm font-bold text-gray-800">{parseFloat(art.stock_actual)}</p>
                                         <p className="text-xs text-gray-400">{art.unidad}</p>
                                     </div>
-                                    <Minus size={16} className="text-orange-400 flex-shrink-0" />
+                                    {esMembranas
+                                        ? <Layers size={16} className="text-purple-400 flex-shrink-0" />
+                                        : <Minus size={16} className="text-orange-400 flex-shrink-0" />
+                                    }
                                 </div>
                             ))
                         )}
                     </div>
+                </>
+            )}
+
+            {/* ===== VISTA: ROLLOS DE UN ARTÍCULO (solo Membranas) ===== */}
+            {rollosArticulo && (
+                <>
+                    {/* Modal descuento de rollo */}
+                    {rolloSeleccionado && (
+                        <div className="bg-white rounded-xl shadow-lg border-2 border-purple-200 p-4 mb-4">
+                            <div className="flex items-start justify-between mb-3">
+                                <div>
+                                    <h3 className="font-semibold text-gray-900">Descontar de: {rolloSeleccionado.identificador}</h3>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        Disponible: <span className="font-bold text-gray-800">{parseFloat(rolloSeleccionado.metraje_restante)} metros</span>
+                                        {' '}de {parseFloat(rolloSeleccionado.metraje_total)}m
+                                    </p>
+                                </div>
+                                <button onClick={() => setRolloSeleccionado(null)} className="p-1 hover:bg-gray-100 rounded-lg">
+                                    <X size={18} className="text-gray-400" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Metros a descontar</label>
+                                    <input
+                                        ref={cantidadRolloRef}
+                                        type="number"
+                                        min="0.01"
+                                        step="0.01"
+                                        max={parseFloat(rolloSeleccionado.metraje_restante)}
+                                        value={cantidadRollo}
+                                        onChange={e => setCantidadRollo(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && confirmarDescuentoRollo()}
+                                        placeholder="0"
+                                        className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-xl font-bold text-center"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Motivo / Observaciones</label>
+                                    <input
+                                        type="text"
+                                        value={obsRollo}
+                                        onChange={e => setObsRollo(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && confirmarDescuentoRollo()}
+                                        placeholder="Ej: Corte para proyecto, salida a obra..."
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                                    />
+                                </div>
+
+                                {cantidadRollo && parseFloat(cantidadRollo) > 0 && (
+                                    <div className={`flex items-center gap-2 p-2 rounded-lg text-sm ${parseFloat(cantidadRollo) > parseFloat(rolloSeleccionado.metraje_restante)
+                                        ? 'bg-red-50 text-red-700'
+                                        : 'bg-purple-50 text-purple-700'
+                                        }`}>
+                                        {parseFloat(cantidadRollo) > parseFloat(rolloSeleccionado.metraje_restante) ? (
+                                            <><AlertTriangle size={14} /> Excede el metraje disponible</>
+                                        ) : (
+                                            <>
+                                                <Ruler size={14} />
+                                                Metraje resultante: <span className="font-bold">{(parseFloat(rolloSeleccionado.metraje_restante) - parseFloat(cantidadRollo)).toFixed(2)}</span> metros
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={confirmarDescuentoRollo}
+                                    disabled={descontandoRollo || !cantidadRollo || parseFloat(cantidadRollo) <= 0 || parseFloat(cantidadRollo) > parseFloat(rolloSeleccionado.metraje_restante)}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium active:scale-[0.98]"
+                                >
+                                    {descontandoRollo ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                            Descontando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Minus size={18} />
+                                            Confirmar Descuento
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Lista de rollos */}
+                    {loadingRollos ? (
+                        <div className="p-8 text-center text-gray-500">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 mx-auto mb-2"></div>
+                            Cargando rollos...
+                        </div>
+                    ) : rollos.length === 0 ? (
+                        <div className="text-center py-12 text-gray-500">
+                            <Layers size={40} className="mx-auto mb-3 text-gray-300" />
+                            <p className="font-medium text-sm">No hay rollos disponibles</p>
+                            <p className="text-xs text-gray-400 mt-1">Registra rollos desde la página de Rollos Membrana</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {rollos.map(rollo => {
+                                const pct = porcentaje(rollo);
+                                const isSelected = rolloSeleccionado?.id === rollo.id;
+                                return (
+                                    <div
+                                        key={rollo.id}
+                                        onClick={() => seleccionarRollo(rollo)}
+                                        className={`bg-white rounded-xl shadow-sm border p-3.5 cursor-pointer transition-all active:scale-[0.98] ${isSelected
+                                                ? 'border-purple-300 bg-purple-50/30 shadow-md'
+                                                : 'border-gray-200 hover:border-purple-200 hover:shadow-md'
+                                            }`}
+                                    >
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-gray-900 text-sm">{rollo.identificador}</span>
+                                                {rollo.color && (
+                                                    <span className="text-xs text-gray-400">🎨 {rollo.color}</span>
+                                                )}
+                                            </div>
+                                            <div className="text-right">
+                                                <span className={`text-sm font-bold ${pct > 50 ? 'text-emerald-600' : pct > 20 ? 'text-amber-600' : 'text-red-600'}`}>
+                                                    {parseFloat(rollo.metraje_restante)}m
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-500 ${barColor(pct)}`}
+                                                    style={{ width: `${pct}%` }}
+                                                ></div>
+                                            </div>
+                                            <span className="text-[10px] text-gray-400 w-8 text-right">{pct}%</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </>
             )}
         </div>
