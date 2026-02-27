@@ -465,8 +465,8 @@ const startServer = async () => {
                             fecha_ingreso DATE NOT NULL DEFAULT CURRENT_DATE,
                             observaciones TEXT,
                             activo BOOLEAN NOT NULL DEFAULT TRUE,
-                            "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                            "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
                         )
                     `);
 

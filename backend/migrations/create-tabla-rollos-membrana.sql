@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS rollos_membrana (
     fecha_ingreso DATE NOT NULL DEFAULT CURRENT_DATE,
     observaciones TEXT,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
-    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_rollos_membrana_articulo_id ON rollos_membrana(articulo_id);
