@@ -1,14 +1,7 @@
 -- Migración: Crear tabla rollos_membrana
 -- Almacena rollos individuales de membrana/malla con metraje lineal
 
--- Crear el tipo ENUM para estado
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_rollos_membrana_estado') THEN
-        CREATE TYPE "enum_rollos_membrana_estado" AS ENUM ('disponible', 'en_uso', 'agotado');
-    END IF;
-END
-$$;
+CREATE TYPE "enum_rollos_membrana_estado" AS ENUM ('disponible', 'en_uso', 'agotado');
 
 CREATE TABLE IF NOT EXISTS rollos_membrana (
     id SERIAL PRIMARY KEY,
