@@ -487,6 +487,48 @@ const startServer = async () => {
 
                     console.log('✅ Tabla rollos_membrana creada exitosamente');
                 }
+
+                // Migración de datos: crear rollos iniciales para artículos existentes
+                const [rollosCount] = await sequelize.query("SELECT COUNT(*) FROM rollos_membrana");
+                const totalRollos = parseInt(rollosCount[0].count);
+
+                if (totalRollos === 0) {
+                    console.log('🔄 Migrando stock existente de membranas a rollos...');
+
+                    // Obtener artículos del almacén Membranas con stock > 0
+                    const [articulosMembrana] = await sequelize.query(`
+                        SELECT a.id, a.nombre, a.stock_actual
+                        FROM articulos a
+                        JOIN ubicaciones u ON a.ubicacion_id = u.id
+                        WHERE u.almacen = 'Membranas'
+                          AND a.activo = true
+                          AND a.stock_actual > 0
+                        ORDER BY a.id
+                    `);
+
+                    if (articulosMembrana.length > 0) {
+                        let contador = 1;
+                        for (const art of articulosMembrana) {
+                            const identificador = `R-${String(contador).padStart(3, '0')}`;
+                            const metraje = parseFloat(art.stock_actual);
+                            try {
+                                await sequelize.query(`
+                                    INSERT INTO rollos_membrana (articulo_id, identificador, metraje_total, metraje_restante, estado, fecha_ingreso, activo, created_at, updated_at)
+                                    VALUES ($1, $2, $3, $3, 'disponible', CURRENT_DATE, true, NOW(), NOW())
+                                `, {
+                                    bind: [art.id, identificador, metraje]
+                                });
+                                console.log(`  ✅ Rollo "${identificador}" → ${art.nombre} (${metraje}m)`);
+                                contador++;
+                            } catch (insertErr) {
+                                console.error(`  ⚠️ Error creando rollo para ${art.nombre}:`, insertErr.message);
+                            }
+                        }
+                        console.log(`✅ ${contador - 1} rollos iniciales creados desde stock existente`);
+                    } else {
+                        console.log('ℹ️ No hay artículos de membrana con stock para migrar');
+                    }
+                }
             } catch (rollosError) {
                 console.error('⚠️ Error con tabla rollos_membrana:', rollosError.message);
             }
