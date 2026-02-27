@@ -419,57 +419,66 @@ const startServer = async () => {
 
             // Verificar/crear tabla de rollos_membrana
             console.log('🔍 Verificando tabla rollos_membrana...');
-            const [rollosTableCheck] = await sequelize.query(
-                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'rollos_membrana'"
-            );
-
-            const rollosTableExists = parseInt(rollosTableCheck[0].count) > 0;
-
-            if (rollosTableExists) {
-                // Verificar si tiene el tipo ENUM correcto o VARCHAR incorrecto
-                const [colCheck] = await sequelize.query(
-                    "SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'rollos_membrana' AND column_name = 'estado'"
+            try {
+                const [rollosTableCheck] = await sequelize.query(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'rollos_membrana'"
                 );
-                const colType = colCheck[0]?.udt_name || '';
-                if (colType !== 'enum_rollos_membrana_estado') {
-                    console.log('🔄 Tabla rollos_membrana tiene tipo incorrecto para estado, recreando...');
+                const rollosTableExists = parseInt(rollosTableCheck[0].count) > 0;
+
+                let needsRecreate = false;
+
+                if (rollosTableExists) {
+                    // Verificar si el tipo de la columna estado es correcto
+                    const [colCheck] = await sequelize.query(
+                        "SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'rollos_membrana' AND column_name = 'estado'"
+                    );
+                    const colType = colCheck[0]?.udt_name || '';
+                    if (colType !== 'enum_rollos_membrana_estado') {
+                        console.log(`🔄 Columna estado tiene tipo '${colType}', necesita ENUM. Recreando tabla...`);
+                        needsRecreate = true;
+                    } else {
+                        console.log('✅ Tabla rollos_membrana ya existe con schema correcto');
+                    }
+                } else {
+                    needsRecreate = true;
+                    console.log('🔄 Tabla rollos_membrana no existe, creando...');
+                }
+
+                if (needsRecreate) {
+                    // Paso 1: Limpiar tabla y tipo existentes
                     await sequelize.query('DROP TABLE IF EXISTS rollos_membrana CASCADE');
                     await sequelize.query('DROP TYPE IF EXISTS "enum_rollos_membrana_estado" CASCADE');
 
-                    const fs = await import('fs');
-                    const path = await import('path');
-                    const { fileURLToPath } = await import('url');
-                    const __filename = fileURLToPath(import.meta.url);
-                    const __dirname = path.dirname(__filename);
-                    const migrationPath = path.join(__dirname, 'migrations', 'create-tabla-rollos-membrana.sql');
-                    try {
-                        const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-                        await sequelize.query(migrationSQL);
-                        console.log('✅ Tabla rollos_membrana recreada con ENUM correcto');
-                    } catch (migrationError) {
-                        console.error('⚠️ Error al recrear tabla rollos_membrana:', migrationError.message);
-                    }
-                } else {
-                    console.log('✅ Tabla rollos_membrana ya existe');
-                }
-            } else {
-                console.log('🔄 Creando tabla rollos_membrana...');
+                    // Paso 2: Crear tipo ENUM
+                    await sequelize.query("CREATE TYPE \"enum_rollos_membrana_estado\" AS ENUM ('disponible', 'en_uso', 'agotado')");
 
-                const fs = await import('fs');
-                const path = await import('path');
-                const { fileURLToPath } = await import('url');
+                    // Paso 3: Crear tabla
+                    await sequelize.query(`
+                        CREATE TABLE rollos_membrana (
+                            id SERIAL PRIMARY KEY,
+                            articulo_id INTEGER NOT NULL REFERENCES articulos(id),
+                            identificador VARCHAR(100) NOT NULL UNIQUE,
+                            metraje_total DECIMAL(10, 2) NOT NULL,
+                            metraje_restante DECIMAL(10, 2) NOT NULL,
+                            color VARCHAR(100),
+                            estado "enum_rollos_membrana_estado" NOT NULL DEFAULT 'disponible',
+                            fecha_ingreso DATE NOT NULL DEFAULT CURRENT_DATE,
+                            observaciones TEXT,
+                            activo BOOLEAN NOT NULL DEFAULT TRUE,
+                            "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                            "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                        )
+                    `);
 
-                const __filename = fileURLToPath(import.meta.url);
-                const __dirname = path.dirname(__filename);
-                const migrationPath = path.join(__dirname, 'migrations', 'create-tabla-rollos-membrana.sql');
+                    // Paso 4: Crear índices
+                    await sequelize.query('CREATE INDEX IF NOT EXISTS idx_rollos_membrana_articulo_id ON rollos_membrana(articulo_id)');
+                    await sequelize.query('CREATE INDEX IF NOT EXISTS idx_rollos_membrana_estado ON rollos_membrana(estado)');
+                    await sequelize.query('CREATE INDEX IF NOT EXISTS idx_rollos_membrana_activo ON rollos_membrana(activo)');
 
-                try {
-                    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-                    await sequelize.query(migrationSQL);
                     console.log('✅ Tabla rollos_membrana creada exitosamente');
-                } catch (migrationError) {
-                    console.error('⚠️ Error al crear tabla rollos_membrana:', migrationError.message);
                 }
+            } catch (rollosError) {
+                console.error('⚠️ Error con tabla rollos_membrana:', rollosError.message);
             }
         }
 
