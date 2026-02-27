@@ -1,5 +1,4 @@
-import { Articulo, Ubicacion } from '../models/index.js';
-import RolloMembrana from '../models/RolloMembrana.js';
+import { Articulo, Ubicacion, RolloMembrana } from '../models/index.js';
 import { sequelize } from '../config/database.js';
 import { Op } from 'sequelize';
 

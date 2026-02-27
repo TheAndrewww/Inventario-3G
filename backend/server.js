@@ -425,7 +425,34 @@ const startServer = async () => {
 
             const rollosTableExists = parseInt(rollosTableCheck[0].count) > 0;
 
-            if (!rollosTableExists) {
+            if (rollosTableExists) {
+                // Verificar si tiene el tipo ENUM correcto o VARCHAR incorrecto
+                const [colCheck] = await sequelize.query(
+                    "SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'rollos_membrana' AND column_name = 'estado'"
+                );
+                const colType = colCheck[0]?.udt_name || '';
+                if (colType !== 'enum_rollos_membrana_estado') {
+                    console.log('🔄 Tabla rollos_membrana tiene tipo incorrecto para estado, recreando...');
+                    await sequelize.query('DROP TABLE IF EXISTS rollos_membrana CASCADE');
+                    await sequelize.query('DROP TYPE IF EXISTS "enum_rollos_membrana_estado" CASCADE');
+
+                    const fs = await import('fs');
+                    const path = await import('path');
+                    const { fileURLToPath } = await import('url');
+                    const __filename = fileURLToPath(import.meta.url);
+                    const __dirname = path.dirname(__filename);
+                    const migrationPath = path.join(__dirname, 'migrations', 'create-tabla-rollos-membrana.sql');
+                    try {
+                        const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+                        await sequelize.query(migrationSQL);
+                        console.log('✅ Tabla rollos_membrana recreada con ENUM correcto');
+                    } catch (migrationError) {
+                        console.error('⚠️ Error al recrear tabla rollos_membrana:', migrationError.message);
+                    }
+                } else {
+                    console.log('✅ Tabla rollos_membrana ya existe');
+                }
+            } else {
                 console.log('🔄 Creando tabla rollos_membrana...');
 
                 const fs = await import('fs');
@@ -443,8 +470,6 @@ const startServer = async () => {
                 } catch (migrationError) {
                     console.error('⚠️ Error al crear tabla rollos_membrana:', migrationError.message);
                 }
-            } else {
-                console.log('✅ Tabla rollos_membrana ya existe');
             }
         }
 
