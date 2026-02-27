@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen } from 'lucide-react';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -121,6 +121,12 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/descontar-almacen',
       icon: PackageOpen,
       label: 'Descuento Almacén',
+      roles: ['administrador', 'almacen', 'encargado']
+    },
+    {
+      path: '/rollos-membrana',
+      icon: Layers,
+      label: 'Rollos Membrana',
       roles: ['administrador', 'almacen', 'encargado']
     },
     {

@@ -22,6 +22,7 @@ import UnidadHerramientaRenta from './UnidadHerramientaRenta.js';
 import HistorialAsignacionHerramienta from './HistorialAsignacionHerramienta.js';
 import CampanaControl from './CampanaControl.js';
 import ConteoCiclico from './ConteoCiclico.js';
+import RolloMembrana from './RolloMembrana.js';
 import ConteoArticulo from './ConteoArticulo.js';
 
 // Definir relaciones
@@ -546,6 +547,18 @@ Articulo.hasMany(ConteoArticulo, {
     as: 'conteos'
 });
 
+// ========== RELACIONES ROLLOS MEMBRANA ==========
+
+// RolloMembrana - Articulo (Muchos a Uno)
+RolloMembrana.belongsTo(Articulo, {
+    foreignKey: 'articulo_id',
+    as: 'articulo'
+});
+Articulo.hasMany(RolloMembrana, {
+    foreignKey: 'articulo_id',
+    as: 'rollos_membrana'
+});
+
 // Exportar todos los modelos
 export {
     sequelize,
@@ -572,7 +585,8 @@ export {
     StockMinimoCamioneta,
     CampanaControl,
     ConteoCiclico,
-    ConteoArticulo
+    ConteoArticulo,
+    RolloMembrana
 };
 
 export default {
@@ -601,5 +615,6 @@ export default {
     HistorialAsignacionHerramienta,
     CampanaControl,
     ConteoCiclico,
-    ConteoArticulo
+    ConteoArticulo,
+    RolloMembrana
 };

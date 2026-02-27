@@ -111,6 +111,7 @@ import produccionRoutes from './src/routes/produccion.routes.js';
 import campanaControlRoutes from './src/routes/campanaControlRoutes.js';
 import conteosCiclicosRoutes from './src/routes/conteosCiclicos.routes.js';
 import descontarAlmacenRoutes from './src/routes/descontarAlmacen.routes.js';
+import rollosMembrana from './src/routes/rollosMembrana.routes.js';
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -141,7 +142,8 @@ app.get('/', (req, res) => {
             produccion: '/api/produccion',
             campanaControl: '/api/campana-control',
             conteosCiclicos: '/api/conteos-ciclicos',
-            descontarAlmacen: '/api/descontar-almacen'
+            descontarAlmacen: '/api/descontar-almacen',
+            rollosMembrana: '/api/rollos-membrana'
         }
     });
 });
@@ -166,6 +168,7 @@ app.use('/api/produccion', produccionRoutes);
 app.use('/api/campana-control', campanaControlRoutes);
 app.use('/api/conteos-ciclicos', conteosCiclicosRoutes);
 app.use('/api/descontar-almacen', descontarAlmacenRoutes);
+app.use('/api/rollos-membrana', rollosMembrana);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
 
@@ -413,6 +416,36 @@ const startServer = async () => {
 
             // Auto-migración de herramientas de renta
             await ejecutarAutoMigracion();
+
+            // Verificar/crear tabla de rollos_membrana
+            console.log('🔍 Verificando tabla rollos_membrana...');
+            const [rollosTableCheck] = await sequelize.query(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'rollos_membrana'"
+            );
+
+            const rollosTableExists = parseInt(rollosTableCheck[0].count) > 0;
+
+            if (!rollosTableExists) {
+                console.log('🔄 Creando tabla rollos_membrana...');
+
+                const fs = await import('fs');
+                const path = await import('path');
+                const { fileURLToPath } = await import('url');
+
+                const __filename = fileURLToPath(import.meta.url);
+                const __dirname = path.dirname(__filename);
+                const migrationPath = path.join(__dirname, 'migrations', 'create-tabla-rollos-membrana.sql');
+
+                try {
+                    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+                    await sequelize.query(migrationSQL);
+                    console.log('✅ Tabla rollos_membrana creada exitosamente');
+                } catch (migrationError) {
+                    console.error('⚠️ Error al crear tabla rollos_membrana:', migrationError.message);
+                }
+            } else {
+                console.log('✅ Tabla rollos_membrana ya existe');
+            }
         }
 
         // Iniciar servidor
