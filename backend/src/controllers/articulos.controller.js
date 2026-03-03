@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { Articulo, Categoria, Ubicacion, Proveedor, ArticuloProveedor, DetalleMovimiento, SolicitudCompra, DetalleOrdenCompra, TipoHerramientaRenta } from '../models/index.js';
+import { Articulo, Categoria, Ubicacion, Proveedor, ArticuloProveedor, DetalleMovimiento, Movimiento, Usuario, SolicitudCompra, DetalleOrdenCompra, TipoHerramientaRenta } from '../models/index.js';
 import { generarCodigoEAN13, generarCodigoEAN13Temporal, validarCodigoEAN13 } from '../utils/ean13-generator.js';
 import { generarImagenCodigoBarras, generarSVGCodigoBarras } from '../utils/barcode-generator.js';
 import { migrarArticulosPendientes, migrarArticuloIndividual } from '../utils/autoMigrate.js';
@@ -1913,9 +1913,6 @@ export const diagnosticarImagenes = async (req, res) => {
 export const getUltimoMovimiento = async (req, res) => {
     try {
         const { id } = req.params;
-
-        // Importar Usuario para la relación
-        const { Movimiento, Usuario } = await import('../models/index.js');
 
         // Buscar el último detalle de movimiento para este artículo
         const ultimoDetalle = await DetalleMovimiento.findOne({
