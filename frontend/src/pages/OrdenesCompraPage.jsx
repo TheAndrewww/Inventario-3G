@@ -42,6 +42,7 @@ const OrdenesCompraPage = () => {
   const [articulosBuscados, setArticulosBuscados] = useState([]);
   const [buscandoArticulos, setBuscandoArticulos] = useState(false);
   const [modalArticulosEncontrados, setModalArticulosEncontrados] = useState(false);
+  const [articulosConSolicitudIds, setArticulosConSolicitudIds] = useState([]);
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
   const [modalCrearSolicitud, setModalCrearSolicitud] = useState(false);
   const [cantidadSolicitud, setCantidadSolicitud] = useState('');
@@ -278,8 +279,15 @@ const OrdenesCompraPage = () => {
     try {
       setBuscandoArticulos(true);
 
-      // Obtener TODOS los artículos sin límite de paginación
-      const todosArticulos = await articulosService.buscar({ activo: true, limit: 99999 });
+      // Obtener solicitudes pendientes y artículos en paralelo
+      const [responseSolicitudes, todosArticulos] = await Promise.all([
+        ordenesCompraService.listarSolicitudes({ estado: 'pendiente' }).catch(() => ({ data: { solicitudes: [] } })),
+        articulosService.buscar({ activo: true, limit: 99999 })
+      ]);
+
+      const solicitudesActivas = responseSolicitudes.data?.solicitudes || [];
+      const idsConSolicitud = solicitudesActivas.map(sol => sol.articulo_id);
+      setArticulosConSolicitudIds(idsConSolicitud);
 
       // Filtrar artículos con stock bajo mínimo (sin importar si ya tienen solicitud)
       const articulosBajoStock = todosArticulos.filter(art =>
@@ -1353,12 +1361,14 @@ const OrdenesCompraPage = () => {
           setMostrandoBajoStock(false);
         }}
         articulos={articulosBuscados}
+        articulosConSolicitudIds={articulosConSolicitudIds}
         onCrearSolicitud={async (articulo) => {
           const stockFaltante = Math.max(0, parseFloat(articulo.stock_maximo || articulo.stock_minimo * 2) - parseFloat(articulo.stock_actual));
           const cantidad = Math.ceil(stockFaltante) || 1;
           const prioridad = parseFloat(articulo.stock_actual) < parseFloat(articulo.stock_minimo) ? 'alta' : 'media';
           const motivo = `Reposición de stock. Stock actual: ${articulo.stock_actual} ${articulo.unidad}, Stock mínimo: ${articulo.stock_minimo} ${articulo.unidad}`;
           await ordenesCompraService.crearSolicitudManual(articulo.id, cantidad, prioridad, motivo);
+          setArticulosConSolicitudIds(prev => [...prev, articulo.id]);
           await fetchData();
         }}
         titulo={mostrandoBajoStock ? '⚠️ Artículos Bajo Stock Mínimo' : '🔍 Resultados de Búsqueda'}
@@ -3016,35 +3026,32 @@ const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
 };
 
 // Sub-componente botón para crear solicitud directamente
-const ArticuloSolicitudBtn = ({ articulo, onCrearSolicitud }) => {
+const ArticuloSolicitudBtn = ({ articulo, onCrearSolicitud, tieneSolicitud }) => {
   const [loading, setLoading] = useState(false);
   const [creada, setCreada] = useState(false);
 
-  const handleClick = async () => {
-    setLoading(true);
-    try {
-      await onCrearSolicitud(articulo);
-      setCreada(true);
-      toast.success(`✅ Solicitud creada: ${articulo.nombre}`);
-    } catch (error) {
-      toast.error(error.response?.data?.message || error.message || 'Error al crear solicitud');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (creada) {
+  if (tieneSolicitud || creada) {
     return (
       <span className="px-4 py-2 bg-green-100 text-green-700 rounded-lg font-medium flex items-center gap-2 whitespace-nowrap text-sm">
         <CheckCircle size={18} />
-        Creada
+        {creada ? 'Creada' : 'Solicitud existente'}
       </span>
     );
   }
-
   return (
     <button
-      onClick={handleClick}
+      onClick={async () => {
+        setLoading(true);
+        try {
+          await onCrearSolicitud(articulo);
+          setCreada(true);
+          toast.success(`✅ Solicitud creada: ${articulo.nombre}`);
+        } catch (error) {
+          toast.error(error.response?.data?.message || error.message || 'Error al crear solicitud');
+        } finally {
+          setLoading(false);
+        }
+      }}
       disabled={loading}
       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
     >
@@ -3103,7 +3110,7 @@ const UltimoMovimientoInfo = ({ articuloId }) => {
   );
 };
 
-const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitud, titulo }) => {
+const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitud, titulo, articulosConSolicitudIds = [] }) => {
   if (!isOpen) return null;
 
   const generarPDFBajoStock = async () => {
@@ -3407,6 +3414,7 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
                         <ArticuloSolicitudBtn
                           articulo={articulo}
                           onCrearSolicitud={onCrearSolicitud}
+                          tieneSolicitud={articulosConSolicitudIds.includes(articulo.id)}
                         />
                         {stockBajo && (
                           <span className={`px-2 py-1 text-xs font-semibold rounded ${stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
