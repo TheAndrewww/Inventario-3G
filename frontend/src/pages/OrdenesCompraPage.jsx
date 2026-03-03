@@ -3051,105 +3051,182 @@ const UltimoMovimientoInfo = ({ articuloId }) => {
 const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitud, titulo }) => {
   if (!isOpen) return null;
 
-  const generarPDFBajoStock = () => {
-    const doc = new jsPDF('landscape', 'mm', 'letter');
-    const fecha = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const generarPDFBajoStock = async () => {
+    toast.loading('Generando PDF...', { id: 'pdf-loading' });
 
-    // Header
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Reporte de Artículos Bajo Stock Mínimo', 14, 20);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100);
-    doc.text(`Generado: ${fecha}`, 14, 27);
-    doc.text(`Total de artículos: ${articulos.length}`, 14, 32);
-    doc.setTextColor(0);
+    try {
+      // Fetch último movimiento para todos los artículos en paralelo
+      const movimientosPromises = articulos.map(art =>
+        articulosService.getUltimoMovimiento(art.id)
+          .then(data => ({ id: art.id, mov: data.ultimoMovimiento }))
+          .catch(() => ({ id: art.id, mov: null }))
+      );
+      const movimientos = await Promise.all(movimientosPromises);
+      const movMap = {};
+      movimientos.forEach(m => { movMap[m.id] = m.mov; });
 
-    // Table header
-    const startY = 40;
-    const colWidths = [8, 85, 45, 30, 30, 30, 30];
-    const headers = ['#', 'Artículo', 'Categoría', 'Stock Actual', 'Stock Mín.', 'Faltante', 'Estado'];
+      // Cargar imágenes de productos
+      const loadImage = (url) => new Promise((resolve) => {
+        if (!url) { resolve(null); return; }
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
+          } catch (e) { resolve(null); }
+        };
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
 
-    doc.setFillColor(220, 38, 38);
-    doc.rect(14, startY - 6, colWidths.reduce((a, b) => a + b, 0), 8, 'F');
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255);
+      const imagePromises = articulos.map(art =>
+        loadImage(art.imagen_url).then(data => ({ id: art.id, img: data }))
+      );
+      const images = await Promise.all(imagePromises);
+      const imgMap = {};
+      images.forEach(i => { imgMap[i.id] = i.img; });
 
-    let xPos = 16;
-    headers.forEach((header, i) => {
-      doc.text(header, xPos, startY);
-      xPos += colWidths[i];
-    });
+      const doc = new jsPDF('landscape', 'mm', 'letter');
+      const fecha = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Table rows
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(0);
-    let yPos = startY + 8;
+      // Header
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Reporte de Artículos Bajo Stock Mínimo', 14, 20);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100);
+      doc.text(`Generado: ${fecha}`, 14, 27);
+      doc.text(`Total de artículos: ${articulos.length}`, 14, 32);
+      doc.setTextColor(0);
 
-    // Sort: critical first, then by % ascending
-    const sorted = [...articulos].sort((a, b) => {
-      const pctA = parseFloat(a.stock_actual) / parseFloat(a.stock_minimo || 1);
-      const pctB = parseFloat(b.stock_actual) / parseFloat(b.stock_minimo || 1);
-      return pctA - pctB;
-    });
+      // Table config
+      const startY = 40;
+      const rowH = 12;
+      const colWidths = [8, 14, 62, 35, 25, 25, 25, 35, 30];
+      const headers = ['#', 'Foto', 'Artículo', 'Categoría', 'Stock Act.', 'Stock Mín.', 'Faltante', 'Proveedor', 'Últ. Actualización'];
+      const tableW = colWidths.reduce((a, b) => a + b, 0);
 
-    sorted.forEach((art, idx) => {
-      if (yPos > 190) {
-        doc.addPage();
-        yPos = 20;
-        // Re-draw header on new page
+      const drawHeader = (y) => {
         doc.setFillColor(220, 38, 38);
-        doc.rect(14, yPos - 6, colWidths.reduce((a, b) => a + b, 0), 8, 'F');
+        doc.rect(14, y - 6, tableW, 8, 'F');
+        doc.setFontSize(7);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(255);
         let xH = 16;
-        headers.forEach((header, i) => {
-          doc.text(header, xH, yPos);
+        headers.forEach((h, i) => {
+          doc.text(h, xH, y);
           xH += colWidths[i];
         });
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(0);
-        yPos += 8;
-      }
+      };
 
-      const stockActual = parseFloat(art.stock_actual);
-      const stockMin = parseFloat(art.stock_minimo || 0);
-      const faltante = Math.max(0, stockMin - stockActual);
-      const pct = (stockActual / (stockMin || 1)) * 100;
-      const critico = pct < 50;
+      drawHeader(startY);
+      let yPos = startY + 8;
 
-      // Row background
-      if (idx % 2 === 0) {
-        doc.setFillColor(critico ? 254 : 255, critico ? 242 : 249, critico ? 242 : 245);
-        doc.rect(14, yPos - 4, colWidths.reduce((a, b) => a + b, 0), 7, 'F');
-      }
+      // Sort: critical first
+      const sorted = [...articulos].sort((a, b) => {
+        const pctA = parseFloat(a.stock_actual) / parseFloat(a.stock_minimo || 1);
+        const pctB = parseFloat(b.stock_actual) / parseFloat(b.stock_minimo || 1);
+        return pctA - pctB;
+      });
 
-      doc.setFontSize(8);
-      let x = 16;
-      doc.text(`${idx + 1}`, x, yPos); x += colWidths[0];
+      sorted.forEach((art, idx) => {
+        if (yPos > 185) {
+          doc.addPage();
+          yPos = 20;
+          drawHeader(yPos);
+          yPos += 8;
+        }
 
-      // Truncate name if too long
-      const nombre = art.nombre.length > 45 ? art.nombre.substring(0, 42) + '...' : art.nombre;
-      doc.text(nombre, x, yPos); x += colWidths[1];
-      doc.text(art.categoria?.nombre || 'N/A', x, yPos); x += colWidths[2];
+        const stockActual = parseFloat(art.stock_actual);
+        const stockMin = parseFloat(art.stock_minimo || 0);
+        const faltante = Math.max(0, stockMin - stockActual);
+        const pct = (stockActual / (stockMin || 1)) * 100;
+        const critico = pct < 50;
 
-      // Stock actual in red if critical
-      if (critico) doc.setTextColor(220, 38, 38);
-      doc.text(`${stockActual} ${art.unidad || ''}`, x, yPos);
-      doc.setTextColor(0); x += colWidths[3];
+        // Row background
+        if (idx % 2 === 0) {
+          doc.setFillColor(critico ? 254 : 250, critico ? 242 : 250, critico ? 242 : 250);
+          doc.rect(14, yPos - 4, tableW, rowH, 'F');
+        }
 
-      doc.text(`${stockMin} ${art.unidad || ''}`, x, yPos); x += colWidths[4];
-      doc.setTextColor(220, 38, 38);
-      doc.text(`${faltante} ${art.unidad || ''}`, x, yPos);
-      doc.setTextColor(0); x += colWidths[5];
-      doc.text(critico ? '⚠ Crítico' : '⚡ Bajo', x, yPos);
+        doc.setFontSize(7);
+        let x = 16;
 
-      yPos += 7;
-    });
+        // #
+        doc.text(`${idx + 1}`, x, yPos);
+        x += colWidths[0];
 
-    doc.save(`bajo-stock-minimo-${new Date().toISOString().slice(0, 10)}.pdf`);
+        // Foto
+        const imgData = imgMap[art.id];
+        if (imgData) {
+          try {
+            doc.addImage(imgData, 'JPEG', x, yPos - 4, 10, 10);
+          } catch (e) { /* skip */ }
+        }
+        x += colWidths[1];
+
+        // Artículo
+        const nombre = art.nombre.length > 35 ? art.nombre.substring(0, 32) + '...' : art.nombre;
+        doc.setFont('helvetica', 'bold');
+        doc.text(nombre, x, yPos);
+        doc.setFont('helvetica', 'normal');
+        x += colWidths[2];
+
+        // Categoría
+        doc.text(art.categoria?.nombre || 'N/A', x, yPos);
+        x += colWidths[3];
+
+        // Stock Actual
+        if (critico) doc.setTextColor(220, 38, 38);
+        doc.text(`${stockActual} ${art.unidad || ''}`, x, yPos);
+        doc.setTextColor(0);
+        x += colWidths[4];
+
+        // Stock Mín.
+        doc.text(`${stockMin} ${art.unidad || ''}`, x, yPos);
+        x += colWidths[5];
+
+        // Faltante
+        doc.setTextColor(220, 38, 38);
+        doc.text(`${faltante} ${art.unidad || ''}`, x, yPos);
+        doc.setTextColor(0);
+        x += colWidths[6];
+
+        // Proveedor
+        const provNombre = art.proveedor?.nombre || art.proveedores?.[0]?.nombre || '-';
+        const provTrunc = provNombre.length > 18 ? provNombre.substring(0, 15) + '...' : provNombre;
+        doc.text(provTrunc, x, yPos);
+        x += colWidths[7];
+
+        // Última actualización
+        const mov = movMap[art.id];
+        if (mov) {
+          const fechaMov = new Date(mov.fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+          doc.text(fechaMov, x, yPos);
+        } else {
+          doc.setTextColor(150);
+          doc.text('Sin datos', x, yPos);
+          doc.setTextColor(0);
+        }
+
+        yPos += rowH;
+      });
+
+      doc.save(`bajo-stock-minimo-${new Date().toISOString().slice(0, 10)}.pdf`);
+      toast.success('PDF descargado', { id: 'pdf-loading' });
+    } catch (error) {
+      console.error('Error al generar PDF:', error);
+      toast.error('Error al generar PDF', { id: 'pdf-loading' });
+    }
   };
 
   return (
