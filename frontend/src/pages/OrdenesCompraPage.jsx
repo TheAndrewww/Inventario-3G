@@ -1353,7 +1353,14 @@ const OrdenesCompraPage = () => {
           setMostrandoBajoStock(false);
         }}
         articulos={articulosBuscados}
-        onCrearSolicitud={handleAbrirModalCrearSolicitudArticulo}
+        onCrearSolicitud={async (articulo) => {
+          const stockFaltante = Math.max(0, parseFloat(articulo.stock_maximo || articulo.stock_minimo * 2) - parseFloat(articulo.stock_actual));
+          const cantidad = Math.ceil(stockFaltante) || 1;
+          const prioridad = parseFloat(articulo.stock_actual) < parseFloat(articulo.stock_minimo) ? 'alta' : 'media';
+          const motivo = `Reposición de stock. Stock actual: ${articulo.stock_actual} ${articulo.unidad}, Stock mínimo: ${articulo.stock_minimo} ${articulo.unidad}`;
+          await ordenesCompraService.crearSolicitudManual(articulo.id, cantidad, prioridad, motivo);
+          await fetchData();
+        }}
         titulo={mostrandoBajoStock ? '⚠️ Artículos Bajo Stock Mínimo' : '🔍 Resultados de Búsqueda'}
       />
 
@@ -3008,6 +3015,54 @@ const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
   );
 };
 
+// Sub-componente botón para crear solicitud directamente
+const ArticuloSolicitudBtn = ({ articulo, onCrearSolicitud }) => {
+  const [loading, setLoading] = useState(false);
+  const [creada, setCreada] = useState(false);
+
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      await onCrearSolicitud(articulo);
+      setCreada(true);
+      toast.success(`✅ Solicitud creada: ${articulo.nombre}`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message || 'Error al crear solicitud');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (creada) {
+    return (
+      <span className="px-4 py-2 bg-green-100 text-green-700 rounded-lg font-medium flex items-center gap-2 whitespace-nowrap text-sm">
+        <CheckCircle size={18} />
+        Creada
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading}
+      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {loading ? (
+        <>
+          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+          Creando...
+        </>
+      ) : (
+        <>
+          <Plus size={18} />
+          Crear Solicitud
+        </>
+      )}
+    </button>
+  );
+};
+
 // Modal de Artículos Encontrados
 // Sub-componente para mostrar último movimiento de un artículo
 const UltimoMovimientoInfo = ({ articuloId }) => {
@@ -3349,13 +3404,10 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
                       </div>
 
                       <div className="flex flex-col gap-2">
-                        <button
-                          onClick={() => onCrearSolicitud(articulo)}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 whitespace-nowrap"
-                        >
-                          <Plus size={18} />
-                          Crear Solicitud
-                        </button>
+                        <ArticuloSolicitudBtn
+                          articulo={articulo}
+                          onCrearSolicitud={onCrearSolicitud}
+                        />
                         {stockBajo && (
                           <span className={`px-2 py-1 text-xs font-semibold rounded ${stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
                             }`}>
