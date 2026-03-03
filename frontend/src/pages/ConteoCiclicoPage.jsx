@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ClipboardCheck, Search, Package, CheckCircle2, AlertTriangle, ArrowRight, BarChart3, RefreshCw, X, Calendar, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
+import { ClipboardCheck, Search, Package, CheckCircle2, AlertTriangle, ArrowRight, BarChart3, RefreshCw, X, Calendar, TrendingUp, ChevronDown, ChevronUp, FastForward } from 'lucide-react';
 import toast from 'react-hot-toast';
 import conteosCiclicosService from '../services/conteosCiclicos.service';
 
@@ -26,8 +26,8 @@ const ConteoCiclicoPage = () => {
                 <button
                     onClick={() => setTab('conteo')}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${tab === 'conteo'
-                            ? 'bg-white text-red-700 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900'
+                        ? 'bg-white text-red-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
                         }`}
                 >
                     <ClipboardCheck size={18} />
@@ -36,8 +36,8 @@ const ConteoCiclicoPage = () => {
                 <button
                     onClick={() => setTab('reportes')}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${tab === 'reportes'
-                            ? 'bg-white text-red-700 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900'
+                        ? 'bg-white text-red-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
                         }`}
                 >
                     <BarChart3 size={18} />
@@ -58,6 +58,7 @@ const TabConteo = () => {
     const [busqueda, setBusqueda] = useState('');
     const [loading, setLoading] = useState(true);
     const [loadingPendientes, setLoadingPendientes] = useState(false);
+    const [adelantando, setAdelantando] = useState(false);
 
     const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
     const [cantidadFisica, setCantidadFisica] = useState('');
@@ -173,6 +174,20 @@ const TabConteo = () => {
         }
     };
 
+    const handleAdelantarConteo = async () => {
+        setAdelantando(true);
+        try {
+            const res = await conteosCiclicosService.adelantarConteo();
+            toast.success(res.message || 'Conteo adelantado exitosamente');
+            // Recargar para mostrar el nuevo conteo
+            await cargarConteoHoy();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Error al adelantar conteo');
+        } finally {
+            setAdelantando(false);
+        }
+    };
+
     const progreso = conteo
         ? Math.round((conteo.articulos_contados / conteo.total_asignados) * 100) || 0
         : 0;
@@ -204,10 +219,14 @@ const TabConteo = () => {
                         <p className="text-sm text-gray-500 mt-1">
                             {completado ? (
                                 <span className="text-green-600 font-medium flex items-center gap-1">
-                                    <CheckCircle2 size={14} /> Checklist del día completado
+                                    <CheckCircle2 size={14} /> Checklist completado
+                                    {conteo.secuencia > 1 && <span className="text-green-500 text-xs ml-1">(Conteo #{conteo.secuencia} del día)</span>}
                                 </span>
                             ) : (
-                                <>{conteo.articulos_contados} de {conteo.total_asignados} artículos contados</>
+                                <>
+                                    {conteo.articulos_contados} de {conteo.total_asignados} artículos contados
+                                    {conteo.secuencia > 1 && <span className="text-gray-400 text-xs ml-1">(Conteo #{conteo.secuencia} del día)</span>}
+                                </>
                             )}
                         </p>
                     </div>
@@ -233,13 +252,35 @@ const TabConteo = () => {
                 </div>
             </div>
 
-            {/* Completado → no mostrar lista */}
+            {/* Completado → mostrar opción de adelantar */}
             {completado ? (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
                     <CheckCircle2 size={48} className="mx-auto mb-3 text-green-500" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-1">¡Buen trabajo!</h3>
-                    <p className="text-gray-500">Has completado el conteo de los {conteo.total_asignados} artículos del día.</p>
-                    <p className="text-sm text-gray-400 mt-2">Mañana se asignarán nuevos artículos automáticamente.</p>
+                    <p className="text-gray-500">Has completado el conteo de los {conteo.total_asignados} artículos{conteo.secuencia > 1 ? ` (conteo #${conteo.secuencia})` : ' del día'}.</p>
+                    <p className="text-sm text-gray-400 mt-2 mb-5">Mañana se asignarán nuevos artículos automáticamente.</p>
+
+                    {/* Botón de adelantar conteo */}
+                    <div className="border-t border-gray-100 pt-5">
+                        <p className="text-sm text-gray-500 mb-3">¿Quieres seguir contando? Genera un conteo extra con artículos nuevos.</p>
+                        <button
+                            onClick={handleAdelantarConteo}
+                            disabled={adelantando}
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                        >
+                            {adelantando ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                    Generando conteo...
+                                </>
+                            ) : (
+                                <>
+                                    <FastForward size={20} />
+                                    Adelantar: Generar Nuevo Conteo
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
             ) : (
                 <>
@@ -536,6 +577,11 @@ const TabReportes = () => {
                                                 Pendiente
                                             </span>
                                         )}
+                                        {conteo.secuencia > 1 && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                                                <FastForward size={10} /> #{conteo.secuencia}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
                                         <span>{conteo.articulos_contados} / {conteo.total_asignados} contados</span>
@@ -579,8 +625,8 @@ const TabReportes = () => {
                             key={page}
                             onClick={() => cargarReportes(page)}
                             className={`px-3 py-1 rounded text-sm ${page === pagination.page
-                                    ? 'bg-red-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                ? 'bg-red-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 }`}
                         >
                             {page}

@@ -3,6 +3,7 @@ import {
     getConteoHoy,
     getArticulosPendientes,
     registrarConteo,
+    adelantarConteo,
     getReportes,
     getResumen
 } from '../controllers/conteosCiclicos.controller.js';
@@ -16,6 +17,13 @@ const router = express.Router();
  * @access  Private
  */
 router.get('/hoy', verificarToken, getConteoHoy);
+
+/**
+ * @route   POST /api/conteos-ciclicos/adelantar
+ * @desc    Generar un nuevo conteo extra cuando el actual está completado
+ * @access  Private
+ */
+router.post('/adelantar', verificarToken, adelantarConteo);
 
 /**
  * @route   GET /api/conteos-ciclicos/reportes

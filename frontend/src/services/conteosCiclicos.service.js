@@ -22,6 +22,12 @@ const conteosCiclicosService = {
         return response.data;
     },
 
+    // Adelantar conteo: generar nuevo conteo extra
+    adelantarConteo: async () => {
+        const response = await api.post(`${BASE_URL}/adelantar`);
+        return response.data;
+    },
+
     // Obtener reportes (historial)
     getReportes: async (params = {}) => {
         const query = new URLSearchParams();

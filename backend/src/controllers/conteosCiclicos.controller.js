@@ -12,50 +12,9 @@ const getFechaHoy = () => {
     return now.toISOString().split('T')[0];
 };
 
-// Obtener o crear el conteo del día, con auto-asignación de artículos
-const obtenerOCrearConteoDelDia = async () => {
-    const fechaHoy = getFechaHoy();
-
-    // Buscar si ya existe el conteo de hoy
-    let conteo = await ConteoCiclico.findOne({
-        where: { fecha: fechaHoy }
-    });
-
-    if (conteo) {
-        return conteo;
-    }
-
-    // No existe → crear nuevo día con asignación automática
-
-    // 1. Buscar artículos pendientes de días anteriores (no contados)
-    const conteosAnteriores = await ConteoCiclico.findAll({
-        where: { estado: 'pendiente', fecha: { [Op.lt]: fechaHoy } },
-        order: [['fecha', 'ASC']]
-    });
-
-    let articulosPendientesIds = [];
-
-    for (const conteoAnterior of conteosAnteriores) {
-        // Obtener IDs asignados a ese día (artículos que tienen registro con ese conteo)
-        const contados = await ConteoArticulo.findAll({
-            where: { conteo_ciclico_id: conteoAnterior.id },
-            attributes: ['articulo_id']
-        });
-        const idsContados = contados.map(c => c.articulo_id);
-
-        // Los asignados son los artículos del conteo anterior
-        // Los que NO fueron contados son los pendientes
-        // Usamos un enfoque más simple: si hay registros, esos fueron contados
-        // Los que estaban asignados pero no contados se determinan del total asignado
-
-        // Marcar el día anterior como completado (ya pasó el día)
-        await conteoAnterior.update({
-            estado: 'completado',
-            completado_at: new Date()
-        });
-    }
-
-    // 2. Obtener todos los IDs de artículos que YA han sido contados alguna vez
+// Seleccionar artículos para un nuevo conteo, excluyendo los ya contados hoy
+const seleccionarArticulosParaConteo = async (idsExcluir = []) => {
+    // Obtener todos los artículos ya contados ALGUNA VEZ
     const todosConteos = await ConteoArticulo.findAll({
         attributes: ['articulo_id', [sequelize.fn('MAX', sequelize.col('contado_at')), 'ultimo_conteo']],
         group: ['articulo_id']
@@ -66,18 +25,19 @@ const obtenerOCrearConteoDelDia = async () => {
         contadoMap[c.articulo_id] = c.get('ultimo_conteo');
     });
 
-    // 3. Obtener todos los artículos activos
+    // Obtener todos los artículos activos
     const todosArticulos = await Articulo.findAll({
         where: { activo: true },
         attributes: ['id'],
         order: [['id', 'ASC']]
     });
 
-    // 4. Separar en: nunca contados vs ya contados
+    // Separar en: nunca contados vs ya contados (excluyendo los de hoy)
     const nuncaContados = [];
     const yaContados = [];
 
     todosArticulos.forEach(art => {
+        if (idsExcluir.includes(art.id)) return; // ya contado HOY, skip
         if (!contadoMap[art.id]) {
             nuncaContados.push(art.id);
         } else {
@@ -88,27 +48,79 @@ const obtenerOCrearConteoDelDia = async () => {
     // Ordenar los ya contados por fecha de último conteo (más antiguos primero)
     yaContados.sort((a, b) => new Date(a.ultimoConteo) - new Date(b.ultimoConteo));
 
-    // 5. Seleccionar artículos para hoy: primero los nunca contados, luego los más antiguos
+    // Seleccionar artículos: primero los nunca contados, luego los más antiguos
     const seleccionados = [];
 
-    // Primero los nunca contados
     for (const id of nuncaContados) {
         if (seleccionados.length >= ARTICULOS_POR_DIA) break;
         seleccionados.push(id);
     }
 
-    // Luego los más antiguos
     for (const item of yaContados) {
         if (seleccionados.length >= ARTICULOS_POR_DIA) break;
         seleccionados.push(item.id);
     }
 
-    // 6. Crear conteo del día
+    return seleccionados;
+};
+
+// Obtener IDs de todos los artículos contados hoy (en todos los conteos del día)
+const getIdsContadosHoy = async (fechaHoy) => {
+    const conteosHoy = await ConteoCiclico.findAll({
+        where: { fecha: fechaHoy },
+        attributes: ['id']
+    });
+
+    if (conteosHoy.length === 0) return [];
+
+    const conteoIds = conteosHoy.map(c => c.id);
+    const contados = await ConteoArticulo.findAll({
+        where: { conteo_ciclico_id: { [Op.in]: conteoIds } },
+        attributes: ['articulo_id']
+    });
+
+    return [...new Set(contados.map(c => c.articulo_id))];
+};
+
+// Obtener o crear el conteo del día, con auto-asignación de artículos
+const obtenerOCrearConteoDelDia = async () => {
+    const fechaHoy = getFechaHoy();
+
+    // Buscar el conteo más reciente de hoy (mayor secuencia)
+    let conteo = await ConteoCiclico.findOne({
+        where: { fecha: fechaHoy },
+        order: [['secuencia', 'DESC']]
+    });
+
+    if (conteo) {
+        return conteo;
+    }
+
+    // No existe → crear nuevo día con asignación automática
+
+    // Marcar días anteriores pendientes como completados
+    const conteosAnteriores = await ConteoCiclico.findAll({
+        where: { estado: 'pendiente', fecha: { [Op.lt]: fechaHoy } },
+        order: [['fecha', 'ASC']]
+    });
+
+    for (const conteoAnterior of conteosAnteriores) {
+        await conteoAnterior.update({
+            estado: 'completado',
+            completado_at: new Date()
+        });
+    }
+
+    // Seleccionar artículos para hoy
+    const seleccionados = await seleccionarArticulosParaConteo([]);
+
+    // Crear conteo del día
     const now = new Date();
     const nombre = `Conteo ${now.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}`;
 
     conteo = await ConteoCiclico.create({
         fecha: fechaHoy,
+        secuencia: 1,
         nombre,
         estado: 'pendiente',
         total_asignados: seleccionados.length,
@@ -360,6 +372,73 @@ export const registrarConteo = async (req, res) => {
     }
 };
 
+// Adelantar conteo: generar un nuevo conteo extra cuando el actual está completado
+export const adelantarConteo = async (req, res) => {
+    try {
+        const fechaHoy = getFechaHoy();
+
+        // Buscar el conteo más reciente de hoy
+        const conteoActual = await ConteoCiclico.findOne({
+            where: { fecha: fechaHoy },
+            order: [['secuencia', 'DESC']]
+        });
+
+        if (!conteoActual) {
+            return res.status(400).json({
+                success: false,
+                message: 'No hay conteo del día para adelantar'
+            });
+        }
+
+        if (conteoActual.estado !== 'completado') {
+            return res.status(400).json({
+                success: false,
+                message: 'El conteo actual aún no está completado. Termina el conteo actual antes de adelantar.'
+            });
+        }
+
+        // Obtener todos los artículos contados hoy para excluirlos
+        const idsContadosHoy = await getIdsContadosHoy(fechaHoy);
+
+        // Seleccionar nuevos artículos excluyendo los ya contados hoy
+        const seleccionados = await seleccionarArticulosParaConteo(idsContadosHoy);
+
+        if (seleccionados.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No hay más artículos disponibles para contar hoy. ¡Ya se contaron todos!'
+            });
+        }
+
+        // Crear nuevo conteo con secuencia incrementada
+        const nuevaSecuencia = conteoActual.secuencia + 1;
+        const now = new Date();
+        const nombre = `Conteo ${now.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })} (#${nuevaSecuencia})`;
+
+        const nuevoConteo = await ConteoCiclico.create({
+            fecha: fechaHoy,
+            secuencia: nuevaSecuencia,
+            nombre,
+            estado: 'pendiente',
+            total_asignados: seleccionados.length,
+            articulos_contados: 0
+        });
+
+        res.json({
+            success: true,
+            message: `✅ Conteo adelantado (#${nuevaSecuencia}). Se asignaron ${seleccionados.length} artículos nuevos.`,
+            data: nuevoConteo
+        });
+    } catch (error) {
+        console.error('Error adelantando conteo:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al adelantar conteo',
+            error: error.message
+        });
+    }
+};
+
 // Obtener reportes (historial de conteos)
 export const getReportes = async (req, res) => {
     try {
@@ -373,7 +452,7 @@ export const getReportes = async (req, res) => {
 
         const { rows: conteos, count: total } = await ConteoCiclico.findAndCountAll({
             where,
-            order: [['fecha', 'DESC']],
+            order: [['fecha', 'DESC'], ['secuencia', 'DESC']],
             limit: parseInt(limit),
             offset
         });
@@ -503,6 +582,7 @@ export default {
     getConteoHoy,
     getArticulosPendientes,
     registrarConteo,
+    adelantarConteo,
     getReportes,
     getResumen
 };

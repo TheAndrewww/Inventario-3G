@@ -10,8 +10,13 @@ const ConteoCiclico = sequelize.define('ConteoCiclico', {
     fecha: {
         type: DataTypes.DATEONLY,
         allowNull: false,
-        unique: true,
-        comment: 'Fecha del día de conteo (un registro por día)'
+        comment: 'Fecha del día de conteo'
+    },
+    secuencia: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
+        comment: 'Número de secuencia del conteo en el día (1 = primero, 2 = adelantado, etc.)'
     },
     nombre: {
         type: DataTypes.STRING(100),
@@ -53,7 +58,8 @@ const ConteoCiclico = sequelize.define('ConteoCiclico', {
         },
         {
             unique: true,
-            fields: ['fecha']
+            fields: ['fecha', 'secuencia'],
+            name: 'unique_fecha_secuencia'
         }
     ]
 });
