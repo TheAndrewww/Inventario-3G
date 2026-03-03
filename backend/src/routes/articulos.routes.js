@@ -21,7 +21,8 @@ import {
     getProcessingQueueHistory,
     retryQueueItem,
     cleanProcessingQueue,
-    diagnosticarImagenes
+    diagnosticarImagenes,
+    getUltimoMovimiento
 } from '../controllers/articulos.controller.js';
 import {
     verificarToken,
@@ -137,6 +138,13 @@ router.get('/:id/barcode-svg', verificarToken, getArticuloBarcodeSVG);
  * @access  Private
  */
 router.get('/:id/etiqueta', verificarToken, getArticuloEtiqueta);
+
+/**
+ * @route   GET /api/articulos/:id/ultimo-movimiento
+ * @desc    Obtener el último movimiento de un artículo
+ * @access  Private
+ */
+router.get('/:id/ultimo-movimiento', verificarToken, getUltimoMovimiento);
 
 /**
  * @route   GET /api/articulos/:id

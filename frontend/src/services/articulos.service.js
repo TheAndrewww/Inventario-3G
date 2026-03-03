@@ -133,6 +133,16 @@ const articulosService = {
     }
   },
 
+  // Obtener último movimiento de un artículo
+  async getUltimoMovimiento(id) {
+    try {
+      const response = await api.get(`/articulos/${id}/ultimo-movimiento`);
+      return response.data.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al obtener último movimiento' };
+    }
+  },
+
   // ============ COLA DE PROCESAMIENTO MASIVO ============
 
   // Agregar múltiples artículos a la cola de procesamiento

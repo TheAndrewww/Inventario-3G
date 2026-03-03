@@ -1906,6 +1906,83 @@ export const diagnosticarImagenes = async (req, res) => {
     }
 };
 
+/**
+ * GET /api/articulos/:id/ultimo-movimiento
+ * Obtener el último movimiento de un artículo (quién lo actualizó y cuándo)
+ */
+export const getUltimoMovimiento = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Importar Usuario para la relación
+        const { Movimiento, Usuario } = await import('../models/index.js');
+
+        // Buscar el último detalle de movimiento para este artículo
+        const ultimoDetalle = await DetalleMovimiento.findOne({
+            where: { articulo_id: id },
+            include: [{
+                model: Movimiento,
+                as: 'movimiento',
+                attributes: ['id', 'ticket_id', 'tipo', 'fecha_hora', 'estado', 'observaciones'],
+                include: [{
+                    model: Usuario,
+                    as: 'usuario',
+                    attributes: ['id', 'nombre', 'email', 'rol']
+                }]
+            }],
+            order: [['createdAt', 'DESC']],
+            limit: 1
+        });
+
+        if (!ultimoDetalle) {
+            return res.status(200).json({
+                success: true,
+                data: { ultimoMovimiento: null }
+            });
+        }
+
+        const mov = ultimoDetalle.movimiento;
+        const tiposLegibles = {
+            'retiro': 'Retiro',
+            'devolucion': 'Devolución',
+            'ajuste_entrada': 'Ajuste (Entrada)',
+            'ajuste_salida': 'Ajuste (Salida)',
+            'transferencia': 'Transferencia',
+            'pedido': 'Pedido',
+            'entrada_orden_compra': 'Entrada (Orden de Compra)'
+        };
+
+        res.status(200).json({
+            success: true,
+            data: {
+                ultimoMovimiento: {
+                    id: mov.id,
+                    ticket_id: mov.ticket_id,
+                    tipo: mov.tipo,
+                    tipo_legible: tiposLegibles[mov.tipo] || mov.tipo,
+                    fecha: mov.fecha_hora,
+                    cantidad: ultimoDetalle.cantidad,
+                    estado: mov.estado,
+                    observaciones: mov.observaciones,
+                    usuario: mov.usuario ? {
+                        id: mov.usuario.id,
+                        nombre: mov.usuario.nombre,
+                        rol: mov.usuario.rol
+                    } : null
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error en getUltimoMovimiento:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener último movimiento',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
 export default {
     getArticulos,
     getArticuloById,
@@ -1925,5 +2002,6 @@ export default {
     getProcessingQueueHistory,
     retryQueueItem,
     cleanProcessingQueue,
-    diagnosticarImagenes
+    diagnosticarImagenes,
+    getUltimoMovimiento
 };

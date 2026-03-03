@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, MapPin, DollarSign, Hash, Box, Edit, Sparkles, Eye, PackagePlus, PackageMinus } from 'lucide-react';
+import { X, Package, MapPin, DollarSign, Hash, Box, Edit, Sparkles, Eye, PackagePlus, PackageMinus, Clock } from 'lucide-react';
 import { Modal } from '../common';
 import BarcodeDisplay from './BarcodeDisplay';
 import UnidadHerramientaDetalleModal from './UnidadHerramientaDetalleModal';
@@ -29,6 +29,10 @@ const ArticuloDetalleModal = ({
   const [unidadSeleccionada, setUnidadSeleccionada] = useState(null);
   const [modalUnidadOpen, setModalUnidadOpen] = useState(false);
 
+  // Estado para último movimiento
+  const [ultimoMovimiento, setUltimoMovimiento] = useState(null);
+  const [loadingUltimoMov, setLoadingUltimoMov] = useState(false);
+
   // Cargar unidades cuando es herramienta de renta
   useEffect(() => {
     if (isOpen && articulo?.es_herramienta) {
@@ -39,6 +43,15 @@ const ArticuloDetalleModal = ({
       setTipoHerramienta(null);
     }
   }, [isOpen, articulo?.id, articulo?.es_herramienta]);
+
+  // Cargar último movimiento cuando se abre el modal
+  useEffect(() => {
+    if (isOpen && articulo?.id) {
+      cargarUltimoMovimiento();
+    } else {
+      setUltimoMovimiento(null);
+    }
+  }, [isOpen, articulo?.id]);
 
   // Cerrar imagen expandida con tecla Escape
   useEffect(() => {
@@ -69,6 +82,21 @@ const ArticuloDetalleModal = ({
       setTipoHerramienta(null);
     } finally {
       setLoadingUnidades(false);
+    }
+  };
+
+  // Cargar último movimiento
+  const cargarUltimoMovimiento = async () => {
+    if (!articulo?.id) return;
+    try {
+      setLoadingUltimoMov(true);
+      const data = await articulosService.getUltimoMovimiento(articulo.id);
+      setUltimoMovimiento(data.ultimoMovimiento);
+    } catch (error) {
+      console.error('Error al cargar último movimiento:', error);
+      setUltimoMovimiento(null);
+    } finally {
+      setLoadingUltimoMov(false);
     }
   };
 
@@ -328,6 +356,66 @@ const ArticuloDetalleModal = ({
               <span className="text-sm text-gray-500">{articulo.unidad}</span>
             </div>
           </div>
+        </div>
+
+        {/* Última actualización */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Clock size={18} className="text-gray-500" />
+            <h3 className="text-sm font-semibold text-gray-700">Última Actualización</h3>
+          </div>
+          {loadingUltimoMov ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+              Cargando...
+            </div>
+          ) : ultimoMovimiento ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Tipo:</span>
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${ultimoMovimiento.tipo === 'ajuste_entrada' || ultimoMovimiento.tipo === 'entrada_orden_compra' || ultimoMovimiento.tipo === 'devolucion'
+                  ? 'bg-green-100 text-green-800'
+                  : ultimoMovimiento.tipo === 'retiro' || ultimoMovimiento.tipo === 'ajuste_salida'
+                    ? 'bg-orange-100 text-orange-800'
+                    : 'bg-blue-100 text-blue-800'
+                  }`}>
+                  {ultimoMovimiento.tipo_legible}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Cantidad:</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {parseFloat(ultimoMovimiento.cantidad).toFixed(0)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Fecha:</span>
+                <span className="text-sm text-gray-900">
+                  {new Date(ultimoMovimiento.fecha).toLocaleDateString('es-MX', {
+                    year: 'numeric', month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                  })}
+                </span>
+              </div>
+              {ultimoMovimiento.usuario && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Realizado por:</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    👤 {ultimoMovimiento.usuario.nombre}
+                  </span>
+                  <span className="text-xs text-gray-400">({ultimoMovimiento.usuario.rol})</span>
+                </div>
+              )}
+              {ultimoMovimiento.ticket_id && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Ticket:</span>
+                  <span className="text-xs font-mono text-gray-600">{ultimoMovimiento.ticket_id}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">Sin movimientos registrados</p>
+          )}
         </div>
 
         {/* Botones de acción */}
