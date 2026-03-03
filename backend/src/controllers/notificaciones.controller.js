@@ -255,6 +255,12 @@ export const notificarPorRol = async ({
   datos_adicionales = null
 }) => {
   try {
+    // Validación defensiva
+    if (!roles || !Array.isArray(roles) || roles.length === 0) {
+      console.warn('notificarPorRol: roles está vacío o undefined, saltando notificación');
+      return true;
+    }
+
     // Obtener usuarios con los roles especificados
     const usuarios = await Usuario.findAll({
       where: {

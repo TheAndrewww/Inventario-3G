@@ -417,6 +417,31 @@ const startServer = async () => {
             // Auto-migración de herramientas de renta
             await ejecutarAutoMigracion();
 
+            // Migración: agregar tipos faltantes al enum de notificaciones
+            try {
+                console.log('🔍 Verificando enum de notificaciones...');
+                const tiposFaltantes = [
+                    'solicitud_cancelada',
+                    'solicitud_creada',
+                    'orden_creada',
+                    'orden_enviada',
+                    'orden_recibida',
+                    'orden_anulada',
+                    'pedido_creado',
+                    'orden_completada_manual'
+                ];
+                for (const tipo of tiposFaltantes) {
+                    try {
+                        await sequelize.query(`ALTER TYPE "enum_notificaciones_tipo" ADD VALUE IF NOT EXISTS '${tipo}'`);
+                    } catch (e) {
+                        // Ignorar si ya existe
+                    }
+                }
+                console.log('✅ Enum de notificaciones actualizado');
+            } catch (enumError) {
+                console.log('⚠️ Error al actualizar enum notificaciones:', enumError.message);
+            }
+
             // Verificar/crear tabla de rollos_membrana
             console.log('🔍 Verificando tabla rollos_membrana...');
             try {

@@ -18,14 +18,22 @@ const Notificacion = sequelize.define('Notificacion', {
   tipo: {
     type: DataTypes.ENUM(
       'solicitud_compra_creada',
-      'orden_compra_creada',
-      'orden_estado_cambiado',
+      'solicitud_creada',
+      'solicitud_cancelada',
       'solicitud_urgente',
+      'orden_compra_creada',
+      'orden_creada',
+      'orden_estado_cambiado',
+      'orden_enviada',
+      'orden_recibida',
+      'orden_anulada',
+      'orden_completada_manual',
       'pedido_aprobado',
       'pedido_rechazado',
-      'stock_bajo',
+      'pedido_creado',
       'pedido_pendiente',
-      'pedido_pendiente_aprobacion'
+      'pedido_pendiente_aprobacion',
+      'stock_bajo'
     ),
     allowNull: false
   },
