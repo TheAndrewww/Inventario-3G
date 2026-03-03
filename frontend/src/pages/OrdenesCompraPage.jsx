@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit } from 'lucide-react';
+import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit, Clock } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import articulosService from '../services/articulos.service';
 import proveedoresService from '../services/proveedores.service';
@@ -556,10 +556,10 @@ const OrdenesCompraPage = () => {
       doc.text(
         ordenCompleta.fecha_llegada_estimada
           ? new Date(ordenCompleta.fecha_llegada_estimada).toLocaleDateString('es-MX', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric'
-            })
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          })
           : 'Sin definir',
         anchoTicket / 2,
         yPos,
@@ -761,11 +761,10 @@ const OrdenesCompraPage = () => {
       {estadisticas && (
         <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Solicitudes Pendientes */}
-          <div className={`bg-white rounded-lg shadow p-5 border-l-4 ${
-            estadisticas.resumen.solicitudesPendientes > 10
+          <div className={`bg-white rounded-lg shadow p-5 border-l-4 ${estadisticas.resumen.solicitudesPendientes > 10
               ? 'border-red-500'
               : 'border-orange-500'
-          }`}>
+            }`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Solicitudes Pendientes</p>
@@ -835,11 +834,10 @@ const OrdenesCompraPage = () => {
         <div className="flex gap-4">
           <button
             onClick={() => setVistaActual('ordenes')}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              vistaActual === 'ordenes'
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${vistaActual === 'ordenes'
                 ? 'border-red-700 text-red-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             <div className="flex items-center gap-2">
               <ShoppingCart size={18} />
@@ -848,11 +846,10 @@ const OrdenesCompraPage = () => {
           </button>
           <button
             onClick={() => setVistaActual('solicitudes')}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              vistaActual === 'solicitudes'
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${vistaActual === 'solicitudes'
                 ? 'border-red-700 text-red-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             <div className="flex items-center gap-2">
               <AlertCircle size={18} />
@@ -900,31 +897,28 @@ const OrdenesCompraPage = () => {
             <div className="flex items-center gap-2 border border-gray-300 rounded-lg p-1 bg-gray-50">
               <button
                 onClick={() => setVistaOrdenes('activas')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  vistaOrdenes === 'activas'
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${vistaOrdenes === 'activas'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-gray-700 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 Activas
               </button>
               <button
                 onClick={() => setVistaOrdenes('completadas')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  vistaOrdenes === 'completadas'
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${vistaOrdenes === 'completadas'
                     ? 'bg-green-600 text-white shadow-sm'
                     : 'text-gray-700 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 Completadas
               </button>
               <button
                 onClick={() => setVistaOrdenes('canceladas')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  vistaOrdenes === 'canceladas'
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${vistaOrdenes === 'canceladas'
                     ? 'bg-red-600 text-white shadow-sm'
                     : 'text-gray-700 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 Canceladas
               </button>
@@ -1085,9 +1079,8 @@ const OrdenesCompraPage = () => {
                         return (
                           <div
                             key={articulo.id}
-                            className={`p-2 hover:bg-gray-50 cursor-pointer transition-colors ${
-                              stockCritico ? 'bg-red-50' : stockBajo ? 'bg-orange-50' : ''
-                            }`}
+                            className={`p-2 hover:bg-gray-50 cursor-pointer transition-colors ${stockCritico ? 'bg-red-50' : stockBajo ? 'bg-orange-50' : ''
+                              }`}
                             onClick={() => {
                               handleAbrirModalCrearSolicitudArticulo(articulo);
                               setBusquedaArticulo('');
@@ -1131,9 +1124,8 @@ const OrdenesCompraPage = () => {
                                   Agregar
                                 </button>
                                 {stockBajo && (
-                                  <span className={`px-1.5 py-0.5 text-xs font-semibold rounded ${
-                                    stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
-                                  }`}>
+                                  <span className={`px-1.5 py-0.5 text-xs font-semibold rounded ${stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
+                                    }`}>
                                     {stockCritico ? '⚠️' : '⚡'}
                                   </span>
                                 )}
@@ -1731,9 +1723,8 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                           type="button"
                           onClick={() => handleSeleccionarArticulo(articulo)}
                           disabled={yaSeleccionado}
-                          className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors ${
-                            yaSeleccionado ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''
-                          }`}
+                          className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors ${yaSeleccionado ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''
+                            }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
@@ -1751,11 +1742,10 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                               <p className="text-sm font-semibold text-gray-900">
                                 ${parseFloat(articulo.costo_unitario || 0).toFixed(2)}
                               </p>
-                              <p className={`text-xs ${
-                                parseFloat(articulo.stock_actual) > parseFloat(articulo.stock_minimo)
+                              <p className={`text-xs ${parseFloat(articulo.stock_actual) > parseFloat(articulo.stock_minimo)
                                   ? 'text-green-600'
                                   : 'text-orange-600'
-                              }`}>
+                                }`}>
                                 Stock: {articulo.stock_actual} {articulo.unidad}
                               </p>
                             </div>
@@ -1785,9 +1775,8 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                               type="button"
                               onClick={() => handleSeleccionarArticulo(articulo)}
                               disabled={yaSeleccionado}
-                              className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors ${
-                                yaSeleccionado ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''
-                              }`}
+                              className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors ${yaSeleccionado ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''
+                                }`}
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
@@ -1802,11 +1791,10 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                                   <p className="text-sm font-semibold text-gray-900">
                                     ${parseFloat(articulo.costo_unitario || 0).toFixed(2)}
                                   </p>
-                                  <p className={`text-xs ${
-                                    parseFloat(articulo.stock_actual) > parseFloat(articulo.stock_minimo)
+                                  <p className={`text-xs ${parseFloat(articulo.stock_actual) > parseFloat(articulo.stock_minimo)
                                       ? 'text-green-600'
                                       : 'text-orange-600'
-                                  }`}>
+                                    }`}>
                                     Stock: {articulo.stock_actual} {articulo.unidad}
                                   </p>
                                 </div>
@@ -1867,9 +1855,8 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                               type="number"
                               value={item.cantidad}
                               onChange={(e) => handleCantidadChange(index, e.target.value)}
-                              className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-red-700 ${
-                                stockInsuficiente ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
-                              }`}
+                              className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-red-700 ${stockInsuficiente ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
+                                }`}
                               min="0.01"
                               step="0.01"
                               required
@@ -2008,21 +1995,19 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
         <div className="flex gap-4">
           <button
             onClick={() => setTabActual('detalle')}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              tabActual === 'detalle'
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${tabActual === 'detalle'
                 ? 'border-red-700 text-red-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             Detalle de la Orden
           </button>
           <button
             onClick={() => setTabActual('historial')}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              tabActual === 'historial'
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${tabActual === 'historial'
                 ? 'border-red-700 text-red-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             Historial de Trazabilidad
           </button>
@@ -2469,64 +2454,64 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
           ) : (
             <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
               <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Artículo</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Cantidad</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Costo Unit.</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Subtotal</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {articulosAgrupados.map((item, index) => {
-                  const costo = parseFloat(item.articulo?.costo_unitario || 0);
-                  const cantidadActual = cantidadesEditadas[item.articulo?.id] || item.cantidad_total;
-                  const subtotal = cantidadActual * costo;
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Artículo</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Cantidad</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Costo Unit.</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Subtotal</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {articulosAgrupados.map((item, index) => {
+                    const costo = parseFloat(item.articulo?.costo_unitario || 0);
+                    const cantidadActual = cantidadesEditadas[item.articulo?.id] || item.cantidad_total;
+                    const subtotal = cantidadActual * costo;
 
-                  return (
-                    <tr key={index}>
-                      <td className="px-4 py-2 text-sm">
-                        <div className="font-medium text-gray-900">{item.articulo?.nombre}</div>
-                        <div className="text-xs text-gray-500">
-                          {item.solicitudes.length > 1 && `${item.solicitudes.length} solicitudes`}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={cantidadActual}
-                            onChange={(e) => handleCantidadChange(item.articulo?.id, e.target.value)}
-                            className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-center"
-                          />
-                          <span className="text-gray-600">{item.articulo?.unidad}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-sm">
-                        ${costo.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-2 text-sm font-medium">
-                        ${subtotal.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-2 text-sm">
-                        <button
-                          type="button"
-                          onClick={() => handleEliminarArticulo(item.articulo?.id)}
-                          className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 rounded transition-colors"
-                          title="Eliminar artículo de la orden"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    return (
+                      <tr key={index}>
+                        <td className="px-4 py-2 text-sm">
+                          <div className="font-medium text-gray-900">{item.articulo?.nombre}</div>
+                          <div className="text-xs text-gray-500">
+                            {item.solicitudes.length > 1 && `${item.solicitudes.length} solicitudes`}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={cantidadActual}
+                              onChange={(e) => handleCantidadChange(item.articulo?.id, e.target.value)}
+                              className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-center"
+                            />
+                            <span className="text-gray-600">{item.articulo?.unidad}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          ${costo.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-2 text-sm font-medium">
+                          ${subtotal.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          <button
+                            type="button"
+                            onClick={() => handleEliminarArticulo(item.articulo?.id)}
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 rounded transition-colors"
+                            title="Eliminar artículo de la orden"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
@@ -3037,6 +3022,45 @@ const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
 };
 
 // Modal de Artículos Encontrados
+// Sub-componente para mostrar último movimiento de un artículo
+const UltimoMovimientoInfo = ({ articuloId }) => {
+  const [mov, setMov] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMov = async () => {
+      try {
+        const data = await articulosService.getUltimoMovimiento(articuloId);
+        setMov(data.ultimoMovimiento);
+      } catch (e) {
+        setMov(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMov();
+  }, [articuloId]);
+
+  if (loading) return <span className="text-xs text-gray-400">Cargando...</span>;
+  if (!mov) return <span className="text-xs text-gray-400 italic">Sin movimientos</span>;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+      <span className="flex items-center gap-1">
+        <Clock size={12} className="text-gray-400" />
+        {new Date(mov.fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+      </span>
+      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${mov.tipo === 'ajuste_entrada' || mov.tipo === 'entrada_orden_compra' || mov.tipo === 'devolucion'
+          ? 'bg-green-100 text-green-700'
+          : mov.tipo === 'retiro' || mov.tipo === 'ajuste_salida'
+            ? 'bg-orange-100 text-orange-700'
+            : 'bg-blue-100 text-blue-700'
+        }`}>{mov.tipo_legible}</span>
+      {mov.usuario && <span>👤 {mov.usuario.nombre}</span>}
+    </div>
+  );
+};
+
 const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitud, titulo }) => {
   if (!isOpen) return null;
 
@@ -3076,13 +3100,12 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
                 return (
                   <div
                     key={articulo.id}
-                    className={`border-2 rounded-lg p-4 hover:shadow-md transition-all ${
-                      stockCritico
+                    className={`border-2 rounded-lg p-4 hover:shadow-md transition-all ${stockCritico
                         ? 'border-red-300 bg-red-50'
                         : stockBajo
-                        ? 'border-orange-300 bg-orange-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
+                          ? 'border-orange-300 bg-orange-50'
+                          : 'border-gray-200 bg-white'
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
@@ -3140,6 +3163,12 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
                             </p>
                           </div>
                         </div>
+
+                        {/* Última actualización */}
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <span className="text-xs font-medium text-gray-500">Última actualización: </span>
+                          <UltimoMovimientoInfo articuloId={articulo.id} />
+                        </div>
                       </div>
 
                       <div className="flex flex-col gap-2">
@@ -3151,9 +3180,8 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
                           Crear Solicitud
                         </button>
                         {stockBajo && (
-                          <span className={`px-2 py-1 text-xs font-semibold rounded ${
-                            stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
-                          }`}>
+                          <span className={`px-2 py-1 text-xs font-semibold rounded ${stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
+                            }`}>
                             {stockCritico ? '⚠️ Stock Crítico' : '⚡ Stock Bajo'}
                           </span>
                         )}
