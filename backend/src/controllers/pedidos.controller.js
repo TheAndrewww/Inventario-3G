@@ -541,7 +541,9 @@ export const crearPedido = async (req, res) => {
             cantidad: d.cantidad,
             unidad: d.articulo?.unidad || 'pz',
             categoria: d.articulo?.categoria?.nombre || 'Sin categoría',
-            ubicacion: d.articulo?.ubicacion?.codigo || 'N/A'
+            ubicacion: d.articulo?.ubicacion?.codigo || 'N/A',
+            imagen: d.articulo?.imagen_url || null,
+            descripcion: d.articulo?.descripcion || null
           })),
           total_piezas: articulos.reduce((sum, art) => sum + art.cantidad, 0)
         };
