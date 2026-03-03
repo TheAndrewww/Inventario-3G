@@ -278,36 +278,23 @@ const OrdenesCompraPage = () => {
     try {
       setBuscandoArticulos(true);
 
-      // Obtener solicitudes FRESCAS de la API (no del estado para evitar problemas de timing)
-      const responseSolicitudes = await ordenesCompraService.listarSolicitudes({ estado: 'pendiente' });
-      const solicitudesFrescas = responseSolicitudes.data?.solicitudes || [];
-
       // Obtener TODOS los artículos sin límite de paginación
       const todosArticulos = await articulosService.buscar({ activo: true, limit: 99999 });
 
-      // Filtrar artículos con stock bajo mínimo
-      let articulosBajoStock = todosArticulos.filter(art =>
+      // Filtrar artículos con stock bajo mínimo (sin importar si ya tienen solicitud)
+      const articulosBajoStock = todosArticulos.filter(art =>
         parseFloat(art.stock_actual) < parseFloat(art.stock_minimo)
-      );
-
-      // Filtrar artículos que ya tienen solicitudes pendientes (usar solicitudes frescas de la API)
-      const articulosConSolicitudPendiente = solicitudesFrescas.map(sol => sol.articulo_id);
-
-      articulosBajoStock = articulosBajoStock.filter(art =>
-        !articulosConSolicitudPendiente.includes(art.id)
       );
 
       setArticulosBuscados(articulosBajoStock);
       setMostrandoBajoStock(true);
 
       if (articulosBajoStock.length === 0) {
-        // Si no hay artículos, cerrar el modal automáticamente
         setModalArticulosEncontrados(false);
-        toast.success('✅ Todos los artículos tienen stock suficiente o ya tienen solicitud pendiente');
+        toast.success('✅ Todos los artículos tienen stock suficiente');
       } else {
-        // Si hay artículos, mantener el modal abierto y mostrar la lista actualizada
         setModalArticulosEncontrados(true);
-        toast(`${articulosBajoStock.length} artículo${articulosBajoStock.length !== 1 ? 's' : ''} bajo stock mínimo sin solicitud`, {
+        toast(`${articulosBajoStock.length} artículo${articulosBajoStock.length !== 1 ? 's' : ''} bajo stock mínimo`, {
           icon: '⚠️',
           duration: 2000
         });
@@ -762,8 +749,8 @@ const OrdenesCompraPage = () => {
         <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Solicitudes Pendientes */}
           <div className={`bg-white rounded-lg shadow p-5 border-l-4 ${estadisticas.resumen.solicitudesPendientes > 10
-              ? 'border-red-500'
-              : 'border-orange-500'
+            ? 'border-red-500'
+            : 'border-orange-500'
             }`}>
             <div className="flex items-center justify-between">
               <div>
@@ -835,8 +822,8 @@ const OrdenesCompraPage = () => {
           <button
             onClick={() => setVistaActual('ordenes')}
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${vistaActual === 'ordenes'
-                ? 'border-red-700 text-red-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-red-700 text-red-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
             <div className="flex items-center gap-2">
@@ -847,8 +834,8 @@ const OrdenesCompraPage = () => {
           <button
             onClick={() => setVistaActual('solicitudes')}
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${vistaActual === 'solicitudes'
-                ? 'border-red-700 text-red-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-red-700 text-red-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
             <div className="flex items-center gap-2">
@@ -898,8 +885,8 @@ const OrdenesCompraPage = () => {
               <button
                 onClick={() => setVistaOrdenes('activas')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${vistaOrdenes === 'activas'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-200'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-700 hover:bg-gray-200'
                   }`}
               >
                 Activas
@@ -907,8 +894,8 @@ const OrdenesCompraPage = () => {
               <button
                 onClick={() => setVistaOrdenes('completadas')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${vistaOrdenes === 'completadas'
-                    ? 'bg-green-600 text-white shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-200'
+                  ? 'bg-green-600 text-white shadow-sm'
+                  : 'text-gray-700 hover:bg-gray-200'
                   }`}
               >
                 Completadas
@@ -916,8 +903,8 @@ const OrdenesCompraPage = () => {
               <button
                 onClick={() => setVistaOrdenes('canceladas')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${vistaOrdenes === 'canceladas'
-                    ? 'bg-red-600 text-white shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-200'
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'text-gray-700 hover:bg-gray-200'
                   }`}
               >
                 Canceladas
@@ -1743,8 +1730,8 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                                 ${parseFloat(articulo.costo_unitario || 0).toFixed(2)}
                               </p>
                               <p className={`text-xs ${parseFloat(articulo.stock_actual) > parseFloat(articulo.stock_minimo)
-                                  ? 'text-green-600'
-                                  : 'text-orange-600'
+                                ? 'text-green-600'
+                                : 'text-orange-600'
                                 }`}>
                                 Stock: {articulo.stock_actual} {articulo.unidad}
                               </p>
@@ -1792,8 +1779,8 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                                     ${parseFloat(articulo.costo_unitario || 0).toFixed(2)}
                                   </p>
                                   <p className={`text-xs ${parseFloat(articulo.stock_actual) > parseFloat(articulo.stock_minimo)
-                                      ? 'text-green-600'
-                                      : 'text-orange-600'
+                                    ? 'text-green-600'
+                                    : 'text-orange-600'
                                     }`}>
                                     Stock: {articulo.stock_actual} {articulo.unidad}
                                   </p>
@@ -1996,8 +1983,8 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
           <button
             onClick={() => setTabActual('detalle')}
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${tabActual === 'detalle'
-                ? 'border-red-700 text-red-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-red-700 text-red-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
             Detalle de la Orden
@@ -2005,8 +1992,8 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
           <button
             onClick={() => setTabActual('historial')}
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${tabActual === 'historial'
-                ? 'border-red-700 text-red-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-red-700 text-red-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
             Historial de Trazabilidad
@@ -3051,10 +3038,10 @@ const UltimoMovimientoInfo = ({ articuloId }) => {
         {new Date(mov.fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
       </span>
       <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${mov.tipo === 'ajuste_entrada' || mov.tipo === 'entrada_orden_compra' || mov.tipo === 'devolucion'
-          ? 'bg-green-100 text-green-700'
-          : mov.tipo === 'retiro' || mov.tipo === 'ajuste_salida'
-            ? 'bg-orange-100 text-orange-700'
-            : 'bg-blue-100 text-blue-700'
+        ? 'bg-green-100 text-green-700'
+        : mov.tipo === 'retiro' || mov.tipo === 'ajuste_salida'
+          ? 'bg-orange-100 text-orange-700'
+          : 'bg-blue-100 text-blue-700'
         }`}>{mov.tipo_legible}</span>
       {mov.usuario && <span>👤 {mov.usuario.nombre}</span>}
     </div>
@@ -3101,10 +3088,10 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
                   <div
                     key={articulo.id}
                     className={`border-2 rounded-lg p-4 hover:shadow-md transition-all ${stockCritico
-                        ? 'border-red-300 bg-red-50'
-                        : stockBajo
-                          ? 'border-orange-300 bg-orange-50'
-                          : 'border-gray-200 bg-white'
+                      ? 'border-red-300 bg-red-50'
+                      : stockBajo
+                        ? 'border-orange-300 bg-orange-50'
+                        : 'border-gray-200 bg-white'
                       }`}
                   >
                     <div className="flex items-start justify-between gap-4">
