@@ -3051,6 +3051,107 @@ const UltimoMovimientoInfo = ({ articuloId }) => {
 const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitud, titulo }) => {
   if (!isOpen) return null;
 
+  const generarPDFBajoStock = () => {
+    const doc = new jsPDF('landscape', 'mm', 'letter');
+    const fecha = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    // Header
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Reporte de Artículos Bajo Stock Mínimo', 14, 20);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(`Generado: ${fecha}`, 14, 27);
+    doc.text(`Total de artículos: ${articulos.length}`, 14, 32);
+    doc.setTextColor(0);
+
+    // Table header
+    const startY = 40;
+    const colWidths = [8, 85, 45, 30, 30, 30, 30];
+    const headers = ['#', 'Artículo', 'Categoría', 'Stock Actual', 'Stock Mín.', 'Faltante', 'Estado'];
+
+    doc.setFillColor(220, 38, 38);
+    doc.rect(14, startY - 6, colWidths.reduce((a, b) => a + b, 0), 8, 'F');
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255);
+
+    let xPos = 16;
+    headers.forEach((header, i) => {
+      doc.text(header, xPos, startY);
+      xPos += colWidths[i];
+    });
+
+    // Table rows
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0);
+    let yPos = startY + 8;
+
+    // Sort: critical first, then by % ascending
+    const sorted = [...articulos].sort((a, b) => {
+      const pctA = parseFloat(a.stock_actual) / parseFloat(a.stock_minimo || 1);
+      const pctB = parseFloat(b.stock_actual) / parseFloat(b.stock_minimo || 1);
+      return pctA - pctB;
+    });
+
+    sorted.forEach((art, idx) => {
+      if (yPos > 190) {
+        doc.addPage();
+        yPos = 20;
+        // Re-draw header on new page
+        doc.setFillColor(220, 38, 38);
+        doc.rect(14, yPos - 6, colWidths.reduce((a, b) => a + b, 0), 8, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(255);
+        let xH = 16;
+        headers.forEach((header, i) => {
+          doc.text(header, xH, yPos);
+          xH += colWidths[i];
+        });
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0);
+        yPos += 8;
+      }
+
+      const stockActual = parseFloat(art.stock_actual);
+      const stockMin = parseFloat(art.stock_minimo || 0);
+      const faltante = Math.max(0, stockMin - stockActual);
+      const pct = (stockActual / (stockMin || 1)) * 100;
+      const critico = pct < 50;
+
+      // Row background
+      if (idx % 2 === 0) {
+        doc.setFillColor(critico ? 254 : 255, critico ? 242 : 249, critico ? 242 : 245);
+        doc.rect(14, yPos - 4, colWidths.reduce((a, b) => a + b, 0), 7, 'F');
+      }
+
+      doc.setFontSize(8);
+      let x = 16;
+      doc.text(`${idx + 1}`, x, yPos); x += colWidths[0];
+
+      // Truncate name if too long
+      const nombre = art.nombre.length > 45 ? art.nombre.substring(0, 42) + '...' : art.nombre;
+      doc.text(nombre, x, yPos); x += colWidths[1];
+      doc.text(art.categoria?.nombre || 'N/A', x, yPos); x += colWidths[2];
+
+      // Stock actual in red if critical
+      if (critico) doc.setTextColor(220, 38, 38);
+      doc.text(`${stockActual} ${art.unidad || ''}`, x, yPos);
+      doc.setTextColor(0); x += colWidths[3];
+
+      doc.text(`${stockMin} ${art.unidad || ''}`, x, yPos); x += colWidths[4];
+      doc.setTextColor(220, 38, 38);
+      doc.text(`${faltante} ${art.unidad || ''}`, x, yPos);
+      doc.setTextColor(0); x += colWidths[5];
+      doc.text(critico ? '⚠ Crítico' : '⚡ Bajo', x, yPos);
+
+      yPos += 7;
+    });
+
+    doc.save(`bajo-stock-minimo-${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -3062,12 +3163,24 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
                 {articulos.length} artículo{articulos.length !== 1 ? 's' : ''} encontrado{articulos.length !== 1 ? 's' : ''}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X size={24} />
-            </button>
+            <div className="flex items-center gap-2">
+              {articulos.length > 0 && (
+                <button
+                  onClick={generarPDFBajoStock}
+                  className="flex items-center gap-2 px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors text-sm font-medium"
+                  title="Descargar PDF con artículos bajo stock"
+                >
+                  <Download size={16} />
+                  PDF
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
           </div>
         </div>
 
