@@ -1927,7 +1927,7 @@ export const getUltimoMovimiento = async (req, res) => {
                     attributes: ['id', 'nombre', 'email', 'rol']
                 }]
             }],
-            order: [['createdAt', 'DESC']],
+            order: [['id', 'DESC']],
             limit: 1
         });
 
