@@ -107,8 +107,15 @@ const OrdenesCompraPage = () => {
     if (solicitud.articulo?.tipo_herramienta_migrado?.proveedor) {
       return solicitud.articulo.tipo_herramienta_migrado.proveedor;
     }
-    // Si no, usar el proveedor directo del artículo
-    return solicitud.articulo?.proveedor || null;
+    // Si tiene proveedor directo (FK), usar ese
+    if (solicitud.articulo?.proveedor) {
+      return solicitud.articulo.proveedor;
+    }
+    // Si tiene proveedores via many-to-many (ArticuloProveedor), usar el primero
+    if (solicitud.articulo?.proveedores?.length > 0) {
+      return solicitud.articulo.proveedores[0];
+    }
+    return null;
   };
 
   const handleClickSolicitud = (solicitud) => {
@@ -2203,8 +2210,15 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
     if (solicitud.articulo?.tipo_herramienta_migrado?.proveedor) {
       return solicitud.articulo.tipo_herramienta_migrado.proveedor;
     }
-    // Si no, usar el proveedor directo del artículo
-    return solicitud.articulo?.proveedor || null;
+    // Si tiene proveedor directo (FK), usar ese
+    if (solicitud.articulo?.proveedor) {
+      return solicitud.articulo.proveedor;
+    }
+    // Si tiene proveedores via many-to-many (ArticuloProveedor), usar el primero
+    if (solicitud.articulo?.proveedores?.length > 0) {
+      return solicitud.articulo.proveedores[0];
+    }
+    return null;
   };
 
   useEffect(() => {

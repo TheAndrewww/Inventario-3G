@@ -421,6 +421,12 @@ export const listarSolicitudesCompra = async (req, res) => {
             { model: Categoria, as: 'categoria' },
             { model: Proveedor, as: 'proveedor' },
             {
+              model: Proveedor,
+              as: 'proveedores',
+              through: { attributes: [] },
+              required: false
+            },
+            {
               model: TipoHerramientaRenta,
               as: 'tipo_herramienta_migrado',
               required: false,
