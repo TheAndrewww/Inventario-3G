@@ -442,6 +442,26 @@ const startServer = async () => {
                 console.log('⚠️ Error al actualizar enum notificaciones:', enumError.message);
             }
 
+            // Migración: agregar estados pendiente_aprobacion y rechazada al enum de ordenes_compra
+            try {
+                console.log('🔍 Verificando enum de ordenes_compra...');
+                const estadosFaltantes = ['pendiente_aprobacion', 'rechazada'];
+                for (const estado of estadosFaltantes) {
+                    try {
+                        await sequelize.query(`ALTER TYPE "enum_ordenes_compra_estado" ADD VALUE IF NOT EXISTS '${estado}'`);
+                    } catch (e) {
+                        // Ignorar si ya existe
+                    }
+                }
+                // Agregar columnas nuevas si no existen
+                await sequelize.query(`ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS motivo_rechazo TEXT`);
+                await sequelize.query(`ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS aprobado_por_id INTEGER REFERENCES usuarios(id)`);
+                await sequelize.query(`ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS fecha_aprobacion TIMESTAMP WITH TIME ZONE`);
+                console.log('✅ Enum y columnas de ordenes_compra actualizados');
+            } catch (ordenError) {
+                console.log('⚠️ Error al actualizar ordenes_compra:', ordenError.message);
+            }
+
             // Verificar/crear tabla de rollos_membrana
             console.log('🔍 Verificando tabla rollos_membrana...');
             try {

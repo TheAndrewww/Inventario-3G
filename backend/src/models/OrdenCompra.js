@@ -32,9 +32,9 @@ const OrdenCompra = sequelize.define('OrdenCompra', {
         comment: 'Usuario que creó la orden (diseñador o almacenista)'
     },
     estado: {
-        type: DataTypes.ENUM('borrador', 'enviada', 'parcial', 'recibida', 'cancelada'),
+        type: DataTypes.ENUM('pendiente_aprobacion', 'borrador', 'enviada', 'parcial', 'recibida', 'cancelada', 'rechazada'),
         allowNull: false,
-        defaultValue: 'borrador',
+        defaultValue: 'pendiente_aprobacion',
         comment: 'Estado de la orden de compra'
     },
     total_estimado: {
@@ -61,6 +61,25 @@ const OrdenCompra = sequelize.define('OrdenCompra', {
         type: DataTypes.DATE,
         allowNull: true,
         comment: 'Fecha estimada de llegada de la orden'
+    },
+    motivo_rechazo: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: 'Motivo de rechazo por el administrador'
+    },
+    aprobado_por_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'usuarios',
+            key: 'id'
+        },
+        comment: 'Administrador que aprobó la orden'
+    },
+    fecha_aprobacion: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Fecha en que se aprobó la orden'
     }
 }, {
     tableName: 'ordenes_compra',

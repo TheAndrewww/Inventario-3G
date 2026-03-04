@@ -55,7 +55,12 @@ const OrdenesCompraPage = () => {
   // Verificar permisos
   const puedeCrearOrdenes = ['administrador', 'diseñador', 'almacen', 'compras'].includes(user?.rol);
   const esDiseñador = user?.rol === 'diseñador';
+  const esAdmin = user?.rol === 'administrador';
   const puedeAnularOrdenes = ['administrador', 'almacen', 'compras'].includes(user?.rol);
+  const [modalRechazo, setModalRechazo] = useState(false);
+  const [motivoRechazo, setMotivoRechazo] = useState('');
+  const [ordenParaRechazo, setOrdenParaRechazo] = useState(null);
+  const [loadingAprobacion, setLoadingAprobacion] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -715,13 +720,58 @@ const OrdenesCompraPage = () => {
     return Array.from(categoriasMap.values());
   }, [solicitudes]);
 
+  const handleAprobarOrden = async (orden) => {
+    if (!confirm(`¿Aprobar la orden ${orden.ticket_id}?`)) return;
+    setLoadingAprobacion(true);
+    try {
+      await ordenesCompraService.aprobarOrden(orden.id);
+      toast.success(`Orden ${orden.ticket_id} aprobada`);
+      setModalDetalle(false);
+      setOrdenSeleccionada(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Error al aprobar');
+    } finally {
+      setLoadingAprobacion(false);
+    }
+  };
+
+  const handleAbrirRechazo = (orden) => {
+    setOrdenParaRechazo(orden);
+    setMotivoRechazo('');
+    setModalRechazo(true);
+  };
+
+  const handleConfirmarRechazo = async () => {
+    if (!motivoRechazo.trim()) {
+      toast.error('Escribe un motivo de rechazo');
+      return;
+    }
+    setLoadingAprobacion(true);
+    try {
+      await ordenesCompraService.rechazarOrden(ordenParaRechazo.id, motivoRechazo.trim());
+      toast.success(`Orden ${ordenParaRechazo.ticket_id} rechazada`);
+      setModalRechazo(false);
+      setModalDetalle(false);
+      setOrdenSeleccionada(null);
+      setOrdenParaRechazo(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Error al rechazar');
+    } finally {
+      setLoadingAprobacion(false);
+    }
+  };
+
   const getEstadoBadge = (estado) => {
     const estados = {
-      borrador: { label: 'Borrador', color: 'bg-gray-100 text-gray-800', icon: AlertCircle },
+      pendiente_aprobacion: { label: 'Pendiente Aprobación', color: 'bg-amber-100 text-amber-800', icon: AlertCircle },
+      borrador: { label: 'Aprobada', color: 'bg-gray-100 text-gray-800', icon: CheckCircle },
       enviada: { label: 'Enviada', color: 'bg-blue-100 text-blue-800', icon: Send },
       parcial: { label: 'Parcial', color: 'bg-yellow-100 text-yellow-800', icon: Package },
       recibida: { label: 'Recibida', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-      cancelada: { label: 'Cancelada', color: 'bg-red-100 text-red-800', icon: XCircle }
+      cancelada: { label: 'Cancelada', color: 'bg-red-100 text-red-800', icon: XCircle },
+      rechazada: { label: 'Rechazada', color: 'bg-red-200 text-red-900', icon: XCircle }
     };
 
     const config = estados[estado] || estados.borrador;
@@ -983,7 +1033,10 @@ const OrdenesCompraPage = () => {
                     </tr>
                   ) : (
                     filteredOrdenes.map((orden) => (
-                      <tr key={orden.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleVerDetalle(orden)}>
+                      <tr key={orden.id} className={`cursor-pointer transition-colors ${orden.estado === 'rechazada' ? 'bg-red-50 hover:bg-red-100' :
+                        orden.estado === 'pendiente_aprobacion' ? 'bg-amber-50 hover:bg-amber-100' :
+                          'hover:bg-gray-50'
+                        }`} onClick={() => handleVerDetalle(orden)}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-medium text-gray-900">{orden.ticket_id}</div>
                         </td>
@@ -1301,7 +1354,50 @@ const OrdenesCompraPage = () => {
           onAbrirModalAnular={handleAbrirModalAnular}
           onEnviarOrden={handleEnviarOrden}
           onEditarOrden={handleAbrirModalEditar}
+          esAdmin={esAdmin}
+          onAprobar={handleAprobarOrden}
+          onRechazar={handleAbrirRechazo}
+          loadingAprobacion={loadingAprobacion}
         />
+      )}
+
+      {/* Modal de Rechazo */}
+      {modalRechazo && ordenParaRechazo && (
+        <Modal isOpen={modalRechazo} onClose={() => setModalRechazo(false)} title="Rechazar Orden de Compra" size="md">
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm text-red-800">
+                Estás rechazando la orden <strong>{ordenParaRechazo.ticket_id}</strong>
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Motivo del rechazo *
+              </label>
+              <textarea
+                value={motivoRechazo}
+                onChange={(e) => setMotivoRechazo(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 resize-none"
+                rows={4}
+                placeholder="Explica por qué se rechaza esta orden..."
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button onClick={() => setModalRechazo(false)} variant="secondary">
+                Cancelar
+              </Button>
+              <button
+                onClick={handleConfirmarRechazo}
+                disabled={loadingAprobacion || !motivoRechazo.trim()}
+                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <XCircle size={16} />
+                {loadingAprobacion ? 'Procesando...' : 'Confirmar Rechazo'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Modal Crear Orden desde Solicitudes Seleccionadas */}
@@ -1995,9 +2091,11 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
 };
 
 // Modal para ver detalle de orden con trazabilidad
-const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, onAbrirModalAnular, onEnviarOrden, onEditarOrden }) => {
+const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, onAbrirModalAnular, onEnviarOrden, onEditarOrden, esAdmin, onAprobar, onRechazar, loadingAprobacion }) => {
   const [tabActual, setTabActual] = React.useState('detalle'); // 'detalle' o 'historial'
   const esBorrador = orden && orden.estado === 'borrador';
+  const esPendienteAprobacion = orden && orden.estado === 'pendiente_aprobacion';
+  const esRechazada = orden && orden.estado === 'rechazada';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Orden ${orden.ticket_id}`} size="xl">
@@ -2032,11 +2130,13 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
             <div>
               <p className="text-sm text-gray-500">Estado</p>
               <p className="font-medium">
-                {orden.estado === 'borrador' && 'Borrador'}
+                {orden.estado === 'pendiente_aprobacion' && '⏳ Pendiente de Aprobación'}
+                {orden.estado === 'borrador' && '✅ Aprobada'}
                 {orden.estado === 'enviada' && 'Enviada'}
                 {orden.estado === 'parcial' && 'Parcial'}
                 {orden.estado === 'recibida' && 'Recibida'}
                 {orden.estado === 'cancelada' && 'Cancelada'}
+                {orden.estado === 'rechazada' && '❌ Rechazada'}
               </p>
             </div>
             <div>
@@ -2057,6 +2157,27 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
             <div>
               <p className="text-sm text-gray-500 mb-1">Observaciones</p>
               <p className="text-sm text-gray-700">{orden.observaciones}</p>
+            </div>
+          )}
+
+          {/* Motivo de rechazo */}
+          {esRechazada && orden.motivo_rechazo && (
+            <div className="bg-red-50 border border-red-300 rounded-lg p-4">
+              <h4 className="font-semibold text-red-900 mb-1 text-sm flex items-center gap-2">
+                <XCircle size={16} />
+                Motivo de Rechazo
+              </h4>
+              <p className="text-sm text-red-800">{orden.motivo_rechazo}</p>
+            </div>
+          )}
+
+          {/* Alerta pendiente de aprobación */}
+          {esPendienteAprobacion && (
+            <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+              <h4 className="font-semibold text-amber-900 text-sm flex items-center gap-2">
+                <AlertCircle size={16} />
+                Esta orden está pendiente de aprobación por un administrador
+              </h4>
             </div>
           )}
 
@@ -2121,6 +2242,27 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
               )}
             </div>
             <div className="flex gap-3">
+              {/* Botones de aprobación (solo admin, solo pendiente) */}
+              {esAdmin && esPendienteAprobacion && (
+                <>
+                  <button
+                    onClick={() => onAprobar(orden)}
+                    disabled={loadingAprobacion}
+                    className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <CheckCircle size={16} />
+                    {loadingAprobacion ? 'Procesando...' : 'Aprobar'}
+                  </button>
+                  <button
+                    onClick={() => onRechazar(orden)}
+                    disabled={loadingAprobacion}
+                    className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <XCircle size={16} />
+                    Rechazar
+                  </button>
+                </>
+              )}
               {esBorrador && onEnviarOrden && (
                 <button
                   onClick={() => onEnviarOrden(orden.id)}
@@ -2130,7 +2272,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                   Enviar Orden
                 </button>
               )}
-              {puedeAnularOrdenes && orden.estado !== 'cancelada' && (
+              {puedeAnularOrdenes && orden.estado !== 'cancelada' && orden.estado !== 'rechazada' && (
                 <Button
                   onClick={() => onAbrirModalAnular(orden)}
                   variant="danger"
@@ -2164,6 +2306,27 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
               )}
             </div>
             <div className="flex gap-3">
+              {/* Botones de aprobación (solo admin, solo pendiente) */}
+              {esAdmin && esPendienteAprobacion && (
+                <>
+                  <button
+                    onClick={() => onAprobar(orden)}
+                    disabled={loadingAprobacion}
+                    className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <CheckCircle size={16} />
+                    {loadingAprobacion ? 'Procesando...' : 'Aprobar'}
+                  </button>
+                  <button
+                    onClick={() => onRechazar(orden)}
+                    disabled={loadingAprobacion}
+                    className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <XCircle size={16} />
+                    Rechazar
+                  </button>
+                </>
+              )}
               {esBorrador && onEnviarOrden && (
                 <button
                   onClick={() => onEnviarOrden(orden.id)}
@@ -2173,7 +2336,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                   Enviar Orden
                 </button>
               )}
-              {puedeAnularOrdenes && orden.estado !== 'cancelada' && (
+              {puedeAnularOrdenes && orden.estado !== 'cancelada' && orden.estado !== 'rechazada' && (
                 <Button
                   onClick={() => onAbrirModalAnular(orden)}
                   variant="danger"

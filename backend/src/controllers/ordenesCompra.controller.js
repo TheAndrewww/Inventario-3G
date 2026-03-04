@@ -97,7 +97,7 @@ export const crearOrdenCompra = async (req, res) => {
       ticket_id,
       proveedor_id: proveedor_id || null,
       usuario_creador_id: usuario_id,
-      estado: 'borrador',
+      estado: 'pendiente_aprobacion',
       total_estimado: 0,
       observaciones: observaciones || null,
       fecha_llegada_estimada: fecha_llegada_estimada || null
@@ -168,10 +168,10 @@ export const crearOrdenCompra = async (req, res) => {
     // Notificar a usuarios con roles de compras y administradores
     try {
       await notificarPorRol({
-        roles: ['compras', 'administrador'],
+        roles: ['administrador'],
         tipo: 'orden_compra_creada',
-        titulo: 'Nueva orden de compra',
-        mensaje: `${req.usuario.nombre} creó la orden ${ticket_id} por $${totalEstimado.toFixed(2)}`,
+        titulo: '🔔 Orden de compra pendiente de aprobación',
+        mensaje: `${req.usuario.nombre} creó la orden ${ticket_id} por $${totalEstimado.toFixed(2)} y requiere tu aprobación`,
         url: `/ordenes-compra`,
         datos_adicionales: {
           orden_id: ordenCompra.id,
@@ -538,7 +538,7 @@ export const actualizarEstadoOrden = async (req, res) => {
     const { id } = req.params;
     const { estado } = req.body;
 
-    const estadosValidos = ['borrador', 'enviada', 'parcial', 'recibida', 'cancelada'];
+    const estadosValidos = ['pendiente_aprobacion', 'borrador', 'enviada', 'parcial', 'recibida', 'cancelada', 'rechazada'];
 
     if (!estadosValidos.includes(estado)) {
       return res.status(400).json({
@@ -2567,6 +2567,147 @@ export const generarSolicitudesStockBajo = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al generar solicitudes de compra',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Aprobar una orden de compra (solo administradores)
+ */
+export const aprobarOrden = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const orden = await OrdenCompra.findByPk(id, {
+      include: [
+        { model: Usuario, as: 'creador', attributes: ['id', 'nombre'] },
+        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] }
+      ]
+    });
+
+    if (!orden) {
+      return res.status(404).json({ success: false, message: 'Orden no encontrada' });
+    }
+
+    if (orden.estado !== 'pendiente_aprobacion') {
+      return res.status(400).json({
+        success: false,
+        message: `No se puede aprobar una orden con estado "${orden.estado}". Solo se pueden aprobar órdenes pendientes de aprobación.`
+      });
+    }
+
+    await orden.update({
+      estado: 'borrador',
+      motivo_rechazo: null,
+      aprobado_por_id: req.usuario.id,
+      fecha_aprobacion: new Date()
+    });
+
+    // Notificar al creador de la orden
+    try {
+      await crearNotificacion({
+        usuario_id: orden.usuario_creador_id,
+        tipo: 'orden_estado_cambiado',
+        titulo: '✅ Orden de compra aprobada',
+        mensaje: `${req.usuario.nombre} aprobó tu orden ${orden.ticket_id}. Ya está lista para enviar al proveedor.`,
+        url: '/ordenes-compra',
+        datos_adicionales: {
+          orden_id: orden.id,
+          ticket_id: orden.ticket_id,
+          aprobado_por: req.usuario.nombre
+        }
+      });
+    } catch (notifError) {
+      console.error('Error al notificar aprobación:', notifError);
+    }
+
+    res.json({
+      success: true,
+      message: `Orden ${orden.ticket_id} aprobada exitosamente`,
+      data: { orden }
+    });
+
+  } catch (error) {
+    console.error('Error al aprobar orden:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al aprobar la orden',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Rechazar una orden de compra (solo administradores)
+ */
+export const rechazarOrden = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body;
+
+    if (!motivo || motivo.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere un motivo de rechazo'
+      });
+    }
+
+    const orden = await OrdenCompra.findByPk(id, {
+      include: [
+        { model: Usuario, as: 'creador', attributes: ['id', 'nombre'] },
+        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] }
+      ]
+    });
+
+    if (!orden) {
+      return res.status(404).json({ success: false, message: 'Orden no encontrada' });
+    }
+
+    if (orden.estado !== 'pendiente_aprobacion') {
+      return res.status(400).json({
+        success: false,
+        message: `No se puede rechazar una orden con estado "${orden.estado}". Solo se pueden rechazar órdenes pendientes de aprobación.`
+      });
+    }
+
+    await orden.update({
+      estado: 'rechazada',
+      motivo_rechazo: motivo.trim(),
+      aprobado_por_id: req.usuario.id,
+      fecha_aprobacion: new Date()
+    });
+
+    // Notificar al creador de la orden
+    try {
+      await crearNotificacion({
+        usuario_id: orden.usuario_creador_id,
+        tipo: 'orden_estado_cambiado',
+        titulo: '❌ Orden de compra rechazada',
+        mensaje: `${req.usuario.nombre} rechazó tu orden ${orden.ticket_id}. Motivo: ${motivo.trim()}`,
+        url: '/ordenes-compra',
+        datos_adicionales: {
+          orden_id: orden.id,
+          ticket_id: orden.ticket_id,
+          rechazado_por: req.usuario.nombre,
+          motivo: motivo.trim()
+        }
+      });
+    } catch (notifError) {
+      console.error('Error al notificar rechazo:', notifError);
+    }
+
+    res.json({
+      success: true,
+      message: `Orden ${orden.ticket_id} rechazada`,
+      data: { orden }
+    });
+
+  } catch (error) {
+    console.error('Error al rechazar orden:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al rechazar la orden',
       error: error.message
     });
   }

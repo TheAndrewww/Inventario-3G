@@ -118,6 +118,18 @@ const ordenesCompraService = {
   completarManualmente: async (id, motivo) => {
     const response = await api.put(`/ordenes-compra/${id}/completar`, { motivo });
     return response.data;
+  },
+
+  // Aprobar orden de compra (solo admin)
+  aprobarOrden: async (id) => {
+    const response = await api.put(`/ordenes-compra/${id}/aprobar`);
+    return response.data;
+  },
+
+  // Rechazar orden de compra (solo admin)
+  rechazarOrden: async (id, motivo) => {
+    const response = await api.put(`/ordenes-compra/${id}/rechazar`, { motivo });
+    return response.data;
   }
 };
 
