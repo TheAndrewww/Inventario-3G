@@ -92,6 +92,13 @@ const OrdenesCompraPage = () => {
   };
 
   const handleCantidadSolicitudChange = (solicitudId, nuevaCantidad) => {
+    if (nuevaCantidad === '' || nuevaCantidad === null || nuevaCantidad === undefined) {
+      setCantidadesSolicitudesEditadas(prev => ({
+        ...prev,
+        [solicitudId]: ''
+      }));
+      return;
+    }
     const cantidad = parseFloat(nuevaCantidad);
     if (isNaN(cantidad) || cantidad < 0) return;
 
@@ -2292,6 +2299,13 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
   };
 
   const handleCantidadChange = (articuloId, nuevaCantidad) => {
+    if (nuevaCantidad === '' || nuevaCantidad === null || nuevaCantidad === undefined) {
+      setCantidadesEditadas(prev => ({
+        ...prev,
+        [articuloId]: ''
+      }));
+      return;
+    }
     const cantidad = parseFloat(nuevaCantidad);
     if (isNaN(cantidad) || cantidad < 0) return;
 
