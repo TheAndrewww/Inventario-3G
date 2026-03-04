@@ -152,6 +152,37 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/articulos', articulosRoutes);
 app.use('/api/movimientos', movimientosRoutes);
+// Ruta de prueba de email (antes de auth)
+app.get('/api/test-email', async (req, res) => {
+    try {
+        const config = {
+            EMAIL_USER: process.env.EMAIL_USER || 'NO CONFIGURADO',
+            EMAIL_PASS: process.env.EMAIL_PASS ? `SI (${process.env.EMAIL_PASS.length} chars)` : 'NO CONFIGURADO',
+            BACKEND_URL: process.env.BACKEND_URL || 'NO CONFIGURADO'
+        };
+        console.log('\n🧪 [TEST EMAIL] Config:', JSON.stringify(config));
+        if (!process.env.EMAIL_PASS) {
+            return res.json({ success: false, message: 'EMAIL_PASS no configurado', config });
+        }
+        const nodemailer = (await import('nodemailer')).default;
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: process.env.EMAIL_USER || '3gvelarias@gmail.com', pass: process.env.EMAIL_PASS }
+        });
+        const info = await transporter.sendMail({
+            from: `"3G Test" <${process.env.EMAIL_USER || '3gvelarias@gmail.com'}>`,
+            to: 'direccion@3gvelarias.com, 3gvelarias@gmail.com',
+            subject: '🧪 Email de prueba - Inventario 3G',
+            html: '<h1>✅ Email de prueba exitoso</h1><p>Si ves este email, la configuración está correcta.</p>'
+        });
+        console.log('📧 [TEST] Email enviado:', info.messageId);
+        return res.json({ success: true, messageId: info.messageId, config });
+    } catch (error) {
+        console.error('❌ [TEST EMAIL] Error:', error.message);
+        return res.json({ success: false, error: error.message });
+    }
+});
+
 app.use('/api/categorias', categoriasRoutes);
 app.use('/api/ubicaciones', ubicacionesRoutes);
 app.use('/api/pedidos', pedidosRoutes);
@@ -171,45 +202,6 @@ app.use('/api/descontar-almacen', descontarAlmacenRoutes);
 app.use('/api/rollos-membrana', rollosMembrana);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
-
-// Ruta de prueba de email (inline para evitar imports)
-app.get('/api/test-email', async (req, res) => {
-    try {
-        const config = {
-            EMAIL_USER: process.env.EMAIL_USER || 'NO CONFIGURADO',
-            EMAIL_PASS: process.env.EMAIL_PASS ? `SI (${process.env.EMAIL_PASS.length} chars)` : 'NO CONFIGURADO',
-            BACKEND_URL: process.env.BACKEND_URL || 'NO CONFIGURADO',
-            NODE_ENV: process.env.NODE_ENV || 'no definido'
-        };
-        console.log('\n🧪 [TEST EMAIL] Config:', JSON.stringify(config));
-
-        if (!process.env.EMAIL_PASS) {
-            return res.json({ success: false, message: 'EMAIL_PASS no configurado en el servicio', config });
-        }
-
-        const nodemailer = (await import('nodemailer')).default;
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: process.env.EMAIL_USER || '3gvelarias@gmail.com',
-                pass: process.env.EMAIL_PASS
-            }
-        });
-
-        const info = await transporter.sendMail({
-            from: `"3G Test" <${process.env.EMAIL_USER || '3gvelarias@gmail.com'}>`,
-            to: 'direccion@3gvelarias.com, 3gvelarias@gmail.com',
-            subject: '🧪 Email de prueba - Inventario 3G',
-            html: '<h1>✅ Email de prueba exitoso</h1><p>Si ves este email, la configuraci\u00f3n est\u00e1 correcta.</p>'
-        });
-
-        console.log('📧 [TEST] Email enviado:', info.messageId);
-        return res.json({ success: true, messageId: info.messageId, config });
-    } catch (error) {
-        console.error('❌ [TEST EMAIL] Error:', error.message);
-        return res.json({ success: false, error: error.message });
-    }
-});
 
 // Manejo de errores
 app.use((err, req, res, next) => {
