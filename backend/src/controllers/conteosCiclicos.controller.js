@@ -1,4 +1,4 @@
-import { ConteoCiclico, ConteoArticulo, Articulo, Categoria, Ubicacion } from '../models/index.js';
+import { ConteoCiclico, ConteoArticulo, Articulo, Categoria, Ubicacion, Movimiento, DetalleMovimiento } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
@@ -335,6 +335,54 @@ export const registrarConteo = async (req, res) => {
             observaciones: observaciones || null,
             contado_at: new Date()
         });
+
+        // ---- ACTUALIZAR STOCK SI HAY DIFERENCIA ----
+        if (diferencia !== 0) {
+            const transaction = await sequelize.transaction();
+            try {
+                // Determinar tipo de ajuste
+                const tipoAjuste = diferencia > 0 ? 'ajuste_entrada' : 'ajuste_salida';
+                const cantidadAbsoluta = Math.abs(diferencia);
+
+                // Generar ticket_id para el movimiento
+                const fecha = new Date();
+                const ddmmyy = fecha.toISOString().slice(2, 10).replace(/-/g, '').match(/.{2}/g).reverse().join('');
+                const hhmm = fecha.toTimeString().slice(0, 5).replace(':', '');
+                const ticket_id = `CC-${ddmmyy}-${hhmm}-${articulo_id}`;
+
+                // Crear movimiento de ajuste
+                const movimiento = await Movimiento.create({
+                    ticket_id,
+                    tipo: tipoAjuste,
+                    usuario_id: req.usuario?.id || null,
+                    observaciones: `Ajuste por conteo cíclico. Sistema: ${cantidadSistema} ${articulo.unidad}, Físico: ${cantidadFisica} ${articulo.unidad}. Diferencia: ${diferencia > 0 ? '+' : ''}${diferencia} ${articulo.unidad}${observaciones ? '. Obs: ' + observaciones : ''}`,
+                    estado: 'completado'
+                }, { transaction });
+
+                // Crear detalle del movimiento
+                await DetalleMovimiento.create({
+                    movimiento_id: movimiento.id,
+                    articulo_id: parseInt(articulo_id),
+                    cantidad: cantidadAbsoluta,
+                    stock_anterior: cantidadSistema,
+                    stock_nuevo: cantidadFisica
+                }, { transaction });
+
+                // Actualizar stock del artículo
+                await articulo.update({
+                    stock_actual: cantidadFisica
+                }, { transaction });
+
+                await transaction.commit();
+                console.log(`📦 Conteo cíclico - Stock actualizado: ${articulo.nombre} (${cantidadSistema} → ${cantidadFisica}, dif: ${diferencia > 0 ? '+' : ''}${diferencia})`);
+            } catch (stockError) {
+                await transaction.rollback();
+                console.error('Error al actualizar stock por conteo cíclico:', stockError);
+                // No fallar el conteo si el stock no se pudo actualizar
+                // pero registrar el error
+            }
+        }
+        // ---- FIN ACTUALIZAR STOCK ----
 
         // Actualizar contador
         const nuevosContados = conteo.articulos_contados + 1;
