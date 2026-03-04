@@ -5,7 +5,8 @@ import {
     registrarConteo,
     adelantarConteo,
     getReportes,
-    getResumen
+    getResumen,
+    aplicarConteosAnteriores
 } from '../controllers/conteosCiclicos.controller.js';
 import { verificarToken } from '../middleware/auth.middleware.js';
 
@@ -55,5 +56,12 @@ router.post('/:id/contar', verificarToken, registrarConteo);
  * @access  Private
  */
 router.get('/:id/resumen', verificarToken, getResumen);
+
+/**
+ * @route   POST /api/conteos-ciclicos/aplicar-anteriores
+ * @desc    Aplicar retroactivamente los conteos anteriores que no actualizaron stock
+ * @access  Private (Admin)
+ */
+router.post('/aplicar-anteriores', verificarToken, aplicarConteosAnteriores);
 
 export default router;

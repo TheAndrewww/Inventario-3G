@@ -626,11 +626,134 @@ export const getResumen = async (req, res) => {
     }
 };
 
+// Aplicar retroactivamente los conteos anteriores que no actualizaron stock
+export const aplicarConteosAnteriores = async (req, res) => {
+    const transaction = await sequelize.transaction();
+    try {
+        // Obtener TODOS los conteo_articulos con diferencia != 0
+        const conteosConDiferencia = await ConteoArticulo.findAll({
+            where: {
+                diferencia: { [Op.ne]: 0 }
+            },
+            include: [{
+                model: Articulo,
+                as: 'articulo',
+                attributes: ['id', 'nombre', 'stock_actual', 'unidad']
+            }],
+            order: [['contado_at', 'ASC']] // Orden cronológico para aplicar en secuencia
+        });
+
+        if (conteosConDiferencia.length === 0) {
+            await transaction.rollback();
+            return res.json({
+                success: true,
+                message: 'No hay conteos con diferencias pendientes de aplicar',
+                data: { ajustados: 0 }
+            });
+        }
+
+        // Agrupar por artículo — solo nos importa el ÚLTIMO conteo de cada artículo
+        // ya que ese tiene la cantidad física más reciente
+        const ultimoConteoPorArticulo = {};
+        conteosConDiferencia.forEach(ca => {
+            ultimoConteoPorArticulo[ca.articulo_id] = ca;
+        });
+
+        const ajustes = [];
+        let ajustados = 0;
+
+        for (const articuloId of Object.keys(ultimoConteoPorArticulo)) {
+            const conteoArt = ultimoConteoPorArticulo[articuloId];
+            const articulo = conteoArt.articulo;
+
+            if (!articulo) continue;
+
+            const stockActualDB = parseFloat(articulo.stock_actual);
+            const cantidadFisica = parseFloat(conteoArt.cantidad_fisica);
+
+            // Solo ajustar si el stock actual del DB todavía no coincide con el conteo físico
+            if (stockActualDB === cantidadFisica) {
+                ajustes.push({
+                    articulo: articulo.nombre,
+                    estado: 'ya_coincide',
+                    stock_db: stockActualDB,
+                    conteo_fisico: cantidadFisica
+                });
+                continue;
+            }
+
+            const diferencia = cantidadFisica - stockActualDB;
+            const tipoAjuste = diferencia > 0 ? 'ajuste_entrada' : 'ajuste_salida';
+
+            // Generar ticket_id
+            const fecha = new Date();
+            const ddmmyy = fecha.toISOString().slice(2, 10).replace(/-/g, '').match(/.{2}/g).reverse().join('');
+            const hhmm = fecha.toTimeString().slice(0, 5).replace(':', '');
+            const ticket_id = `CC-FIX-${ddmmyy}-${hhmm}-${articuloId}`;
+
+            // Crear movimiento
+            const movimiento = await Movimiento.create({
+                ticket_id,
+                tipo: tipoAjuste,
+                usuario_id: req.usuario?.id || null,
+                observaciones: `Ajuste retroactivo por conteo cíclico (fix). Stock DB: ${stockActualDB} ${articulo.unidad}, Conteo físico: ${cantidadFisica} ${articulo.unidad}. Conteo original: ${new Date(conteoArt.contado_at).toLocaleDateString('es-MX')}`,
+                estado: 'completado'
+            }, { transaction });
+
+            await DetalleMovimiento.create({
+                movimiento_id: movimiento.id,
+                articulo_id: parseInt(articuloId),
+                cantidad: Math.abs(diferencia),
+                stock_anterior: stockActualDB,
+                stock_nuevo: cantidadFisica
+            }, { transaction });
+
+            await Articulo.update(
+                { stock_actual: cantidadFisica },
+                { where: { id: articuloId }, transaction }
+            );
+
+            ajustes.push({
+                articulo: articulo.nombre,
+                estado: 'ajustado',
+                stock_anterior: stockActualDB,
+                stock_nuevo: cantidadFisica,
+                diferencia,
+                ticket_id
+            });
+            ajustados++;
+        }
+
+        await transaction.commit();
+
+        console.log(`📦 Conteos retroactivos aplicados: ${ajustados} artículos ajustados`);
+
+        res.json({
+            success: true,
+            message: `Se ajustaron ${ajustados} artículos de ${Object.keys(ultimoConteoPorArticulo).length} con diferencias`,
+            data: {
+                ajustados,
+                total_con_diferencia: Object.keys(ultimoConteoPorArticulo).length,
+                detalle: ajustes
+            }
+        });
+    } catch (error) {
+        await transaction.rollback();
+        console.error('Error al aplicar conteos anteriores:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al aplicar conteos anteriores',
+            error: error.message
+        });
+    }
+};
+
 export default {
     getConteoHoy,
     getArticulosPendientes,
     registrarConteo,
     adelantarConteo,
     getReportes,
-    getResumen
+    getResumen,
+    aplicarConteosAnteriores
 };
