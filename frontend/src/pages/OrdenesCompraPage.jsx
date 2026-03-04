@@ -983,7 +983,7 @@ const OrdenesCompraPage = () => {
                     </tr>
                   ) : (
                     filteredOrdenes.map((orden) => (
-                      <tr key={orden.id} className="hover:bg-gray-50">
+                      <tr key={orden.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleVerDetalle(orden)}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-medium text-gray-900">{orden.ticket_id}</div>
                         </td>
@@ -1011,14 +1011,7 @@ const OrdenesCompraPage = () => {
                             year: 'numeric'
                           })}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleVerDetalle(orden)}
-                            className="text-red-700 hover:text-red-900 mr-3"
-                            title="Ver detalle"
-                          >
-                            <Eye size={18} />
-                          </button>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => generarPDFOrden(orden)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors text-sm"
