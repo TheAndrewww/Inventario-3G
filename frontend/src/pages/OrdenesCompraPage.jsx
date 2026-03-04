@@ -2230,7 +2230,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
 
           <div className="flex gap-3 justify-between mt-6">
             <div className="flex gap-3">
-              {esBorrador && onEditarOrden && (
+              {esAdmin && esBorrador && onEditarOrden && (
                 <Button
                   onClick={() => onEditarOrden(orden)}
                   variant="secondary"
@@ -2263,7 +2263,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                   </button>
                 </>
               )}
-              {esBorrador && onEnviarOrden && (
+              {esAdmin && esBorrador && onEnviarOrden && (
                 <button
                   onClick={() => onEnviarOrden(orden.id)}
                   className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
@@ -2272,7 +2272,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                   Enviar Orden
                 </button>
               )}
-              {puedeAnularOrdenes && orden.estado !== 'cancelada' && orden.estado !== 'rechazada' && (
+              {esAdmin && puedeAnularOrdenes && orden.estado !== 'cancelada' && orden.estado !== 'rechazada' && orden.estado !== 'pendiente_aprobacion' && (
                 <Button
                   onClick={() => onAbrirModalAnular(orden)}
                   variant="danger"
@@ -2294,7 +2294,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
 
           <div className="flex gap-3 justify-between mt-6">
             <div className="flex gap-3">
-              {esBorrador && onEditarOrden && (
+              {esAdmin && esBorrador && onEditarOrden && (
                 <Button
                   onClick={() => onEditarOrden(orden)}
                   variant="secondary"
@@ -2327,7 +2327,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                   </button>
                 </>
               )}
-              {esBorrador && onEnviarOrden && (
+              {esAdmin && esBorrador && onEnviarOrden && (
                 <button
                   onClick={() => onEnviarOrden(orden.id)}
                   className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
@@ -2336,7 +2336,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                   Enviar Orden
                 </button>
               )}
-              {puedeAnularOrdenes && orden.estado !== 'cancelada' && orden.estado !== 'rechazada' && (
+              {esAdmin && puedeAnularOrdenes && orden.estado !== 'cancelada' && orden.estado !== 'rechazada' && orden.estado !== 'pendiente_aprobacion' && (
                 <Button
                   onClick={() => onAbrirModalAnular(orden)}
                   variant="danger"

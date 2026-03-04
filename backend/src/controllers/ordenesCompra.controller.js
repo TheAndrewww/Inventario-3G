@@ -889,7 +889,7 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
       ticket_id,
       proveedor_id: proveedor_id || null,
       usuario_creador_id: usuario_id,
-      estado: 'borrador',
+      estado: 'pendiente_aprobacion',
       total_estimado: totalEstimado,
       observaciones: observaciones || `Orden creada desde ${solicitudes.length} solicitud(es) pendiente(s)`,
       fecha_llegada_estimada: fecha_llegada_estimada || null
