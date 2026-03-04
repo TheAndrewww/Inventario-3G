@@ -168,8 +168,11 @@ app.get('/api/test-email', async (req, res) => {
     try {
         const nodemailer = (await import('nodemailer')).default;
         const transporter = nodemailer.createTransport({
-            service: 'gmail',
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true,
             auth: { user: process.env.EMAIL_USER || '3gvelarias@gmail.com', pass: process.env.EMAIL_PASS },
+            family: 4,
             connectionTimeout: 10000,
             greetingTimeout: 10000,
             socketTimeout: 10000

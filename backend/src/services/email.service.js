@@ -6,11 +6,19 @@ let _transporter = null;
 function getTransporter() {
     if (!_transporter) {
         _transporter = nodemailer.createTransport({
-            service: 'gmail',
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true,
             auth: {
                 user: process.env.EMAIL_USER || '3gvelarias@gmail.com',
                 pass: process.env.EMAIL_PASS
-            }
+            },
+            tls: { rejectUnauthorized: false },
+            // Forzar IPv4 (Railway no soporta IPv6 a Gmail)
+            family: 4,
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 15000
         });
     }
     return _transporter;
