@@ -2292,7 +2292,7 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
 
   const calcularTotal = () => {
     return articulosAgrupados.reduce((total, item) => {
-      const cantidad = cantidadesEditadas[item.articulo?.id] || item.cantidad_total;
+      const cantidad = item.articulo?.id in cantidadesEditadas ? cantidadesEditadas[item.articulo?.id] : item.cantidad_total;
       const costo = parseFloat(item.articulo?.costo_unitario || 0);
       return total + (cantidad * costo);
     }, 0);
@@ -2498,7 +2498,7 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
                 <tbody className="bg-white divide-y divide-gray-200">
                   {articulosAgrupados.map((item, index) => {
                     const costo = parseFloat(item.articulo?.costo_unitario || 0);
-                    const cantidadActual = cantidadesEditadas[item.articulo?.id] || item.cantidad_total;
+                    const cantidadActual = item.articulo?.id in cantidadesEditadas ? cantidadesEditadas[item.articulo?.id] : item.cantidad_total;
                     const subtotal = cantidadActual * costo;
 
                     return (
