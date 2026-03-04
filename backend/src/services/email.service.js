@@ -1,14 +1,20 @@
 import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
 
-// Configurar transportador Gmail
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER || '3gvelarias@gmail.com',
-        pass: process.env.EMAIL_PASS
+// Lazy transporter - solo se crea cuando se necesita
+let _transporter = null;
+function getTransporter() {
+    if (!_transporter) {
+        _transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER || '3gvelarias@gmail.com',
+                pass: process.env.EMAIL_PASS
+            }
+        });
     }
-});
+    return _transporter;
+}
 
 // Destinatarios de notificaciones de órdenes
 const ADMIN_EMAILS = [
@@ -206,7 +212,7 @@ export const enviarEmailAprobacion = async (orden) => {
             html
         };
 
-        const info = await transporter.sendMail(mailOptions);
+        const info = await getTransporter().sendMail(mailOptions);
         console.log(`📧 Email de aprobación enviado: ${info.messageId}`);
         return true;
     } catch (error) {
@@ -259,7 +265,7 @@ export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprob
 </body>
 </html>`;
 
-        await transporter.sendMail({
+        await getTransporter().sendMail({
             from: `"3G Inventario" <${process.env.EMAIL_USER || '3gvelarias@gmail.com'}>`,
             to: creadorEmail,
             subject: `${esAprobada ? '✅' : '❌'} Orden ${orden.ticket_id} ${esAprobada ? 'aprobada' : 'rechazada'}`,
