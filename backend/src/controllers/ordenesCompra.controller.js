@@ -13,7 +13,7 @@ import {
 } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
-import { notificarPorRol } from './notificaciones.controller.js';
+import { notificarPorRol, crearNotificacion } from './notificaciones.controller.js';
 import admin from '../config/firebase-admin.js'; // Importar Firebase Admin
 
 /**
@@ -964,6 +964,25 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
         }
       ]
     });
+
+    // Notificar a administradores que hay una orden pendiente de aprobación
+    try {
+      await notificarPorRol({
+        roles: ['administrador'],
+        tipo: 'orden_compra_creada',
+        titulo: '🔔 Orden de compra pendiente de aprobación',
+        mensaje: `${req.usuario.nombre} creó la orden ${ticket_id} por $${totalEstimado.toFixed(2)} desde ${solicitudes.length} solicitud(es) y requiere tu aprobación`,
+        url: '/ordenes-compra',
+        datos_adicionales: {
+          orden_id: ordenCompra.id,
+          ticket_id: ticket_id,
+          creador: req.usuario.nombre,
+          total: totalEstimado
+        }
+      });
+    } catch (notifError) {
+      console.error('Error al enviar notificación:', notifError);
+    }
 
     res.status(201).json({
       success: true,
