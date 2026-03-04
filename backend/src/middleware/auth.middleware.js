@@ -129,7 +129,7 @@ export const esEncargadoOAdmin = (req, res, next) => {
  * (Almacen, Encargado, Administrador)
  */
 export const accesoInventario = (req, res, next) => {
-    return verificarRol('almacen', 'encargado', 'administrador')(req, res, next);
+    return verificarRol('almacen', 'compras', 'encargado', 'administrador')(req, res, next);
 };
 
 /**
