@@ -15,6 +15,7 @@ import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { notificarPorRol, crearNotificacion } from './notificaciones.controller.js';
 import admin from '../config/firebase-admin.js'; // Importar Firebase Admin
+import { enviarEmailAprobacion, enviarEmailEstadoOrden, verificarTokenAprobacion } from '../services/email.service.js';
 
 /**
  * Crear una nueva orden de compra
@@ -182,7 +183,13 @@ export const crearOrdenCompra = async (req, res) => {
       });
     } catch (notifError) {
       console.error('Error al enviar notificación:', notifError);
-      // No fallar la creación de la orden si falla la notificación
+    }
+
+    // Enviar email de aprobación a admins
+    try {
+      await enviarEmailAprobacion(ordenCompleta);
+    } catch (emailError) {
+      console.error('Error al enviar email:', emailError);
     }
 
     // --- INTEGRACIÓN IMPRESIÓN AUTOMÁTICA ---
@@ -982,6 +989,13 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
       });
     } catch (notifError) {
       console.error('Error al enviar notificación:', notifError);
+    }
+
+    // Enviar email de aprobación a admins
+    try {
+      await enviarEmailAprobacion(ordenCompleta);
+    } catch (emailError) {
+      console.error('Error al enviar email:', emailError);
     }
 
     res.status(201).json({
@@ -2641,6 +2655,13 @@ export const aprobarOrden = async (req, res) => {
       console.error('Error al notificar aprobación:', notifError);
     }
 
+    // Enviar email al creador
+    try {
+      await enviarEmailEstadoOrden(orden, 'aprobada', null, req.usuario.nombre);
+    } catch (emailError) {
+      console.error('Error al enviar email de aprobación:', emailError);
+    }
+
     res.json({
       success: true,
       message: `Orden ${orden.ticket_id} aprobada exitosamente`,
@@ -2716,6 +2737,13 @@ export const rechazarOrden = async (req, res) => {
       console.error('Error al notificar rechazo:', notifError);
     }
 
+    // Enviar email al creador
+    try {
+      await enviarEmailEstadoOrden(orden, 'rechazada', motivo.trim(), req.usuario.nombre);
+    } catch (emailError) {
+      console.error('Error al enviar email de rechazo:', emailError);
+    }
+
     res.json({
       success: true,
       message: `Orden ${orden.ticket_id} rechazada`,
@@ -2731,3 +2759,87 @@ export const rechazarOrden = async (req, res) => {
     });
   }
 };
+
+/**
+ * Aprobar orden de compra por email (link directo con token)
+ */
+export const aprobarPorEmail = async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).send(paginaResultado('Error', 'Token no proporcionado', false));
+    }
+
+    const decoded = verificarTokenAprobacion(token);
+    if (!decoded || decoded.accion !== 'aprobar') {
+      return res.status(400).send(paginaResultado('Error', 'El enlace ha expirado o es inválido. Ingresa al sistema para aprobar la orden.', false));
+    }
+
+    const orden = await OrdenCompra.findByPk(decoded.orden_id, {
+      include: [
+        { model: Usuario, as: 'creador', attributes: ['id', 'nombre', 'email'] },
+        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] }
+      ]
+    });
+
+    if (!orden) {
+      return res.status(404).send(paginaResultado('Error', 'Orden no encontrada', false));
+    }
+
+    if (orden.estado !== 'pendiente_aprobacion') {
+      return res.send(paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado === 'borrador' ? 'aprobada' : orden.estado}.`, orden.estado === 'borrador'));
+    }
+
+    await orden.update({
+      estado: 'borrador',
+      motivo_rechazo: null,
+      fecha_aprobacion: new Date()
+    });
+
+    // Notificar al creador
+    try {
+      await crearNotificacion({
+        usuario_id: orden.usuario_creador_id,
+        tipo: 'orden_estado_cambiado',
+        titulo: '✅ Orden de compra aprobada',
+        mensaje: `Tu orden ${orden.ticket_id} ha sido aprobada por email. Ya está lista para enviar al proveedor.`,
+        url: '/ordenes-compra'
+      });
+    } catch (e) { /* ignore */ }
+
+    try {
+      await enviarEmailEstadoOrden(orden, 'aprobada', null, 'Administrador (por email)');
+    } catch (e) { /* ignore */ }
+
+    return res.send(paginaResultado('✅ Orden Aprobada', `La orden ${orden.ticket_id} ha sido aprobada exitosamente. Ya está lista para enviar al proveedor.`, true));
+
+  } catch (error) {
+    console.error('Error al aprobar por email:', error);
+    return res.status(500).send(paginaResultado('Error', 'Ocurrió un error al procesar la aprobación.', false));
+  }
+};
+
+// Página HTML de resultado para approve-by-email
+function paginaResultado(titulo, mensaje, exito) {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${titulo} - 3G Inventario</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;">
+    <div style="max-width:420px;text-align:center;padding:40px;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+        <div style="font-size:64px;margin-bottom:16px;">${exito ? '✅' : '❌'}</div>
+        <h1 style="font-size:24px;color:#111827;margin:0 0 8px;">${titulo}</h1>
+        <p style="font-size:14px;color:#6b7280;margin:0 0 24px;">${mensaje}</p>
+        <a href="${process.env.FRONTEND_URL || 'https://inventario-3-g.vercel.app'}/ordenes-compra" 
+           style="display:inline-block;background:#991b1b;color:white;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">
+            Ir al Sistema
+        </a>
+    </div>
+</body>
+</html>`;
+}

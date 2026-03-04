@@ -19,13 +19,17 @@ import {
   completarOrdenManualmente,
   generarSolicitudesStockBajo,
   aprobarOrden,
-  rechazarOrden
+  rechazarOrden,
+  aprobarPorEmail
 } from '../controllers/ordenesCompra.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
-// Todas las rutas requieren autenticación
+// Ruta pública para aprobar por email (usa token propio en query string)
+router.get('/ordenes-compra/aprobar-email', aprobarPorEmail);
+
+// Todas las rutas a partir de aquí requieren autenticación
 router.use(verificarToken);
 
 // Rutas de órdenes de compra
