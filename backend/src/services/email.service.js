@@ -197,6 +197,10 @@ const generarEmailAprobacion = (orden, tokenAprobar, frontendUrl) => {
  */
 export const enviarEmailAprobacion = async (orden) => {
     try {
+        console.log('📧 [EMAIL] Iniciando envío de email de aprobación para orden:', orden?.ticket_id);
+        console.log('📧 [EMAIL] EMAIL_USER:', process.env.EMAIL_USER ? 'configurado' : 'NO configurado');
+        console.log('📧 [EMAIL] EMAIL_PASS:', process.env.EMAIL_PASS ? 'configurado (' + process.env.EMAIL_PASS.length + ' chars)' : 'NO configurado');
+
         if (!process.env.EMAIL_PASS) {
             console.log('⚠️ EMAIL_PASS no configurado, no se puede enviar email');
             return false;
@@ -212,12 +216,50 @@ export const enviarEmailAprobacion = async (orden) => {
             html
         };
 
+        console.log('📧 [EMAIL] Enviando a:', mailOptions.to);
         const info = await getTransporter().sendMail(mailOptions);
-        console.log(`📧 Email de aprobación enviado: ${info.messageId}`);
+        console.log(`📧 [EMAIL] ✅ Email enviado exitosamente: ${info.messageId}`);
         return true;
     } catch (error) {
-        console.error('❌ Error al enviar email de aprobación:', error.message);
+        console.error('❌ [EMAIL] Error al enviar email de aprobación:', error.message);
+        console.error('❌ [EMAIL] Stack:', error.stack);
         return false;
+    }
+};
+
+/**
+ * Enviar un email de prueba para verificar configuración
+ */
+export const testEmail = async (req, res) => {
+    try {
+        const config = {
+            EMAIL_USER: process.env.EMAIL_USER ? 'configurado' : 'NO configurado',
+            EMAIL_PASS: process.env.EMAIL_PASS ? `configurado (${process.env.EMAIL_PASS.length} chars)` : 'NO configurado',
+            BACKEND_URL: process.env.BACKEND_URL || 'NO configurado'
+        };
+
+        console.log('🧪 [TEST EMAIL] Config:', config);
+
+        if (!process.env.EMAIL_PASS) {
+            return res.json({ success: false, message: 'EMAIL_PASS no configurado', config });
+        }
+
+        const info = await getTransporter().sendMail({
+            from: `"3G Inventario - Test" <${process.env.EMAIL_USER || '3gvelarias@gmail.com'}>`,
+            to: ADMIN_EMAILS.join(', '),
+            subject: '🧪 Email de prueba - Inventario 3G',
+            html: '<h1>✅ Email de prueba exitoso</h1><p>Si ves este email, la configuración está correcta.</p>'
+        });
+
+        return res.json({ success: true, messageId: info.messageId, config });
+    } catch (error) {
+        console.error('❌ [TEST EMAIL] Error:', error.message);
+        return res.json({
+            success: false, error: error.message, config: {
+                EMAIL_USER: process.env.EMAIL_USER ? 'configurado' : 'NO',
+                EMAIL_PASS: process.env.EMAIL_PASS ? 'configurado' : 'NO'
+            }
+        });
     }
 };
 
