@@ -1,3 +1,5 @@
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first'); // Forzar IPv4 (Railway no soporta IPv6)
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
