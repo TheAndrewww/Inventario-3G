@@ -154,32 +154,35 @@ app.use('/api/articulos', articulosRoutes);
 app.use('/api/movimientos', movimientosRoutes);
 // Ruta de prueba de email (antes de auth)
 app.get('/api/test-email', async (req, res) => {
+    const config = {
+        EMAIL_USER: process.env.EMAIL_USER || 'NO CONFIGURADO',
+        EMAIL_PASS: process.env.EMAIL_PASS ? `SI (${process.env.EMAIL_PASS.length} chars)` : 'NO CONFIGURADO',
+        BACKEND_URL: process.env.BACKEND_URL || 'NO CONFIGURADO'
+    };
+
+    // Sin ?send=1, solo mostrar config
+    if (req.query.send !== '1') {
+        return res.json({ message: 'Agrega ?send=1 a la URL para enviar email de prueba', config });
+    }
+
     try {
-        const config = {
-            EMAIL_USER: process.env.EMAIL_USER || 'NO CONFIGURADO',
-            EMAIL_PASS: process.env.EMAIL_PASS ? `SI (${process.env.EMAIL_PASS.length} chars)` : 'NO CONFIGURADO',
-            BACKEND_URL: process.env.BACKEND_URL || 'NO CONFIGURADO'
-        };
-        console.log('\n🧪 [TEST EMAIL] Config:', JSON.stringify(config));
-        if (!process.env.EMAIL_PASS) {
-            return res.json({ success: false, message: 'EMAIL_PASS no configurado', config });
-        }
         const nodemailer = (await import('nodemailer')).default;
         const transporter = nodemailer.createTransport({
             service: 'gmail',
-            auth: { user: process.env.EMAIL_USER || '3gvelarias@gmail.com', pass: process.env.EMAIL_PASS }
+            auth: { user: process.env.EMAIL_USER || '3gvelarias@gmail.com', pass: process.env.EMAIL_PASS },
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 10000
         });
         const info = await transporter.sendMail({
             from: `"3G Test" <${process.env.EMAIL_USER || '3gvelarias@gmail.com'}>`,
             to: 'direccion@3gvelarias.com, 3gvelarias@gmail.com',
             subject: '🧪 Email de prueba - Inventario 3G',
-            html: '<h1>✅ Email de prueba exitoso</h1><p>Si ves este email, la configuración está correcta.</p>'
+            html: '<h1>✅ Funciona!</h1><p>La configuración de email está correcta.</p>'
         });
-        console.log('📧 [TEST] Email enviado:', info.messageId);
         return res.json({ success: true, messageId: info.messageId, config });
     } catch (error) {
-        console.error('❌ [TEST EMAIL] Error:', error.message);
-        return res.json({ success: false, error: error.message });
+        return res.json({ success: false, error: error.message, config });
     }
 });
 
