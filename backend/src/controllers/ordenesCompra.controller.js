@@ -185,12 +185,8 @@ export const crearOrdenCompra = async (req, res) => {
       console.error('Error al enviar notificación:', notifError);
     }
 
-    // Enviar email de aprobación a admins
-    try {
-      await enviarEmailAprobacion(ordenCompleta);
-    } catch (emailError) {
-      console.error('Error al enviar email:', emailError);
-    }
+    // Enviar email de aprobación a admins (fire-and-forget, no bloquear respuesta)
+    enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
 
     // --- INTEGRACIÓN IMPRESIÓN AUTOMÁTICA ---
     try {
@@ -991,12 +987,8 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
       console.error('Error al enviar notificación:', notifError);
     }
 
-    // Enviar email de aprobación a admins
-    try {
-      await enviarEmailAprobacion(ordenCompleta);
-    } catch (emailError) {
-      console.error('Error al enviar email:', emailError);
-    }
+    // Enviar email de aprobación a admins (fire-and-forget)
+    enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
 
     res.status(201).json({
       success: true,
@@ -2655,12 +2647,8 @@ export const aprobarOrden = async (req, res) => {
       console.error('Error al notificar aprobación:', notifError);
     }
 
-    // Enviar email al creador
-    try {
-      await enviarEmailEstadoOrden(orden, 'aprobada', null, req.usuario.nombre);
-    } catch (emailError) {
-      console.error('Error al enviar email de aprobación:', emailError);
-    }
+    // Enviar email al creador (fire-and-forget)
+    enviarEmailEstadoOrden(orden, 'aprobada', null, req.usuario.nombre).catch(e => console.error('Error email:', e.message));
 
     res.json({
       success: true,
@@ -2737,12 +2725,8 @@ export const rechazarOrden = async (req, res) => {
       console.error('Error al notificar rechazo:', notifError);
     }
 
-    // Enviar email al creador
-    try {
-      await enviarEmailEstadoOrden(orden, 'rechazada', motivo.trim(), req.usuario.nombre);
-    } catch (emailError) {
-      console.error('Error al enviar email de rechazo:', emailError);
-    }
+    // Enviar email al creador (fire-and-forget)
+    enviarEmailEstadoOrden(orden, 'rechazada', motivo.trim(), req.usuario.nombre).catch(e => console.error('Error email:', e.message));
 
     res.json({
       success: true,
@@ -2808,9 +2792,7 @@ export const aprobarPorEmail = async (req, res) => {
       });
     } catch (e) { /* ignore */ }
 
-    try {
-      await enviarEmailEstadoOrden(orden, 'aprobada', null, 'Administrador (por email)');
-    } catch (e) { /* ignore */ }
+    enviarEmailEstadoOrden(orden, 'aprobada', null, 'Administrador (por email)').catch(() => { });
 
     return res.send(paginaResultado('✅ Orden Aprobada', `La orden ${orden.ticket_id} ha sido aprobada exitosamente. Ya está lista para enviar al proveedor.`, true));
 
