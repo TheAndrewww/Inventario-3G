@@ -25,13 +25,13 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/procesamiento-masivo',
       icon: Wand2,
       label: 'Procesamiento IA',
-      roles: ['administrador', 'almacen', 'encargado']
+      roles: ['administrador', 'encargado']
     },
     {
       path: '/pedido',
       icon: ShoppingCart,
       label: 'Pedido Actual',
-      roles: ['administrador', 'diseñador', 'almacen']
+      roles: ['administrador', 'diseñador']
     },
     {
       path: '/pedidos-pendientes',
@@ -43,7 +43,7 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/monitor-pedidos',
       icon: BarChart3,
       label: 'Monitor Pedidos',
-      roles: ['administrador', 'almacen', 'encargado']
+      roles: ['administrador', 'encargado']
     },
     {
       path: '/recibir-pedidos',
@@ -73,19 +73,19 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/renta-herramientas',
       icon: Wrench,
       label: 'Renta Herramientas',
-      roles: ['administrador', 'encargado']
+      roles: ['administrador', 'encargado', 'almacen']
     },
     {
       path: '/calendario',
       icon: Calendar,
       label: 'Calendario',
-      roles: ['administrador', 'diseñador', 'almacen', 'ventas', 'compras', 'encargado']
+      roles: ['administrador', 'diseñador', 'ventas', 'compras', 'encargado']
     },
     {
       path: '/mi-equipo',
       icon: User,
       label: 'Mi Equipo',
-      roles: ['administrador', 'diseñador', 'almacen', 'ventas', 'compras', 'encargado', 'operador']
+      roles: ['administrador', 'diseñador', 'ventas', 'compras', 'encargado', 'operador']
     },
     {
       path: '/produccion',
@@ -121,13 +121,13 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/descontar-almacen',
       icon: PackageOpen,
       label: 'Descuento Almacén',
-      roles: ['administrador', 'almacen', 'encargado']
+      roles: ['administrador', 'encargado']
     },
     {
       path: '/rollos-membrana',
       icon: Layers,
       label: 'Rollos Membrana',
-      roles: ['administrador', 'almacen', 'encargado']
+      roles: ['administrador', 'encargado']
     },
     {
       path: '/reportes',
