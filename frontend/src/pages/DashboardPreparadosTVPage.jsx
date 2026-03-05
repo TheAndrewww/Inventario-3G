@@ -38,17 +38,33 @@ const DashboardPreparadosTVPage = () => {
     const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
     const toggleOrientacion = () => setOrientacion(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
 
-    // Proyectos PREPARADOS (instalacion) excluyendo pausados
+    // Helper: detectar proyectos MTO/GTIA con timeline simplificado
+    const usaTimelineSimplificado = (p) => {
+        const tipo = p.tipo_proyecto?.toUpperCase();
+        return tipo === 'GTIA' || (tipo === 'MTO' && !p.es_extensivo);
+    };
+
+    // Proyectos PREPARADOS: etapa 'instalacion' O proyectos MTO/GTIA simplificados activos
     const proyectosPreparados = useMemo(() =>
         sortProyectosPorUrgencia(
-            proyectos.filter(p => p.etapa_actual === 'instalacion' && !p.pausado)
+            proyectos.filter(p =>
+                !p.pausado && (
+                    p.etapa_actual === 'instalacion' ||
+                    (usaTimelineSimplificado(p) && p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
+                )
+            )
         ),
         [proyectos]
     );
 
-    // Proyectos congelados (pausados) que estén en preparado
+    // Proyectos congelados (pausados) que estén en preparado o sean MTO/GTIA
     const proyectosCongelados = useMemo(() =>
-        proyectos.filter(p => p.pausado && p.etapa_actual === 'instalacion'),
+        proyectos.filter(p =>
+            p.pausado && (
+                p.etapa_actual === 'instalacion' ||
+                (usaTimelineSimplificado(p) && p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
+            )
+        ),
         [proyectos]
     );
 

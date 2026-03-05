@@ -38,14 +38,21 @@ const DashboardProduccionTVPage = () => {
     const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
     const toggleOrientacion = () => setOrientacion(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
 
-    // Proyectos EN PRODUCCIÓN (diseño, compras, produccion) excluyendo preparados y pausados
+    // Helper: detectar proyectos MTO/GTIA con timeline simplificado (van directo a Preparados)
+    const usaTimelineSimplificado = (p) => {
+        const tipo = p.tipo_proyecto?.toUpperCase();
+        return tipo === 'GTIA' || (tipo === 'MTO' && !p.es_extensivo);
+    };
+
+    // Proyectos EN PRODUCCIÓN (diseño, compras, produccion) excluyendo preparados, pausados y MTO/GTIA simplificados
     const proyectosActivos = useMemo(() =>
         sortProyectosPorUrgencia(
             proyectos.filter(p =>
                 p.etapa_actual !== 'completado' &&
                 p.etapa_actual !== 'pendiente' &&
                 p.etapa_actual !== 'instalacion' &&
-                !p.pausado
+                !p.pausado &&
+                !usaTimelineSimplificado(p)
             )
         ),
         [proyectos]
