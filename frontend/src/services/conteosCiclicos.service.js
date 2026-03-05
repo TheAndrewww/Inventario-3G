@@ -43,6 +43,12 @@ const conteosCiclicosService = {
     getResumen: async (conteoId) => {
         const response = await api.get(`${BASE_URL}/${conteoId}/resumen`);
         return response.data;
+    },
+
+    // Obtener IDs de artículos en el conteo activo de hoy
+    getArticulosEnConteoActivo: async () => {
+        const response = await api.get(`${BASE_URL}/articulos-activos`);
+        return response.data;
     }
 };
 

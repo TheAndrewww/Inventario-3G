@@ -6,6 +6,7 @@ import movimientosService from '../services/movimientos.service';
 import categoriasService from '../services/categorias.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import herramientasRentaService from '../services/herramientasRenta.service';
+import conteosCiclicosService from '../services/conteosCiclicos.service';
 import { Loader, Modal, AuthenticatedImage } from '../components/common';
 import ArticuloDetalleModal from '../components/articulos/ArticuloDetalleModal';
 import ArticuloFormModal from '../components/articulos/ArticuloFormModal';
@@ -128,10 +129,14 @@ const InventarioPage = () => {
   const esAdministrador = user?.rol === 'administrador';
   const esAlmacen = user?.rol === 'almacen';
 
+  // Estado para artículos en conteo cíclico activo
+  const [articulosEnConteo, setArticulosEnConteo] = useState(new Set());
+
   useEffect(() => {
     fetchArticulos();
     fetchCategorias();
     fetchUbicaciones();
+    fetchArticulosConteo();
   }, []);
 
   const fetchArticulos = async () => {
@@ -164,6 +169,19 @@ const InventarioPage = () => {
       setUbicaciones(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error al cargar ubicaciones:', error);
+    }
+  };
+
+  // Cargar IDs de artículos en el conteo cíclico activo
+  const fetchArticulosConteo = async () => {
+    try {
+      const response = await conteosCiclicosService.getArticulosEnConteoActivo();
+      if (response.success && response.data?.articulo_ids) {
+        setArticulosEnConteo(new Set(response.data.articulo_ids));
+      }
+    } catch (error) {
+      // Silencioso - no bloquea la funcionalidad principal
+      console.log('Conteo cíclico no disponible');
     }
   };
 
@@ -1600,6 +1618,9 @@ const InventarioPage = () => {
                     // Detectar si el artículo está pendiente de revisión (creado por almacén)
                     const esPendienteRevision = item.pendiente_revision === true;
 
+                    // Detectar si el artículo está en el conteo cíclico activo
+                    const esEnConteo = articulosEnConteo.has(item.id);
+
                     return (
                       <tr
                         key={item.id}
@@ -1608,7 +1629,9 @@ const InventarioPage = () => {
                           ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
                           : esUbicacionRevisar
                             ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
-                            : 'hover:bg-gray-50'
+                            : esEnConteo
+                              ? 'bg-blue-50 hover:bg-blue-100 border-l-4 border-blue-400'
+                              : 'hover:bg-gray-50'
                           }`}
                       >
                         {/* Artículo con imagen */}
@@ -1771,6 +1794,9 @@ const InventarioPage = () => {
                     // Detectar si es el artículo encontrado por código
                     const esArticuloEncontrado = articuloEncontradoPorCodigo === item.id;
 
+                    // Detectar si el artículo está en el conteo cíclico activo
+                    const esEnConteo = articulosEnConteo.has(item.id);
+
                     return (
                       <React.Fragment key={item.id}>
                         <tr
@@ -1780,7 +1806,9 @@ const InventarioPage = () => {
                               ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
                               : esUbicacionRevisar
                                 ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
-                                : 'hover:bg-gray-50'
+                                : esEnConteo
+                                  ? 'bg-blue-50 hover:bg-blue-100 border-l-4 border-blue-400'
+                                  : 'hover:bg-gray-50'
                             }`}
                         >
                           {/* Artículo con imagen y botón expandir */}
@@ -1849,11 +1877,10 @@ const InventarioPage = () => {
 
                           {/* Stock Disponible */}
                           <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
-                            <span className={`font-medium ${
-                              (item.tipo_herramienta_migrado?.unidades_disponibles || 0) === 0
-                                ? 'text-red-600'
-                                : 'text-green-600'
-                            }`}>
+                            <span className={`font-medium ${(item.tipo_herramienta_migrado?.unidades_disponibles || 0) === 0
+                              ? 'text-red-600'
+                              : 'text-green-600'
+                              }`}>
                               {item.tipo_herramienta_migrado?.unidades_disponibles || 0}
                             </span>
                           </td>
@@ -1963,12 +1990,11 @@ const InventarioPage = () => {
                                   </div>
                                   <div>
                                     <span className="text-gray-500">Estado:</span>
-                                    <p className={`font-medium ${
-                                      unidad.estado === 'buen_estado' || unidad.estado === 'disponible' ? 'text-green-600' :
+                                    <p className={`font-medium ${unidad.estado === 'buen_estado' || unidad.estado === 'disponible' ? 'text-green-600' :
                                       unidad.estado === 'estado_regular' || unidad.estado === 'en_reparacion' ? 'text-yellow-600' :
-                                      unidad.estado === 'mal_estado' || unidad.estado === 'perdida' || unidad.estado === 'baja' ? 'text-red-600' :
-                                      unidad.estado === 'asignada' ? 'text-blue-600' :
-                                      'text-gray-600'
+                                        unidad.estado === 'mal_estado' || unidad.estado === 'perdida' || unidad.estado === 'baja' ? 'text-red-600' :
+                                          unidad.estado === 'asignada' ? 'text-blue-600' :
+                                            'text-gray-600'
                                       }`}>
                                       {unidad.estado === 'buen_estado' ? '🟢 Buen estado' :
                                         unidad.estado === 'estado_regular' ? '🟡 Estado regular' :
@@ -2076,6 +2102,9 @@ const InventarioPage = () => {
                 // Detectar si el artículo está pendiente de revisión (creado por almacén)
                 const esPendienteRevision = item.pendiente_revision === true;
 
+                // Detectar si el artículo está en el conteo cíclico activo
+                const esEnConteo = articulosEnConteo.has(item.id);
+
                 return (
                   <div
                     key={`consumible-${item.id}`}
@@ -2084,7 +2113,9 @@ const InventarioPage = () => {
                       ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
                       : esUbicacionRevisar
                         ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
-                        : 'hover:bg-gray-50'
+                        : esEnConteo
+                          ? 'bg-blue-50 hover:bg-blue-100 border-l-4 border-blue-400'
+                          : 'hover:bg-gray-50'
                       }`}
                   >
                     <div className="flex gap-3">
@@ -2317,11 +2348,10 @@ const InventarioPage = () => {
                             </div>
                             <div className="flex items-center gap-1">
                               <span className="text-gray-500 text-[10px]">Disponible:</span>
-                              <span className={`font-bold ${
-                                (item.tipo_herramienta_migrado?.unidades_disponibles || 0) === 0
-                                  ? 'text-red-600'
-                                  : 'text-green-600'
-                              }`}>
+                              <span className={`font-bold ${(item.tipo_herramienta_migrado?.unidades_disponibles || 0) === 0
+                                ? 'text-red-600'
+                                : 'text-green-600'
+                                }`}>
                                 {item.tipo_herramienta_migrado?.unidades_disponibles || 0}
                               </span>
                               <span className="text-gray-400 text-[10px]">unidades</span>
@@ -2419,12 +2449,11 @@ const InventarioPage = () => {
                                 </div>
                                 <div>
                                   <span className="text-gray-500">Estado:</span>
-                                  <span className={`ml-1 font-medium ${
-                                    unidad.estado === 'buen_estado' || unidad.estado === 'disponible' ? 'text-green-600' :
+                                  <span className={`ml-1 font-medium ${unidad.estado === 'buen_estado' || unidad.estado === 'disponible' ? 'text-green-600' :
                                     unidad.estado === 'estado_regular' || unidad.estado === 'en_reparacion' ? 'text-yellow-600' :
-                                    unidad.estado === 'mal_estado' || unidad.estado === 'perdida' || unidad.estado === 'baja' ? 'text-red-600' :
-                                    unidad.estado === 'asignada' ? 'text-blue-600' :
-                                    'text-gray-600'
+                                      unidad.estado === 'mal_estado' || unidad.estado === 'perdida' || unidad.estado === 'baja' ? 'text-red-600' :
+                                        unidad.estado === 'asignada' ? 'text-blue-600' :
+                                          'text-gray-600'
                                     }`}>
                                     {unidad.estado === 'buen_estado' ? '🟢 Buen estado' :
                                       unidad.estado === 'estado_regular' ? '🟡 Estado regular' :

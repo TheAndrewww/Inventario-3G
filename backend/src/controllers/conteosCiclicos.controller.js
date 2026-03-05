@@ -748,6 +748,90 @@ export const aplicarConteosAnteriores = async (req, res) => {
     }
 };
 
+// Obtener IDs de artículos asignados al conteo activo de hoy
+export const getArticulosEnConteoActivo = async (req, res) => {
+    try {
+        const fechaHoy = getFechaHoy();
+
+        // Buscar conteo activo de hoy
+        const conteo = await ConteoCiclico.findOne({
+            where: { fecha: fechaHoy },
+            order: [['secuencia', 'DESC']]
+        });
+
+        if (!conteo) {
+            return res.json({ success: true, data: { articulo_ids: [], conteo_id: null } });
+        }
+
+        // Obtener IDs de artículos ya contados en esta sesión
+        const articulosContados = await ConteoArticulo.findAll({
+            where: { conteo_ciclico_id: conteo.id },
+            attributes: ['articulo_id']
+        });
+        const idsContados = articulosContados.map(ca => ca.articulo_id);
+
+        // Obtener todos los artículos con su último conteo
+        const todosConteos = await ConteoArticulo.findAll({
+            attributes: ['articulo_id', [sequelize.fn('MAX', sequelize.col('contado_at')), 'ultimo_conteo']],
+            group: ['articulo_id']
+        });
+        const contadoMap = {};
+        todosConteos.forEach(c => {
+            contadoMap[c.articulo_id] = c.get('ultimo_conteo');
+        });
+
+        // Obtener todos los artículos activos
+        const todosArticulos = await Articulo.findAll({
+            where: { activo: true },
+            attributes: ['id'],
+            order: [['id', 'ASC']]
+        });
+
+        // Seleccionar los asignados para hoy
+        const nuncaContados = [];
+        const yaContadosList = [];
+
+        todosArticulos.forEach(art => {
+            if (idsContados.includes(art.id)) return;
+            if (!contadoMap[art.id]) {
+                nuncaContados.push(art.id);
+            } else {
+                yaContadosList.push({ id: art.id, ultimoConteo: contadoMap[art.id] });
+            }
+        });
+
+        yaContadosList.sort((a, b) => new Date(a.ultimoConteo) - new Date(b.ultimoConteo));
+
+        const faltantes = conteo.total_asignados - idsContados.length;
+        const seleccionados = [];
+
+        for (const id of nuncaContados) {
+            if (seleccionados.length >= faltantes) break;
+            seleccionados.push(id);
+        }
+        for (const item of yaContadosList) {
+            if (seleccionados.length >= faltantes) break;
+            seleccionados.push(item.id);
+        }
+
+        // Incluir también los ya contados hoy como parte del conteo activo
+        const todosDelConteo = [...new Set([...seleccionados, ...idsContados])];
+
+        res.json({
+            success: true,
+            data: {
+                articulo_ids: todosDelConteo,
+                conteo_id: conteo.id,
+                pendientes: seleccionados.length,
+                contados: idsContados.length
+            }
+        });
+    } catch (error) {
+        console.error('Error obteniendo artículos en conteo activo:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 export default {
     getConteoHoy,
     getArticulosPendientes,
@@ -755,5 +839,6 @@ export default {
     adelantarConteo,
     getReportes,
     getResumen,
-    aplicarConteosAnteriores
+    aplicarConteosAnteriores,
+    getArticulosEnConteoActivo
 };

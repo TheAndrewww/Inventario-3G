@@ -6,7 +6,8 @@ import {
     adelantarConteo,
     getReportes,
     getResumen,
-    aplicarConteosAnteriores
+    aplicarConteosAnteriores,
+    getArticulosEnConteoActivo
 } from '../controllers/conteosCiclicos.controller.js';
 import { verificarToken } from '../middleware/auth.middleware.js';
 
@@ -18,6 +19,13 @@ const router = express.Router();
  * @access  Private
  */
 router.get('/hoy', verificarToken, getConteoHoy);
+
+/**
+ * @route   GET /api/conteos-ciclicos/articulos-activos
+ * @desc    Obtener IDs de artículos en el conteo activo de hoy
+ * @access  Private
+ */
+router.get('/articulos-activos', verificarToken, getArticulosEnConteoActivo);
 
 /**
  * @route   POST /api/conteos-ciclicos/adelantar
