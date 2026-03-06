@@ -76,6 +76,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
   // Detectar si es rol almacén (campos limitados)
   const esAlmacen = user?.rol === 'almacen';
 
+  // Almacén en modo edición: solo puede cambiar nombre y foto
+  const esEdicionLimitada = esAlmacen && isEdit;
+
   // Cargar catálogos y datos del artículo si es edición
   useEffect(() => {
     if (isOpen) {
@@ -636,8 +639,18 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       let articuloCreado = null;
 
       if (isEdit) {
-        console.log('🔄 Actualizando artículo:', articulo.id, dataToSend);
-        await articulosService.update(articulo.id, dataToSend);
+        console.log('🔄 Actualizando artículo:', articulo.id);
+
+        if (esEdicionLimitada) {
+          // Almacén solo puede actualizar nombre y foto
+          const dataLimitada = {
+            nombre: formData.nombre.trim().toUpperCase()
+          };
+          await articulosService.update(articulo.id, dataLimitada);
+        } else {
+          await articulosService.update(articulo.id, dataToSend);
+        }
+
         articuloId = articulo.id;
         console.log('✅ Artículo actualizado exitosamente');
         toast.success('Artículo actualizado exitosamente');
@@ -759,7 +772,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={isEdit ? 'Editar Artículo' : (modoIngreso ? 'Ingreso de Inventario' : 'Nuevo Artículo')}
+      title={isEdit ? (esEdicionLimitada ? 'Editar Nombre y Foto' : 'Editar Artículo') : (modoIngreso ? 'Ingreso de Inventario' : 'Nuevo Artículo')}
       closeOnBackdropClick={false}
     >
       <form onSubmit={modoIngreso ? handleIngresoInventario : handleSubmit} className="space-y-4">
@@ -932,6 +945,45 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                 placeholder="MOTIVO DEL INGRESO, PROVEEDOR, ETC..."
                 style={{ textTransform: 'uppercase' }}
               />
+            </div>
+          </>
+        ) : esEdicionLimitada ? (
+          /* Modo Edición Limitada (Almacén): Solo Nombre y Foto */
+          <>
+            {/* Nombre */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nombre <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                name="nombre"
+                value={formData.nombre}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                placeholder="Ej: TORNILLO HEXAGONAL 1/4"
+                style={{ textTransform: 'uppercase' }}
+                required
+              />
+            </div>
+
+            {/* Fotografía */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Fotografía del Artículo
+              </label>
+              <ImageUpload
+                currentImage={currentImageUrl}
+                onImageSelect={handleImageSelect}
+                onImageRemove={handleImageRemove}
+                disabled={loading}
+              />
+            </div>
+
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                ⚠️ Solo puedes modificar el nombre y la foto del artículo.
+              </p>
             </div>
           </>
         ) : (
@@ -1462,8 +1514,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             type="submit"
             disabled={loading}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 ${modoIngreso
-                ? 'bg-blue-600 hover:bg-blue-700'
-                : 'bg-red-700 hover:bg-red-800'
+              ? 'bg-blue-600 hover:bg-blue-700'
+              : 'bg-red-700 hover:bg-red-800'
               } text-white rounded-lg transition-colors disabled:opacity-50`}
           >
             {loading ? (

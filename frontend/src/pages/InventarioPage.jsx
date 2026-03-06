@@ -122,7 +122,7 @@ const InventarioPage = () => {
 
   // Verificar permisos según el rol
   const puedeCrearArticulos = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
-  const puedeEditarArticulos = ['administrador', 'encargado'].includes(user?.rol); // Almacén NO puede editar
+  const puedeEditarArticulos = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
   const puedeAgregarAlPedido = ['administrador', 'diseñador'].includes(user?.rol);
   const puedeGestionarInventario = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
   const puedeRegistrarSalida = ['administrador', 'almacen'].includes(user?.rol); // Almacén puede registrar salidas
