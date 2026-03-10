@@ -1,14 +1,32 @@
-import { Categoria, Articulo } from '../models/index.js';
+import { Categoria, Articulo, Almacen, AlmacenCategoria } from '../models/index.js';
 
 /**
  * GET /api/categorias
  * Obtener todas las categorías
+ * Query params: almacen_id (opcional) - filtrar por almacén
  */
 export const getCategorias = async (req, res) => {
     try {
-        const categorias = await Categoria.findAll({
-            order: [['nombre', 'ASC']]
-        });
+        const { almacen_id } = req.query;
+
+        let categorias;
+        if (almacen_id) {
+            // Obtener categorías vinculadas a un almacén específico
+            categorias = await Categoria.findAll({
+                include: [{
+                    model: Almacen,
+                    as: 'almacenes',
+                    where: { id: almacen_id },
+                    attributes: [],
+                    through: { attributes: [] }
+                }],
+                order: [['nombre', 'ASC']]
+            });
+        } else {
+            categorias = await Categoria.findAll({
+                order: [['nombre', 'ASC']]
+            });
+        }
 
         res.status(200).json({
             success: true,

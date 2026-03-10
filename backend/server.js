@@ -113,6 +113,7 @@ import produccionRoutes from './src/routes/produccion.routes.js';
 import campanaControlRoutes from './src/routes/campanaControlRoutes.js';
 import conteosCiclicosRoutes from './src/routes/conteosCiclicos.routes.js';
 import descontarAlmacenRoutes from './src/routes/descontarAlmacen.routes.js';
+import almacenesRoutes from './src/routes/almacenes.routes.js';
 import rollosMembrana from './src/routes/rollosMembrana.routes.js';
 
 // Ruta de prueba
@@ -145,6 +146,7 @@ app.get('/', (req, res) => {
             campanaControl: '/api/campana-control',
             conteosCiclicos: '/api/conteos-ciclicos',
             descontarAlmacen: '/api/descontar-almacen',
+            almacenes: '/api/almacenes',
             rollosMembrana: '/api/rollos-membrana'
         }
     });
@@ -207,6 +209,7 @@ app.use('/api/produccion', produccionRoutes);
 app.use('/api/campana-control', campanaControlRoutes);
 app.use('/api/conteos-ciclicos', conteosCiclicosRoutes);
 app.use('/api/descontar-almacen', descontarAlmacenRoutes);
+app.use('/api/almacenes', almacenesRoutes);
 app.use('/api/rollos-membrana', rollosMembrana);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
@@ -455,6 +458,63 @@ const startServer = async () => {
 
             // Auto-migración de herramientas de renta
             await ejecutarAutoMigracion();
+
+            // Verificar/crear tabla de almacenes
+            console.log('🔍 Verificando tabla almacenes...');
+            try {
+                const [almacenesTableCheck] = await sequelize.query(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'almacenes'"
+                );
+                const almacenesTableExists = parseInt(almacenesTableCheck[0].count) > 0;
+
+                if (!almacenesTableExists) {
+                    console.log('🔄 Creando sistema de almacenes...');
+
+                    const fs = await import('fs');
+                    const path = await import('path');
+                    const { fileURLToPath } = await import('url');
+
+                    const __filename = fileURLToPath(import.meta.url);
+                    const __dirname = path.dirname(__filename);
+                    const migrationPath = path.join(__dirname, 'migrations', 'create-tabla-almacenes.sql');
+
+                    try {
+                        const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+                        // Split by semicolons and execute each statement
+                        const statements = migrationSQL
+                            .split(';')
+                            .map(s => s.trim())
+                            .filter(s => s.length > 0 && !s.startsWith('--'));
+
+                        for (const stmt of statements) {
+                            try {
+                                await sequelize.query(stmt);
+                            } catch (stmtErr) {
+                                console.log(`  ⚠️ Statement skipped: ${stmtErr.message.substring(0, 100)}`);
+                            }
+                        }
+                        console.log('✅ Sistema de almacenes creado exitosamente');
+                    } catch (migrationError) {
+                        console.error('⚠️ Error al crear tabla almacenes:', migrationError.message);
+                    }
+                } else {
+                    console.log('✅ Tabla almacenes ya existe');
+
+                    // Verificar si almacen_id existe en ubicaciones
+                    const [colCheck] = await sequelize.query(
+                        "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'ubicaciones' AND column_name = 'almacen_id'"
+                    );
+                    if (parseInt(colCheck[0].count) === 0) {
+                        console.log('🔄 Agregando columna almacen_id a ubicaciones...');
+                        await sequelize.query('ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS almacen_id INTEGER REFERENCES almacenes(id)');
+                        // Poblar almacen_id
+                        await sequelize.query('UPDATE ubicaciones u SET almacen_id = a.id FROM almacenes a WHERE u.almacen = a.nombre AND u.almacen_id IS NULL');
+                        console.log('✅ Columna almacen_id agregada y poblada');
+                    }
+                }
+            } catch (almacenesError) {
+                console.error('⚠️ Error con tabla almacenes:', almacenesError.message);
+            }
 
             // Migración: agregar tipos faltantes al enum de notificaciones
             try {

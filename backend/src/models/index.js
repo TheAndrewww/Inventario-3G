@@ -1,5 +1,7 @@
 import { sequelize } from '../config/database.js';
 import Usuario from './Usuario.js';
+import Almacen from './Almacen.js';
+import AlmacenCategoria from './AlmacenCategoria.js';
 import Categoria from './Categoria.js';
 import Ubicacion from './Ubicacion.js';
 import Proveedor from './Proveedor.js';
@@ -26,6 +28,36 @@ import RolloMembrana from './RolloMembrana.js';
 import ConteoArticulo from './ConteoArticulo.js';
 
 // Definir relaciones
+
+// ========== RELACIONES ALMACÉN ==========
+
+// Almacén - Ubicación (Uno a Muchos)
+Almacen.hasMany(Ubicacion, {
+    foreignKey: 'almacen_id',
+    as: 'ubicaciones'
+});
+Ubicacion.belongsTo(Almacen, {
+    foreignKey: 'almacen_id',
+    as: 'almacen_ref'
+});
+
+// Almacén - Categoría (Muchos a Muchos a través de AlmacenCategoria)
+Almacen.belongsToMany(Categoria, {
+    through: AlmacenCategoria,
+    foreignKey: 'almacen_id',
+    otherKey: 'categoria_id',
+    as: 'categorias'
+});
+Categoria.belongsToMany(Almacen, {
+    through: AlmacenCategoria,
+    foreignKey: 'categoria_id',
+    otherKey: 'almacen_id',
+    as: 'almacenes'
+});
+
+// AlmacenCategoria - relaciones directas
+AlmacenCategoria.belongsTo(Almacen, { foreignKey: 'almacen_id', as: 'almacen' });
+AlmacenCategoria.belongsTo(Categoria, { foreignKey: 'categoria_id', as: 'categoria' });
 
 // Artículo - Categoría (Muchos a Uno)
 Articulo.belongsTo(Categoria, {
@@ -563,6 +595,8 @@ Articulo.hasMany(RolloMembrana, {
 export {
     sequelize,
     Usuario,
+    Almacen,
+    AlmacenCategoria,
     Categoria,
     Ubicacion,
     Proveedor,
@@ -592,6 +626,8 @@ export {
 export default {
     sequelize,
     Usuario,
+    Almacen,
+    AlmacenCategoria,
     Categoria,
     Ubicacion,
     Proveedor,
@@ -610,7 +646,6 @@ export default {
     Proyecto,
     ProduccionProyecto,
     TipoHerramientaRenta,
-    UnidadHerramientaRenta,
     UnidadHerramientaRenta,
     HistorialAsignacionHerramienta,
     CampanaControl,

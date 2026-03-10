@@ -1,10 +1,11 @@
 import api from './api';
 
 const categoriasService = {
-  // Obtener todas las categorías
-  async getAll() {
+  // Obtener todas las categorías (opcionalmente filtradas por almacén)
+  async getAll(almacenId = null) {
     try {
-      const response = await api.get('/categorias');
+      const params = almacenId ? `?almacen_id=${almacenId}` : '';
+      const response = await api.get(`/categorias${params}`);
       return response.data.data?.categorias || response.data.data || [];
     } catch (error) {
       throw error.response?.data || { message: 'Error al obtener categorías' };

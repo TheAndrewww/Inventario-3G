@@ -1,10 +1,11 @@
 import api from './api';
 
 const ubicacionesService = {
-  // Obtener todas las ubicaciones
-  async getAll() {
+  // Obtener todas las ubicaciones (opcionalmente filtradas por almacén)
+  async getAll(almacenId = null) {
     try {
-      const response = await api.get('/ubicaciones');
+      const params = almacenId ? `?almacen_id=${almacenId}` : '';
+      const response = await api.get(`/ubicaciones${params}`);
       return response.data.data?.ubicaciones || response.data.data || [];
     } catch (error) {
       throw error.response?.data || { message: 'Error al obtener ubicaciones' };

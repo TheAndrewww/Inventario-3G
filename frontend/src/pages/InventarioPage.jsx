@@ -5,6 +5,7 @@ import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
 import categoriasService from '../services/categorias.service';
 import ubicacionesService from '../services/ubicaciones.service';
+import almacenesService from '../services/almacenes.service';
 import herramientasRentaService from '../services/herramientasRenta.service';
 import conteosCiclicosService from '../services/conteosCiclicos.service';
 import { Loader, Modal, AuthenticatedImage } from '../components/common';
@@ -49,7 +50,8 @@ const InventarioPage = () => {
   const [herramientasEncontradasPorCodigo, setHerramientasEncontradasPorCodigo] = useState([]); // Herramientas encontradas por búsqueda parcial
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState(null);
-  const [almacenSeleccionado, setAlmacenSeleccionado] = useState('todos'); // Nuevo: filtro de almacén
+  const [almacenSeleccionado, setAlmacenSeleccionado] = useState('todos'); // Filtro de almacén (ID o 'todos')
+  const [almacenesData, setAlmacenesData] = useState([]); // Almacenes desde la API
   const [tabActivo, setTabActivo] = useState('consumibles'); // Nuevo: 'consumibles' o 'herramientas'
   const [mostrarCategorias, setMostrarCategorias] = useState(false);
   const [mostrarUbicaciones, setMostrarUbicaciones] = useState(false);
@@ -134,10 +136,25 @@ const InventarioPage = () => {
 
   useEffect(() => {
     fetchArticulos();
+    fetchAlmacenes();
     fetchCategorias();
     fetchUbicaciones();
     fetchArticulosConteo();
   }, []);
+
+  // Cuando cambia el almacén seleccionado, recargar categorías y ubicaciones filtradas
+  useEffect(() => {
+    if (almacenSeleccionado !== 'todos') {
+      fetchCategorias(almacenSeleccionado);
+      fetchUbicaciones(almacenSeleccionado);
+    } else {
+      fetchCategorias();
+      fetchUbicaciones();
+    }
+    // Limpiar filtros de categoría y ubicación al cambiar almacén
+    setCategoriaSeleccionada(null);
+    setUbicacionSeleccionada(null);
+  }, [almacenSeleccionado]);
 
   const fetchArticulos = async () => {
     try {
@@ -154,18 +171,27 @@ const InventarioPage = () => {
     }
   };
 
-  const fetchCategorias = async () => {
+  const fetchAlmacenes = async () => {
     try {
-      const data = await categoriasService.getAll();
+      const data = await almacenesService.getAll();
+      setAlmacenesData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error al cargar almacenes:', error);
+    }
+  };
+
+  const fetchCategorias = async (almacenId = null) => {
+    try {
+      const data = await categoriasService.getAll(almacenId);
       setCategorias(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error al cargar categorías:', error);
     }
   };
 
-  const fetchUbicaciones = async () => {
+  const fetchUbicaciones = async (almacenId = null) => {
     try {
-      const data = await ubicacionesService.getAll();
+      const data = await ubicacionesService.getAll(almacenId);
       setUbicaciones(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error al cargar ubicaciones:', error);
@@ -185,14 +211,10 @@ const InventarioPage = () => {
     }
   };
 
-  // Obtener lista única de almacenes desde las ubicaciones ACTIVAS
+  // Lista de almacenes disponibles (desde la API)
   const almacenesDisponibles = React.useMemo(() => {
-    const almacenes = ubicaciones
-      .filter(u => u.activo !== false) // Solo ubicaciones activas
-      .map(u => u.almacen)
-      .filter(a => a && a.trim() !== '');
-    return [...new Set(almacenes)].sort();
-  }, [ubicaciones]);
+    return almacenesData.filter(a => a.activo !== false);
+  }, [almacenesData]);
 
   // Buscar herramienta por código único cuando se detecta el patrón
   useEffect(() => {
@@ -291,7 +313,7 @@ const InventarioPage = () => {
           const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
           const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
           const matchesAlmacen = almacenSeleccionado === 'todos' ||
-            (item.ubicacion && item.ubicacion.almacen === almacenSeleccionado);
+            (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
 
           return matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen;
         })
@@ -341,7 +363,7 @@ const InventarioPage = () => {
 
         // Filtrar por almacén
         const matchesAlmacen = almacenSeleccionado === 'todos' ||
-          (item.ubicacion && item.ubicacion.almacen === almacenSeleccionado);
+          (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
 
         // Filtrar por tipo según el tab activo
         const estaEnTabCorrecto = tabActivo === 'consumibles'
@@ -1004,28 +1026,16 @@ const InventarioPage = () => {
       return;
     }
 
-    // Verificar si ya existe
-    if (almacenesDisponibles.includes(nuevoNombreAlmacen.trim())) {
-      toast.error('Ya existe un almacén con ese nombre');
-      return;
-    }
-
     try {
       setLoadingAlmacenes(true);
-
-      // Crear una ubicación genérica con este almacén
-      await ubicacionesService.create({
-        codigo: `${nuevoNombreAlmacen.trim().toUpperCase().replace(/\s+/g, '-')}-GRAL`,
-        almacen: nuevoNombreAlmacen.trim(),
-        pasillo: null,
-        estante: null,
-        nivel: null,
-        descripcion: `Ubicación general del almacén ${nuevoNombreAlmacen.trim()}`
+      await almacenesService.create({
+        nombre: nuevoNombreAlmacen.trim(),
+        descripcion: `Almacén ${nuevoNombreAlmacen.trim()}`
       });
 
       toast.success(`Almacén "${nuevoNombreAlmacen.trim()}" creado exitosamente`);
       setNuevoNombreAlmacen('');
-      await fetchUbicaciones(); // Recargar ubicaciones
+      await fetchAlmacenes();
     } catch (error) {
       console.error('Error al crear almacén:', error);
       toast.error(error.message || 'Error al crear el almacén');
@@ -1034,41 +1044,28 @@ const InventarioPage = () => {
     }
   };
 
-  const handleRenombrarAlmacen = async (almacenActual) => {
+  const handleRenombrarAlmacen = async (almacenObj) => {
     if (!nuevoNombreAlmacen.trim()) {
       toast.error('El nombre del almacén no puede estar vacío');
       return;
     }
 
-    if (almacenActual === nuevoNombreAlmacen.trim()) {
+    if (almacenObj.nombre === nuevoNombreAlmacen.trim()) {
       toast.error('El nuevo nombre es igual al actual');
-      return;
-    }
-
-    // Verificar si el nuevo nombre ya existe
-    if (almacenesDisponibles.includes(nuevoNombreAlmacen.trim())) {
-      toast.error('Ya existe un almacén con ese nombre');
       return;
     }
 
     try {
       setLoadingAlmacenes(true);
+      await almacenesService.update(almacenObj.id, {
+        nombre: nuevoNombreAlmacen.trim()
+      });
 
-      // Obtener todas las ubicaciones de este almacén
-      const ubicacionesDelAlmacen = ubicaciones.filter(u => u.almacen === almacenActual);
-
-      // Actualizar cada ubicación
-      for (const ubicacion of ubicacionesDelAlmacen) {
-        await ubicacionesService.update(ubicacion.id, {
-          ...ubicacion,
-          almacen: nuevoNombreAlmacen.trim()
-        });
-      }
-
-      toast.success(`Almacén renombrado de "${almacenActual}" a "${nuevoNombreAlmacen.trim()}"`);
+      toast.success(`Almacén renombrado de "${almacenObj.nombre}" a "${nuevoNombreAlmacen.trim()}"`);
       setAlmacenEditando(null);
       setNuevoNombreAlmacen('');
-      await fetchUbicaciones(); // Recargar ubicaciones
+      await fetchAlmacenes();
+      await fetchUbicaciones();
     } catch (error) {
       console.error('Error al renombrar almacén:', error);
       toast.error(error.message || 'Error al renombrar el almacén');
@@ -1077,27 +1074,18 @@ const InventarioPage = () => {
     }
   };
 
-  const handleEliminarAlmacen = async (nombreAlmacen) => {
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar el almacén "${nombreAlmacen}"?\n\nEsto desactivará todas las ubicaciones de este almacén.`)) {
+  const handleEliminarAlmacen = async (almacenObj) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar el almacén "${almacenObj.nombre}"?\n\nEsto desvinculará todas las ubicaciones de este almacén.`)) {
       return;
     }
 
     try {
       setLoadingAlmacenes(true);
+      await almacenesService.delete(almacenObj.id, true);
 
-      // Obtener todas las ubicaciones de este almacén
-      const ubicacionesDelAlmacen = ubicaciones.filter(u => u.almacen === nombreAlmacen);
-
-      // Desactivar cada ubicación
-      for (const ubicacion of ubicacionesDelAlmacen) {
-        await ubicacionesService.update(ubicacion.id, {
-          ...ubicacion,
-          activo: false
-        });
-      }
-
-      toast.success(`Almacén "${nombreAlmacen}" eliminado exitosamente`);
-      await fetchUbicaciones(); // Recargar ubicaciones
+      toast.success(`Almacén "${almacenObj.nombre}" eliminado exitosamente`);
+      await fetchAlmacenes();
+      await fetchUbicaciones();
     } catch (error) {
       console.error('Error al eliminar almacén:', error);
       toast.error(error.message || 'Error al eliminar el almacén');
@@ -1315,8 +1303,8 @@ const InventarioPage = () => {
             >
               <option value="todos">📦 Todos los almacenes</option>
               {almacenesDisponibles.map((almacen) => (
-                <option key={almacen} value={almacen}>
-                  🏢 {almacen}
+                <option key={almacen.id} value={almacen.id}>
+                  🏢 {almacen.nombre}
                 </option>
               ))}
             </select>
@@ -3344,12 +3332,11 @@ const InventarioPage = () => {
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {almacenesDisponibles.map((almacen) => {
-                  const ubicacionesCount = ubicaciones.filter(u => u.almacen === almacen && u.activo !== false).length;
-                  const estaEditando = almacenEditando === almacen;
+                  const estaEditando = almacenEditando === almacen.id;
 
                   return (
                     <div
-                      key={almacen}
+                      key={almacen.id}
                       className={`border rounded-lg p-4 transition-all ${estaEditando ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'
                         }`}
                     >
@@ -3393,14 +3380,16 @@ const InventarioPage = () => {
                         // Modo vista
                         <div className="flex items-center justify-between">
                           <div>
-                            <h4 className="font-semibold text-gray-900">🏢 {almacen}</h4>
-                            <p className="text-sm text-gray-500">{ubicacionesCount} ubicaciones</p>
+                            <h4 className="font-semibold text-gray-900">🏢 {almacen.nombre}</h4>
+                            <p className="text-sm text-gray-500">
+                              {almacen.ubicaciones_count || 0} ubicaciones · {almacen.categorias?.length || 0} categorías · {almacen.articulos_count || 0} artículos
+                            </p>
                           </div>
                           <div className="flex gap-2">
                             <button
                               onClick={() => {
-                                setAlmacenEditando(almacen);
-                                setNuevoNombreAlmacen(almacen);
+                                setAlmacenEditando(almacen.id);
+                                setNuevoNombreAlmacen(almacen.nombre);
                               }}
                               disabled={loadingAlmacenes}
                               className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center gap-1"

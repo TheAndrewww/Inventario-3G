@@ -1,4 +1,4 @@
-import { Articulo, Ubicacion, Movimiento, DetalleMovimiento } from '../models/index.js';
+import { Articulo, Ubicacion, Movimiento, DetalleMovimiento, Almacen } from '../models/index.js';
 import { sequelize } from '../config/database.js';
 import { Op } from 'sequelize';
 import { generarTicketID } from '../utils/ticket-generator.js';
@@ -6,19 +6,38 @@ import { generarTicketID } from '../utils/ticket-generator.js';
 // Obtener lista de almacenes disponibles
 export const getAlmacenes = async (req, res) => {
     try {
-        const [almacenes] = await sequelize.query(
-            `SELECT DISTINCT u.almacen, COUNT(a.id) as total_articulos
-             FROM ubicaciones u
-             LEFT JOIN articulos a ON a.ubicacion_id = u.id AND a.activo = true
-             WHERE u.activo = true
-             GROUP BY u.almacen
-             HAVING COUNT(a.id) > 0
-             ORDER BY u.almacen`
-        );
+        const almacenes = await Almacen.findAll({
+            where: { activo: true },
+            attributes: ['id', 'nombre'],
+            order: [['nombre', 'ASC']]
+        });
+
+        // Agregar conteo de artículos por almacén
+        const almacenesConConteo = await Promise.all(almacenes.map(async (alm) => {
+            const ubicacionIds = (await Ubicacion.findAll({
+                where: { almacen_id: alm.id, activo: true },
+                attributes: ['id']
+            })).map(u => u.id);
+
+            const total_articulos = ubicacionIds.length > 0
+                ? await Articulo.count({
+                    where: { ubicacion_id: { [Op.in]: ubicacionIds }, activo: true }
+                })
+                : 0;
+
+            return {
+                almacen: alm.nombre,
+                almacen_id: alm.id,
+                total_articulos
+            };
+        }));
+
+        // Filtrar solo los que tienen artículos
+        const almacenesFiltrados = almacenesConConteo.filter(a => a.total_articulos > 0);
 
         res.json({
             success: true,
-            data: almacenes
+            data: almacenesFiltrados
         });
     } catch (error) {
         console.error('Error obteniendo almacenes:', error);

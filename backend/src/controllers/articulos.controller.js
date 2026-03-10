@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { Articulo, Categoria, Ubicacion, Proveedor, ArticuloProveedor, DetalleMovimiento, Movimiento, Usuario, SolicitudCompra, DetalleOrdenCompra, TipoHerramientaRenta } from '../models/index.js';
+import { Articulo, Categoria, Ubicacion, Almacen, Proveedor, ArticuloProveedor, DetalleMovimiento, Movimiento, Usuario, SolicitudCompra, DetalleOrdenCompra, TipoHerramientaRenta } from '../models/index.js';
 import { generarCodigoEAN13, generarCodigoEAN13Temporal, validarCodigoEAN13 } from '../utils/ean13-generator.js';
 import { generarImagenCodigoBarras, generarSVGCodigoBarras } from '../utils/barcode-generator.js';
 import { migrarArticulosPendientes, migrarArticuloIndividual } from '../utils/autoMigrate.js';
@@ -14,6 +14,7 @@ export const getArticulos = async (req, res) => {
             search,
             categoria_id,
             ubicacion_id,
+            almacen_id,
             stock_bajo,
             activo,
             page = 1,
@@ -47,6 +48,15 @@ export const getArticulos = async (req, res) => {
             where.activo = activo === 'true';
         }
 
+        // Filtrar por almacén: obtener ubicaciones del almacén y filtrar artículos
+        if (almacen_id) {
+            const ubicacionesAlmacen = await Ubicacion.findAll({
+                where: { almacen_id, activo: true },
+                attributes: ['id']
+            });
+            where.ubicacion_id = { [Op.in]: ubicacionesAlmacen.map(u => u.id) };
+        }
+
         // Calcular offset para paginación
         const offset = (parseInt(page) - 1) * parseInt(limit);
 
@@ -62,7 +72,13 @@ export const getArticulos = async (req, res) => {
                 {
                     model: Ubicacion,
                     as: 'ubicacion',
-                    attributes: ['id', 'codigo', 'almacen', 'descripcion']
+                    attributes: ['id', 'codigo', 'almacen', 'almacen_id', 'descripcion'],
+                    include: [{
+                        model: Almacen,
+                        as: 'almacen_ref',
+                        attributes: ['id', 'nombre'],
+                        required: false
+                    }]
                 },
                 {
                     model: Proveedor,

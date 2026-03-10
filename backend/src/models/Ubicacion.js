@@ -13,11 +13,20 @@ const Ubicacion = sequelize.define('Ubicacion', {
         unique: true,
         comment: 'Código de ubicación (ej: A-12, B-05)'
     },
+    almacen_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'almacenes',
+            key: 'id'
+        },
+        comment: 'FK al almacén al que pertenece esta ubicación'
+    },
     almacen: {
         type: DataTypes.STRING(100),
-        allowNull: false,
+        allowNull: true,
         defaultValue: 'Principal',
-        comment: 'Nombre del almacén'
+        comment: 'Nombre del almacén (legacy, usar almacen_id)'
     },
     pasillo: {
         type: DataTypes.STRING(10),

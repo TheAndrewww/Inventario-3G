@@ -1,12 +1,27 @@
-import { Ubicacion, Articulo } from '../models/index.js';
+import { Ubicacion, Articulo, Almacen } from '../models/index.js';
 
 /**
  * GET /api/ubicaciones
  * Obtener todas las ubicaciones
+ * Query params: almacen_id (opcional) - filtrar por almacén
  */
 export const getUbicaciones = async (req, res) => {
     try {
+        const { almacen_id } = req.query;
+
+        const where = {};
+        if (almacen_id) {
+            where.almacen_id = almacen_id;
+        }
+
         const ubicaciones = await Ubicacion.findAll({
+            where,
+            include: [{
+                model: Almacen,
+                as: 'almacen_ref',
+                attributes: ['id', 'nombre'],
+                required: false
+            }],
             order: [['codigo', 'ASC']]
         });
 
@@ -33,7 +48,7 @@ export const getUbicaciones = async (req, res) => {
  */
 export const crearUbicacion = async (req, res) => {
     try {
-        const { codigo, almacen, pasillo, estante, nivel, descripcion } = req.body;
+        const { codigo, almacen, almacen_id, pasillo, estante, nivel, descripcion } = req.body;
 
         // Validar campos requeridos
         if (!codigo || !codigo.trim()) {
@@ -55,10 +70,20 @@ export const crearUbicacion = async (req, res) => {
             });
         }
 
+        // Si hay almacen_id, obtener el nombre del almacén para el campo legacy
+        let almacenNombre = almacen && almacen.trim() ? almacen.trim() : 'Principal';
+        if (almacen_id) {
+            const almacenObj = await Almacen.findByPk(almacen_id);
+            if (almacenObj) {
+                almacenNombre = almacenObj.nombre;
+            }
+        }
+
         // Crear la ubicación
         const nuevaUbicacion = await Ubicacion.create({
             codigo: codigo.trim(),
-            almacen: almacen && almacen.trim() ? almacen.trim() : 'Principal', // Usar valor por defecto si está vacío
+            almacen_id: almacen_id || null,
+            almacen: almacenNombre,
             pasillo: pasillo ? pasillo.trim() : null,
             estante: estante ? estante.trim() : null,
             nivel: nivel || null,
