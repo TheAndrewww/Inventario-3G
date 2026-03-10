@@ -480,15 +480,20 @@ const startServer = async () => {
 
                     try {
                         const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-                        // Split by semicolons and execute each statement
-                        const statements = migrationSQL
+                        // Strip comment lines first, then split by semicolons
+                        const cleanedSQL = migrationSQL
+                            .split('\n')
+                            .filter(line => !line.trim().startsWith('--'))
+                            .join('\n');
+                        const statements = cleanedSQL
                             .split(';')
                             .map(s => s.trim())
-                            .filter(s => s.length > 0 && !s.startsWith('--'));
+                            .filter(s => s.length > 0);
 
                         for (const stmt of statements) {
                             try {
                                 await sequelize.query(stmt);
+                                console.log(`  ✅ OK`);
                             } catch (stmtErr) {
                                 console.log(`  ⚠️ Statement skipped: ${stmtErr.message.substring(0, 100)}`);
                             }

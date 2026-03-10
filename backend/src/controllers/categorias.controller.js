@@ -11,17 +11,25 @@ export const getCategorias = async (req, res) => {
 
         let categorias;
         if (almacen_id) {
-            // Obtener categorías vinculadas a un almacén específico
-            categorias = await Categoria.findAll({
-                include: [{
-                    model: Almacen,
-                    as: 'almacenes',
-                    where: { id: almacen_id },
-                    attributes: [],
-                    through: { attributes: [] }
-                }],
-                order: [['nombre', 'ASC']]
-            });
+            try {
+                // Obtener categorías vinculadas a un almacén específico
+                categorias = await Categoria.findAll({
+                    include: [{
+                        model: Almacen,
+                        as: 'almacenes',
+                        where: { id: almacen_id },
+                        attributes: [],
+                        through: { attributes: [] }
+                    }],
+                    order: [['nombre', 'ASC']]
+                });
+            } catch (includeError) {
+                // Fallback: si la tabla almacen_categorias no existe, devolver todas
+                console.log('⚠️ getCategorias fallback sin Almacen filter:', includeError.message?.substring(0, 80));
+                categorias = await Categoria.findAll({
+                    order: [['nombre', 'ASC']]
+                });
+            }
         } else {
             categorias = await Categoria.findAll({
                 order: [['nombre', 'ASC']]

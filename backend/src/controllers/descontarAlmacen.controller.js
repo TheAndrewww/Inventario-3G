@@ -41,11 +41,28 @@ export const getAlmacenes = async (req, res) => {
         });
     } catch (error) {
         console.error('Error obteniendo almacenes:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al obtener almacenes',
-            error: error.message
-        });
+        // Fallback: usar query legacy si la tabla almacenes no existe
+        try {
+            const [results] = await sequelize.query(`
+                SELECT u.almacen, COUNT(DISTINCT a.id) as total_articulos
+                FROM ubicaciones u
+                INNER JOIN articulos a ON a.ubicacion_id = u.id AND a.activo = true AND a.stock_actual > 0
+                WHERE u.activo = true AND u.almacen IS NOT NULL AND u.almacen != ''
+                GROUP BY u.almacen
+                ORDER BY u.almacen ASC
+            `);
+            return res.json({
+                success: true,
+                data: results.map(r => ({ almacen: r.almacen, total_articulos: parseInt(r.total_articulos) }))
+            });
+        } catch (fallbackError) {
+            console.error('Error en fallback getAlmacenes:', fallbackError);
+            res.status(500).json({
+                success: false,
+                message: 'Error al obtener almacenes',
+                error: error.message
+            });
+        }
     }
 };
 

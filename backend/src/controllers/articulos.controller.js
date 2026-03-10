@@ -50,62 +50,115 @@ export const getArticulos = async (req, res) => {
 
         // Filtrar por almacén: obtener ubicaciones del almacén y filtrar artículos
         if (almacen_id) {
-            const ubicacionesAlmacen = await Ubicacion.findAll({
-                where: { almacen_id, activo: true },
-                attributes: ['id']
-            });
-            where.ubicacion_id = { [Op.in]: ubicacionesAlmacen.map(u => u.id) };
+            try {
+                const ubicacionesAlmacen = await Ubicacion.findAll({
+                    where: { almacen_id, activo: true },
+                    attributes: ['id']
+                });
+                where.ubicacion_id = { [Op.in]: ubicacionesAlmacen.map(u => u.id) };
+            } catch (almacenFilterErr) {
+                console.log('⚠️ almacen_id filter skipped:', almacenFilterErr.message?.substring(0, 80));
+            }
         }
 
         // Calcular offset para paginación
         const offset = (parseInt(page) - 1) * parseInt(limit);
 
         // Consultar artículos
-        const { count, rows: articulos } = await Articulo.findAndCountAll({
-            where,
-            include: [
-                {
-                    model: Categoria,
-                    as: 'categoria',
-                    attributes: ['id', 'nombre', 'color', 'icono']
-                },
-                {
-                    model: Ubicacion,
-                    as: 'ubicacion',
-                    attributes: ['id', 'codigo', 'almacen', 'almacen_id', 'descripcion'],
-                    include: [{
-                        model: Almacen,
-                        as: 'almacen_ref',
-                        attributes: ['id', 'nombre'],
-                        required: false
-                    }]
-                },
-                {
-                    model: Proveedor,
-                    as: 'proveedor',
-                    attributes: ['id', 'nombre', 'contacto', 'telefono'],
-                    required: false
-                },
-                {
-                    model: Proveedor,
-                    as: 'proveedores',
-                    attributes: ['id', 'nombre', 'contacto', 'telefono', 'email'],
-                    through: {
-                        attributes: ['costo_unitario', 'es_preferido', 'sku_proveedor', 'notas']
+        let count, articulos;
+        try {
+            const result = await Articulo.findAndCountAll({
+                where,
+                include: [
+                    {
+                        model: Categoria,
+                        as: 'categoria',
+                        attributes: ['id', 'nombre', 'color', 'icono']
                     },
-                    required: false
-                },
-                {
-                    model: TipoHerramientaRenta,
-                    as: 'tipo_herramienta_migrado',
-                    attributes: ['id', 'nombre', 'total_unidades', 'unidades_disponibles', 'unidades_asignadas', 'prefijo_codigo'],
-                    required: false
-                }
-            ],
-            order: [[order_by, order_dir.toUpperCase()]],
-            limit: parseInt(limit),
-            offset
-        });
+                    {
+                        model: Ubicacion,
+                        as: 'ubicacion',
+                        attributes: ['id', 'codigo', 'almacen', 'almacen_id', 'descripcion'],
+                        include: [{
+                            model: Almacen,
+                            as: 'almacen_ref',
+                            attributes: ['id', 'nombre'],
+                            required: false
+                        }]
+                    },
+                    {
+                        model: Proveedor,
+                        as: 'proveedor',
+                        attributes: ['id', 'nombre', 'contacto', 'telefono'],
+                        required: false
+                    },
+                    {
+                        model: Proveedor,
+                        as: 'proveedores',
+                        attributes: ['id', 'nombre', 'contacto', 'telefono', 'email'],
+                        through: {
+                            attributes: ['costo_unitario', 'es_preferido', 'sku_proveedor', 'notas']
+                        },
+                        required: false
+                    },
+                    {
+                        model: TipoHerramientaRenta,
+                        as: 'tipo_herramienta_migrado',
+                        attributes: ['id', 'nombre', 'total_unidades', 'unidades_disponibles', 'unidades_asignadas', 'prefijo_codigo'],
+                        required: false
+                    }
+                ],
+                order: [[order_by, order_dir.toUpperCase()]],
+                limit: parseInt(limit),
+                offset
+            });
+            count = result.count;
+            articulos = result.rows;
+        } catch (includeError) {
+            // Fallback: si la tabla almacenes no existe aún, consultar sin su include
+            console.log('⚠️ getArticulos fallback sin Almacen include:', includeError.message?.substring(0, 80));
+            const result = await Articulo.findAndCountAll({
+                where,
+                include: [
+                    {
+                        model: Categoria,
+                        as: 'categoria',
+                        attributes: ['id', 'nombre', 'color', 'icono']
+                    },
+                    {
+                        model: Ubicacion,
+                        as: 'ubicacion',
+                        attributes: ['id', 'codigo', 'almacen', 'descripcion']
+                    },
+                    {
+                        model: Proveedor,
+                        as: 'proveedor',
+                        attributes: ['id', 'nombre', 'contacto', 'telefono'],
+                        required: false
+                    },
+                    {
+                        model: Proveedor,
+                        as: 'proveedores',
+                        attributes: ['id', 'nombre', 'contacto', 'telefono', 'email'],
+                        through: {
+                            attributes: ['costo_unitario', 'es_preferido', 'sku_proveedor', 'notas']
+                        },
+                        required: false
+                    },
+                    {
+                        model: TipoHerramientaRenta,
+                        as: 'tipo_herramienta_migrado',
+                        attributes: ['id', 'nombre', 'total_unidades', 'unidades_disponibles', 'unidades_asignadas', 'prefijo_codigo'],
+                        required: false
+                    }
+                ],
+                order: [[order_by, order_dir.toUpperCase()]],
+                limit: parseInt(limit),
+                offset
+            });
+            count = result.count;
+            articulos = result.rows;
+        }
 
         // Si se solicita filtrar por stock bajo
         let articulosFiltrados = articulos;

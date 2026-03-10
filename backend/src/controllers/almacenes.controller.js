@@ -50,6 +50,13 @@ export const getAlmacenes = async (req, res) => {
 
     } catch (error) {
         console.error('Error en getAlmacenes:', error);
+        // Si la tabla no existe aún, devolver array vacío en vez de 500
+        if (error.message?.includes('relation') || error.message?.includes('does not exist') || error.original?.code === '42P01') {
+            return res.status(200).json({
+                success: true,
+                data: { almacenes: [] }
+            });
+        }
         res.status(500).json({
             success: false,
             message: 'Error al obtener almacenes',

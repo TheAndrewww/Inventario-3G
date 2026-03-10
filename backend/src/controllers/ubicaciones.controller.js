@@ -14,16 +14,26 @@ export const getUbicaciones = async (req, res) => {
             where.almacen_id = almacen_id;
         }
 
-        const ubicaciones = await Ubicacion.findAll({
-            where,
-            include: [{
-                model: Almacen,
-                as: 'almacen_ref',
-                attributes: ['id', 'nombre'],
-                required: false
-            }],
-            order: [['codigo', 'ASC']]
-        });
+        let ubicaciones;
+        try {
+            ubicaciones = await Ubicacion.findAll({
+                where,
+                include: [{
+                    model: Almacen,
+                    as: 'almacen_ref',
+                    attributes: ['id', 'nombre'],
+                    required: false
+                }],
+                order: [['codigo', 'ASC']]
+            });
+        } catch (includeError) {
+            // Fallback: si la tabla almacenes no existe aún, consultar sin include
+            console.log('⚠️ getUbicaciones fallback sin Almacen include:', includeError.message?.substring(0, 80));
+            ubicaciones = await Ubicacion.findAll({
+                where: {},
+                order: [['codigo', 'ASC']]
+            });
+        }
 
         res.status(200).json({
             success: true,
