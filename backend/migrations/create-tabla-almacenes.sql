@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS almacenes (
     nombre VARCHAR(100) NOT NULL UNIQUE,
     descripcion TEXT,
     activo BOOLEAN DEFAULT true,
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 2. Poblar almacenes a partir de los valores DISTINCT existentes en ubicaciones.almacen
@@ -34,8 +34,8 @@ CREATE TABLE IF NOT EXISTS almacen_categorias (
     id SERIAL PRIMARY KEY,
     almacen_id INTEGER NOT NULL REFERENCES almacenes(id) ON DELETE CASCADE,
     categoria_id INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(almacen_id, categoria_id)
 );
 

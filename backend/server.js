@@ -505,12 +505,22 @@ const startServer = async () => {
                 } else {
                     console.log('✅ Tabla almacenes ya existe');
 
-                    // Verificar si la tabla está vacía (puede pasar si la migración anterior falló parcialmente)
+                    // Fix: renombrar columnas camelCase a snake_case si existen
+                    try {
+                        await sequelize.query('ALTER TABLE almacenes RENAME COLUMN "createdAt" TO created_at');
+                        console.log('  ✅ Renombrada createdAt → created_at en almacenes');
+                    } catch (e) { /* ya renombrada o no existe */ }
+                    try {
+                        await sequelize.query('ALTER TABLE almacenes RENAME COLUMN "updatedAt" TO updated_at');
+                        console.log('  ✅ Renombrada updatedAt → updated_at en almacenes');
+                    } catch (e) { /* ya renombrada o no existe */ }
+
+                    // Verificar si la tabla está vacía
                     const [countCheck] = await sequelize.query('SELECT COUNT(*) FROM almacenes');
                     if (parseInt(countCheck[0].count) === 0) {
                         console.log('🔄 Tabla almacenes vacía, poblando desde ubicaciones...');
                         await sequelize.query(`
-                            INSERT INTO almacenes (nombre, descripcion, "createdAt", "updatedAt")
+                            INSERT INTO almacenes (nombre, descripcion, created_at, updated_at)
                             SELECT DISTINCT almacen, CONCAT('Almacén ', almacen, ' (migrado automáticamente)'), NOW(), NOW()
                             FROM ubicaciones
                             WHERE almacen IS NOT NULL AND almacen != ''
@@ -528,7 +538,7 @@ const startServer = async () => {
                         await sequelize.query('ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS almacen_id INTEGER REFERENCES almacenes(id)');
                     }
 
-                    // Siempre intentar poblar almacen_id para registros que no lo tengan
+                    // Siempre intentar poblar almacen_id
                     await sequelize.query('UPDATE ubicaciones u SET almacen_id = a.id FROM almacenes a WHERE u.almacen = a.nombre AND u.almacen_id IS NULL');
                     console.log('✅ almacen_id sincronizado');
 
@@ -543,44 +553,42 @@ const startServer = async () => {
                                 id SERIAL PRIMARY KEY,
                                 almacen_id INTEGER NOT NULL REFERENCES almacenes(id) ON DELETE CASCADE,
                                 categoria_id INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
-                                "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                                "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                                 UNIQUE(almacen_id, categoria_id)
                             )
                         `);
-                        // Cross-join all categories to all warehouses
                         await sequelize.query(`
-                            INSERT INTO almacen_categorias (almacen_id, categoria_id, "createdAt", "updatedAt")
+                            INSERT INTO almacen_categorias (almacen_id, categoria_id, created_at, updated_at)
                             SELECT a.id, c.id, NOW(), NOW()
-                            FROM almacenes a
-                            CROSS JOIN categorias c
+                            FROM almacenes a CROSS JOIN categorias c
                             ON CONFLICT (almacen_id, categoria_id) DO NOTHING
                         `);
                         console.log('✅ Tabla almacen_categorias creada y poblada');
                     } else {
-                        // Verificar si está vacía
+                        // Fix: renombrar columnas camelCase a snake_case
+                        try { await sequelize.query('ALTER TABLE almacen_categorias RENAME COLUMN "createdAt" TO created_at'); } catch (e) { }
+                        try { await sequelize.query('ALTER TABLE almacen_categorias RENAME COLUMN "updatedAt" TO updated_at'); } catch (e) { }
+
                         const [pivotCountCheck] = await sequelize.query('SELECT COUNT(*) FROM almacen_categorias');
                         if (parseInt(pivotCountCheck[0].count) === 0) {
                             console.log('🔄 Poblando almacen_categorias...');
                             await sequelize.query(`
-                                INSERT INTO almacen_categorias (almacen_id, categoria_id, "createdAt", "updatedAt")
+                                INSERT INTO almacen_categorias (almacen_id, categoria_id, created_at, updated_at)
                                 SELECT a.id, c.id, NOW(), NOW()
-                                FROM almacenes a
-                                CROSS JOIN categorias c
+                                FROM almacenes a CROSS JOIN categorias c
                                 ON CONFLICT (almacen_id, categoria_id) DO NOTHING
                             `);
                             console.log('✅ almacen_categorias poblada');
                         }
                     }
 
-                    // Crear índices si no existen
+                    // Crear índices
                     try {
                         await sequelize.query('CREATE INDEX IF NOT EXISTS idx_ubicaciones_almacen_id ON ubicaciones(almacen_id)');
                         await sequelize.query('CREATE INDEX IF NOT EXISTS idx_almacen_categorias_almacen_id ON almacen_categorias(almacen_id)');
                         await sequelize.query('CREATE INDEX IF NOT EXISTS idx_almacen_categorias_categoria_id ON almacen_categorias(categoria_id)');
-                    } catch (idxErr) {
-                        // Indices may already exist
-                    }
+                    } catch (idxErr) { }
                 }
             } catch (almacenesError) {
                 console.error('⚠️ Error con tabla almacenes:', almacenesError.message);
