@@ -505,6 +505,20 @@ const startServer = async () => {
                 } else {
                     console.log('✅ Tabla almacenes ya existe');
 
+                    // Verificar si la tabla está vacía (puede pasar si la migración anterior falló parcialmente)
+                    const [countCheck] = await sequelize.query('SELECT COUNT(*) FROM almacenes');
+                    if (parseInt(countCheck[0].count) === 0) {
+                        console.log('🔄 Tabla almacenes vacía, poblando desde ubicaciones...');
+                        await sequelize.query(`
+                            INSERT INTO almacenes (nombre, descripcion, "createdAt", "updatedAt")
+                            SELECT DISTINCT almacen, CONCAT('Almacén ', almacen, ' (migrado automáticamente)'), NOW(), NOW()
+                            FROM ubicaciones
+                            WHERE almacen IS NOT NULL AND almacen != ''
+                            ON CONFLICT (nombre) DO NOTHING
+                        `);
+                        console.log('✅ Almacenes poblados');
+                    }
+
                     // Verificar si almacen_id existe en ubicaciones
                     const [colCheck] = await sequelize.query(
                         "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'ubicaciones' AND column_name = 'almacen_id'"
@@ -512,9 +526,60 @@ const startServer = async () => {
                     if (parseInt(colCheck[0].count) === 0) {
                         console.log('🔄 Agregando columna almacen_id a ubicaciones...');
                         await sequelize.query('ALTER TABLE ubicaciones ADD COLUMN IF NOT EXISTS almacen_id INTEGER REFERENCES almacenes(id)');
-                        // Poblar almacen_id
-                        await sequelize.query('UPDATE ubicaciones u SET almacen_id = a.id FROM almacenes a WHERE u.almacen = a.nombre AND u.almacen_id IS NULL');
-                        console.log('✅ Columna almacen_id agregada y poblada');
+                    }
+
+                    // Siempre intentar poblar almacen_id para registros que no lo tengan
+                    await sequelize.query('UPDATE ubicaciones u SET almacen_id = a.id FROM almacenes a WHERE u.almacen = a.nombre AND u.almacen_id IS NULL');
+                    console.log('✅ almacen_id sincronizado');
+
+                    // Verificar y crear tabla almacen_categorias si no existe
+                    const [pivotCheck] = await sequelize.query(
+                        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'almacen_categorias'"
+                    );
+                    if (parseInt(pivotCheck[0].count) === 0) {
+                        console.log('🔄 Creando tabla almacen_categorias...');
+                        await sequelize.query(`
+                            CREATE TABLE IF NOT EXISTS almacen_categorias (
+                                id SERIAL PRIMARY KEY,
+                                almacen_id INTEGER NOT NULL REFERENCES almacenes(id) ON DELETE CASCADE,
+                                categoria_id INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+                                "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                                "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                                UNIQUE(almacen_id, categoria_id)
+                            )
+                        `);
+                        // Cross-join all categories to all warehouses
+                        await sequelize.query(`
+                            INSERT INTO almacen_categorias (almacen_id, categoria_id, "createdAt", "updatedAt")
+                            SELECT a.id, c.id, NOW(), NOW()
+                            FROM almacenes a
+                            CROSS JOIN categorias c
+                            ON CONFLICT (almacen_id, categoria_id) DO NOTHING
+                        `);
+                        console.log('✅ Tabla almacen_categorias creada y poblada');
+                    } else {
+                        // Verificar si está vacía
+                        const [pivotCountCheck] = await sequelize.query('SELECT COUNT(*) FROM almacen_categorias');
+                        if (parseInt(pivotCountCheck[0].count) === 0) {
+                            console.log('🔄 Poblando almacen_categorias...');
+                            await sequelize.query(`
+                                INSERT INTO almacen_categorias (almacen_id, categoria_id, "createdAt", "updatedAt")
+                                SELECT a.id, c.id, NOW(), NOW()
+                                FROM almacenes a
+                                CROSS JOIN categorias c
+                                ON CONFLICT (almacen_id, categoria_id) DO NOTHING
+                            `);
+                            console.log('✅ almacen_categorias poblada');
+                        }
+                    }
+
+                    // Crear índices si no existen
+                    try {
+                        await sequelize.query('CREATE INDEX IF NOT EXISTS idx_ubicaciones_almacen_id ON ubicaciones(almacen_id)');
+                        await sequelize.query('CREATE INDEX IF NOT EXISTS idx_almacen_categorias_almacen_id ON almacen_categorias(almacen_id)');
+                        await sequelize.query('CREATE INDEX IF NOT EXISTS idx_almacen_categorias_categoria_id ON almacen_categorias(categoria_id)');
+                    } catch (idxErr) {
+                        // Indices may already exist
                     }
                 }
             } catch (almacenesError) {
