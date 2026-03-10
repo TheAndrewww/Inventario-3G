@@ -118,6 +118,9 @@ const InventarioPage = () => {
   const [almacenEditando, setAlmacenEditando] = useState(null);
   const [nuevoNombreAlmacen, setNuevoNombreAlmacen] = useState('');
   const [loadingAlmacenes, setLoadingAlmacenes] = useState(false);
+  const [almacenCategoriasExpandido, setAlmacenCategoriasExpandido] = useState(null); // ID del almacén con categorías expandidas
+  const [todasLasCategorias, setTodasLasCategorias] = useState([]); // Todas las categorías del sistema
+  const [loadingToggleCategoria, setLoadingToggleCategoria] = useState(false);
 
   const { agregarArticulo } = usePedido();
   const { user } = useAuth();
@@ -3378,36 +3381,111 @@ const InventarioPage = () => {
                         </div>
                       ) : (
                         // Modo vista
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-semibold text-gray-900">🏢 {almacen.nombre}</h4>
-                            <p className="text-sm text-gray-500">
-                              {almacen.ubicaciones_count || 0} ubicaciones · {almacen.categorias?.length || 0} categorías · {almacen.articulos_count || 0} artículos
-                            </p>
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-semibold text-gray-900">🏢 {almacen.nombre}</h4>
+                              <p className="text-sm text-gray-500">
+                                {almacen.ubicaciones_count || 0} ubicaciones · {almacen.categorias?.length || 0} categorías · {almacen.articulos_count || 0} artículos
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={async () => {
+                                  if (almacenCategoriasExpandido === almacen.id) {
+                                    setAlmacenCategoriasExpandido(null);
+                                  } else {
+                                    // Cargar todas las categorías del sistema si no se han cargado
+                                    if (todasLasCategorias.length === 0) {
+                                      try {
+                                        const data = await categoriasService.getAll();
+                                        setTodasLasCategorias(Array.isArray(data) ? data : []);
+                                      } catch (e) { console.error(e); }
+                                    }
+                                    setAlmacenCategoriasExpandido(almacen.id);
+                                  }
+                                }}
+                                className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1 ${almacenCategoriasExpandido === almacen.id
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                  }`}
+                                title="Gestionar categorías"
+                              >
+                                {almacenCategoriasExpandido === almacen.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                Categorías
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setAlmacenEditando(almacen.id);
+                                  setNuevoNombreAlmacen(almacen.nombre);
+                                }}
+                                disabled={loadingAlmacenes}
+                                className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center gap-1"
+                                title="Renombrar almacén"
+                              >
+                                <Edit2 size={14} />
+                                Renombrar
+                              </button>
+                              <button
+                                onClick={() => handleEliminarAlmacen(almacen)}
+                                disabled={loadingAlmacenes}
+                                className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1"
+                                title="Eliminar almacén"
+                              >
+                                <Trash2 size={14} />
+                                Eliminar
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                setAlmacenEditando(almacen.id);
-                                setNuevoNombreAlmacen(almacen.nombre);
-                              }}
-                              disabled={loadingAlmacenes}
-                              className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center gap-1"
-                              title="Renombrar almacén"
-                            >
-                              <Edit2 size={14} />
-                              Renombrar
-                            </button>
-                            <button
-                              onClick={() => handleEliminarAlmacen(almacen)}
-                              disabled={loadingAlmacenes}
-                              className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1"
-                              title="Eliminar almacén"
-                            >
-                              <Trash2 size={14} />
-                              Eliminar
-                            </button>
-                          </div>
+
+                          {/* Panel expandible de categorías */}
+                          {almacenCategoriasExpandido === almacen.id && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <p className="text-xs font-medium text-gray-600 mb-2">Categorías asignadas a este almacén:</p>
+                              {todasLasCategorias.length === 0 ? (
+                                <p className="text-sm text-gray-400">Cargando categorías...</p>
+                              ) : (
+                                <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto">
+                                  {todasLasCategorias.map((cat) => {
+                                    const isAssigned = almacen.categorias?.some(c => c.id === cat.id);
+                                    return (
+                                      <label
+                                        key={cat.id}
+                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors text-sm ${isAssigned
+                                            ? 'bg-green-50 border border-green-200 text-green-800'
+                                            : 'bg-gray-50 border border-gray-200 text-gray-500 hover:bg-gray-100'
+                                          } ${loadingToggleCategoria ? 'opacity-50 pointer-events-none' : ''}`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isAssigned}
+                                          onChange={async () => {
+                                            setLoadingToggleCategoria(true);
+                                            try {
+                                              if (isAssigned) {
+                                                await almacenesService.desasignarCategoria(almacen.id, cat.id);
+                                              } else {
+                                                await almacenesService.asignarCategoria(almacen.id, cat.id);
+                                              }
+                                              // Recargar almacenes para reflejar cambio
+                                              await fetchAlmacenes();
+                                            } catch (err) {
+                                              toast.error(err.message || 'Error al actualizar categoría');
+                                            } finally {
+                                              setLoadingToggleCategoria(false);
+                                            }
+                                          }}
+                                          className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                        />
+                                        {cat.icono && <span>{cat.icono}</span>}
+                                        <span className="truncate">{cat.nombre}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
