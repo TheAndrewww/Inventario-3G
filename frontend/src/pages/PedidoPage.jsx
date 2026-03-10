@@ -509,8 +509,8 @@ const PedidoPage = () => {
                 <button
                   onClick={() => setShowScanner(!showScanner)}
                   className={`px-4 py-3 rounded-lg border-2 transition-colors ${showScanner
-                      ? 'bg-red-700 text-white border-red-700'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    ? 'bg-red-700 text-white border-red-700'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   title="Escanear código de barras"
                 >
@@ -815,11 +815,19 @@ const PedidoPage = () => {
                         required={!ubicacionDestino}
                       >
                         <option value="">Selecciona un proyecto...</option>
-                        {proyectosProduccion.map(p => (
-                          <option key={p.id} value={p.nombre}>
-                            {p.nombre}{p.cliente ? ` — ${p.cliente}` : ''}
-                          </option>
-                        ))}
+                        <optgroup label="Áreas fijas">
+                          <option value="MANUFACTURA">🏭 MANUFACTURA</option>
+                          <option value="HERRERÍA">⚒️ HERRERÍA</option>
+                        </optgroup>
+                        {proyectosProduccion.length > 0 && (
+                          <optgroup label="Proyectos en producción">
+                            {proyectosProduccion.map(p => (
+                              <option key={p.id} value={p.nombre}>
+                                {p.nombre}{p.cliente ? ` — ${p.cliente}` : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                       {proyectosProduccion.length === 0 && !cargandoProyectos && (
                         <p className="text-xs text-amber-600 mt-1">
