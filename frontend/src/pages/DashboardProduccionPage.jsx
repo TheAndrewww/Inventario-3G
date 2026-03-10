@@ -133,19 +133,24 @@ const ModalNuevoProyecto = ({ isOpen, onClose, onCrear }) => {
 
 // ============ Filtros ============
 const FiltrosProyectos = ({ filtro, setFiltro, opciones }) => (
-    <div className="flex gap-2 mb-4">
-        {opciones.map(op => (
-            <button
-                key={op.value}
-                onClick={() => setFiltro(op.value)}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${filtro === op.value
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-            >
-                {op.label}
-            </button>
-        ))}
+    <div className="flex flex-wrap gap-2 mb-4 items-center">
+        {opciones.map(op => {
+            if (op.value === '_separator') {
+                return <div key="_sep" className="w-px h-8 bg-gray-300 mx-1 hidden sm:block" />;
+            }
+            return (
+                <button
+                    key={op.value}
+                    onClick={() => setFiltro(op.value)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${filtro === op.value
+                        ? 'bg-gray-900 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                >
+                    {op.label}
+                </button>
+            );
+        })}
     </div>
 );
 

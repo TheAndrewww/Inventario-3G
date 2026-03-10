@@ -9,7 +9,11 @@ export const FILTRO_OPCIONES = [
     { value: 'activos', label: 'En Proceso' },
     { value: 'preparados', label: '📦 Preparados' },
     { value: 'urgentes', label: '🔴 Urgentes' },
-    { value: 'completados', label: '✅ Completados' }
+    { value: 'completados', label: '✅ Completados' },
+    { value: '_separator', label: '|' },
+    { value: 'produccion_diseno', label: '🏗️ Producción / Diseño' },
+    { value: 'manufactura', label: '🏭 Manufactura' },
+    { value: 'herreria', label: '⚒️ Herrería' }
 ];
 
 /**
@@ -33,6 +37,18 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'activos') => {
                     return p.prioridad === 1 || (p.diasRestantes !== null && p.diasRestantes <= 3);
                 case 'completados':
                     return p.etapa_actual === 'completado';
+                case 'produccion_diseno':
+                    // Proyectos normales de producción/diseño (excluyendo los que son solo MTO/GTIA sin extensivo)
+                    return p.etapa_actual !== 'completado' &&
+                        !p.tipo_proyecto?.toUpperCase().startsWith('CANCELADO') &&
+                        (
+                            (p.tipo_proyecto !== 'MTO' && p.tipo_proyecto !== 'GTIA') ||
+                            (p.tipo_proyecto === 'MTO' && p.es_extensivo)
+                        );
+                case 'manufactura':
+                    return p.tiene_manufactura && p.etapa_actual !== 'completado';
+                case 'herreria':
+                    return p.tiene_herreria && p.etapa_actual !== 'completado';
                 default:
                     return true;
             }
