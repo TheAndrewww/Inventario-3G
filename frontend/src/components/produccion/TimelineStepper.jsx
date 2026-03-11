@@ -304,6 +304,11 @@ const TimelineStepper = memo(({ proyecto }) => {
                     return 'bg-orange-500 text-white';
                 }
 
+                // Sub-etapas de producción (manufactura/herrería) en proceso -> Amber
+                if (node.stage === 'manufactura' || node.stage === 'herreria') {
+                    return 'bg-amber-500 text-white';
+                }
+
                 // Default Active (verde - está trabajando en esta etapa)
                 return 'bg-green-500 text-white';
             }
