@@ -1408,13 +1408,15 @@ const InventarioPage = () => {
                 <Barcode size={18} />
                 <span className="hidden sm:inline">Generar Etiquetas</span>
               </button>
-              <button
-                onClick={handleNuevoArticulo}
-                className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base bg-red-700 text-white rounded-lg hover:bg-red-800"
-              >
-                <Plus size={18} />
-                <span className="hidden sm:inline">Nuevo Artículo</span>
-              </button>
+              {user?.rol !== 'almacen' && (
+                <button
+                  onClick={handleNuevoArticulo}
+                  className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base bg-red-700 text-white rounded-lg hover:bg-red-800"
+                >
+                  <Plus size={18} />
+                  <span className="hidden sm:inline">Nuevo Artículo</span>
+                </button>
+              )}
             </>
           )}
         </div>
@@ -3406,8 +3408,8 @@ const InventarioPage = () => {
                                   }
                                 }}
                                 className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1 ${almacenCategoriasExpandido === almacen.id
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                                   }`}
                                 title="Gestionar categorías"
                               >
@@ -3452,8 +3454,8 @@ const InventarioPage = () => {
                                       <label
                                         key={cat.id}
                                         className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors text-sm ${isAssigned
-                                            ? 'bg-green-50 border border-green-200 text-green-800'
-                                            : 'bg-gray-50 border border-gray-200 text-gray-500 hover:bg-gray-100'
+                                          ? 'bg-green-50 border border-green-200 text-green-800'
+                                          : 'bg-gray-50 border border-gray-200 text-gray-500 hover:bg-gray-100'
                                           } ${loadingToggleCategoria ? 'opacity-50 pointer-events-none' : ''}`}
                                       >
                                         <input
