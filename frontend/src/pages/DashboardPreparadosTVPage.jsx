@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ZoomIn, ZoomOut, RotateCw, Snowflake } from 'lucide-react';
 import { Loader } from '../components/common';
 import { Toaster } from 'react-hot-toast';
@@ -22,21 +22,51 @@ const DashboardPreparadosTVPage = () => {
         return savedZoom ? parseFloat(savedZoom) : 1;
     });
 
-    const [orientacion, setOrientacion] = useState(() => {
-        return localStorage.getItem('dashboardPreparadosTVOrientation') || 'horizontal';
+    const [rotacion, setRotacion] = useState(() => {
+        const saved = localStorage.getItem('dashboardPreparadosTVRotation');
+        return saved ? parseInt(saved) : 0;
     });
+
+    const [controlsVisible, setControlsVisible] = useState(false);
+    const hideTimerRef = useRef(null);
 
     useEffect(() => {
         localStorage.setItem('dashboardPreparadosTVScale', zoomLevel.toString());
     }, [zoomLevel]);
 
     useEffect(() => {
-        localStorage.setItem('dashboardPreparadosTVOrientation', orientacion);
-    }, [orientacion]);
+        localStorage.setItem('dashboardPreparadosTVRotation', rotacion.toString());
+    }, [rotacion]);
+
+    const handleMouseMove = useCallback(() => {
+        setControlsVisible(true);
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = setTimeout(() => setControlsVisible(false), 3000);
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        };
+    }, [handleMouseMove]);
 
     const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 3));
     const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
-    const toggleOrientacion = () => setOrientacion(prev => prev === 'horizontal' ? 'vertical' : 'horizontal');
+    const rotar = () => setRotacion(prev => (prev + 90) % 360);
+
+    const getRotationStyle = () => {
+        const isVertical = rotacion === 90 || rotacion === 270;
+        return {
+            transform: rotacion === 0 ? 'none' : `rotate(${rotacion}deg)`,
+            width: isVertical ? '100vh' : '100vw',
+            height: isVertical ? '100vw' : '100vh',
+            position: 'absolute',
+            top: isVertical ? 'calc(50% - 50vw)' : 0,
+            left: isVertical ? 'calc(50% - 50vh)' : 0,
+        };
+    };
 
     // Helper: detectar proyectos MTO/GTIA con timeline simplificado
     const usaTimelineSimplificado = (p) => {
@@ -79,14 +109,7 @@ const DashboardPreparadosTVPage = () => {
             {/* Main Content Container with Rotation */}
             <div
                 className="w-full h-full transition-all duration-300 origin-center"
-                style={{
-                    transform: orientacion === 'vertical' ? 'rotate(90deg)' : 'none',
-                    width: orientacion === 'vertical' ? '100vh' : '100vw',
-                    height: orientacion === 'vertical' ? '100vw' : '100vh',
-                    position: 'absolute',
-                    top: orientacion === 'vertical' ? 'calc(50% - 50vw)' : 0,
-                    left: orientacion === 'vertical' ? 'calc(50% - 50vh)' : 0,
-                }}
+                style={getRotationStyle()}
             >
                 {/* Scrollable Area */}
                 <div className="h-full w-full overflow-auto" style={{ padding: px(16) }}>
@@ -139,14 +162,20 @@ const DashboardPreparadosTVPage = () => {
 
             {/* En vivo indicator */}
             <div
-                className={`fixed z-40 bg-blue-500 text-white backdrop-blur-sm rounded-full font-medium shadow-sm border border-blue-600 flex items-center ${orientacion === 'vertical' ? 'bottom-4 right-4' : 'bottom-4 left-4'}`}
+                className={`fixed z-40 bg-blue-500 text-white backdrop-blur-sm rounded-full font-medium shadow-sm border border-blue-600 flex items-center bottom-4 left-4`}
                 style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem', gap: '0.5rem' }}
             >
                 <span>📦 Preparados - En vivo</span>
             </div>
 
             {/* Controls */}
-            <div className={`fixed z-50 flex gap-2 transition-opacity duration-300 opacity-0 hover:opacity-100 ${orientacion === 'vertical' ? 'bottom-4 left-4' : 'bottom-4 right-4'}`}>
+            <div className={`fixed z-50 flex gap-2 transition-opacity duration-300 bottom-4 right-4 ${controlsVisible ? 'opacity-100' : 'opacity-0'}`}>
+                {/* Rotation indicator */}
+                <div className="flex bg-gray-900 text-white rounded-lg shadow-xl overflow-hidden border border-gray-700">
+                    <div className="px-3 py-1 text-xs font-medium flex items-center justify-center bg-gray-800">
+                        {rotacion}°
+                    </div>
+                </div>
                 {/* Scale Controls */}
                 <div className="flex bg-gray-900 text-white rounded-lg shadow-xl overflow-hidden border border-gray-700">
                     <button onClick={handleZoomOut} className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors" title="Reducir Escala">
@@ -160,9 +189,9 @@ const DashboardPreparadosTVPage = () => {
                     </button>
                 </div>
 
-                {/* Rotation Toggle */}
+                {/* Rotation */}
                 <div className="flex bg-gray-900 text-white rounded-lg shadow-xl overflow-hidden border border-gray-700">
-                    <button onClick={toggleOrientacion} className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors" title={`Cambiar a modo ${orientacion === 'horizontal' ? 'vertical' : 'horizontal'}`}>
+                    <button onClick={rotar} className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors" title="Rotar 90°">
                         <RotateCw size={20} />
                     </button>
                 </div>
