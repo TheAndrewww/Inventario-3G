@@ -73,7 +73,7 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/renta-herramientas',
       icon: Wrench,
       label: 'Renta Herramientas',
-      roles: ['administrador', 'encargado', 'almacen']
+      roles: ['administrador', 'encargado', 'almacen', 'compras']
     },
     {
       path: '/calendario',
