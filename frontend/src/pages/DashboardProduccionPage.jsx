@@ -230,6 +230,30 @@ const DashboardProduccionPage = () => {
                             <ExternalLink size={12} className="opacity-50" />
                         </a>
 
+                        <a
+                            href="/manufactura-tv"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-sm"
+                            title="Vista TV - Manufactura"
+                        >
+                            <Monitor size={16} />
+                            <span>TV Manufactura</span>
+                            <ExternalLink size={12} className="opacity-50" />
+                        </a>
+
+                        <a
+                            href="/herreria-tv"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
+                            title="Vista TV - Herrería"
+                        >
+                            <Monitor size={16} />
+                            <span>TV Herrería</span>
+                            <ExternalLink size={12} className="opacity-50" />
+                        </a>
+
                         <div className="h-8 w-px bg-gray-300 mx-2 hidden lg:block"></div>
 
                         <button

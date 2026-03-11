@@ -30,6 +30,8 @@ import DashboardProduccionPage from './pages/DashboardProduccionPage';
 import TerminalAreaPage from './pages/TerminalAreaPage';
 import DashboardProduccionTVPage from './pages/DashboardProduccionTVPage';
 import DashboardPreparadosTVPage from './pages/DashboardPreparadosTVPage';
+import DashboardManufacturaTVPage from './pages/DashboardManufacturaTVPage';
+import DashboardHerreriaTVPage from './pages/DashboardHerreriaTVPage';
 import ControlCampanaPage from './pages/ControlCampanaPage';
 import ConteoCiclicoPage from './pages/ConteoCiclicoPage';
 import DescontarAlmacenPage from './pages/DescontarAlmacenPage';
@@ -47,6 +49,8 @@ function App() {
         <Route path="/calendario-publico" element={<CalendarioPublicoPage />} />
         <Route path="/produccion-tv" element={<DashboardProduccionTVPage />} />
         <Route path="/preparados-tv" element={<DashboardPreparadosTVPage />} />
+        <Route path="/manufactura-tv" element={<DashboardManufacturaTVPage />} />
+        <Route path="/herreria-tv" element={<DashboardHerreriaTVPage />} />
         <Route path="/terminal" element={<TerminalAreaPage />} />
         <Route path="/terminal/:area" element={<TerminalAreaPage />} />
 
