@@ -19,7 +19,7 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/recepcion-mercancia',
       icon: PackageCheck,
       label: 'Recepción Mercancía',
-      roles: ['administrador', 'almacen', 'compras']
+      roles: ['administrador', 'almacen']
     },
     {
       path: '/procesamiento-masivo',
@@ -79,13 +79,13 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/calendario',
       icon: Calendar,
       label: 'Calendario',
-      roles: ['administrador', 'diseñador', 'ventas', 'compras', 'encargado', 'almacen']
+      roles: ['administrador', 'diseñador', 'ventas', 'encargado', 'almacen']
     },
     {
       path: '/mi-equipo',
       icon: User,
       label: 'Mi Equipo',
-      roles: ['administrador', 'diseñador', 'ventas', 'compras', 'encargado', 'operador']
+      roles: ['administrador', 'diseñador', 'ventas', 'encargado', 'operador']
     },
     {
       path: '/produccion',
