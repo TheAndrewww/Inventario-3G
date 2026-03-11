@@ -79,7 +79,7 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       path: '/calendario',
       icon: Calendar,
       label: 'Calendario',
-      roles: ['administrador', 'diseñador', 'ventas', 'compras', 'encargado']
+      roles: ['administrador', 'diseñador', 'ventas', 'compras', 'encargado', 'almacen']
     },
     {
       path: '/mi-equipo',
