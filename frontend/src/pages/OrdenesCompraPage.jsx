@@ -2758,7 +2758,7 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
     ubicacion_id: '',
     proveedor_id: '',
     stock_actual: 0,
-    stock_minimo: 1,
+    stock_minimo: 0,
     stock_maximo: '',
     unidad: 'piezas',
     costo_unitario: ''
@@ -2843,14 +2843,14 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
         ubicacion_id: parseInt(formData.ubicacion_id),
         proveedor_id: formData.proveedor_id ? parseInt(formData.proveedor_id) : null,
         stock_actual: 0, // Siempre en 0 para artículos nuevos desde orden de compra
-        stock_minimo: parseFloat(formData.stock_minimo) || 1,
+        stock_minimo: parseFloat(formData.stock_minimo) >= 0 ? parseFloat(formData.stock_minimo) : 0,
         stock_maximo: formData.stock_maximo ? parseFloat(formData.stock_maximo) : null,
         unidad: formData.unidad,
         costo_unitario: formData.costo_unitario ? parseFloat(formData.costo_unitario) : null,
         activo: true
       };
 
-      const response = await articulosService.crear(dataToSend);
+      const response = await articulosService.create(dataToSend);
       const nuevoArticulo = response.data?.articulo || response.articulo || response;
 
       onSuccess(nuevoArticulo);
@@ -2864,7 +2864,7 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
         ubicacion_id: '',
         proveedor_id: '',
         stock_actual: 0,
-        stock_minimo: 1,
+        stock_minimo: 0,
         stock_maximo: '',
         unidad: 'piezas',
         costo_unitario: ''
@@ -3051,7 +3051,7 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
               name="stock_minimo"
               value={formData.stock_minimo}
               onChange={handleChange}
-              min="1"
+              min="0"
               step="1"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
             />
