@@ -2077,6 +2077,8 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
           categorias={categorias}
           ubicaciones={ubicaciones}
           proveedores={proveedores}
+          nombreInicial={searchTerm}
+          proveedorInicial={proveedorId}
           onSuccess={(nuevoArticulo) => {
             setArticulos([...articulos, nuevoArticulo]);
             setMostrarModalNuevoArticulo(false);
@@ -2750,13 +2752,13 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
 };
 
 // Modal para crear nuevo artículo desde la orden de compra
-const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedores, onSuccess }) => {
+const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedores, onSuccess, nombreInicial = '', proveedorInicial = '' }) => {
   const [formData, setFormData] = useState({
-    nombre: '',
+    nombre: nombreInicial || '',
     descripcion: '',
     categoria_id: '',
     ubicacion_id: '',
-    proveedor_id: '',
+    proveedor_id: proveedorInicial || '',
     stock_actual: 0,
     stock_minimo: 0,
     stock_maximo: '',
