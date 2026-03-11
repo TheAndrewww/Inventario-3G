@@ -42,7 +42,7 @@ const RentaHerramientasPage = () => {
     const { user } = useAuth();
 
     // Solo administradores, almacenistas y encargados pueden gestionar
-    const puedeGestionar = ['administrador', 'almacenista', 'encargado'].includes(user?.rol);
+    const puedeGestionar = ['administrador', 'almacenista', 'almacen', 'encargado'].includes(user?.rol);
 
     useEffect(() => {
         if (puedeGestionar) {
