@@ -3,15 +3,40 @@ import { ZoomIn, ZoomOut, RotateCw, Clock, AlertTriangle, Calendar } from 'lucid
 import { Loader } from '../components/common';
 import { Toaster } from 'react-hot-toast';
 import { useProduccionData } from '../hooks/useProduccionData';
-import { sortProyectosPorUrgencia } from '../utils/produccion';
+import { sortProyectosPorUrgencia, addBusinessDays, calcularDiasHabiles, getHoyStr, formatDateShort } from '../utils/produccion';
 import { px } from '../utils/produccion';
+
+// Tiempos acumulados por tipo (mismos que el backend)
+const TIEMPOS_POR_TIPO = {
+    'C': { produccion: 5 },
+    'B': { produccion: 10 },
+    'A': { produccion: 20 }
+};
 
 /**
  * Tarjeta grande de proyecto para el TV de Manufactura
  */
 const ProyectoCardManufactura = ({ proyecto }) => {
-    const diasRestantes = proyecto.diasRestantes;
-    const urgente = proyecto.prioridad === 1 || (diasRestantes !== null && diasRestantes <= 3);
+    // Calcular fecha límite del ÁREA (producción) en vez de la global
+    const tipo = proyecto.tipo_proyecto?.toUpperCase();
+    const tiempos = tipo ? TIEMPOS_POR_TIPO[tipo] : null;
+
+    let fechaLimiteArea = proyecto.fecha_limite;
+    let diasRestantesArea = proyecto.diasRestantes;
+
+    if (tiempos && proyecto.fecha_entrada) {
+        // Fecha límite del área = fecha_entrada + días acumulados hasta producción
+        const fechaObj = addBusinessDays(proyecto.fecha_entrada, tiempos.produccion);
+        if (fechaObj) {
+            const y = fechaObj.getUTCFullYear();
+            const m = String(fechaObj.getUTCMonth() + 1).padStart(2, '0');
+            const d = String(fechaObj.getUTCDate()).padStart(2, '0');
+            fechaLimiteArea = `${y}-${m}-${d}`;
+            diasRestantesArea = calcularDiasHabiles(getHoyStr(), fechaLimiteArea);
+        }
+    }
+
+    const urgente = proyecto.prioridad === 1 || (diasRestantesArea !== null && diasRestantesArea <= 3);
 
     const formatFecha = (fecha) => {
         if (!fecha) return '—';
@@ -20,51 +45,51 @@ const ProyectoCardManufactura = ({ proyecto }) => {
 
     return (
         <div
-            className={`rounded-2xl border-2 p-6 transition-all ${urgente ? 'border-red-500' : 'bg-amber-50 border-amber-300'}`}
+            className={`rounded-2xl border-2 p-10 transition-all ${urgente ? 'border-red-500' : 'bg-amber-50 border-amber-300'}`}
             style={urgente ? { animation: 'pulseRed 2.5s ease-in-out infinite', background: '#fecaca' } : {}}
         >
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4 min-w-0 flex-1">
-                    <Clock size={28} className={`${urgente ? 'text-red-600' : 'text-amber-500 animate-pulse'} shrink-0`} />
+            <div className="flex items-center justify-between gap-6">
+                <div className="flex items-center gap-5 min-w-0 flex-1">
+                    <Clock size={44} className={`${urgente ? 'text-red-600' : 'text-amber-500 animate-pulse'} shrink-0`} />
                     <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <h3 className="font-bold text-gray-900 text-2xl">{proyecto.nombre}</h3>
+                        <div className="flex items-center gap-4 flex-wrap">
+                            <h3 className="font-bold text-gray-900 text-5xl">{proyecto.nombre}</h3>
                             {urgente && (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-bold shrink-0">
-                                    <AlertTriangle size={16} /> URGENTE
+                                <span className="inline-flex items-center gap-2 px-5 py-2 bg-red-100 text-red-700 rounded-full text-lg font-bold shrink-0">
+                                    <AlertTriangle size={24} /> URGENTE
                                 </span>
                             )}
                             {proyecto.tipo_proyecto && (
-                                <span className="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm font-semibold shrink-0">
+                                <span className="px-5 py-2 bg-gray-200 text-gray-700 rounded-full text-lg font-semibold shrink-0">
                                     {proyecto.tipo_proyecto}
                                 </span>
                             )}
                         </div>
                         {proyecto.cliente && (
-                            <p className="text-base text-gray-500 mt-1">{proyecto.cliente}</p>
+                            <p className="text-2xl text-gray-500 mt-2">{proyecto.cliente}</p>
                         )}
                     </div>
                 </div>
-                <div className="text-right shrink-0 space-y-2">
-                    {proyecto.fecha_limite && (
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${diasRestantes !== null && diasRestantes <= 3 ? 'bg-red-200/60 border border-red-300' : 'bg-white/60 border border-gray-200'}`}>
-                            <Calendar size={22} className={diasRestantes !== null && diasRestantes <= 3 ? 'text-red-500' : 'text-gray-400'} />
+                <div className="text-right shrink-0 space-y-3">
+                    {fechaLimiteArea && (
+                        <div className={`flex items-center gap-3 px-6 py-4 rounded-xl ${diasRestantesArea !== null && diasRestantesArea <= 3 ? 'bg-red-200/60 border border-red-300' : 'bg-white/60 border border-gray-200'}`}>
+                            <Calendar size={32} className={diasRestantesArea !== null && diasRestantesArea <= 3 ? 'text-red-500' : 'text-gray-400'} />
                             <div>
-                                <span className="text-xs text-gray-500 block">Fecha límite</span>
-                                <span className={`font-bold text-3xl ${diasRestantes !== null && diasRestantes <= 3 ? 'text-red-700' : 'text-gray-800'}`}>
-                                    {formatFecha(proyecto.fecha_limite)}
+                                <span className="text-base text-gray-500 block">Límite de área</span>
+                                <span className={`font-bold text-5xl ${diasRestantesArea !== null && diasRestantesArea <= 3 ? 'text-red-700' : 'text-gray-800'}`}>
+                                    {formatFecha(fechaLimiteArea)}
                                 </span>
                             </div>
                         </div>
                     )}
-                    {diasRestantes !== null && diasRestantes >= 0 && (
-                        <p className={`text-base font-bold ${diasRestantes <= 3 ? 'text-red-600' : 'text-gray-500'}`}>
-                            {diasRestantes} día{diasRestantes !== 1 ? 's' : ''} restante{diasRestantes !== 1 ? 's' : ''}
+                    {diasRestantesArea !== null && diasRestantesArea >= 0 && (
+                        <p className={`text-xl font-bold ${diasRestantesArea <= 3 ? 'text-red-600' : 'text-gray-500'}`}>
+                            {diasRestantesArea} día{diasRestantesArea !== 1 ? 's' : ''} restante{diasRestantesArea !== 1 ? 's' : ''}
                         </p>
                     )}
-                    {diasRestantes !== null && diasRestantes < 0 && (
-                        <p className="text-base font-bold text-red-600">
-                            {Math.abs(diasRestantes)} día{Math.abs(diasRestantes) !== 1 ? 's' : ''} de atraso
+                    {diasRestantesArea !== null && diasRestantesArea < 0 && (
+                        <p className="text-xl font-bold text-red-600">
+                            {Math.abs(diasRestantesArea)} día{Math.abs(diasRestantesArea) !== 1 ? 's' : ''} de atraso
                         </p>
                     )}
                 </div>
@@ -127,17 +152,37 @@ const DashboardManufacturaTVPage = () => {
     };
 
     // Proyectos con manufactura desbloqueada (sin importar etapa), no completados, no pausados
-    const enProduccion = useMemo(() =>
-        sortProyectosPorUrgencia(
-            proyectos.filter(p =>
-                p.tiene_manufactura &&
-                p.etapa_actual !== 'completado' &&
-                !p.pausado &&
-                !(p.estadoSubEtapas?.manufactura?.completado || p.manufactura_completado)
-            )
-        ),
-        [proyectos]
-    );
+    const enProduccion = useMemo(() => {
+        const filtered = proyectos.filter(p =>
+            p.tiene_manufactura &&
+            p.etapa_actual !== 'completado' &&
+            !p.pausado &&
+            !(p.estadoSubEtapas?.manufactura?.completado || p.manufactura_completado)
+        );
+
+        // Helper: calcular diasRestantes del ÁREA para un proyecto
+        const getDiasArea = (p) => {
+            const tipo = p.tipo_proyecto?.toUpperCase();
+            const tiempos = tipo ? TIEMPOS_POR_TIPO[tipo] : null;
+            if (tiempos && p.fecha_entrada) {
+                const fechaObj = addBusinessDays(p.fecha_entrada, tiempos.produccion);
+                if (fechaObj) {
+                    const y = fechaObj.getUTCFullYear();
+                    const m = String(fechaObj.getUTCMonth() + 1).padStart(2, '0');
+                    const d = String(fechaObj.getUTCDate()).padStart(2, '0');
+                    return calcularDiasHabiles(getHoyStr(), `${y}-${m}-${d}`);
+                }
+            }
+            return p.diasRestantes ?? 999;
+        };
+
+        // Ordenar por: vencidos primero (más atraso arriba), luego menos días restantes
+        return [...filtered].sort((a, b) => {
+            const aDias = getDiasArea(a);
+            const bDias = getDiasArea(b);
+            return aDias - bDias;
+        });
+    }, [proyectos]);
 
     if (loading && proyectos.length === 0) {
         return <div className="flex items-center justify-center h-screen"><Loader size="lg" /></div>;
