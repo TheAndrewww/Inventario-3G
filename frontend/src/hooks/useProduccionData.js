@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import produccionService from '../services/produccion.service';
-import { flattenProyectos } from '../utils/produccion';
+import { obtenerCalendarioActualPublico } from '../services/calendario.service';
+import { flattenProyectos, aplicarFechasCalendario } from '../utils/produccion';
 import toast from 'react-hot-toast';
 
 /**
@@ -34,7 +35,25 @@ export const useProduccionData = ({
                 : await produccionService.obtenerDashboard();
 
             if (response.success && mountedRef.current) {
-                setProyectos(flattenProyectos(response.data.resumen));
+                let proys = flattenProyectos(response.data.resumen);
+
+                // Integrar fechas del calendario (silencioso, no bloquea si falla)
+                try {
+                    const calResponse = await obtenerCalendarioActualPublico();
+                    if (calResponse?.success && calResponse?.data?.proyectos?.length) {
+                        const now = new Date();
+                        // Usar hora de México para determinar el mes actual
+                        const mexicoOffset = -6 * 60;
+                        const mexicoTime = new Date(now.getTime() + (now.getTimezoneOffset() + mexicoOffset) * 60 * 1000);
+                        const anio = mexicoTime.getFullYear();
+                        const mes = mexicoTime.getMonth() + 1;
+                        proys = aplicarFechasCalendario(proys, calResponse.data.proyectos, anio, mes);
+                    }
+                } catch (calError) {
+                    console.warn('⚠️ No se pudo cargar calendario para fechas:', calError.message);
+                }
+
+                setProyectos(proys);
                 setEstadisticas(response.data.estadisticas);
             }
         } catch (error) {

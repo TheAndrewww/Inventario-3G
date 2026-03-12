@@ -135,7 +135,7 @@ const DashboardPreparadosTVPage = () => {
                         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm mb-6">
                             <div className="flex items-center gap-2 mb-2 text-blue-700 font-bold border-b border-blue-100 pb-2">
                                 <Snowflake size={20} />
-                                <span>Proyectos Completados Congelados ({proyectosCongelados.length})</span>
+                                <span>Proyectos Completados Pausados ({proyectosCongelados.length})</span>
                             </div>
                             <div className="flex-1 overflow-y-auto pr-2 space-y-1" style={{ maxHeight: px(220) }}>
                                 {proyectosCongelados.map(p => (

@@ -23,7 +23,7 @@ const ProyectoCardHerreria = ({ proyecto }) => {
         diasRestantesArea = diasPorEtapa.produccion.dias;
     }
 
-    const urgente = proyecto.prioridad === 1 || (diasRestantesArea !== null && diasRestantesArea <= 3);
+    const urgente = proyecto.prioridad === 1 || (diasRestantesArea !== null && diasRestantesArea <= 2);
 
     const formatFecha = (fecha) => {
         if (!fecha) return '—';
@@ -59,18 +59,18 @@ const ProyectoCardHerreria = ({ proyecto }) => {
                 </div>
                 <div className="text-right shrink-0 space-y-3">
                     {fechaLimiteArea && (
-                        <div className={`flex items-center gap-3 px-6 py-4 rounded-xl ${diasRestantesArea !== null && diasRestantesArea <= 3 ? 'bg-red-200/60 border border-red-300' : 'bg-white/60 border border-gray-200'}`}>
-                            <Calendar size={32} className={diasRestantesArea !== null && diasRestantesArea <= 3 ? 'text-red-500' : 'text-gray-400'} />
-                            <div>
-                                <span className="text-base text-gray-500 block">Límite de área</span>
-                                <span className={`font-bold text-5xl ${diasRestantesArea !== null && diasRestantesArea <= 3 ? 'text-red-700' : 'text-gray-800'}`}>
+                        <>
+                            <span className="text-xl font-bold text-gray-600 block">Fecha de entrega</span>
+                            <div className={`flex items-center gap-3 px-6 py-4 rounded-xl ${diasRestantesArea !== null && diasRestantesArea <= 2 ? 'bg-red-200/60 border border-red-300' : 'bg-white/60 border border-gray-200'}`}>
+                                <Calendar size={32} className={diasRestantesArea !== null && diasRestantesArea <= 2 ? 'text-red-500' : 'text-gray-400'} />
+                                <span className={`font-bold text-5xl ${diasRestantesArea !== null && diasRestantesArea <= 2 ? 'text-red-700' : 'text-gray-800'}`}>
                                     {formatFecha(fechaLimiteArea)}
                                 </span>
                             </div>
-                        </div>
+                        </>
                     )}
                     {diasRestantesArea !== null && diasRestantesArea >= 0 && (
-                        <p className={`text-xl font-bold ${diasRestantesArea <= 3 ? 'text-red-600' : 'text-gray-500'}`}>
+                        <p className={`text-xl font-bold ${diasRestantesArea <= 2 ? 'text-red-600' : 'text-gray-500'}`}>
                             {diasRestantesArea} día{diasRestantesArea !== 1 ? 's' : ''} restante{diasRestantesArea !== 1 ? 's' : ''}
                         </p>
                     )}

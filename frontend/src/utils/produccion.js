@@ -290,3 +290,106 @@ export const calcularDiasPorEtapa = (proyecto) => {
     return resultado;
 };
 
+// ===== Calendar-based deadline override =====
+
+/**
+ * Normaliza un nombre para comparación: minúsculas, sin acentos, sin espacios extra
+ */
+const normalizarNombre = (str) => {
+    if (!str) return '';
+    return str
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+};
+
+/**
+ * Calcula la distancia de Levenshtein entre dos strings
+ */
+const levenshtein = (a, b) => {
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            const cost = b[i - 1] === a[j - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(
+                matrix[i - 1][j] + 1,
+                matrix[i][j - 1] + 1,
+                matrix[i - 1][j - 1] + cost
+            );
+        }
+    }
+    return matrix[b.length][a.length];
+};
+
+/**
+ * Compara dos nombres y devuelve true si la similitud es >= 80%
+ */
+export const matchNombre = (nombreA, nombreB) => {
+    const a = normalizarNombre(nombreA);
+    const b = normalizarNombre(nombreB);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    const maxLen = Math.max(a.length, b.length);
+    if (maxLen === 0) return false;
+    const dist = levenshtein(a, b);
+    const similarity = 1 - dist / maxLen;
+    return similarity >= 0.8;
+};
+
+/**
+ * Aplica fechas del calendario como fecha_limite a los proyectos de producción.
+ * Para cada proyecto del calendario, busca un match de nombre (≥80%) en la lista de producción.
+ * Si encuentra match, overridea fecha_limite con (día del calendario - 1).
+ *
+ * @param {Array} proyectos - Proyectos de producción
+ * @param {Array} calendarioProyectos - Proyectos del calendario [{nombre, dia, ...}]
+ * @param {number} anio - Año actual
+ * @param {number} mes - Mes actual (1-12)
+ * @returns {Array} Proyectos con fecha_limite actualizada donde corresponde
+ */
+export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, mes) => {
+    if (!calendarioProyectos?.length || !proyectos?.length) return proyectos;
+
+    // Crear mapa de nombre calendario → menor día encontrado
+    const fechasPorNombre = {};
+    calendarioProyectos.forEach(cp => {
+        if (!cp.nombre || !cp.dia) return;
+        const key = normalizarNombre(cp.nombre);
+        if (!key) return;
+        // Guardar el menor día (primera aparición del proyecto en el calendario)
+        if (!fechasPorNombre[key] || cp.dia < fechasPorNombre[key]) {
+            fechasPorNombre[key] = cp.dia;
+        }
+    });
+
+    const nombresCalendario = Object.keys(fechasPorNombre);
+    if (nombresCalendario.length === 0) return proyectos;
+
+    return proyectos.map(p => {
+        const nombreProd = normalizarNombre(p.nombre);
+        if (!nombreProd) return p;
+
+        // Buscar match en nombres del calendario
+        for (const nombreCal of nombresCalendario) {
+            if (matchNombre(nombreProd, nombreCal)) {
+                const diaCal = fechasPorNombre[nombreCal];
+                // Fecha de instalación = día del calendario - 1
+                const diaLimite = Math.max(1, diaCal - 1);
+                const nuevaFechaLimite = `${anio}-${String(mes).padStart(2, '0')}-${String(diaLimite).padStart(2, '0')}`;
+
+                // Solo overridear si la fecha del calendario es ANTES de la fecha_limite actual
+                // o si no hay fecha_limite
+                if (!p.fecha_limite || nuevaFechaLimite < p.fecha_limite) {
+                    return { ...p, fecha_limite: nuevaFechaLimite, _fechaCalendario: true };
+                }
+                break;
+            }
+        }
+        return p;
+    });
+};
