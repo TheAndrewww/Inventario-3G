@@ -66,7 +66,7 @@ const ProyectoCardHerreria = ({ proyecto }) => {
                 <div className="text-right shrink-0 space-y-3">
                     {fechaLimiteArea && (
                         <>
-                            <span className="text-2xl font-bold text-gray-600 block">Fecha de entrega</span>
+                            <span className="text-4xl font-bold text-gray-600 block mb-2">Fecha de entrega</span>
                             <div className={`flex items-center gap-3 px-6 py-4 rounded-xl ${diasRestantesArea !== null && diasRestantesArea <= 2 ? 'bg-red-200/60 border border-red-300' : 'bg-white/60 border border-gray-200'}`}>
                                 <Calendar size={32} className={diasRestantesArea !== null && diasRestantesArea <= 2 ? 'text-red-500' : 'text-gray-400'} />
                                 <span className={`font-bold text-5xl ${diasRestantesArea !== null && diasRestantesArea <= 2 ? 'text-red-700' : 'text-gray-800'}`}>
