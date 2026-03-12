@@ -3,36 +3,24 @@ import { ZoomIn, ZoomOut, RotateCw, Clock, AlertTriangle, Calendar } from 'lucid
 import { Loader } from '../components/common';
 import { Toaster } from 'react-hot-toast';
 import { useProduccionData } from '../hooks/useProduccionData';
-import { sortProyectosPorUrgencia, addBusinessDays, calcularDiasHabiles, getHoyStr } from '../utils/produccion';
+import { sortProyectosPorUrgencia, calcularDiasPorEtapa, calcularDiasHabiles, getHoyStr } from '../utils/produccion';
 import { px } from '../utils/produccion';
-
-// Tiempos acumulados por tipo (mismos que el backend)
-const TIEMPOS_POR_TIPO = {
-    'C': { produccion: 5 },
-    'B': { produccion: 10 },
-    'A': { produccion: 20 }
-};
 
 /**
  * Tarjeta grande de proyecto para el TV de Herrería
  */
 const ProyectoCardHerreria = ({ proyecto }) => {
-    // Calcular fecha límite del ÁREA (producción) en vez de la global
-    const tipo = proyecto.tipo_proyecto?.toUpperCase();
-    const tiempos = tipo ? TIEMPOS_POR_TIPO[tipo] : null;
+    // Calcular fecha límite del ÁREA (producción) usando la misma lógica del dashboard
+    const diasPorEtapa = calcularDiasPorEtapa(proyecto);
+
+    const dateToStr = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 
     let fechaLimiteArea = proyecto.fecha_limite;
     let diasRestantesArea = proyecto.diasRestantes;
 
-    if (tiempos && proyecto.fecha_entrada) {
-        const fechaObj = addBusinessDays(proyecto.fecha_entrada, tiempos.produccion);
-        if (fechaObj) {
-            const y = fechaObj.getUTCFullYear();
-            const m = String(fechaObj.getUTCMonth() + 1).padStart(2, '0');
-            const d = String(fechaObj.getUTCDate()).padStart(2, '0');
-            fechaLimiteArea = `${y}-${m}-${d}`;
-            diasRestantesArea = calcularDiasHabiles(getHoyStr(), fechaLimiteArea);
-        }
+    if (diasPorEtapa?.produccion) {
+        fechaLimiteArea = dateToStr(diasPorEtapa.produccion.fechaLimite);
+        diasRestantesArea = diasPorEtapa.produccion.dias;
     }
 
     const urgente = proyecto.prioridad === 1 || (diasRestantesArea !== null && diasRestantesArea <= 3);
@@ -159,18 +147,11 @@ const DashboardHerreriaTVPage = () => {
             !(p.estadoSubEtapas?.herreria?.completado || p.herreria_completado)
         );
 
-        // Helper: calcular diasRestantes del ÁREA para un proyecto
+        // Helper: calcular diasRestantes del ÁREA usando la misma lógica del dashboard
         const getDiasArea = (p) => {
-            const tipo = p.tipo_proyecto?.toUpperCase();
-            const tiempos = tipo ? TIEMPOS_POR_TIPO[tipo] : null;
-            if (tiempos && p.fecha_entrada) {
-                const fechaObj = addBusinessDays(p.fecha_entrada, tiempos.produccion);
-                if (fechaObj) {
-                    const y = fechaObj.getUTCFullYear();
-                    const m = String(fechaObj.getUTCMonth() + 1).padStart(2, '0');
-                    const d = String(fechaObj.getUTCDate()).padStart(2, '0');
-                    return calcularDiasHabiles(getHoyStr(), `${y}-${m}-${d}`);
-                }
+            const diasPorEtapa = calcularDiasPorEtapa(p);
+            if (diasPorEtapa?.produccion) {
+                return diasPorEtapa.produccion.dias;
             }
             return p.diasRestantes ?? 999;
         };
