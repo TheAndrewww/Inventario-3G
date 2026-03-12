@@ -335,7 +335,7 @@ const TimelineStepper = memo(({ proyecto }) => {
         // Timeline simplificado (posiciones ajustadas: 8% y 75%)
         if (timelineSimplificado) {
             const nodes = [
-                { stage: 'instalacion', icon: ETAPAS_CONFIG.instalacion.icon, label: 'Preparado', pos: '8%' },
+                { stage: 'instalacion', icon: ETAPAS_CONFIG.instalacion.icon, label: 'Completado', pos: '8%' },
                 { stage: 'completado', icon: ETAPAS_CONFIG.completado.icon, label: 'Fin', pos: '75%' }
             ];
 
@@ -382,7 +382,7 @@ const TimelineStepper = memo(({ proyecto }) => {
             }
 
             nodes.push(
-                { stage: 'instalacion', icon: ETAPAS_CONFIG.instalacion.icon, label: 'Prep.', pos: POS5.P4, idx: 4, topPercent: '40%' },
+                { stage: 'instalacion', icon: ETAPAS_CONFIG.instalacion.icon, label: 'Comp.', pos: POS5.P4, idx: 4, topPercent: '40%' },
                 { stage: 'completado', icon: ETAPAS_CONFIG.completado.icon, label: 'Fin', pos: POS5.P5, idx: 5, topPercent: '40%' }
             );
         } else {
@@ -391,7 +391,7 @@ const TimelineStepper = memo(({ proyecto }) => {
             nodes = [
                 { stage: 'diseno', icon: ETAPAS_CONFIG.diseno.icon, label: 'Diseño', pos: POS4.P1, idx: 1, topPercent: '40%' },
                 { stage: 'compras', icon: ETAPAS_CONFIG.compras.icon, label: 'Compras', pos: POS4.P2, idx: 2, topPercent: '40%' },
-                { stage: 'instalacion', icon: ETAPAS_CONFIG.instalacion.icon, label: 'Prep.', pos: POS4.P3, idx: 4, topPercent: '40%' },
+                { stage: 'instalacion', icon: ETAPAS_CONFIG.instalacion.icon, label: 'Comp.', pos: POS4.P3, idx: 4, topPercent: '40%' },
                 { stage: 'completado', icon: ETAPAS_CONFIG.completado.icon, label: 'Fin', pos: POS4.P4, idx: 5, topPercent: '40%' }
             ];
         }

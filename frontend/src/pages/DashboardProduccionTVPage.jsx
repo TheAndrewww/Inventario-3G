@@ -109,6 +109,7 @@ const DashboardProduccionTVPage = () => {
             >
                 {/* Scrollable Area */}
                 <div className="h-full w-full overflow-auto" style={{ padding: px(16) }}>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-4">Panel de Producción</h1>
                     <div className="flex gap-4 mb-6">
                         <div className="flex-1">
                             <EstadisticasHeader estadisticas={estadisticas} />

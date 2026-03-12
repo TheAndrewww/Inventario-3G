@@ -15,7 +15,7 @@ export const ETAPAS_CONFIG = {
     diseno: { nombre: 'Diseño', color: '#8B5CF6', bgColor: 'bg-violet-500', icon: PencilRuler, orden: 1 },
     compras: { nombre: 'Compras', color: '#10B981', bgColor: 'bg-emerald-500', icon: ShoppingCart, orden: 2 },
     produccion: { nombre: 'Producción', color: '#F59E0B', bgColor: 'bg-amber-500', icon: Factory, orden: 3 },
-    instalacion: { nombre: 'Preparado', color: '#3B82F6', bgColor: 'bg-blue-500', icon: Truck, orden: 4 },
+    instalacion: { nombre: 'Completado', color: '#3B82F6', bgColor: 'bg-blue-500', icon: Truck, orden: 4 },
     completado: { nombre: 'Completado', color: '#22C55E', bgColor: 'bg-green-500', icon: CheckCircle2, orden: 5 }
 };
 

@@ -19,10 +19,13 @@ const ProyectoCardManufactura = ({ proyecto }) => {
     };
 
     return (
-        <div className={`rounded-2xl border-2 p-6 transition-all bg-amber-50 border-amber-300 ${urgente ? 'ring-2 ring-red-300' : ''}`}>
+        <div
+            className={`rounded-2xl border-2 p-6 transition-all ${urgente ? 'border-red-500' : 'bg-amber-50 border-amber-300'}`}
+            style={urgente ? { animation: 'pulseRed 2.5s ease-in-out infinite', background: '#fecaca' } : {}}
+        >
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0 flex-1">
-                    <Clock size={28} className="text-amber-500 animate-pulse shrink-0" />
+                    <Clock size={28} className={`${urgente ? 'text-red-600' : 'text-amber-500 animate-pulse'} shrink-0`} />
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3 flex-wrap">
                             <h3 className="font-bold text-gray-900 text-2xl">{proyecto.nombre}</h3>
@@ -43,29 +46,24 @@ const ProyectoCardManufactura = ({ proyecto }) => {
                     </div>
                 </div>
                 <div className="text-right shrink-0 space-y-2">
-                    <div className="flex items-center gap-4 text-sm">
-                        <div className="flex items-center gap-1.5">
-                            <Calendar size={16} className="text-gray-400" />
-                            <span className="text-gray-500">Entrada:</span>
-                            <span className="font-bold text-gray-700">{formatFecha(proyecto.fecha_entrada)}</span>
-                        </div>
-                        {proyecto.fecha_limite && (
-                            <div className="flex items-center gap-1.5">
-                                <Calendar size={16} className={diasRestantes !== null && diasRestantes <= 3 ? 'text-red-500' : 'text-gray-400'} />
-                                <span className="text-gray-500">Límite:</span>
-                                <span className={`font-bold ${diasRestantes !== null && diasRestantes <= 3 ? 'text-red-600' : 'text-gray-700'}`}>
+                    {proyecto.fecha_limite && (
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${diasRestantes !== null && diasRestantes <= 3 ? 'bg-red-200/60 border border-red-300' : 'bg-white/60 border border-gray-200'}`}>
+                            <Calendar size={22} className={diasRestantes !== null && diasRestantes <= 3 ? 'text-red-500' : 'text-gray-400'} />
+                            <div>
+                                <span className="text-xs text-gray-500 block">Fecha límite</span>
+                                <span className={`font-bold text-3xl ${diasRestantes !== null && diasRestantes <= 3 ? 'text-red-700' : 'text-gray-800'}`}>
                                     {formatFecha(proyecto.fecha_limite)}
                                 </span>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                     {diasRestantes !== null && diasRestantes >= 0 && (
-                        <p className={`text-sm font-bold ${diasRestantes <= 3 ? 'text-red-600' : 'text-gray-500'}`}>
+                        <p className={`text-base font-bold ${diasRestantes <= 3 ? 'text-red-600' : 'text-gray-500'}`}>
                             {diasRestantes} día{diasRestantes !== 1 ? 's' : ''} restante{diasRestantes !== 1 ? 's' : ''}
                         </p>
                     )}
                     {diasRestantes !== null && diasRestantes < 0 && (
-                        <p className="text-sm font-bold text-red-600">
+                        <p className="text-base font-bold text-red-600">
                             {Math.abs(diasRestantes)} día{Math.abs(diasRestantes) !== 1 ? 's' : ''} de atraso
                         </p>
                     )}
@@ -161,7 +159,7 @@ const DashboardManufacturaTVPage = () => {
                                 <span className="text-3xl">🏭</span>
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Manufactura</h1>
+                                <h1 className="text-3xl font-bold text-gray-900">Producción de Manufactura</h1>
                                 <p className="text-gray-500">
                                     <span className="font-semibold text-amber-600">{enProduccion.length}</span> proyecto{enProduccion.length !== 1 ? 's' : ''} en proceso
                                 </p>

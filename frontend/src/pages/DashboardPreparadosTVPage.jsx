@@ -120,7 +120,7 @@ const DashboardPreparadosTVPage = () => {
                                 📦
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Proyectos Preparados</h1>
+                                <h1 className="text-3xl font-bold text-gray-900">Proyectos Completados</h1>
                                 <p className="text-gray-500 text-sm">Listos para entrega o completar</p>
                             </div>
                             <div className="ml-auto">
@@ -135,7 +135,7 @@ const DashboardPreparadosTVPage = () => {
                         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm mb-6">
                             <div className="flex items-center gap-2 mb-2 text-blue-700 font-bold border-b border-blue-100 pb-2">
                                 <Snowflake size={20} />
-                                <span>Proyectos Preparados Congelados ({proyectosCongelados.length})</span>
+                                <span>Proyectos Completados Congelados ({proyectosCongelados.length})</span>
                             </div>
                             <div className="flex-1 overflow-y-auto pr-2 space-y-1" style={{ maxHeight: px(220) }}>
                                 {proyectosCongelados.map(p => (
@@ -153,7 +153,7 @@ const DashboardPreparadosTVPage = () => {
                         ))}
                         {proyectosPreparados.length === 0 && (
                             <div className="text-center text-gray-500 font-bold" style={{ padding: px(80), fontSize: `calc(1.5rem * var(--escala, 1))` }}>
-                                No hay proyectos preparados
+                                No hay proyectos completados
                             </div>
                         )}
                     </div>
@@ -165,7 +165,7 @@ const DashboardPreparadosTVPage = () => {
                 className={`fixed z-40 bg-blue-500 text-white backdrop-blur-sm rounded-full font-medium shadow-sm border border-blue-600 flex items-center bottom-4 left-4`}
                 style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem', gap: '0.5rem' }}
             >
-                <span>📦 Preparados - En vivo</span>
+                <span>📦 Completados - En vivo</span>
             </div>
 
             {/* Controls */}

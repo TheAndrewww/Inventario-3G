@@ -94,7 +94,7 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
             {!isPaused && subEtapas.ambosCompletados && proyecto.etapa_actual === 'produccion' && (
                 <div className="px-6 py-3 bg-green-50 border-t border-green-100 text-center">
                     <span className="text-base text-green-700 font-bold flex items-center justify-center gap-2">
-                        <CheckCircle2 size={16} /> Producción Finalizada - Listo para marcar como Preparado
+                        <CheckCircle2 size={16} /> Producción Finalizada - Listo para marcar como Completado
                     </span>
                 </div>
             )}
@@ -107,7 +107,7 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
                             onClick={handleRegresar}
                             disabled={regresarLoading}
                             className="py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-gray-100 hover:bg-gray-200 text-gray-700"
-                            title="Regresar a Preparado"
+                            title="Regresar a Completado"
                         >
                             {regresarLoading ? (
                                 <RefreshCw size={18} className="animate-spin" />
@@ -134,7 +134,7 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
                                 { key: 'compras', label: 'Compras', done: !!proyecto.compras_completado_en, color: 'emerald' },
                                 { key: 'manufactura', label: 'Manufactura', done: proyecto.estadoSubEtapas?.manufactura?.completado || proyecto.manufactura_completado, color: 'amber' },
                                 { key: 'herreria', label: 'Herrería', done: proyecto.estadoSubEtapas?.herreria?.completado || proyecto.herreria_completado, color: 'red' },
-                                { key: 'instalacion', label: 'Preparado', done: !!proyecto.instalacion_completado_en, color: 'blue' }
+                                { key: 'instalacion', label: 'Completado', done: !!proyecto.instalacion_completado_en, color: 'blue' }
                             ].filter((etapa) => {
                                 // Ocultar Manufactura/Herrería si el proyecto no las tiene activas
                                 if (etapa.key === 'manufactura') {
