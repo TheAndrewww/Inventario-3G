@@ -1,73 +1,72 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, Clock, AlertTriangle, Calendar } from 'lucide-react';
 import { Loader } from '../components/common';
 import { Toaster } from 'react-hot-toast';
 import { useProduccionData } from '../hooks/useProduccionData';
 import { sortProyectosPorUrgencia } from '../utils/produccion';
 import { px } from '../utils/produccion';
-import { ETAPAS_CONFIG } from '../components/produccion/constants';
 
 /**
- * Tarjeta simplificada de proyecto para el TV de Herrería
+ * Tarjeta grande de proyecto para el TV de Herrería
  */
 const ProyectoCardHerreria = ({ proyecto }) => {
-    const herreriaDone = proyecto.estadoSubEtapas?.herreria?.completado || proyecto.herreria_completado;
-    const etapaActual = proyecto.etapa_actual;
-    const enProduccion = etapaActual === 'produccion';
-    const etapaConfig = ETAPAS_CONFIG[etapaActual] || ETAPAS_CONFIG.pendiente;
-
-    let statusColor, statusBg, statusIcon, statusText;
-    if (herreriaDone) {
-        statusColor = 'text-green-700';
-        statusBg = 'bg-green-50 border-green-200';
-        statusIcon = <CheckCircle2 size={20} className="text-green-500" />;
-        statusText = 'Completado';
-    } else if (enProduccion) {
-        statusColor = 'text-orange-700';
-        statusBg = 'bg-orange-50 border-orange-300 ring-2 ring-orange-200';
-        statusIcon = <Clock size={20} className="text-orange-500 animate-pulse" />;
-        statusText = 'En proceso';
-    } else {
-        statusColor = 'text-gray-500';
-        statusBg = 'bg-gray-50 border-gray-200';
-        statusIcon = <Clock size={20} className="text-gray-400" />;
-        statusText = `En ${etapaConfig.nombre}`;
-    }
-
     const diasRestantes = proyecto.diasRestantes;
     const urgente = proyecto.prioridad === 1 || (diasRestantes !== null && diasRestantes <= 3);
 
+    const formatFecha = (fecha) => {
+        if (!fecha) return '—';
+        return new Date(fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+    };
+
     return (
-        <div className={`rounded-xl border-2 p-4 transition-all ${statusBg} ${urgente && !herreriaDone ? 'ring-2 ring-red-300' : ''}`}>
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                    {statusIcon}
+        <div className={`rounded-2xl border-2 p-6 transition-all bg-orange-50 border-orange-300 ${urgente ? 'ring-2 ring-red-300' : ''}`}>
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <Clock size={28} className="text-orange-500 animate-pulse shrink-0" />
                     <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-bold text-gray-900 text-lg truncate">{proyecto.nombre}</h3>
-                            {urgente && !herreriaDone && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-bold shrink-0">
-                                    <AlertTriangle size={12} /> URGENTE
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h3 className="font-bold text-gray-900 text-2xl">{proyecto.nombre}</h3>
+                            {urgente && (
+                                <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-bold shrink-0">
+                                    <AlertTriangle size={16} /> URGENTE
                                 </span>
                             )}
                             {proyecto.tipo_proyecto && (
-                                <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded-full text-xs font-medium shrink-0">
+                                <span className="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm font-semibold shrink-0">
                                     {proyecto.tipo_proyecto}
                                 </span>
                             )}
                         </div>
                         {proyecto.cliente && (
-                            <p className="text-sm text-gray-500 truncate">{proyecto.cliente}</p>
+                            <p className="text-base text-gray-500 mt-1">{proyecto.cliente}</p>
                         )}
                     </div>
                 </div>
-                <div className="text-right shrink-0">
-                    <span className={`inline-block px-3 py-1.5 rounded-lg text-sm font-bold ${statusColor} ${herreriaDone ? 'bg-green-100' : enProduccion ? 'bg-orange-100' : 'bg-gray-100'}`}>
-                        {statusText}
-                    </span>
-                    {diasRestantes !== null && diasRestantes >= 0 && !herreriaDone && (
-                        <p className={`text-xs mt-1 ${diasRestantes <= 3 ? 'text-red-600 font-bold' : 'text-gray-400'}`}>
+                <div className="text-right shrink-0 space-y-2">
+                    <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-1.5">
+                            <Calendar size={16} className="text-gray-400" />
+                            <span className="text-gray-500">Entrada:</span>
+                            <span className="font-bold text-gray-700">{formatFecha(proyecto.fecha_entrada)}</span>
+                        </div>
+                        {proyecto.fecha_limite && (
+                            <div className="flex items-center gap-1.5">
+                                <Calendar size={16} className={diasRestantes !== null && diasRestantes <= 3 ? 'text-red-500' : 'text-gray-400'} />
+                                <span className="text-gray-500">Límite:</span>
+                                <span className={`font-bold ${diasRestantes !== null && diasRestantes <= 3 ? 'text-red-600' : 'text-gray-700'}`}>
+                                    {formatFecha(proyecto.fecha_limite)}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                    {diasRestantes !== null && diasRestantes >= 0 && (
+                        <p className={`text-sm font-bold ${diasRestantes <= 3 ? 'text-red-600' : 'text-gray-500'}`}>
                             {diasRestantes} día{diasRestantes !== 1 ? 's' : ''} restante{diasRestantes !== 1 ? 's' : ''}
+                        </p>
+                    )}
+                    {diasRestantes !== null && diasRestantes < 0 && (
+                        <p className="text-sm font-bold text-red-600">
+                            {Math.abs(diasRestantes)} día{Math.abs(diasRestantes) !== 1 ? 's' : ''} de atraso
                         </p>
                     )}
                 </div>
@@ -129,21 +128,18 @@ const DashboardHerreriaTVPage = () => {
         };
     };
 
-    // Solo proyectos con herrería, no completados, no pausados
-    const proyectosHerreria = useMemo(() =>
+    // Solo proyectos en producción con herrería activa (no completada)
+    const enProduccion = useMemo(() =>
         sortProyectosPorUrgencia(
             proyectos.filter(p =>
                 p.tiene_herreria &&
-                p.etapa_actual !== 'completado' &&
-                !p.pausado
+                p.etapa_actual === 'produccion' &&
+                !p.pausado &&
+                !(p.estadoSubEtapas?.herreria?.completado || p.herreria_completado)
             )
         ),
         [proyectos]
     );
-
-    const enProduccion = proyectosHerreria.filter(p => p.etapa_actual === 'produccion' && !(p.estadoSubEtapas?.herreria?.completado || p.herreria_completado));
-    const completados = proyectosHerreria.filter(p => p.estadoSubEtapas?.herreria?.completado || p.herreria_completado);
-    const pendientes = proyectosHerreria.filter(p => p.etapa_actual !== 'produccion' && !(p.estadoSubEtapas?.herreria?.completado || p.herreria_completado));
 
     if (loading && proyectos.length === 0) {
         return <div className="flex items-center justify-center h-screen"><Loader size="lg" /></div>;
@@ -167,56 +163,21 @@ const DashboardHerreriaTVPage = () => {
                             <div>
                                 <h1 className="text-3xl font-bold text-gray-900">Herrería</h1>
                                 <p className="text-gray-500">
-                                    <span className="font-semibold text-orange-600">{enProduccion.length}</span> en proceso
-                                    {completados.length > 0 && <> · <span className="text-green-600 font-semibold">{completados.length}</span> completados</>}
-                                    {pendientes.length > 0 && <> · <span className="text-gray-400">{pendientes.length}</span> por llegar</>}
+                                    <span className="font-semibold text-orange-600">{enProduccion.length}</span> proyecto{enProduccion.length !== 1 ? 's' : ''} en proceso
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* En proceso ahora */}
-                    {enProduccion.length > 0 && (
-                        <div className="mb-6">
-                            <h2 className="text-sm font-bold text-orange-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
-                                En Proceso ({enProduccion.length})
-                            </h2>
-                            <div className="space-y-3">
-                                {enProduccion.map(p => <ProyectoCardHerreria key={p.id} proyecto={p} />)}
+                    {/* Proyectos en proceso */}
+                    <div className="pb-20 space-y-4">
+                        {enProduccion.map(p => <ProyectoCardHerreria key={p.id} proyecto={p} />)}
+                        {enProduccion.length === 0 && (
+                            <div className="text-center text-gray-400 font-bold py-20 text-xl">
+                                No hay proyectos en herrería actualmente
                             </div>
-                        </div>
-                    )}
-
-                    {/* Por llegar */}
-                    {pendientes.length > 0 && (
-                        <div className="mb-6">
-                            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
-                                Por llegar a herrería ({pendientes.length})
-                            </h2>
-                            <div className="space-y-2">
-                                {pendientes.map(p => <ProyectoCardHerreria key={p.id} proyecto={p} />)}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Completados en herrería */}
-                    {completados.length > 0 && (
-                        <div className="mb-6 pb-20">
-                            <h2 className="text-sm font-bold text-green-600 uppercase tracking-wider mb-3">
-                                ✅ Herrería completada ({completados.length})
-                            </h2>
-                            <div className="space-y-2 opacity-70">
-                                {completados.map(p => <ProyectoCardHerreria key={p.id} proyecto={p} />)}
-                            </div>
-                        </div>
-                    )}
-
-                    {proyectosHerreria.length === 0 && (
-                        <div className="text-center text-gray-400 font-bold py-20 text-xl">
-                            No hay proyectos con herrería activa
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
 
