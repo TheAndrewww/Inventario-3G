@@ -23,25 +23,31 @@ const ProyectoCardHerreria = ({ proyecto }) => {
         diasRestantesArea = diasPorEtapa.produccion.dias;
     }
 
-    const urgente = proyecto.prioridad === 1 || (diasRestantesArea !== null && diasRestantesArea <= 2);
+    // Dos niveles: advertencia (≤2 días, borde rojo) y crítico (≤1 día, fondo rojo + parpadeo)
+    const critico = proyecto.prioridad === 1 || (diasRestantesArea !== null && diasRestantesArea <= 1);
+    const advertencia = !critico && (diasRestantesArea !== null && diasRestantesArea <= 2);
 
     const formatFecha = (fecha) => {
         if (!fecha) return '—';
+        if (fecha === fechaLimiteArea) {
+            if (diasRestantesArea === 0) return 'HOY';
+            if (diasRestantesArea === 1) return 'MAÑANA';
+        }
         return new Date(fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
     };
 
     return (
         <div
-            className={`rounded-2xl border-2 p-10 transition-all ${urgente ? 'border-red-500' : 'bg-orange-50 border-orange-300'}`}
-            style={urgente ? { animation: 'pulseRed 2.5s ease-in-out infinite', background: '#fecaca' } : {}}
+            className={`rounded-2xl border-2 p-10 transition-all ${critico ? 'border-red-500' : advertencia ? 'border-red-400 bg-orange-50' : 'bg-orange-50 border-orange-300'}`}
+            style={critico ? { animation: 'pulseRed 2.5s ease-in-out infinite', background: '#fecaca' } : {}}
         >
             <div className="flex items-center justify-between gap-6">
                 <div className="flex items-center gap-5 min-w-0 flex-1">
-                    <Clock size={44} className={`${urgente ? 'text-red-600' : 'text-orange-500 animate-pulse'} shrink-0`} />
+                    <Clock size={44} className={`${(critico || advertencia) ? 'text-red-600' : 'text-orange-500 animate-pulse'} shrink-0`} />
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-4 flex-wrap">
                             <h3 className="font-bold text-gray-900 text-5xl">{proyecto.nombre}</h3>
-                            {urgente && (
+                            {critico && (
                                 <span className="inline-flex items-center gap-2 px-5 py-2 bg-red-100 text-red-700 rounded-full text-lg font-bold shrink-0">
                                     <AlertTriangle size={24} /> URGENTE
                                 </span>
@@ -60,7 +66,7 @@ const ProyectoCardHerreria = ({ proyecto }) => {
                 <div className="text-right shrink-0 space-y-3">
                     {fechaLimiteArea && (
                         <>
-                            <span className="text-xl font-bold text-gray-600 block">Fecha de entrega</span>
+                            <span className="text-2xl font-bold text-gray-600 block">Fecha de entrega</span>
                             <div className={`flex items-center gap-3 px-6 py-4 rounded-xl ${diasRestantesArea !== null && diasRestantesArea <= 2 ? 'bg-red-200/60 border border-red-300' : 'bg-white/60 border border-gray-200'}`}>
                                 <Calendar size={32} className={diasRestantesArea !== null && diasRestantesArea <= 2 ? 'text-red-500' : 'text-gray-400'} />
                                 <span className={`font-bold text-5xl ${diasRestantesArea !== null && diasRestantesArea <= 2 ? 'text-red-700' : 'text-gray-800'}`}>

@@ -361,6 +361,8 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
         if (!cp.nombre || !cp.dia) return;
         const key = normalizarNombre(cp.nombre);
         if (!key) return;
+        // Ignorar entradas de cimentación
+        if (key.includes('cimentacion')) return;
         // Guardar el menor día (primera aparición del proyecto en el calendario)
         if (!fechasPorNombre[key] || cp.dia < fechasPorNombre[key]) {
             fechasPorNombre[key] = cp.dia;
