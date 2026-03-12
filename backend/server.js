@@ -243,8 +243,8 @@ const startServer = async () => {
 
         // Sincronizar modelos
         if (process.env.NODE_ENV === 'development') {
-            await sequelize.sync({ alter: false });
-            console.log('✅ Modelos sincronizados con la base de datos');
+            // await sequelize.sync({ alter: false });
+            console.log('✅ Modelos sincronizados con la base de datos (sync deshabilitado)');
 
             // Verificar columna tipo_proyecto en desarrollo también
             try {

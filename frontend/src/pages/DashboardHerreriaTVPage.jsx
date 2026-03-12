@@ -128,12 +128,12 @@ const DashboardHerreriaTVPage = () => {
         };
     };
 
-    // Solo proyectos en producción con herrería activa (no completada)
+    // Proyectos con herrería desbloqueada (sin importar etapa), no completados, no pausados
     const enProduccion = useMemo(() =>
         sortProyectosPorUrgencia(
             proyectos.filter(p =>
                 p.tiene_herreria &&
-                p.etapa_actual === 'produccion' &&
+                p.etapa_actual !== 'completado' &&
                 !p.pausado &&
                 !(p.estadoSubEtapas?.herreria?.completado || p.herreria_completado)
             )

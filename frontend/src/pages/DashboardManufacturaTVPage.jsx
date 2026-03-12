@@ -128,12 +128,12 @@ const DashboardManufacturaTVPage = () => {
         };
     };
 
-    // Solo proyectos en producción con manufactura activa (no completada)
+    // Proyectos con manufactura desbloqueada (sin importar etapa), no completados, no pausados
     const enProduccion = useMemo(() =>
         sortProyectosPorUrgencia(
             proyectos.filter(p =>
                 p.tiene_manufactura &&
-                p.etapa_actual === 'produccion' &&
+                p.etapa_actual !== 'completado' &&
                 !p.pausado &&
                 !(p.estadoSubEtapas?.manufactura?.completado || p.manufactura_completado)
             )
