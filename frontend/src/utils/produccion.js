@@ -1,11 +1,11 @@
 /**
  * Ordena proyectos por urgencia (criterio único para Dashboard y TV).
- *   0. Proyectos pausados van al final (después de todos los activos)
- *   1. En retraso primero (estadoRetraso.enRetraso — solo tipos A/B/C)
- *   2. Más días de retraso cuando ambos están en retraso
- *   3. Vencidos (diasRestantes < 0)
+ *   0. Proyectos pausados van al final
+ *   1. GTIA (Garantía) va primero
+ *   2. Vencidos primero (diasRestantes < 0), más atraso = más arriba
+ *   3. En retraso por etapa (estadoRetraso.enRetraso)
  *   4. Por prioridad (1 = urgente … 5 = muy baja)
- *   5. Tiebreaker: diasRestantesEtapa (menor = más urgente)
+ *   5. Tiebreaker: diasRestantes (menor = más urgente)
  *
  * Retorna un nuevo array; no muta el original.
  */
@@ -20,13 +20,18 @@ export const sortProyectosPorUrgencia = (proyectos) =>
         const bEsGarantia = b.tipo_proyecto === 'GTIA' ? 1 : 0;
         if (aEsGarantia !== bEsGarantia) return bEsGarantia - aEsGarantia;
 
-        // Lógica especial para Instalación: Solo es "urgente" si faltan <= 2 días para la FECHA LÍMITE del proyecto
-        // Si ya pasó la fecha (< 0), TAMBIÉN es urgente (Vencido).
+        // Vencidos (fecha límite pasada) van primero — más días de atraso = más arriba
+        const aVencido = a.diasRestantes !== null && a.diasRestantes < 0;
+        const bVencido = b.diasRestantes !== null && b.diasRestantes < 0;
+        if (aVencido !== bVencido) return aVencido ? -1 : 1;
+        if (aVencido && bVencido) {
+            return a.diasRestantes - b.diasRestantes; // más negativo = más atraso = primero
+        }
+
+        // En retraso por etapa
         let aEnRetrasoParaSort = a.estadoRetraso?.enRetraso;
         if (a.etapa_actual === 'instalacion') {
             const diasParaEntrega = a.diasRestantes ?? 999;
-            // Solo si faltan > 2 días no es urgente.
-            // Si faltan <= 2 días (incluyendo negativos), SÍ es urgente.
             if (diasParaEntrega > 2) aEnRetrasoParaSort = false;
             else aEnRetrasoParaSort = true;
         }
@@ -47,15 +52,6 @@ export const sortProyectosPorUrgencia = (proyectos) =>
             const bRetrasoDias = b.estadoRetraso?.diasRetraso || 0;
             if (aRetrasoDias !== bRetrasoDias) return bRetrasoDias - aRetrasoDias;
         }
-
-        let aVencido = a.diasRestantes !== null && a.diasRestantes < 0;
-        // Permitir que Instalación sea Vencido si pasó la fecha
-        // if (a.etapa_actual === 'instalacion') aVencido = false; 
-
-        let bVencido = b.diasRestantes !== null && b.diasRestantes < 0;
-        // if (b.etapa_actual === 'instalacion') bVencido = false;
-
-        if (aVencido !== bVencido) return aVencido ? -1 : 1;
 
         let aPrioridad = a.prioridad || 3;
         // Si es instalación y no es urgente (>2 días), bajar prioridad al mínimo (5)
