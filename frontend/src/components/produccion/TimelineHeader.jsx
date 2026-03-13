@@ -87,6 +87,15 @@ const TimelineHeader = memo(({ proyecto }) => {
                 <h3 className="font-bold text-gray-900 leading-tight truncate" style={{ fontSize: s(1.8) }}>
                     {proyecto.nombre}
                 </h3>
+                {(proyecto.fecha_limite_original || proyecto.fecha_limite) && (
+                    <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg border border-blue-200" style={{ marginTop: px(8), fontSize: s(1.5), gap: px(6) }}>
+                        <Clock style={{ width: s(1.4), height: s(1.4) }} className="text-blue-500" />
+                        <span className="font-semibold">
+                            {new Date((proyecto.fecha_limite_original || proyecto.fecha_limite) + 'T12:00:00')
+                                .toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                        </span>
+                    </div>
+                )}
                 {proyecto.cliente && (
                     <p className="text-gray-500 flex items-center" style={{ marginTop: px(8), fontSize: s(1.5), gap: px(6) }}>
                         <User style={{ width: s(1.4), height: s(1.4) }} className="text-gray-400" />
@@ -115,7 +124,7 @@ const TimelineHeader = memo(({ proyecto }) => {
                         </div>
                     </div>
                 )}
-                {proyecto.fecha_limite && (
+                {(proyecto.fecha_limite_original || proyecto.fecha_limite) && (
                     <div
                         className={`text-center font-medium ${diasRestantes !== null && (diasRestantes <= 3 && proyecto.etapa_actual !== 'instalacion' || (proyecto.etapa_actual === 'instalacion' && diasRestantes <= 2))
                             ? 'text-red-600' : 'text-gray-500'

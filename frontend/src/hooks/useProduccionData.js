@@ -47,6 +47,10 @@ export const useProduccionData = ({
                         const mexicoTime = new Date(now.getTime() + (now.getTimezoneOffset() + mexicoOffset) * 60 * 1000);
                         const anio = mexicoTime.getFullYear();
                         const mes = mexicoTime.getMonth() + 1;
+
+                        // Guardar la fecha original antes de aplicar el calendario
+                        proys = proys.map(p => ({ ...p, fecha_limite_original: p.fecha_limite }));
+
                         proys = aplicarFechasCalendario(proys, calResponse.data.proyectos, anio, mes);
                     }
                 } catch (calError) {
