@@ -37,6 +37,15 @@ import ConteoCiclicoPage from './pages/ConteoCiclicoPage';
 import DescontarAlmacenPage from './pages/DescontarAlmacenPage';
 import RollosMembranasPage from './pages/RollosMembranasPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
+import { useAuth } from './context/AuthContext';
+
+const IndexRedirect = () => {
+  const { user } = useAuth();
+  if (user?.rol === 'compras') {
+    return <Navigate to="/ordenes-compra" replace />;
+  }
+  return <Navigate to="/inventario" replace />;
+};
 
 function App() {
   // Auto-reload cuando se detecta nueva versión en producción
@@ -96,7 +105,7 @@ function App() {
                         </PrivateRoute>
                       }
                     >
-                      <Route index element={<Navigate to="/inventario" replace />} />
+                      <Route index element={<IndexRedirect />} />
                       <Route path="inventario" element={<InventarioPage />} />
                       <Route path="recepcion-mercancia" element={<RecepcionMercanciaPage />} />
                       <Route path="pedido" element={<PedidoPage />} />

@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -18,9 +18,13 @@ const LoginPage = () => {
   // Redirigir si ya está autenticado
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/inventario', { replace: true });
+      if (user?.rol === 'compras') {
+        navigate('/ordenes-compra', { replace: true });
+      } else {
+        navigate('/inventario', { replace: true });
+      }
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, user]);
 
   const handleChange = (e) => {
     setFormData({
