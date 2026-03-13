@@ -1042,6 +1042,9 @@ export const obtenerEstadisticas = async (req, res) => {
       where: {
         created_at: {
           [Op.between]: [inicioMes, finMes]
+        },
+        estado: {
+          [Op.notIn]: ['rechazada', 'cancelada']
         }
       },
       attributes: ['total_estimado']
@@ -1073,8 +1076,13 @@ export const obtenerEstadisticas = async (req, res) => {
       distribucionPrioridad[prioridad] = parseInt(item.dataValues.total);
     });
 
-    // Obtener órdenes recientes (últimas 5)
+    // Obtener órdenes recientes (últimas 5) - solo activas
     const ordenesRecientes = await OrdenCompra.findAll({
+      where: {
+        estado: {
+          [Op.notIn]: ['rechazada', 'cancelada']
+        }
+      },
       limit: 5,
       order: [['created_at', 'DESC']],
       include: [
