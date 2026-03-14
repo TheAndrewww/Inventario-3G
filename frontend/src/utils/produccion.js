@@ -93,6 +93,33 @@ export const flattenProyectos = (resumen) => {
 export const s = (val) => `calc(${val}rem * var(--escala, 1))`;
 export const px = (val) => `calc(${val}px * var(--escala, 1))`;
 
+// Días de asueto oficiales en México y días de asueto de la empresa (formato MM-DD)
+// Se omitió el año para que aplique siempre anualmente a menos que sea una fecha móvil, 
+// en este caso dejaremos las fechas fijas que siempre caen en los mismos días.
+const DIAS_ASUETO = [
+    '01-01', // Año nuevo
+    '02-05', // Día de la Constitución (se recorre al lunes, pero dejaremos fijo o los exactos del año si se desea)
+    '03-21', // Natalicio Benito Juárez
+    '05-01', // Día del Trabajo
+    '09-16', // Día de la Independencia
+    '11-20', // Revolución Mexicana
+    '12-25', // Navidad
+    // Agregamos fechas específicas de 2026 que sabemos son puente
+    '2026-02-02', // Puente constitución
+    '2026-03-16', // Puente natalicio Juárez
+    '2026-11-16'  // Puente Revolución
+];
+
+/**
+ * Verifica si una fecha es día de asueto
+ */
+const esDiaAsueto = (date) => {
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    return DIAS_ASUETO.includes(`${m}-${d}`) || DIAS_ASUETO.includes(`${y}-${m}-${d}`);
+};
+
 /**
  * Suma días hábiles (Lun-Sab) a una fecha.
  * Excluye domingos (0).
@@ -108,7 +135,7 @@ export const addBusinessDays = (startDateStr, daysToAdd) => {
     let added = 0;
     while (added < daysToAdd) {
         current.setUTCDate(current.getUTCDate() + 1);
-        if (current.getUTCDay() !== 0) { // Si no es Domingo
+        if (current.getUTCDay() !== 0 && !esDiaAsueto(current)) { // Si no es Domingo ni asueto
             added++;
         }
     }
@@ -136,7 +163,7 @@ export const calcularDiasHabiles = (startStr, endStr) => {
     const cur = new Date(start);
     while (cur.getTime() < end.getTime()) {
         cur.setUTCDate(cur.getUTCDate() + 1);
-        if (cur.getUTCDay() !== 0) dias++;
+        if (cur.getUTCDay() !== 0 && !esDiaAsueto(cur)) dias++;
     }
     return tsStart <= tsEnd ? dias : -dias;
 };
@@ -178,7 +205,9 @@ export const restarDiasHabiles = (dateStr, daysToSubtract) => {
     let removed = 0;
     while (removed < daysToSubtract) {
         current.setUTCDate(current.getUTCDate() - 1);
-        if (current.getUTCDay() !== 0) removed++;
+        if (current.getUTCDay() !== 0 && !esDiaAsueto(current)) { // Si no es Domingo ni asueto
+            removed++;
+        }
     }
     return current;
 };
@@ -231,7 +260,9 @@ export const calcularDiasPorEtapa = (proyecto) => {
         const totalDiasNecesarios = tiemposAcum.instalacion;
         const diasDesdeEntradaALimite = calcularDiasHabiles(fechaEntrada, fechaLimite);
 
-        if (diasDesdeEntradaALimite < totalDiasNecesarios) {
+        // Si el proyecto tiene fecha impuesta por el calendario, SIEMPRE calculamos hacia atrás.
+        // O si no hay tiempo suficiente desde la entrada hasta la fecha límite.
+        if (proyecto._fechaCalendario || diasDesdeEntradaALimite < totalDiasNecesarios) {
             const resultado = {};
             const etapas = ['diseno', 'compras', 'produccion', 'instalacion'];
             for (let i = 0; i < etapas.length; i++) {
