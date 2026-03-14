@@ -120,6 +120,7 @@ const esDiaAsueto = (date) => {
     return DIAS_ASUETO.includes(`${m}-${d}`) || DIAS_ASUETO.includes(`${y}-${m}-${d}`);
 };
 
+
 /**
  * Suma días hábiles (Lun-Sab) a una fecha.
  * Excluye domingos (0).
