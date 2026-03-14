@@ -1,76 +1,34 @@
 /**
- * Ordena proyectos por urgencia (criterio único para Dashboard y TV).
- *   0. Proyectos pausados van al final
- *   1. GTIA (Garantía) va primero
- *   2. Vencidos primero (diasRestantes < 0), más atraso = más arriba
- *   3. En retraso por etapa (estadoRetraso.enRetraso)
- *   4. Por prioridad (1 = urgente … 5 = muy baja)
- *   5. Tiebreaker: diasRestantes (menor = más urgente)
+ * Ordena proyectos por fecha de instalación más cercana (criterio único para Dashboard y TV).
+ *   1. Proyectos pausados van al final
+ *   2. Por fecha límite más cercana (diasRestantes menor = primero)
+ *   3. Proyectos sin fecha al final (después de los activos, antes de pausados)
  *
  * Retorna un nuevo array; no muta el original.
  */
 export const sortProyectosPorUrgencia = (proyectos) =>
     [...proyectos].sort((a, b) => {
+        // 1. Pausados siempre al final
         const aPausado = a.pausado ? 1 : 0;
         const bPausado = b.pausado ? 1 : 0;
         if (aPausado !== bPausado) return aPausado - bPausado;
 
-        // Prioridad absoluta: GTIA (Garantía) va primero
-        const aEsGarantia = a.tipo_proyecto === 'GTIA' ? 1 : 0;
-        const bEsGarantia = b.tipo_proyecto === 'GTIA' ? 1 : 0;
-        if (aEsGarantia !== bEsGarantia) return bEsGarantia - aEsGarantia;
+        // 2. Proyectos sin fecha al final (antes de pausados)
+        const aFecha = a.fecha_limite ? 1 : 0;
+        const bFecha = b.fecha_limite ? 1 : 0;
+        if (aFecha !== bFecha) return bFecha - aFecha;
 
-        // Vencidos (fecha límite pasada) van primero — más días de atraso = más arriba
-        const aVencido = a.diasRestantes !== null && a.diasRestantes < 0;
-        const bVencido = b.diasRestantes !== null && b.diasRestantes < 0;
-        if (aVencido !== bVencido) return aVencido ? -1 : 1;
-        if (aVencido && bVencido) {
-            return a.diasRestantes - b.diasRestantes; // más negativo = más atraso = primero
+        // 3. Ordenar por fecha límite (convertir a timestamp para comparar)
+        if (a.fecha_limite && b.fecha_limite) {
+            const aTime = new Date(a.fecha_limite + 'T00:00:00').getTime();
+            const bTime = new Date(b.fecha_limite + 'T00:00:00').getTime();
+            return aTime - bTime; // Más cercana primero
         }
 
-        // En retraso por etapa
-        let aEnRetrasoParaSort = a.estadoRetraso?.enRetraso;
-        if (a.etapa_actual === 'instalacion') {
-            const diasParaEntrega = a.diasRestantes ?? 999;
-            if (diasParaEntrega > 2) aEnRetrasoParaSort = false;
-            else aEnRetrasoParaSort = true;
-        }
-
-        let bEnRetrasoParaSort = b.estadoRetraso?.enRetraso;
-        if (b.etapa_actual === 'instalacion') {
-            const diasParaEntrega = b.diasRestantes ?? 999;
-            if (diasParaEntrega > 2) bEnRetrasoParaSort = false;
-            else bEnRetrasoParaSort = true;
-        }
-
-        const aRetraso = aEnRetrasoParaSort ? 1 : 0;
-        const bRetraso = bEnRetrasoParaSort ? 1 : 0;
-        if (aRetraso !== bRetraso) return bRetraso - aRetraso;
-
-        if (aRetraso && bRetraso) {
-            const aRetrasoDias = a.estadoRetraso?.diasRetraso || 0;
-            const bRetrasoDias = b.estadoRetraso?.diasRetraso || 0;
-            if (aRetrasoDias !== bRetrasoDias) return bRetrasoDias - aRetrasoDias;
-        }
-
-        let aPrioridad = a.prioridad || 3;
-        // Si es instalación y no es urgente (>2 días), bajar prioridad al mínimo (5)
-        if (a.etapa_actual === 'instalacion') {
-            const diasParaEntrega = a.diasRestantes ?? 999;
-            if (diasParaEntrega > 2) aPrioridad = 5;
-        }
-
-        let bPrioridad = b.prioridad || 3;
-        if (b.etapa_actual === 'instalacion') {
-            const diasParaEntrega = b.diasRestantes ?? 999;
-            if (diasParaEntrega > 2) bPrioridad = 5;
-        }
-
-        if (aPrioridad !== bPrioridad) return aPrioridad - bPrioridad;
-
-        const aDiasEtapa = a.estadoRetraso?.diasRestantesEtapa ?? a.diasRestantes ?? 999;
-        const bDiasEtapa = b.estadoRetraso?.diasRestantesEtapa ?? b.diasRestantes ?? 999;
-        return aDiasEtapa - bDiasEtapa;
+        // 4. Fallback: por días restantes
+        const aDias = a.diasRestantes ?? 999;
+        const bDias = b.diasRestantes ?? 999;
+        return aDias - bDias;
     });
 
 /**

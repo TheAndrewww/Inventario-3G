@@ -51,7 +51,12 @@ export const useProduccionData = ({
                         // Guardar la fecha original antes de aplicar el calendario
                         proys = proys.map(p => ({ ...p, fecha_limite_original: p.fecha_limite }));
 
+                        // Aplicar fechas del calendario (recalcula automáticamente)
                         proys = aplicarFechasCalendario(proys, calResponse.data.proyectos, anio, mes);
+
+                        console.log(`📅 Fechas del calendario aplicadas (${anio}-${String(mes).padStart(2, '0')})`);
+                    } else {
+                        console.log('ℹ️ No hay proyectos en el calendario este mes');
                     }
                 } catch (calError) {
                     console.warn('⚠️ No se pudo cargar calendario para fechas:', calError.message);

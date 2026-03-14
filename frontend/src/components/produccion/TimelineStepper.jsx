@@ -146,46 +146,45 @@ const TimelineStepper = memo(({ proyecto }) => {
             if (node.stage === 'instalacion' && proyecto.instalacion_completado_en) isCompleted = true;
             if (node.stage === 'completado' && proyecto.etapa_actual === 'completado') isCompleted = true;
 
+            // 1. Si la etapa está completada -> VERDE
+            if (isCompleted) {
+                return 'bg-green-500 text-white';
+            }
+
             // Check if this node is in the "active zone" (current working stage)
             const isInActiveZone = (
                 (proyecto.etapa_actual === 'produccion' && (node.stage === 'manufactura' || node.stage === 'herreria')) ||
                 (proyecto.etapa_actual === node.stage)
             );
 
-            // 1. Completed AND in active zone -> NARANJA (etapa completada pero proyecto sigue aquí)
-            if (isCompleted && isInActiveZone) {
-                return 'bg-orange-500 text-white';
-            }
-
-            // 2. Completed but NOT in active zone -> Verde (etapa pasada y completada)
-            if (isCompleted) {
-                return 'bg-green-500 text-white';
-            }
-
-            // 3. Active Stage but NOT completed yet
+            // 2. Si es la etapa activa (en proceso)
             if (isInActiveZone) {
-                // Check for delay (Red)
-                if (enRetraso) return 'bg-red-500 text-white';
-                // Check for warning (Amber) - Compras in process
-                if (node.stage === 'compras' && proyecto.compras_en_proceso) return 'bg-amber-500 text-white';
-                // Special MTO delay
-                if (esMTO && diasRestantes !== null && diasRestantes < 0) return 'bg-red-500 text-white';
+                // Verificar si está atrasada usando diasPorEtapa
+                const diasPorEtapa = calcularDiasPorEtapa(proyecto);
+                let estaAtrasada = false;
 
-                // Preparado (instalacion) sin completar -> Naranja (listo para marcar)
-                if (node.stage === 'instalacion' && !proyecto.instalacion_completado_en) {
-                    return 'bg-orange-500 text-white';
+                if (diasPorEtapa) {
+                    // Para sub-etapas (manufactura/herrería), usar "produccion"
+                    const etapaKey = (node.stage === 'manufactura' || node.stage === 'herreria')
+                        ? 'produccion'
+                        : node.stage;
+
+                    const info = diasPorEtapa[etapaKey];
+                    if (info && info.dias < 0) {
+                        estaAtrasada = true;
+                    }
                 }
 
-                // Sub-etapas de producción (manufactura/herrería) en proceso -> Amber
-                if (node.stage === 'manufactura' || node.stage === 'herreria') {
-                    return 'bg-amber-500 text-white';
+                // Si está atrasada -> ROJO
+                if (estaAtrasada) {
+                    return 'bg-red-500 text-white';
                 }
 
-                // Default Active (verde - está trabajando en esta etapa)
-                return 'bg-green-500 text-white';
+                // Si está en proceso y a buen tiempo -> AMARILLO
+                return 'bg-amber-500 text-white';
             }
 
-            // 4. Future Stages or not relevant -> Gray
+            // 3. Etapas futuras -> GRIS
             return 'bg-white border-2 border-gray-200 text-gray-400';
         };
 
