@@ -376,22 +376,6 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
         const nombreProd = normalizarNombre(p.nombre);
         if (!nombreProd) return p;
 
-        // Buscar match en nombres del calendario
-        for (const nombreCal of nombresCalendario) {
-            if (matchNombre(nombreProd, nombreCal)) {
-                const diaCal = fechasPorNombre[nombreCal];
-                // Fecha de instalación = día del calendario - 1
-                const diaLimite = Math.max(1, diaCal - 1);
-                const nuevaFechaLimite = `${anio}-${String(mes).padStart(2, '0')}-${String(diaLimite).padStart(2, '0')}`;
-
-                // Solo overridear si la fecha del calendario es ANTES de la fecha_limite actual
-                // o si no hay fecha_limite
-                if (!p.fecha_limite || nuevaFechaLimite < p.fecha_limite) {
-                    return { ...p, fecha_limite: nuevaFechaLimite, _fechaCalendario: true };
-                }
-                break;
-            }
-        }
         return p;
     });
 };
