@@ -221,8 +221,8 @@ const TIEMPOS_POR_TIPO_CALC = {
 };
 const DIAS_INDIVIDUALES_POR_TIPO_CALC = {
     'C': { diseno: 1, compras: 1, produccion: 3, instalacion: 1 },
-    'B': { diseno: 2, compras: 3, produccion: 5, instalacion: 3 },
-    'A': { diseno: 5, compras: 5, produccion: 10, instalacion: 5 }
+    'B': { diseno: 2, compras: 3, produccion: 5, instalacion: 1 },
+    'A': { diseno: 5, compras: 5, produccion: 10, instalacion: 1 }
 };
 
 /**
@@ -421,11 +421,14 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
         for (const nombreCal of nombresCalendario) {
             if (matchNombre(nombreProd, nombreCal)) {
                 const diaCal = fechasPorNombre[nombreCal];
-                // Fecha calendario real
-                const fechaCalendarioStr = `${anio}-${String(mes).padStart(2, '0')}-${String(diaCal).padStart(2, '0')}`;
+                // Fecha del calendario = día programado para instalación
+                const fechaInstalacionStr = `${anio}-${String(mes).padStart(2, '0')}-${String(diaCal).padStart(2, '0')}`;
 
-                const m = String(current.getUTCMonth() + 1).padStart(2, '0');
-                const d = String(current.getUTCDate()).padStart(2, '0');
+                // El proyecto debe estar COMPLETADO 1 día hábil antes de la instalación
+                const fechaCompletado = restarDiasHabiles(fechaInstalacionStr, 1);
+                const y = fechaCompletado.getUTCFullYear();
+                const m = String(fechaCompletado.getUTCMonth() + 1).padStart(2, '0');
+                const d = String(fechaCompletado.getUTCDate()).padStart(2, '0');
                 const nuevaFechaLimite = `${y}-${m}-${d}`;
 
                 // El calendario manda. Siempre overridear la fecha_limite con la del calendario.
