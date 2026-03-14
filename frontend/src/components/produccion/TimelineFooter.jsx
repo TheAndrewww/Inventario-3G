@@ -116,10 +116,23 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
                             )}
                         </button>
                     )}
-                    <div className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold flex items-center justify-center gap-2 shadow-lg">
+                    <div className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold flex items-center justify-center gap-2 shadow-lg min-w-[200px]">
                         <CheckCircle2 size={20} />
                         <span>Proyecto Completado</span>
                     </div>
+                    {onTogglePausa && (
+                        <button
+                            onClick={handleTogglePausa}
+                            disabled={pauseLoading}
+                            className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all border shadow ${isPaused
+                                ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200'
+                                : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                                }`}
+                        >
+                            {isPaused ? <Play size={18} /> : <Pause size={18} />}
+                            {pauseLoading ? '...' : isPaused ? 'Reanudar' : 'Pausar'}
+                        </button>
+                    )}
                 </div>
             )}
 
