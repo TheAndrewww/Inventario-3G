@@ -386,8 +386,7 @@ const TimelineStepper = memo(({ proyecto }) => {
 
     return (
         <div className="bg-gray-50 relative overflow-visible" style={{ height: px(160), padding: px(12) }}>
-            {/* Cuadro de fecha límite */}
-            {(proyecto.fecha_limite_original || proyecto.fecha_limite) && (
+            {proyecto.fecha_limite && (
                 <div
                     className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center origin-right rounded-xl shadow-md ${diasRestantes !== null && (diasRestantes < 0 && proyecto.etapa_actual !== 'instalacion')
                         ? 'bg-red-100 text-red-700 border border-red-200'
