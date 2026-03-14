@@ -408,6 +408,6 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
         const nombreProd = normalizarNombre(p.nombre);
         if (!nombreProd) return p;
 
-        return p;
+
     });
 };
