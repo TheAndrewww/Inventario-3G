@@ -359,13 +359,22 @@ const levenshtein = (a, b) => {
 };
 
 /**
- * Compara dos nombres y devuelve true si la similitud es >= 80%
+ * Compara dos nombres y devuelve true si:
+ * - La similitud Levenshtein es >= 80%, O
+ * - Uno contiene al otro como substring (para nombres parciales del calendario)
  */
 export const matchNombre = (nombreA, nombreB) => {
     const a = normalizarNombre(nombreA);
     const b = normalizarNombre(nombreB);
     if (!a || !b) return false;
     if (a === b) return true;
+    
+    // Check substring containment (calendar often has shorter names)
+    // Solo si el substring tiene al menos 8 caracteres para evitar falsos positivos
+    if (a.length >= 8 && b.length >= 8) {
+        if (a.includes(b) || b.includes(a)) return true;
+    }
+    
     const maxLen = Math.max(a.length, b.length);
     if (maxLen === 0) return false;
     const dist = levenshtein(a, b);
