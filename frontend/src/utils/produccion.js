@@ -423,21 +423,7 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
                 const diaCal = fechasPorNombre[nombreCal];
                 // Fecha calendario real
                 const fechaCalendarioStr = `${anio}-${String(mes).padStart(2, '0')}-${String(diaCal).padStart(2, '0')}`;
-                
-                // Fecha de entrega para Completado: 1 día de TRABAJO (Lun-Vie) antes de la instalación
-                // Ignora sábados, domingos y días de asueto
-                const [yDate, mDate, dDate] = fechaCalendarioStr.split('-').map(Number);
-                let current = new Date(Date.UTC(yDate, mDate - 1, dDate));
-                let removed = 0;
-                while (removed < 1) {
-                    current.setUTCDate(current.getUTCDate() - 1);
-                    // 0 = Domingo, 6 = Sábado
-                    if (current.getUTCDay() !== 0 && current.getUTCDay() !== 6 && !esDiaAsueto(current)) {
-                        removed++;
-                    }
-                }
-                
-                const y = current.getUTCFullYear();
+
                 const m = String(current.getUTCMonth() + 1).padStart(2, '0');
                 const d = String(current.getUTCDate()).padStart(2, '0');
                 const nuevaFechaLimite = `${y}-${m}-${d}`;
