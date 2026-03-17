@@ -56,7 +56,6 @@ const isEtapaCompletada = (proyecto, etapaKey) => {
 const isEtapaActiva = (proyecto, etapaKey) => {
     // Sub-etapas: manufactura / herrería
     if (etapaKey === 'manufactura' || etapaKey === 'herreria') {
-        if (!proyecto.compras_completado_en) return false;
         if (etapaKey === 'manufactura' && !proyecto.tiene_manufactura) return false;
         if (etapaKey === 'herreria' && !proyecto.tiene_herreria) return false;
         return !isEtapaCompletada(proyecto, etapaKey);
