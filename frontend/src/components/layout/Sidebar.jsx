@@ -94,6 +94,12 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       roles: ['administrador', 'diseñador', 'encargado']
     },
     {
+      path: '/avance-produccion',
+      icon: ClipboardCheck,
+      label: 'Avance Producción',
+      roles: ['administrador', 'almacen']
+    },
+    {
       path: '/historial',
       icon: History,
       label: 'Historial',

@@ -36,6 +36,7 @@ import ControlCampanaPage from './pages/ControlCampanaPage';
 import ConteoCiclicoPage from './pages/ConteoCiclicoPage';
 import DescontarAlmacenPage from './pages/DescontarAlmacenPage';
 import RollosMembranasPage from './pages/RollosMembranasPage';
+import AvanceProduccionPage from './pages/AvanceProduccionPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAuth } from './context/AuthContext';
 
@@ -127,6 +128,7 @@ function App() {
                       <Route path="conteo-ciclico" element={<ConteoCiclicoPage />} />
                       <Route path="descontar-almacen" element={<DescontarAlmacenPage />} />
                       <Route path="rollos-membrana" element={<RollosMembranasPage />} />
+                      <Route path="avance-produccion" element={<AvanceProduccionPage />} />
                       <Route path="perfil" element={<PerfilPage />} />
 
                       {/* Ruta 404 para rutas privadas no encontradas */}
