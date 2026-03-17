@@ -350,10 +350,15 @@ const AvanceProduccionPage = () => {
 
     // Filtrar proyectos
     const proyectosFiltrados = useMemo(() => {
-        // Solo mostrar proyectos en producción (desbloqueados)
+        // Solo mostrar proyectos con manufactura o herrería desbloqueadas
         let filtered = proyectos.filter(p =>
             !p.pausado &&
-            p.etapa_actual === 'produccion'
+            p.etapa_actual === 'produccion' &&
+            !!p.compras_completado_en &&
+            (
+                (p.tiene_manufactura && !p.manufactura_completado && !p.manufactura_completado_en) ||
+                (p.tiene_herreria && !p.herreria_completado && !p.herreria_completado_en)
+            )
         );
 
         // Búsqueda
