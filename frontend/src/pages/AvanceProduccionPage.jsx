@@ -350,10 +350,9 @@ const AvanceProduccionPage = () => {
 
     // Filtrar proyectos
     const proyectosFiltrados = useMemo(() => {
-        // Mostrar proyectos con manufactura o herrería desbloqueada y pendiente
+        // Mostrar proyectos con manufactura o herrería pendiente
         let filtered = proyectos.filter(p => {
             if (p.pausado || p.etapa_actual === 'completado') return false;
-            if (!p.compras_completado_en) return false;
             const mfraPendiente = p.tiene_manufactura && !p.manufactura_completado && !p.manufactura_completado_en;
             const herrPendiente = p.tiene_herreria && !p.herreria_completado && !p.herreria_completado_en;
             return mfraPendiente || herrPendiente;
