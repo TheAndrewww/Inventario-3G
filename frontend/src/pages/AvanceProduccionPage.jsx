@@ -25,7 +25,6 @@ import toast, { Toaster } from 'react-hot-toast';
 const ETAPAS_FLOW = [
     { key: 'manufactura', label: 'Mfra', icon: Factory, color: '#F59E0B', bgClass: 'bg-amber-50', textClass: 'text-amber-700', borderClass: 'border-amber-200', isSubEtapa: true },
     { key: 'herreria', label: 'Herr', icon: Scissors, color: '#EF4444', bgClass: 'bg-red-50', textClass: 'text-red-700', borderClass: 'border-red-200', isSubEtapa: true },
-    { key: 'instalacion', label: 'Instalación', icon: Truck, color: '#3B82F6', bgClass: 'bg-blue-50', textClass: 'text-blue-700', borderClass: 'border-blue-200' },
 ];
 
 // Orden de etapas para determinar si están completadas
@@ -351,10 +350,10 @@ const AvanceProduccionPage = () => {
 
     // Filtrar proyectos
     const proyectosFiltrados = useMemo(() => {
-        // Solo mostrar proyectos en producción o instalación (desbloqueados)
+        // Solo mostrar proyectos en producción (desbloqueados)
         let filtered = proyectos.filter(p =>
             !p.pausado &&
-            (p.etapa_actual === 'produccion' || p.etapa_actual === 'instalacion')
+            p.etapa_actual === 'produccion'
         );
 
         // Búsqueda
