@@ -23,8 +23,8 @@ import toast, { Toaster } from 'react-hot-toast';
 
 // ─── Configuración de etapas ───
 const ETAPAS_FLOW = [
-    { key: 'manufactura', label: 'Mfra', icon: Factory, color: '#F59E0B', bgClass: 'bg-amber-50', textClass: 'text-amber-700', borderClass: 'border-amber-200', isSubEtapa: true },
-    { key: 'herreria', label: 'Herr', icon: Scissors, color: '#EF4444', bgClass: 'bg-red-50', textClass: 'text-red-700', borderClass: 'border-red-200', isSubEtapa: true },
+    { key: 'manufactura', label: 'Mfra', icon: Scissors, color: '#F59E0B', bgClass: 'bg-amber-50', textClass: 'text-amber-700', borderClass: 'border-amber-200', isSubEtapa: true },
+    { key: 'herreria', label: 'Herr', icon: Wrench, color: '#EF4444', bgClass: 'bg-red-50', textClass: 'text-red-700', borderClass: 'border-red-200', isSubEtapa: true },
 ];
 
 // Orden de etapas para determinar si están completadas
@@ -350,16 +350,14 @@ const AvanceProduccionPage = () => {
 
     // Filtrar proyectos
     const proyectosFiltrados = useMemo(() => {
-        // Solo mostrar proyectos con manufactura o herrería desbloqueadas
-        let filtered = proyectos.filter(p =>
-            !p.pausado &&
-            p.etapa_actual === 'produccion' &&
-            !!p.compras_completado_en &&
-            (
-                (p.tiene_manufactura && !p.manufactura_completado && !p.manufactura_completado_en) ||
-                (p.tiene_herreria && !p.herreria_completado && !p.herreria_completado_en)
-            )
-        );
+        // Mostrar proyectos con manufactura o herrería desbloqueada y pendiente
+        let filtered = proyectos.filter(p => {
+            if (p.pausado || p.etapa_actual === 'completado') return false;
+            if (!p.compras_completado_en) return false;
+            const mfraPendiente = p.tiene_manufactura && !p.manufactura_completado && !p.manufactura_completado_en;
+            const herrPendiente = p.tiene_herreria && !p.herreria_completado && !p.herreria_completado_en;
+            return mfraPendiente || herrPendiente;
+        });
 
         // Búsqueda
         if (busqueda.trim()) {
