@@ -2824,7 +2824,7 @@ export const eliminarOrden = async (req, res) => {
     const orden = await OrdenCompra.findByPk(id, {
       include: [
         { model: DetalleOrdenCompra, as: 'detalles' },
-        { model: SolicitudCompra, as: 'solicitudes' }
+        { model: SolicitudCompra, as: 'solicitudes_origen' }
       ],
       transaction
     });
@@ -2860,8 +2860,10 @@ export const eliminarOrden = async (req, res) => {
       });
     }
 
+    const ticket_id = orden.ticket_id;
+
     // Si hay solicitudes vinculadas, desvincularse y volver a pendiente
-    if (orden.solicitudes && orden.solicitudes.length > 0) {
+    if (orden.solicitudes_origen && orden.solicitudes_origen.length > 0) {
       await SolicitudCompra.update(
         {
           orden_compra_id: null,
@@ -2887,7 +2889,7 @@ export const eliminarOrden = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Orden ${orden.ticket_id} eliminada exitosamente`
+      message: `Orden ${ticket_id} eliminada exitosamente`
     });
 
   } catch (error) {
