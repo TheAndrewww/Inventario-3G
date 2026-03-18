@@ -24,7 +24,8 @@ import {
   mostrarFormularioRechazo,
   rechazarPorEmail,
   eliminarOrden,
-  reabrirOrden
+  reabrirOrden,
+  obtenerArticulosPendientesPorProveedor
 } from '../controllers/ordenesCompra.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 import { testEmail } from '../services/email.service.js';
@@ -44,6 +45,7 @@ router.use(verificarToken);
 
 // Rutas de órdenes de compra
 router.get('/ordenes-compra/estadisticas', obtenerEstadisticas);
+router.get('/ordenes-compra/articulos-pendientes/:proveedor_id', obtenerArticulosPendientesPorProveedor);
 router.post('/ordenes-compra', crearOrdenCompra);
 router.post('/ordenes-compra/desde-solicitudes', crearOrdenDesdeSolicitudes);
 router.get('/ordenes-compra', listarOrdenesCompra);

@@ -27,7 +27,7 @@ export const crearOrdenCompra = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { articulos, proveedor_id, observaciones, fecha_llegada_estimada } = req.body;
+    const { articulos, proveedor_id, observaciones, fecha_llegada_estimada, consolidar_ordenes } = req.body;
     const usuario_id = req.usuario.id;
     const usuario_rol = req.usuario.rol;
 
@@ -94,14 +94,22 @@ export const crearOrdenCompra = async (req, res) => {
     // disponibilidad de stock actual.
 
     // Crear la orden de compra
+    // Si es administrador, aprobar automáticamente; si no, dejar en pendiente
+    const estadoInicial = usuario_rol === 'administrador' ? 'aprobada' : 'pendiente_aprobacion';
+
     const ordenCompra = await OrdenCompra.create({
       ticket_id,
       proveedor_id: proveedor_id || null,
       usuario_creador_id: usuario_id,
-      estado: 'pendiente_aprobacion',
+      estado: estadoInicial,
       total_estimado: 0,
       observaciones: observaciones || null,
-      fecha_llegada_estimada: fecha_llegada_estimada || null
+      fecha_llegada_estimada: fecha_llegada_estimada || null,
+      // Si es admin, marcar como aprobada por el mismo creador
+      ...(usuario_rol === 'administrador' && {
+        aprobado_por_id: usuario_id,
+        fecha_aprobacion: new Date()
+      })
     }, { transaction });
 
     // Calcular total estimado
@@ -133,6 +141,42 @@ export const crearOrdenCompra = async (req, res) => {
     // Actualizar total estimado de la orden
     ordenCompra.total_estimado = totalEstimado;
     await ordenCompra.save({ transaction });
+
+    // CONSOLIDACIÓN: Si el admin especificó órdenes a consolidar, eliminar artículos duplicados
+    if (consolidar_ordenes && Array.isArray(consolidar_ordenes) && consolidar_ordenes.length > 0) {
+      console.log(`🔄 Consolidando artículos de ${consolidar_ordenes.length} órdenes anteriores...`);
+
+      // Crear set de articulo_ids de la nueva orden
+      const articulosNuevos = new Set(articulos.map(a => a.articulo_id));
+
+      for (const ordenIdAntigua of consolidar_ordenes) {
+        // Eliminar detalles de artículos que están en la nueva orden
+        await DetalleOrdenCompra.destroy({
+          where: {
+            orden_compra_id: ordenIdAntigua,
+            articulo_id: { [Op.in]: Array.from(articulosNuevos) }
+          },
+          transaction
+        });
+
+        // Verificar si la orden antigua quedó sin detalles
+        const detallesRestantes = await DetalleOrdenCompra.count({
+          where: { orden_compra_id: ordenIdAntigua },
+          transaction
+        });
+
+        // Si no quedan detalles, eliminar la orden completa
+        if (detallesRestantes === 0) {
+          await OrdenCompra.destroy({
+            where: { id: ordenIdAntigua },
+            transaction
+          });
+          console.log(`   ✅ Orden ${ordenIdAntigua} eliminada (sin artículos restantes)`);
+        } else {
+          console.log(`   ℹ️  Orden ${ordenIdAntigua} mantiene ${detallesRestantes} artículo(s)`);
+        }
+      }
+    }
 
     await transaction.commit();
 
@@ -166,27 +210,31 @@ export const crearOrdenCompra = async (req, res) => {
       ]
     });
 
-    // Notificar a usuarios con roles de compras y administradores
-    try {
-      await notificarPorRol({
-        roles: ['administrador'],
-        tipo: 'orden_compra_creada',
-        titulo: '🔔 Orden de compra pendiente de aprobación',
-        mensaje: `${req.usuario.nombre} creó la orden ${ticket_id} por $${totalEstimado.toFixed(2)} y requiere tu aprobación`,
-        url: `/ordenes-compra`,
-        datos_adicionales: {
-          orden_id: ordenCompra.id,
-          ticket_id: ticket_id,
-          creador: req.usuario.nombre,
-          total: totalEstimado
-        }
-      });
-    } catch (notifError) {
-      console.error('Error al enviar notificación:', notifError);
-    }
+    // Notificar a admins solo si no es administrador el creador (necesita aprobación)
+    if (usuario_rol !== 'administrador') {
+      try {
+        await notificarPorRol({
+          roles: ['administrador'],
+          tipo: 'orden_compra_creada',
+          titulo: '🔔 Orden de compra pendiente de aprobación',
+          mensaje: `${req.usuario.nombre} creó la orden ${ticket_id} por $${totalEstimado.toFixed(2)} y requiere tu aprobación`,
+          url: `/ordenes-compra`,
+          datos_adicionales: {
+            orden_id: ordenCompra.id,
+            ticket_id: ticket_id,
+            creador: req.usuario.nombre,
+            total: totalEstimado
+          }
+        });
+      } catch (notifError) {
+        console.error('Error al enviar notificación:', notifError);
+      }
 
-    // Enviar email de aprobación a admins (fire-and-forget, no bloquear respuesta)
-    enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
+      // Enviar email de aprobación a admins (fire-and-forget, no bloquear respuesta)
+      enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
+    } else {
+      console.log(`✅ Orden ${ticket_id} creada por administrador - aprobada automáticamente`);
+    }
 
     // --- INTEGRACIÓN IMPRESIÓN AUTOMÁTICA ---
     try {
@@ -800,6 +848,7 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
   try {
     const { solicitudes_ids, proveedor_id, observaciones, cantidades_custom, fecha_llegada_estimada } = req.body;
     const usuario_id = req.usuario.id;
+    const usuario_rol = req.usuario.rol;
 
     // Validaciones
     if (!solicitudes_ids || !Array.isArray(solicitudes_ids) || solicitudes_ids.length === 0) {
@@ -912,14 +961,22 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
     }
 
     // Crear la orden de compra
+    // Si es administrador, aprobar automáticamente; si no, dejar en pendiente
+    const estadoInicial = usuario_rol === 'administrador' ? 'aprobada' : 'pendiente_aprobacion';
+
     const ordenCompra = await OrdenCompra.create({
       ticket_id,
       proveedor_id: proveedor_id || null,
       usuario_creador_id: usuario_id,
-      estado: 'pendiente_aprobacion',
+      estado: estadoInicial,
       total_estimado: totalEstimado,
       observaciones: observaciones || `Orden creada desde ${solicitudes.length} solicitud(es) pendiente(s)`,
-      fecha_llegada_estimada: fecha_llegada_estimada || null
+      fecha_llegada_estimada: fecha_llegada_estimada || null,
+      // Si es admin, marcar como aprobada por el mismo creador
+      ...(usuario_rol === 'administrador' && {
+        aprobado_por_id: usuario_id,
+        fecha_aprobacion: new Date()
+      })
     }, { transaction });
 
     // Crear detalles de la orden
@@ -992,27 +1049,31 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
       ]
     });
 
-    // Notificar a administradores que hay una orden pendiente de aprobación
-    try {
-      await notificarPorRol({
-        roles: ['administrador'],
-        tipo: 'orden_compra_creada',
-        titulo: '🔔 Orden de compra pendiente de aprobación',
-        mensaje: `${req.usuario.nombre} creó la orden ${ticket_id} por $${totalEstimado.toFixed(2)} desde ${solicitudes.length} solicitud(es) y requiere tu aprobación`,
-        url: '/ordenes-compra',
-        datos_adicionales: {
-          orden_id: ordenCompra.id,
-          ticket_id: ticket_id,
-          creador: req.usuario.nombre,
-          total: totalEstimado
-        }
-      });
-    } catch (notifError) {
-      console.error('Error al enviar notificación:', notifError);
-    }
+    // Notificar a admins solo si no es administrador el creador (necesita aprobación)
+    if (usuario_rol !== 'administrador') {
+      try {
+        await notificarPorRol({
+          roles: ['administrador'],
+          tipo: 'orden_compra_creada',
+          titulo: '🔔 Orden de compra pendiente de aprobación',
+          mensaje: `${req.usuario.nombre} creó la orden ${ticket_id} por $${totalEstimado.toFixed(2)} desde ${solicitudes.length} solicitud(es) y requiere tu aprobación`,
+          url: '/ordenes-compra',
+          datos_adicionales: {
+            orden_id: ordenCompra.id,
+            ticket_id: ticket_id,
+            creador: req.usuario.nombre,
+            total: totalEstimado
+          }
+        });
+      } catch (notifError) {
+        console.error('Error al enviar notificación:', notifError);
+      }
 
-    // Enviar email de aprobación a admins (fire-and-forget)
-    enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
+      // Enviar email de aprobación a admins (fire-and-forget)
+      enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
+    } else {
+      console.log(`✅ Orden ${ticket_id} creada por administrador desde solicitudes - aprobada automáticamente`);
+    }
 
     res.status(201).json({
       success: true,
@@ -3238,3 +3299,96 @@ function paginaFormularioRechazo(orden, token) {
 </body>
 </html>`;
 }
+
+/**
+ * GET /api/ordenes-compra/articulos-pendientes/:proveedor_id
+ * Obtener artículos de órdenes pendientes/rechazadas de un proveedor específico
+ * Para consolidar órdenes del mismo proveedor
+ */
+export const obtenerArticulosPendientesPorProveedor = async (req, res) => {
+  try {
+    const { proveedor_id } = req.params;
+
+    // Buscar órdenes pendientes o rechazadas de ese proveedor
+    const ordenes = await OrdenCompra.findAll({
+      where: {
+        proveedor_id: proveedor_id,
+        estado: {
+          [Op.in]: ['pendiente_aprobacion', 'rechazada']
+        }
+      },
+      include: [
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalles',
+          include: [
+            {
+              model: Articulo,
+              as: 'articulo',
+              include: [
+                { model: Categoria, as: 'categoria' },
+                { model: Ubicacion, as: 'ubicacion' }
+              ]
+            }
+          ]
+        },
+        {
+          model: Usuario,
+          as: 'creador',
+          attributes: ['id', 'nombre']
+        }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+
+    // Agrupar artículos por articulo_id para facilitar consolidación
+    const articulosMap = new Map();
+
+    ordenes.forEach(orden => {
+      orden.detalles.forEach(detalle => {
+        const articuloId = detalle.articulo_id;
+
+        if (!articulosMap.has(articuloId)) {
+          articulosMap.set(articuloId, {
+            articulo_id: articuloId,
+            articulo: detalle.articulo,
+            ordenes: []
+          });
+        }
+
+        articulosMap.get(articuloId).ordenes.push({
+          orden_id: orden.id,
+          orden_ticket: orden.ticket_id,
+          orden_estado: orden.estado,
+          cantidad_solicitada: detalle.cantidad_solicitada,
+          costo_unitario: detalle.costo_unitario,
+          subtotal: detalle.subtotal,
+          creador: orden.creador?.nombre
+        });
+      });
+    });
+
+    // Convertir Map a array
+    const articulos = Array.from(articulosMap.values()).map(item => ({
+      ...item,
+      cantidad_total: item.ordenes.reduce((sum, o) => sum + parseFloat(o.cantidad_solicitada), 0),
+      ordenes_count: item.ordenes.length
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        articulos,
+        total_ordenes: ordenes.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al obtener artículos pendientes por proveedor:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener artículos pendientes',
+      error: error.message
+    });
+  }
+};
