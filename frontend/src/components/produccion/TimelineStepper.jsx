@@ -215,7 +215,7 @@ const TimelineStepper = memo(({ proyecto }) => {
                     <div className={`rounded-full flex items-center justify-center shadow-md ${getNodeColorSimple(node.stage)}`} style={{ width: px(56), height: px(56) }}>
                         <node.icon style={{ width: px(28), height: px(28) }} />
                     </div>
-                    <span className="absolute font-bold text-gray-600 bg-gray-50 px-1" style={{ top: px(64), fontSize: s(1.5) }}>{node.label}</span>
+                    <span className="absolute font-bold text-gray-600 bg-gray-50 px-1 whitespace-nowrap text-center" style={{ top: px(64), fontSize: s(1.5) }}>{node.label}</span>
                 </div>
             ));
         }
@@ -342,7 +342,7 @@ const TimelineStepper = memo(({ proyecto }) => {
                     </div>
                     {node.labelPosition === 'top' && (
                         <span
-                            className="absolute font-bold text-gray-600 bg-gray-50 px-1"
+                            className="absolute font-bold text-gray-600 bg-gray-50 px-1 whitespace-nowrap text-center"
                             style={{ bottom: node.isSubStage ? px(50) : px(64), fontSize: node.isSubStage ? s(1.1) : s(1.5) }}
                         >
                             {node.label}
@@ -350,7 +350,7 @@ const TimelineStepper = memo(({ proyecto }) => {
                     )}
                     {node.labelPosition !== 'top' && (
                         <span
-                            className="absolute font-bold text-gray-600 bg-gray-50 px-1"
+                            className="absolute font-bold text-gray-600 bg-gray-50 px-1 whitespace-nowrap text-center"
                             style={{ top: node.isSubStage ? px(50) : px(64), fontSize: node.isSubStage ? s(1.1) : s(1.5) }}
                         >
                             {node.label}
