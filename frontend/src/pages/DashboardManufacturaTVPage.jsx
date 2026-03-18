@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Clock, AlertTriangle, Calendar } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, Clock, AlertTriangle, Calendar, Scissors } from 'lucide-react';
 import { Loader } from '../components/common';
 import { Toaster } from 'react-hot-toast';
 import { useProduccionData } from '../hooks/useProduccionData';
@@ -186,12 +186,17 @@ const DashboardManufacturaTVPage = () => {
                     {/* Header */}
                     <div className="mb-6 flex items-center justify-between">
                         <div className="flex items-center gap-4">
+                            <img
+                                src="https://res.cloudinary.com/dd93jrilg/image/upload/v1762289946/logo-page_qhpoey.png"
+                                alt="3G"
+                                className="h-14 w-14 object-contain rounded-xl"
+                            />
                             <div className="bg-amber-500 text-white rounded-xl p-3 shadow-lg">
-                                <span className="text-3xl">🏭</span>
+                                <Scissors size={32} />
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Producción de Manufactura</h1>
-                                <p className="text-gray-500">
+                                <h1 className="text-5xl font-bold text-gray-900">Producción de Manufactura</h1>
+                                <p className="text-gray-500 text-lg">
                                     <span className="font-semibold text-amber-600">{enProduccion.length}</span> proyecto{enProduccion.length !== 1 ? 's' : ''} en proceso
                                 </p>
                             </div>

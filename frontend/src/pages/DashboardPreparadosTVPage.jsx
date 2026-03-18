@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Snowflake } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, Snowflake, Package } from 'lucide-react';
 import { Loader } from '../components/common';
 import { Toaster } from 'react-hot-toast';
 import ProyectoTimeline from '../components/produccion/ProyectoTimeline';
@@ -116,12 +116,17 @@ const DashboardPreparadosTVPage = () => {
                     {/* Header con título */}
                     <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                         <div className="flex items-center gap-3">
-                            <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-green-500 rounded-xl flex items-center justify-center text-white text-2xl font-bold">
-                                📦
+                            <img
+                                src="https://res.cloudinary.com/dd93jrilg/image/upload/v1762289946/logo-page_qhpoey.png"
+                                alt="3G"
+                                className="h-14 w-14 object-contain rounded-xl"
+                            />
+                            <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-green-500 rounded-xl flex items-center justify-center text-white">
+                                <Package size={28} />
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Proyectos Completados</h1>
-                                <p className="text-gray-500 text-sm">Listos para entrega o completar</p>
+                                <h1 className="text-5xl font-bold text-gray-900">Proyectos Completados</h1>
+                                <p className="text-gray-500 text-lg">Listos para entrega o completar</p>
                             </div>
                             <div className="ml-auto">
                                 <div className="px-6 py-3 bg-blue-100 text-blue-700 rounded-full text-lg font-bold">
