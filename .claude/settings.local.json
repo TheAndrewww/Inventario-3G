@@ -14,7 +14,8 @@
       "Bash(railway variables:*)",
       "Bash(curl:*)",
       "Bash(dig:*)",
-      "Bash(railway up:*)"
+      "Bash(railway up:*)",
+      "Bash(npm version:*)"
     ],
     "deny": [],
     "ask": []
