@@ -11,7 +11,8 @@
       "Bash(railway run:*)",
       "Bash(railway logs:*)",
       "Bash(railway shell)",
-      "Bash(railway variables:*)"
+      "Bash(railway variables:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

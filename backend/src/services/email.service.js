@@ -1,5 +1,9 @@
 import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
+import dns from 'dns';
+
+// Configurar DNS resolver para IPv4 solamente
+dns.setDefaultResultOrder('ipv4first');
 
 // Lazy transporter - solo se crea cuando se necesita
 let _transporter = null;
@@ -13,12 +17,19 @@ function getTransporter() {
                 user: process.env.EMAIL_USER || '3gvelarias@gmail.com',
                 pass: process.env.EMAIL_PASS
             },
-            tls: { rejectUnauthorized: false },
+            tls: {
+                rejectUnauthorized: false,
+                minVersion: 'TLSv1.2'
+            },
             // Forzar IPv4 (Railway no soporta IPv6 a Gmail)
             family: 4,
+            dnsTimeout: 5000,
             connectionTimeout: 10000,
             greetingTimeout: 10000,
-            socketTimeout: 15000
+            socketTimeout: 15000,
+            // Logger para debugging
+            logger: false,
+            debug: false
         });
     }
     return _transporter;
