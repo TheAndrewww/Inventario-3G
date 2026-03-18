@@ -3302,14 +3302,16 @@ function paginaFormularioRechazo(orden, token) {
 
 /**
  * GET /api/ordenes-compra/articulos-pendientes/:proveedor_id
- * Obtener artículos de órdenes pendientes/rechazadas de un proveedor específico
- * Para consolidar órdenes del mismo proveedor
+ * Obtener artículos de órdenes pendientes/rechazadas, solicitudes pendientes y stock bajo
+ * de un proveedor específico para consolidar órdenes
  */
 export const obtenerArticulosPendientesPorProveedor = async (req, res) => {
   try {
     const { proveedor_id } = req.params;
 
-    // Buscar órdenes pendientes o rechazadas de ese proveedor
+    // ========================================
+    // 1. ARTÍCULOS EN ÓRDENES PENDIENTES/RECHAZADAS
+    // ========================================
     const ordenes = await OrdenCompra.findAll({
       where: {
         proveedor_id: proveedor_id,
@@ -3341,22 +3343,22 @@ export const obtenerArticulosPendientesPorProveedor = async (req, res) => {
       order: [['created_at', 'DESC']]
     });
 
-    // Agrupar artículos por articulo_id para facilitar consolidación
-    const articulosMap = new Map();
+    // Agrupar artículos por articulo_id
+    const articulosOrdenesMap = new Map();
 
     ordenes.forEach(orden => {
       orden.detalles.forEach(detalle => {
         const articuloId = detalle.articulo_id;
 
-        if (!articulosMap.has(articuloId)) {
-          articulosMap.set(articuloId, {
+        if (!articulosOrdenesMap.has(articuloId)) {
+          articulosOrdenesMap.set(articuloId, {
             articulo_id: articuloId,
             articulo: detalle.articulo,
             ordenes: []
           });
         }
 
-        articulosMap.get(articuloId).ordenes.push({
+        articulosOrdenesMap.get(articuloId).ordenes.push({
           orden_id: orden.id,
           orden_ticket: orden.ticket_id,
           orden_estado: orden.estado,
@@ -3368,18 +3370,110 @@ export const obtenerArticulosPendientesPorProveedor = async (req, res) => {
       });
     });
 
-    // Convertir Map a array
-    const articulos = Array.from(articulosMap.values()).map(item => ({
+    const articulosOrdenes = Array.from(articulosOrdenesMap.values()).map(item => ({
       ...item,
       cantidad_total: item.ordenes.reduce((sum, o) => sum + parseFloat(o.cantidad_solicitada), 0),
       ordenes_count: item.ordenes.length
     }));
 
+    // ========================================
+    // 2. ARTÍCULOS CON SOLICITUDES PENDIENTES
+    // ========================================
+    const solicitudes = await SolicitudCompra.findAll({
+      where: {
+        proveedor_id: proveedor_id,
+        estado: 'pendiente'
+      },
+      include: [
+        {
+          model: Articulo,
+          as: 'articulo',
+          include: [
+            { model: Categoria, as: 'categoria' },
+            { model: Ubicacion, as: 'ubicacion' }
+          ]
+        },
+        {
+          model: Usuario,
+          as: 'solicitante',
+          attributes: ['id', 'nombre']
+        }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+
+    // Agrupar solicitudes por articulo_id
+    const articulosSolicitudesMap = new Map();
+
+    solicitudes.forEach(solicitud => {
+      const articuloId = solicitud.articulo_id;
+
+      if (!articulosSolicitudesMap.has(articuloId)) {
+        articulosSolicitudesMap.set(articuloId, {
+          articulo_id: articuloId,
+          articulo: solicitud.articulo,
+          solicitudes: []
+        });
+      }
+
+      articulosSolicitudesMap.get(articuloId).solicitudes.push({
+        solicitud_id: solicitud.id,
+        solicitud_ticket: solicitud.ticket_id,
+        cantidad_solicitada: solicitud.cantidad_solicitada,
+        prioridad: solicitud.prioridad,
+        motivo: solicitud.motivo,
+        solicitante: solicitud.solicitante?.nombre,
+        created_at: solicitud.created_at
+      });
+    });
+
+    const articulosSolicitudes = Array.from(articulosSolicitudesMap.values()).map(item => ({
+      ...item,
+      cantidad_total: item.solicitudes.reduce((sum, s) => sum + parseFloat(s.cantidad_solicitada), 0),
+      solicitudes_count: item.solicitudes.length
+    }));
+
+    // ========================================
+    // 3. ARTÍCULOS BAJO STOCK MÍNIMO
+    // ========================================
+    const articulosBajoStock = await Articulo.findAll({
+      where: {
+        proveedor_id: proveedor_id,
+        activo: true,
+        stock_actual: {
+          [Op.lt]: sequelize.col('stock_minimo')
+        }
+      },
+      include: [
+        { model: Categoria, as: 'categoria' },
+        { model: Ubicacion, as: 'ubicacion' }
+      ],
+      order: [
+        [sequelize.literal('(stock_minimo - stock_actual)'), 'DESC']
+      ]
+    });
+
+    const articulosStockBajo = articulosBajoStock.map(articulo => ({
+      articulo_id: articulo.id,
+      articulo: articulo,
+      stock_actual: parseFloat(articulo.stock_actual),
+      stock_minimo: parseFloat(articulo.stock_minimo),
+      faltante: parseFloat(articulo.stock_minimo) - parseFloat(articulo.stock_actual),
+      cantidad_sugerida: parseFloat(articulo.stock_maximo || articulo.stock_minimo) - parseFloat(articulo.stock_actual)
+    }));
+
+    // ========================================
+    // RESPUESTA CONSOLIDADA
+    // ========================================
     res.json({
       success: true,
       data: {
-        articulos,
-        total_ordenes: ordenes.length
+        articulos_ordenes: articulosOrdenes,
+        articulos_solicitudes: articulosSolicitudes,
+        articulos_bajo_stock: articulosStockBajo,
+        total_ordenes: ordenes.length,
+        total_solicitudes: solicitudes.length,
+        total_bajo_stock: articulosStockBajo.length
       }
     });
 
