@@ -2769,12 +2769,12 @@ export const aprobarPorEmail = async (req, res) => {
     const { token } = req.query;
 
     if (!token) {
-      return res.status(400).send(paginaResultado('Error', 'Token no proporcionado', false));
+      return enviarHTML(res, paginaResultado('Error', 'Token no proporcionado', false), 400);
     }
 
     const decoded = verificarTokenAprobacion(token);
     if (!decoded || decoded.accion !== 'aprobar') {
-      return res.status(400).send(paginaResultado('Error', 'El enlace ha expirado o es inválido. Ingresa al sistema para aprobar la orden.', false));
+      return enviarHTML(res, paginaResultado('Error', 'El enlace ha expirado o es inválido. Ingresa al sistema para aprobar la orden.', false), 400);
     }
 
     const orden = await OrdenCompra.findByPk(decoded.orden_id, {
@@ -2794,11 +2794,11 @@ export const aprobarPorEmail = async (req, res) => {
     });
 
     if (!orden) {
-      return res.status(404).send(paginaResultado('Error', 'Orden no encontrada', false));
+      return enviarHTML(res, paginaResultado('Error', 'Orden no encontrada', false), 404);
     }
 
     if (orden.estado !== 'pendiente_aprobacion') {
-      return res.send(paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado === 'borrador' ? 'aprobada' : orden.estado}.`, orden.estado === 'borrador'));
+      return enviarHTML(res, paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado === 'borrador' ? 'aprobada' : orden.estado}.`, orden.estado === 'borrador'));
     }
 
     await orden.update({
@@ -2820,11 +2820,11 @@ export const aprobarPorEmail = async (req, res) => {
 
     enviarEmailEstadoOrden(orden, 'aprobada', null, 'Administrador (por email)').catch(() => { });
 
-    return res.send(paginaResultado('✅ Orden Aprobada', `La orden ${orden.ticket_id} ha sido aprobada exitosamente. Ya está lista para enviar al proveedor.`, true));
+    return enviarHTML(res, paginaResultado('✅ Orden Aprobada', `La orden ${orden.ticket_id} ha sido aprobada exitosamente. Ya está lista para enviar al proveedor.`, true));
 
   } catch (error) {
     console.error('Error al aprobar por email:', error);
-    return res.status(500).send(paginaResultado('Error', 'Ocurrió un error al procesar la aprobación.', false));
+    return enviarHTML(res, paginaResultado('Error', 'Ocurrió un error al procesar la aprobación.', false), 500);
   }
 };
 
@@ -3000,12 +3000,12 @@ export const mostrarFormularioRechazo = async (req, res) => {
     const { token } = req.query;
 
     if (!token) {
-      return res.status(400).send(paginaResultado('Error', 'Token no proporcionado', false));
+      return enviarHTML(res, paginaResultado('Error', 'Token no proporcionado', false), 400);
     }
 
     const decoded = verificarTokenAprobacion(token);
     if (!decoded || decoded.accion !== 'rechazar') {
-      return res.status(400).send(paginaResultado('Error', 'El enlace ha expirado o es inválido. Ingresa al sistema para rechazar la orden.', false));
+      return enviarHTML(res, paginaResultado('Error', 'El enlace ha expirado o es inválido. Ingresa al sistema para rechazar la orden.', false));
     }
 
     const orden = await OrdenCompra.findByPk(decoded.orden_id, {
@@ -3016,11 +3016,11 @@ export const mostrarFormularioRechazo = async (req, res) => {
     });
 
     if (!orden) {
-      return res.status(404).send(paginaResultado('Error', 'Orden no encontrada', false));
+      return enviarHTML(res, paginaResultado('Error', 'Orden no encontrada', false), 404);
     }
 
     if (orden.estado !== 'pendiente_aprobacion') {
-      return res.send(paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado}.`, false));
+      return enviarHTML(res, paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado}.`, false));
     }
 
     // Mostrar formulario
@@ -3028,7 +3028,7 @@ export const mostrarFormularioRechazo = async (req, res) => {
 
   } catch (error) {
     console.error('Error al mostrar formulario de rechazo:', error);
-    return res.status(500).send(paginaResultado('Error', 'Error al cargar el formulario. Intenta nuevamente.', false));
+    return enviarHTML(res, paginaResultado('Error', 'Error al cargar el formulario. Intenta nuevamente.', false), 500);
   }
 };
 
@@ -3040,16 +3040,16 @@ export const rechazarPorEmail = async (req, res) => {
     const { token, motivo } = req.body;
 
     if (!token) {
-      return res.status(400).send(paginaResultado('Error', 'Token no proporcionado', false));
+      return enviarHTML(res, paginaResultado('Error', 'Token no proporcionado', false), 400);
     }
 
     if (!motivo || motivo.trim() === '') {
-      return res.status(400).send(paginaResultado('Error', 'Debes proporcionar un motivo de rechazo', false));
+      return enviarHTML(res, paginaResultado('Error', 'Debes proporcionar un motivo de rechazo', false), 400);
     }
 
     const decoded = verificarTokenAprobacion(token);
     if (!decoded || decoded.accion !== 'rechazar') {
-      return res.status(400).send(paginaResultado('Error', 'El enlace ha expirado o es inválido. Ingresa al sistema para rechazar la orden.', false));
+      return enviarHTML(res, paginaResultado('Error', 'El enlace ha expirado o es inválido. Ingresa al sistema para rechazar la orden.', false));
     }
 
     const orden = await OrdenCompra.findByPk(decoded.orden_id, {
@@ -3060,11 +3060,11 @@ export const rechazarPorEmail = async (req, res) => {
     });
 
     if (!orden) {
-      return res.status(404).send(paginaResultado('Error', 'Orden no encontrada', false));
+      return enviarHTML(res, paginaResultado('Error', 'Orden no encontrada', false), 404);
     }
 
     if (orden.estado !== 'pendiente_aprobacion') {
-      return res.send(paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado}.`, false));
+      return enviarHTML(res, paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado}.`, false));
     }
 
     await orden.update({
@@ -3086,16 +3086,23 @@ export const rechazarPorEmail = async (req, res) => {
 
     enviarEmailEstadoOrden(orden, 'rechazada', motivo.trim(), 'Administrador (por email)').catch(() => { });
 
-    return res.send(paginaResultado('❌ Orden Rechazada', `La orden ${orden.ticket_id} ha sido rechazada. El creador fue notificado.`, false));
+    return enviarHTML(res, paginaResultado('❌ Orden Rechazada', `La orden ${orden.ticket_id} ha sido rechazada. El creador fue notificado.`, false));
 
   } catch (error) {
     console.error('Error al rechazar por email:', error);
-    return res.status(500).send(paginaResultado('Error', 'Error al procesar el rechazo. Intenta nuevamente.', false));
+    return enviarHTML(res, paginaResultado('Error', 'Error al procesar el rechazo. Intenta nuevamente.', false), 500);
   }
 };
 
+// Helper para enviar HTML
+function enviarHTML(res, html, statusCode = 200) {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  return res.status(statusCode).send(html);
+}
+
 // Página HTML de resultado para approve-by-email
 function paginaResultado(titulo, mensaje, exito) {
+  const color = exito ? '#059669' : '#dc2626';
   return `
 <!DOCTYPE html>
 <html>
@@ -3103,14 +3110,32 @@ function paginaResultado(titulo, mensaje, exito) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${titulo} - 3G Inventario</title>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .container {
+            animation: fadeIn 0.5s ease-out;
+        }
+        .icon {
+            animation: bounce 0.6s ease-out;
+        }
+    </style>
 </head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;">
-    <div style="max-width:420px;text-align:center;padding:40px;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
-        <div style="font-size:64px;margin-bottom:16px;">${exito ? '✅' : '❌'}</div>
-        <h1 style="font-size:24px;color:#111827;margin:0 0 8px;">${titulo}</h1>
-        <p style="font-size:14px;color:#6b7280;margin:0 0 24px;">${mensaje}</p>
+    <div class="container" style="max-width:420px;text-align:center;padding:40px;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+        <div class="icon" style="font-size:72px;margin-bottom:16px;">${exito ? '✅' : '❌'}</div>
+        <h1 style="font-size:26px;color:#111827;margin:0 0 12px;font-weight:700;">${titulo}</h1>
+        <p style="font-size:15px;color:#6b7280;margin:0 0 28px;line-height:1.6;">${mensaje}</p>
         <a href="${process.env.FRONTEND_URL || 'https://inventario-3-g.vercel.app'}/ordenes-compra"
-           style="display:inline-block;background:#991b1b;color:white;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">
+           style="display:inline-block;background:${color};color:white;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:600;font-size:15px;transition:transform 0.2s;"
+           onmouseover="this.style.transform='scale(1.05)'"
+           onmouseout="this.style.transform='scale(1)'">
             Ir al Sistema
         </a>
     </div>
@@ -3128,43 +3153,58 @@ function paginaFormularioRechazo(orden, token) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rechazar Orden ${orden.ticket_id} - 3G Inventario</title>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .container {
+            animation: fadeIn 0.5s ease-out;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #dc2626;
+        }
+    </style>
 </head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;">
-    <div style="max-width:500px;padding:40px;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
-        <div style="font-size:48px;text-align:center;margin-bottom:16px;">❌</div>
-        <h1 style="font-size:24px;color:#111827;margin:0 0 8px;text-align:center;">Rechazar Orden</h1>
-        <p style="font-size:14px;color:#6b7280;margin:0 0 24px;text-align:center;">
-            Orden <strong>${orden.ticket_id}</strong><br>
-            Proveedor: ${orden.proveedor?.nombre || 'N/A'}<br>
-            Total: $${parseFloat(orden.total_estimado || 0).toFixed(2)}
-        </p>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;">
+    <div class="container" style="max-width:520px;width:100%;padding:40px;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+        <div style="font-size:56px;text-align:center;margin-bottom:16px;">❌</div>
+        <h1 style="font-size:26px;color:#111827;margin:0 0 12px;text-align:center;font-weight:700;">Rechazar Orden</h1>
+        <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:16px;margin-bottom:24px;">
+            <p style="font-size:15px;color:#7f1d1d;margin:0;text-align:center;">
+                <strong>Orden:</strong> ${orden.ticket_id}<br>
+                <strong>Proveedor:</strong> ${orden.proveedor?.nombre || 'N/A'}<br>
+                <strong>Total:</strong> $${parseFloat(orden.total_estimado || 0).toFixed(2)}
+            </p>
+        </div>
 
         <form method="POST" action="${backendUrl}/api/ordenes-compra/rechazar-email" style="width:100%;">
             <input type="hidden" name="token" value="${token}">
 
-            <label style="display:block;font-size:14px;font-weight:600;color:#374151;margin-bottom:8px;">
+            <label style="display:block;font-size:15px;font-weight:600;color:#374151;margin-bottom:10px;">
                 Motivo del rechazo <span style="color:#dc2626;">*</span>
             </label>
             <textarea
                 name="motivo"
                 required
-                rows="4"
-                placeholder="Explica por qué se rechaza esta orden..."
-                style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;box-sizing:border-box;"
+                rows="5"
+                placeholder="Explica detalladamente por qué se rechaza esta orden..."
+                style="width:100%;padding:14px;border:2px solid #d1d5db;border-radius:10px;font-size:15px;font-family:inherit;resize:vertical;box-sizing:border-box;transition:border-color 0.2s;"
             ></textarea>
 
             <button
                 type="submit"
-                style="width:100%;margin-top:16px;background:#dc2626;color:white;border:none;padding:14px;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;"
-                onmouseover="this.style.background='#b91c1c'"
-                onmouseout="this.style.background='#dc2626'"
+                style="width:100%;margin-top:20px;background:#dc2626;color:white;border:none;padding:16px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;transition:all 0.2s;"
+                onmouseover="this.style.background='#b91c1c';this.style.transform='scale(1.02)'"
+                onmouseout="this.style.background='#dc2626';this.style.transform='scale(1)'"
             >
                 Confirmar Rechazo
             </button>
         </form>
 
-        <p style="font-size:12px;color:#9ca3af;margin:16px 0 0;text-align:center;">
-            El creador de la orden será notificado inmediatamente.
+        <p style="font-size:13px;color:#9ca3af;margin:20px 0 0;text-align:center;">
+            El creador de la orden será notificado inmediatamente por email.
         </p>
     </div>
 </body>
