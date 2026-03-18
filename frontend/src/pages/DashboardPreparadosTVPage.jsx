@@ -124,7 +124,7 @@ const DashboardPreparadosTVPage = () => {
                                 />
                             </div>
                             <div className="flex-1">
-                                <h1 className="text-5xl font-bold text-white mb-2">Proyectos Completados</h1>
+                                <h1 className="text-6xl font-bold text-white mb-2">Proyectos Completados</h1>
                                 <p className="text-gray-300 text-xl font-medium">Listos para entrega o completar</p>
                             </div>
                             <div className="ml-auto shrink-0">

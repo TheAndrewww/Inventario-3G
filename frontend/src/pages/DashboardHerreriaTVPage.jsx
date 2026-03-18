@@ -194,7 +194,7 @@ const DashboardHerreriaTVPage = () => {
                                 />
                             </div>
                             <div className="flex-1">
-                                <h1 className="text-5xl font-bold text-white mb-2">Producción de Herrería</h1>
+                                <h1 className="text-6xl font-bold text-white mb-2">Producción de Herrería</h1>
                                 <p className="text-gray-300 text-xl font-medium">
                                     <span className="font-bold text-orange-500">{enProduccion.length}</span> proyecto{enProduccion.length !== 1 ? 's' : ''} en proceso
                                 </p>
