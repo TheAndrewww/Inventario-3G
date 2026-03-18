@@ -184,9 +184,9 @@ const DashboardHerreriaTVPage = () => {
             >
                 <div className="h-full w-full overflow-auto" style={{ padding: px(16) }}>
                     {/* Header */}
-                    <div className="mb-6 bg-gray-900 rounded-2xl shadow-xl border border-gray-800 p-6">
-                        <div className="flex items-center gap-6">
-                            <div className="h-24 px-4 flex items-center justify-center shrink-0">
+                    <div className="mb-5 bg-gray-900 rounded-2xl shadow-xl border border-gray-800 p-5">
+                        <div className="flex items-center gap-5">
+                            <div className="h-16 px-3 flex items-center justify-center shrink-0">
                                 <img
                                     src="https://res.cloudinary.com/dd93jrilg/image/upload/v1763171532/logo_web_blanco_j8xeyh.png"
                                     alt="3G"
@@ -194,8 +194,8 @@ const DashboardHerreriaTVPage = () => {
                                 />
                             </div>
                             <div className="flex-1">
-                                <h1 className="text-6xl font-bold text-white mb-2">Producción de Herrería</h1>
-                                <p className="text-gray-300 text-xl font-medium">
+                                <h1 className="text-4xl font-bold text-white mb-1">Producción de Herrería</h1>
+                                <p className="text-gray-300 text-lg font-medium">
                                     <span className="font-bold text-orange-500">{enProduccion.length}</span> proyecto{enProduccion.length !== 1 ? 's' : ''} en proceso
                                 </p>
                             </div>
