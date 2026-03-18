@@ -20,7 +20,9 @@ import {
   generarSolicitudesStockBajo,
   aprobarOrden,
   rechazarOrden,
-  aprobarPorEmail
+  aprobarPorEmail,
+  eliminarOrden,
+  reabrirOrden
 } from '../controllers/ordenesCompra.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -60,6 +62,16 @@ router.put(
   '/ordenes-compra/:id/rechazar',
   verificarRol('administrador'),
   rechazarOrden
+);
+router.put(
+  '/ordenes-compra/:id/reabrir',
+  verificarRol('compras', 'administrador'),
+  reabrirOrden
+);
+router.delete(
+  '/ordenes-compra/:id',
+  verificarRol('compras', 'almacen', 'administrador'),
+  eliminarOrden
 );
 
 // Rutas de recepción de mercancía

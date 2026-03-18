@@ -57,6 +57,7 @@ const OrdenesCompraPage = () => {
   const esDiseñador = user?.rol === 'diseñador';
   const esAdmin = user?.rol === 'administrador';
   const puedeAnularOrdenes = ['administrador', 'almacen', 'compras'].includes(user?.rol);
+  const puedeReabrirOrdenes = ['administrador', 'compras'].includes(user?.rol);
   const [modalRechazo, setModalRechazo] = useState(false);
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [ordenParaRechazo, setOrdenParaRechazo] = useState(null);
@@ -763,6 +764,38 @@ const OrdenesCompraPage = () => {
     }
   };
 
+  const handleReabrirOrden = async (orden) => {
+    if (!confirm(`¿Reabrir la orden ${orden.ticket_id} como borrador? Podrás editarla y enviarla nuevamente.`)) return;
+    setLoadingAprobacion(true);
+    try {
+      await ordenesCompraService.reabrirOrden(orden.id);
+      toast.success(`Orden ${orden.ticket_id} reabierta como borrador`);
+      setModalDetalle(false);
+      setOrdenSeleccionada(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Error al reabrir');
+    } finally {
+      setLoadingAprobacion(false);
+    }
+  };
+
+  const handleEliminarOrden = async (orden) => {
+    if (!confirm(`¿Eliminar permanentemente la orden ${orden.ticket_id}? Esta acción no se puede deshacer.`)) return;
+    setLoadingAprobacion(true);
+    try {
+      await ordenesCompraService.eliminarOrden(orden.id);
+      toast.success(`Orden ${orden.ticket_id} eliminada`);
+      setModalDetalle(false);
+      setOrdenSeleccionada(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Error al eliminar');
+    } finally {
+      setLoadingAprobacion(false);
+    }
+  };
+
   const getEstadoBadge = (estado) => {
     const estados = {
       pendiente_aprobacion: { label: 'Pendiente Aprobación', color: 'bg-amber-100 text-amber-800', icon: AlertCircle },
@@ -1351,12 +1384,15 @@ const OrdenesCompraPage = () => {
           }}
           onActualizarEstado={handleActualizarEstado}
           puedeAnularOrdenes={puedeAnularOrdenes}
+          puedeReabrirOrdenes={puedeReabrirOrdenes}
           onAbrirModalAnular={handleAbrirModalAnular}
           onEnviarOrden={handleEnviarOrden}
           onEditarOrden={handleAbrirModalEditar}
           esAdmin={esAdmin}
           onAprobar={handleAprobarOrden}
           onRechazar={handleAbrirRechazo}
+          onReabrir={handleReabrirOrden}
+          onEliminar={handleEliminarOrden}
           loadingAprobacion={loadingAprobacion}
         />
       )}
@@ -2093,7 +2129,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
 };
 
 // Modal para ver detalle de orden con trazabilidad
-const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, onAbrirModalAnular, onEnviarOrden, onEditarOrden, esAdmin, onAprobar, onRechazar, loadingAprobacion }) => {
+const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, puedeReabrirOrdenes, onAbrirModalAnular, onEnviarOrden, onEditarOrden, esAdmin, onAprobar, onRechazar, onReabrir, onEliminar, loadingAprobacion }) => {
   const [tabActual, setTabActual] = React.useState('detalle'); // 'detalle' o 'historial'
   const esBorrador = orden && orden.estado === 'borrador';
   const esPendienteAprobacion = orden && orden.estado === 'pendiente_aprobacion';
@@ -2284,6 +2320,31 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                   Anular Orden
                 </Button>
               )}
+              {/* Botones para órdenes rechazadas */}
+              {esRechazada && (
+                <>
+                  {puedeReabrirOrdenes && onReabrir && (
+                    <button
+                      onClick={() => onReabrir(orden)}
+                      disabled={loadingAprobacion}
+                      className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <RotateCcw size={16} />
+                      {loadingAprobacion ? 'Procesando...' : 'Reabrir como Borrador'}
+                    </button>
+                  )}
+                  {puedeAnularOrdenes && onEliminar && (
+                    <button
+                      onClick={() => onEliminar(orden)}
+                      disabled={loadingAprobacion}
+                      className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <Trash2 size={16} />
+                      {loadingAprobacion ? 'Eliminando...' : 'Eliminar'}
+                    </button>
+                  )}
+                </>
+              )}
               <Button onClick={onClose} variant="secondary">
                 Cerrar
               </Button>
@@ -2347,6 +2408,31 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                   <RotateCcw size={16} />
                   Anular Orden
                 </Button>
+              )}
+              {/* Botones para órdenes rechazadas */}
+              {esRechazada && (
+                <>
+                  {puedeReabrirOrdenes && onReabrir && (
+                    <button
+                      onClick={() => onReabrir(orden)}
+                      disabled={loadingAprobacion}
+                      className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <RotateCcw size={16} />
+                      {loadingAprobacion ? 'Procesando...' : 'Reabrir como Borrador'}
+                    </button>
+                  )}
+                  {puedeAnularOrdenes && onEliminar && (
+                    <button
+                      onClick={() => onEliminar(orden)}
+                      disabled={loadingAprobacion}
+                      className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <Trash2 size={16} />
+                      {loadingAprobacion ? 'Eliminando...' : 'Eliminar'}
+                    </button>
+                  )}
+                </>
               )}
               <Button onClick={onClose} variant="secondary">
                 Cerrar

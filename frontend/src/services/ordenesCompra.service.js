@@ -130,6 +130,18 @@ const ordenesCompraService = {
   rechazarOrden: async (id, motivo) => {
     const response = await api.put(`/ordenes-compra/${id}/rechazar`, { motivo });
     return response.data;
+  },
+
+  // Reabrir orden rechazada a borrador (compras y admin)
+  reabrirOrden: async (id) => {
+    const response = await api.put(`/ordenes-compra/${id}/reabrir`);
+    return response.data;
+  },
+
+  // Eliminar orden rechazada o cancelada (compras, almacen y admin)
+  eliminarOrden: async (id) => {
+    const response = await api.delete(`/ordenes-compra/${id}`);
+    return response.data;
   }
 };
 

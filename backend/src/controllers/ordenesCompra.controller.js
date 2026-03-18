@@ -2810,6 +2810,168 @@ export const aprobarPorEmail = async (req, res) => {
   }
 };
 
+/**
+ * Eliminar orden de compra (solo rechazadas o canceladas)
+ * - Compras, Almacén y Administradores pueden eliminar
+ * - Solo se pueden eliminar órdenes que NO han afectado inventario
+ */
+export const eliminarOrden = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+
+    const orden = await OrdenCompra.findByPk(id, {
+      include: [
+        { model: DetalleOrdenCompra, as: 'detalles' },
+        { model: SolicitudCompra, as: 'solicitudes' }
+      ],
+      transaction
+    });
+
+    if (!orden) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Orden no encontrada'
+      });
+    }
+
+    // Solo se pueden eliminar órdenes rechazadas o canceladas
+    if (!['rechazada', 'cancelada'].includes(orden.estado)) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `No se puede eliminar una orden con estado "${orden.estado}". Solo se pueden eliminar órdenes rechazadas o canceladas.`
+      });
+    }
+
+    // Verificar que no haya recepciones asociadas
+    const recepciones = await Movimiento.count({
+      where: { orden_compra_id: id },
+      transaction
+    });
+
+    if (recepciones > 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'No se puede eliminar una orden que tiene recepciones de mercancía. Use la función de anular en su lugar.'
+      });
+    }
+
+    // Si hay solicitudes vinculadas, desvincularse y volver a pendiente
+    if (orden.solicitudes && orden.solicitudes.length > 0) {
+      await SolicitudCompra.update(
+        {
+          orden_compra_id: null,
+          estado: 'pendiente'
+        },
+        {
+          where: { orden_compra_id: id },
+          transaction
+        }
+      );
+    }
+
+    // Eliminar detalles primero (cascade debería hacerlo, pero por seguridad)
+    await DetalleOrdenCompra.destroy({
+      where: { orden_compra_id: id },
+      transaction
+    });
+
+    // Eliminar la orden
+    await orden.destroy({ transaction });
+
+    await transaction.commit();
+
+    res.json({
+      success: true,
+      message: `Orden ${orden.ticket_id} eliminada exitosamente`
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al eliminar orden:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar la orden',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Reabrir orden rechazada a estado borrador
+ * - Solo administradores y compras pueden reabrir
+ * - La orden vuelve a estado borrador para poder editarla y reenviarla
+ */
+export const reabrirOrden = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const orden = await OrdenCompra.findByPk(id, {
+      include: [
+        { model: Usuario, as: 'creador', attributes: ['id', 'nombre'] },
+        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] }
+      ]
+    });
+
+    if (!orden) {
+      return res.status(404).json({
+        success: false,
+        message: 'Orden no encontrada'
+      });
+    }
+
+    if (orden.estado !== 'rechazada') {
+      return res.status(400).json({
+        success: false,
+        message: `No se puede reabrir una orden con estado "${orden.estado}". Solo se pueden reabrir órdenes rechazadas.`
+      });
+    }
+
+    await orden.update({
+      estado: 'borrador',
+      motivo_rechazo: null,
+      aprobado_por_id: null,
+      fecha_aprobacion: null
+    });
+
+    // Notificar al creador
+    try {
+      await crearNotificacion({
+        usuario_id: orden.usuario_creador_id,
+        tipo: 'orden_estado_cambiado',
+        titulo: '🔄 Orden reabierta',
+        mensaje: `${req.usuario.nombre} reabrió tu orden ${orden.ticket_id}. Ahora puedes editarla y reenviarla.`,
+        url: '/ordenes-compra',
+        datos_adicionales: {
+          orden_id: orden.id,
+          ticket_id: orden.ticket_id,
+          reabierto_por: req.usuario.nombre
+        }
+      });
+    } catch (notifError) {
+      console.error('Error al notificar reapertura:', notifError);
+    }
+
+    res.json({
+      success: true,
+      message: `Orden ${orden.ticket_id} reabierta como borrador`,
+      data: { orden }
+    });
+
+  } catch (error) {
+    console.error('Error al reabrir orden:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al reabrir la orden',
+      error: error.message
+    });
+  }
+};
+
 // Página HTML de resultado para approve-by-email
 function paginaResultado(titulo, mensaje, exito) {
   return `
@@ -2825,7 +2987,7 @@ function paginaResultado(titulo, mensaje, exito) {
         <div style="font-size:64px;margin-bottom:16px;">${exito ? '✅' : '❌'}</div>
         <h1 style="font-size:24px;color:#111827;margin:0 0 8px;">${titulo}</h1>
         <p style="font-size:14px;color:#6b7280;margin:0 0 24px;">${mensaje}</p>
-        <a href="${process.env.FRONTEND_URL || 'https://inventario-3-g.vercel.app'}/ordenes-compra" 
+        <a href="${process.env.FRONTEND_URL || 'https://inventario-3-g.vercel.app'}/ordenes-compra"
            style="display:inline-block;background:#991b1b;color:white;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">
             Ir al Sistema
         </a>
