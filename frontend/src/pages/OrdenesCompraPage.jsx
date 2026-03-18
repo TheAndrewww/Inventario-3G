@@ -1100,8 +1100,13 @@ const OrdenesCompraPage = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => generarPDFOrden(orden)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors text-sm"
-                            title="Descargar PDF"
+                            disabled={orden.estado !== 'borrador'}
+                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors text-sm ${
+                              orden.estado === 'borrador'
+                                ? 'bg-red-700 hover:bg-red-800 text-white'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                            title={orden.estado === 'borrador' ? 'Descargar PDF' : 'Solo disponible para órdenes aprobadas'}
                           >
                             <Download size={16} />
                             PDF

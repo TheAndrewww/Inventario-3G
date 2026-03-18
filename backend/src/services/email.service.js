@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import jwt from 'jsonwebtoken';
+import { generarPDFOrdenCompra } from '../utils/ordenCompraPDF.js';
 
 // Inicializar Resend
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -269,7 +270,10 @@ export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprob
         const creadorEmail = orden.creador?.email;
 
         // Si no tenemos email del creador, no enviamos
-        if (!creadorEmail) return false;
+        if (!creadorEmail) {
+            console.log('⚠️ No se pudo enviar email: creador sin email');
+            return false;
+        }
 
         const html = `
 <!DOCTYPE html>
@@ -296,18 +300,36 @@ export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprob
                 <p style="font-size: 14px; color: #7f1d1d; margin: 0;">${motivo}</p>
             </div>
             ` : ''}
-            ${esAprobada ? '<p style="font-size: 14px; color: #059669;">Ya puedes enviar la orden al proveedor desde el sistema.</p>' : ''}
+            ${esAprobada ? '<p style="font-size: 14px; color: #059669;">Ya puedes enviar la orden al proveedor desde el sistema. El PDF adjunto contiene los detalles completos.</p>' : ''}
         </div>
     </div>
 </body>
 </html>`;
 
-        const { data, error } = await resend.emails.send({
+        const emailData = {
             from: '3G Inventario <notificaciones@3gvelarias.com>',
             to: creadorEmail,
             subject: `${esAprobada ? '✅' : '❌'} Orden ${orden.ticket_id} ${esAprobada ? 'aprobada' : 'rechazada'}`,
             html
-        });
+        };
+
+        // Si la orden fue aprobada, generar y adjuntar el PDF
+        if (esAprobada) {
+            try {
+                console.log('📄 Generando PDF para orden:', orden.ticket_id);
+                const pdfBuffer = await generarPDFOrdenCompra(orden);
+                emailData.attachments = [{
+                    filename: `Orden-Compra-${orden.ticket_id}.pdf`,
+                    content: pdfBuffer
+                }];
+                console.log('✅ PDF generado exitosamente');
+            } catch (pdfError) {
+                console.error('❌ Error al generar PDF:', pdfError);
+                // Continuar enviando el email sin el PDF
+            }
+        }
+
+        const { data, error } = await resend.emails.send(emailData);
 
         if (error) {
             console.error('❌ [RESEND] Error al enviar email de estado:', error);

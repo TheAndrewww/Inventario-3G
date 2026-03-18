@@ -2614,8 +2614,17 @@ export const aprobarOrden = async (req, res) => {
 
     const orden = await OrdenCompra.findByPk(id, {
       include: [
-        { model: Usuario, as: 'creador', attributes: ['id', 'nombre'] },
-        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] }
+        { model: Usuario, as: 'creador', attributes: ['id', 'nombre', 'email'] },
+        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] },
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalles',
+          include: [{
+            model: Articulo,
+            as: 'articulo',
+            include: [{ model: Categoria, as: 'categoria' }]
+          }]
+        }
       ]
     });
 
@@ -2691,7 +2700,7 @@ export const rechazarOrden = async (req, res) => {
 
     const orden = await OrdenCompra.findByPk(id, {
       include: [
-        { model: Usuario, as: 'creador', attributes: ['id', 'nombre'] },
+        { model: Usuario, as: 'creador', attributes: ['id', 'nombre', 'email'] },
         { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] }
       ]
     });
@@ -2771,7 +2780,16 @@ export const aprobarPorEmail = async (req, res) => {
     const orden = await OrdenCompra.findByPk(decoded.orden_id, {
       include: [
         { model: Usuario, as: 'creador', attributes: ['id', 'nombre', 'email'] },
-        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] }
+        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] },
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalles',
+          include: [{
+            model: Articulo,
+            as: 'articulo',
+            include: [{ model: Categoria, as: 'categoria' }]
+          }]
+        }
       ]
     });
 
