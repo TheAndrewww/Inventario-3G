@@ -759,15 +759,14 @@ export const actualizarOrdenCompra = async (req, res) => {
       ]
     });
 
-    // Si la orden estaba rechazada, enviar email de aprobación al admin
-    if (estadoAnterior === 'rechazada') {
-      try {
-        await enviarEmailAprobacion(ordenActualizada);
-        console.log(`📧 Email de aprobación enviado para orden ${ordenActualizada.ticket_id} (reeditada después de rechazo)`);
-      } catch (emailError) {
-        console.error('❌ Error al enviar email de aprobación:', emailError);
-        // No fallar la operación si el email falla
-      }
+    // Enviar email de aprobación al admin siempre que se actualice una orden pendiente o rechazada
+    // (para que los administradores puedan aprobar/rechazar desde el email)
+    try {
+      await enviarEmailAprobacion(ordenActualizada);
+      console.log(`📧 Email de aprobación enviado para orden ${ordenActualizada.ticket_id} (actualizada desde estado: ${estadoAnterior})`);
+    } catch (emailError) {
+      console.error('❌ Error al enviar email de aprobación:', emailError);
+      // No fallar la operación si el email falla
     }
 
     res.status(200).json({
