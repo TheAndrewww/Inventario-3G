@@ -755,7 +755,7 @@ export const actualizarOrdenCompra = async (req, res) => {
           ]
         },
         { model: Proveedor, as: 'proveedor' },
-        { model: Usuario, as: 'usuarioCreador', attributes: ['id', 'nombre', 'email'] }
+        { model: Usuario, as: 'creador', attributes: ['id', 'nombre', 'email'] }
       ]
     });
 
