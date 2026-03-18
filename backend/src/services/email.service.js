@@ -197,7 +197,7 @@ export const enviarEmailAprobacion = async (orden) => {
         const html = generarEmailAprobacion(orden, tokenAprobar);
 
         const { data, error } = await resend.emails.send({
-            from: '3G Inventario <onboarding@resend.dev>',
+            from: '3G Inventario <notificaciones@3gvelarias.com>',
             to: ADMIN_EMAILS,
             subject: `🔔 Orden ${orden.ticket_id} pendiente de aprobación — $${parseFloat(orden.total_estimado || 0).toFixed(2)}`,
             html
@@ -234,7 +234,7 @@ export const testEmail = async (req, res) => {
         }
 
         const { data, error } = await resend.emails.send({
-            from: '3G Inventario <onboarding@resend.dev>',
+            from: '3G Inventario <notificaciones@3gvelarias.com>',
             to: ADMIN_EMAILS,
             subject: '🧪 Email de prueba - Inventario 3G',
             html: '<h1>✅ Email de prueba exitoso</h1><p>Si ves este email, la configuración de Resend está correcta.</p>'
@@ -303,7 +303,7 @@ export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprob
 </html>`;
 
         const { data, error } = await resend.emails.send({
-            from: '3G Inventario <onboarding@resend.dev>',
+            from: '3G Inventario <notificaciones@3gvelarias.com>',
             to: creadorEmail,
             subject: `${esAprobada ? '✅' : '❌'} Orden ${orden.ticket_id} ${esAprobada ? 'aprobada' : 'rechazada'}`,
             html
