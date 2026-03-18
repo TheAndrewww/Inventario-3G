@@ -1554,7 +1554,9 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
   const [ubicaciones, setUbicaciones] = useState([]);
 
   // Estados para consolidación de órdenes (solo admin)
-  const [articulosPendientes, setArticulosPendientes] = useState([]);
+  const [articulosOrdenes, setArticulosOrdenes] = useState([]);
+  const [articulosSolicitudes, setArticulosSolicitudes] = useState([]);
+  const [articulosBajoStock, setArticulosBajoStock] = useState([]);
   const [ordenesSeleccionadas, setOrdenesSeleccionadas] = useState(new Set());
   const [loadingPendientes, setLoadingPendientes] = useState(false);
 
@@ -1630,7 +1632,9 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
   useEffect(() => {
     const fetchArticulosPendientes = async () => {
       if (!esAdmin || !proveedorId) {
-        setArticulosPendientes([]);
+        setArticulosOrdenes([]);
+        setArticulosSolicitudes([]);
+        setArticulosBajoStock([]);
         setOrdenesSeleccionadas(new Set());
         return;
       }
@@ -1638,10 +1642,14 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
       setLoadingPendientes(true);
       try {
         const response = await ordenesCompraService.obtenerArticulosPendientes(proveedorId);
-        setArticulosPendientes(response?.data?.articulos || []);
+        setArticulosOrdenes(response?.data?.articulos_ordenes || []);
+        setArticulosSolicitudes(response?.data?.articulos_solicitudes || []);
+        setArticulosBajoStock(response?.data?.articulos_bajo_stock || []);
       } catch (error) {
         console.error('Error al cargar artículos pendientes:', error);
-        setArticulosPendientes([]);
+        setArticulosOrdenes([]);
+        setArticulosSolicitudes([]);
+        setArticulosBajoStock([]);
       } finally {
         setLoadingPendientes(false);
       }
@@ -1831,17 +1839,16 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
         </div>
 
         {/* Sección de consolidación de órdenes (solo para admin) */}
-        {esAdmin && proveedorId && articulosPendientes.length > 0 && (
+        {esAdmin && proveedorId && (articulosOrdenes.length > 0 || articulosSolicitudes.length > 0 || articulosBajoStock.length > 0) && (
           <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <h4 className="font-semibold text-gray-900 flex items-center gap-2">
                   <AlertTriangle className="text-yellow-600" size={18} />
-                  Artículos en otras órdenes pendientes
+                  Artículos disponibles para incluir
                 </h4>
                 <p className="text-sm text-gray-600 mt-1">
-                  Hay {articulosPendientes.length} artículo{articulosPendientes.length !== 1 ? 's' : ''} de este proveedor en órdenes pendientes/rechazadas.
-                  Puedes consolidarlos en esta orden.
+                  Este proveedor tiene artículos en órdenes pendientes, solicitudes y/o bajo stock mínimo.
                 </p>
               </div>
               {loadingPendientes && (
@@ -1849,54 +1856,134 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
               )}
             </div>
 
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {articulosPendientes.map((item) => (
-                <div key={item.articulo_id} className="bg-white rounded-lg p-3 border border-gray-200">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{item.articulo?.nombre}</p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        En {item.ordenes_count} orden{item.ordenes_count !== 1 ? 'es' : ''} •
-                        Total: {item.cantidad_total} {item.articulo?.unidad || 'uds'}
-                      </p>
-                      <div className="mt-2 space-y-1">
-                        {item.ordenes.map((orden) => (
-                          <label
-                            key={orden.orden_id}
-                            className="flex items-center gap-2 text-xs text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={ordenesSeleccionadas.has(orden.orden_id)}
-                              onChange={(e) => {
-                                const newSet = new Set(ordenesSeleccionadas);
-                                if (e.target.checked) {
-                                  newSet.add(orden.orden_id);
-                                } else {
-                                  newSet.delete(orden.orden_id);
-                                }
-                                setOrdenesSeleccionadas(newSet);
-                              }}
-                              className="rounded border-gray-300"
-                            />
-                            <span className="font-mono">{orden.orden_ticket}</span>
-                            <span className="text-gray-400">•</span>
-                            <span>{orden.cantidad_solicitada} {item.articulo?.unidad}</span>
-                            <span className="text-gray-400">•</span>
-                            <span className={`px-1.5 py-0.5 rounded text-xs ${
-                              orden.orden_estado === 'pendiente_aprobacion'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {orden.orden_estado === 'pendiente_aprobacion' ? 'Pendiente' : 'Rechazada'}
-                            </span>
-                          </label>
-                        ))}
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {/* 1. Artículos en órdenes pendientes/rechazadas */}
+              {articulosOrdenes.length > 0 && (
+                <div className="space-y-2">
+                  <h5 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <ShoppingCart size={16} />
+                    En órdenes pendientes/rechazadas ({articulosOrdenes.length})
+                  </h5>
+                  {articulosOrdenes.map((item) => (
+                    <div key={`orden-${item.articulo_id}`} className="bg-white rounded-lg p-3 border border-gray-200">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{item.articulo?.nombre}</p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            En {item.ordenes_count} orden{item.ordenes_count !== 1 ? 'es' : ''} •
+                            Total: {item.cantidad_total} {item.articulo?.unidad || 'uds'}
+                          </p>
+                          <div className="mt-2 space-y-1">
+                            {item.ordenes.map((orden) => (
+                              <label
+                                key={orden.orden_id}
+                                className="flex items-center gap-2 text-xs text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={ordenesSeleccionadas.has(orden.orden_id)}
+                                  onChange={(e) => {
+                                    const newSet = new Set(ordenesSeleccionadas);
+                                    if (e.target.checked) {
+                                      newSet.add(orden.orden_id);
+                                    } else {
+                                      newSet.delete(orden.orden_id);
+                                    }
+                                    setOrdenesSeleccionadas(newSet);
+                                  }}
+                                  className="rounded border-gray-300"
+                                />
+                                <span className="font-mono">{orden.orden_ticket}</span>
+                                <span className="text-gray-400">•</span>
+                                <span>{orden.cantidad_solicitada} {item.articulo?.unidad}</span>
+                                <span className="text-gray-400">•</span>
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                  orden.orden_estado === 'pendiente_aprobacion'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {orden.orden_estado === 'pendiente_aprobacion' ? 'Pendiente' : 'Rechazada'}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              )}
+
+              {/* 2. Artículos con solicitudes pendientes */}
+              {articulosSolicitudes.length > 0 && (
+                <div className="space-y-2">
+                  <h5 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <FileText size={16} />
+                    Con solicitudes pendientes ({articulosSolicitudes.length})
+                  </h5>
+                  {articulosSolicitudes.map((item) => (
+                    <div key={`solicitud-${item.articulo_id}`} className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{item.articulo?.nombre}</p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {item.solicitudes_count} solicitud{item.solicitudes_count !== 1 ? 'es' : ''} •
+                            Total: {item.cantidad_total} {item.articulo?.unidad || 'uds'}
+                          </p>
+                          <div className="mt-2 space-y-1">
+                            {item.solicitudes.map((solicitud) => (
+                              <div
+                                key={solicitud.solicitud_id}
+                                className="flex items-center gap-2 text-xs text-gray-600 p-1"
+                              >
+                                <span className="font-mono text-blue-700">{solicitud.solicitud_ticket}</span>
+                                <span className="text-gray-400">•</span>
+                                <span>{solicitud.cantidad_solicitada} {item.articulo?.unidad}</span>
+                                <span className="text-gray-400">•</span>
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                  solicitud.prioridad === 'urgente' ? 'bg-red-100 text-red-800' :
+                                  solicitud.prioridad === 'alta' ? 'bg-orange-100 text-orange-800' :
+                                  solicitud.prioridad === 'media' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {solicitud.prioridad}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 3. Artículos bajo stock mínimo */}
+              {articulosBajoStock.length > 0 && (
+                <div className="space-y-2">
+                  <h5 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <AlertCircle size={16} />
+                    Bajo stock mínimo ({articulosBajoStock.length})
+                  </h5>
+                  {articulosBajoStock.map((item) => (
+                    <div key={`stock-${item.articulo_id}`} className="bg-red-50 rounded-lg p-3 border border-red-200">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{item.articulo?.nombre}</p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Stock actual: {item.stock_actual} {item.articulo?.unidad} •
+                            Mínimo: {item.stock_minimo} {item.articulo?.unidad} •
+                            Faltante: <span className="text-red-600 font-semibold">{item.faltante}</span>
+                          </p>
+                          <p className="text-xs text-red-700 mt-1">
+                            Cantidad sugerida: {item.cantidad_sugerida} {item.articulo?.unidad}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {ordenesSeleccionadas.size > 0 && (
