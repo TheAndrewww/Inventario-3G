@@ -764,21 +764,6 @@ const OrdenesCompraPage = () => {
     }
   };
 
-  const handleReabrirOrden = async (orden) => {
-    if (!confirm(`¿Reabrir la orden ${orden.ticket_id}? Volverá a estar pendiente de aprobación.`)) return;
-    setLoadingAprobacion(true);
-    try {
-      await ordenesCompraService.reabrirOrden(orden.id);
-      toast.success(`Orden ${orden.ticket_id} reabierta. Ahora está pendiente de aprobación`);
-      setModalDetalle(false);
-      setOrdenSeleccionada(null);
-      fetchData();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Error al reabrir');
-    } finally {
-      setLoadingAprobacion(false);
-    }
-  };
 
   const handleEliminarOrden = async (orden) => {
     if (!confirm(`¿Eliminar permanentemente la orden ${orden.ticket_id}? Esta acción no se puede deshacer.`)) return;
@@ -1396,7 +1381,6 @@ const OrdenesCompraPage = () => {
           esAdmin={esAdmin}
           onAprobar={handleAprobarOrden}
           onRechazar={handleAbrirRechazo}
-          onReabrir={handleReabrirOrden}
           onEliminar={handleEliminarOrden}
           loadingAprobacion={loadingAprobacion}
         />
@@ -2134,7 +2118,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
 };
 
 // Modal para ver detalle de orden con trazabilidad
-const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, puedeReabrirOrdenes, onAbrirModalAnular, onEnviarOrden, onEditarOrden, esAdmin, onAprobar, onRechazar, onReabrir, onEliminar, loadingAprobacion }) => {
+const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, puedeReabrirOrdenes, onAbrirModalAnular, onEnviarOrden, onEditarOrden, esAdmin, onAprobar, onRechazar, onEliminar, loadingAprobacion }) => {
   const [tabActual, setTabActual] = React.useState('detalle'); // 'detalle' o 'historial'
   const esPendienteAprobacion = orden && orden.estado === 'pendiente_aprobacion';
   const esRechazada = orden && orden.estado === 'rechazada';
@@ -2317,14 +2301,13 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
               {/* Botones para órdenes rechazadas */}
               {esRechazada && (
                 <>
-                  {puedeReabrirOrdenes && onReabrir && (
+                  {puedeReabrirOrdenes && onEditarOrden && (
                     <button
-                      onClick={() => onReabrir(orden)}
-                      disabled={loadingAprobacion}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                      onClick={() => onEditarOrden(orden)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
                     >
-                      <RotateCcw size={16} />
-                      {loadingAprobacion ? 'Procesando...' : 'Reabrir Orden'}
+                      <Edit size={16} />
+                      Editar Orden
                     </button>
                   )}
                   {puedeAnularOrdenes && onEliminar && (
@@ -2397,14 +2380,13 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
               {/* Botones para órdenes rechazadas */}
               {esRechazada && (
                 <>
-                  {puedeReabrirOrdenes && onReabrir && (
+                  {puedeReabrirOrdenes && onEditarOrden && (
                     <button
-                      onClick={() => onReabrir(orden)}
-                      disabled={loadingAprobacion}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                      onClick={() => onEditarOrden(orden)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
                     >
-                      <RotateCcw size={16} />
-                      {loadingAprobacion ? 'Procesando...' : 'Reabrir Orden'}
+                      <Edit size={16} />
+                      Editar Orden
                     </button>
                   )}
                   {puedeAnularOrdenes && onEliminar && (

@@ -607,7 +607,8 @@ export const actualizarEstadoOrden = async (req, res) => {
 
 /**
  * Actualizar una orden de compra existente
- * - Solo se pueden actualizar órdenes en estado 'pendiente_aprobacion'
+ * - Se pueden actualizar órdenes en estado 'pendiente_aprobacion' o 'rechazada'
+ * - Si se edita una orden rechazada, vuelve a estado 'pendiente_aprobacion' y se envía email al admin
  * - Permite actualizar proveedor, observaciones, fecha estimada y artículos
  * - Recalcula el total estimado
  */
@@ -647,12 +648,13 @@ export const actualizarOrdenCompra = async (req, res) => {
       });
     }
 
-    // Verificar que la orden está en estado 'pendiente_aprobacion'
-    if (orden.estado !== 'pendiente_aprobacion') {
+    // Verificar que la orden está en estado 'pendiente_aprobacion' o 'rechazada'
+    const estadoAnterior = orden.estado;
+    if (!['pendiente_aprobacion', 'rechazada'].includes(orden.estado)) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
-        message: 'Solo se pueden editar órdenes pendientes de aprobación. Una vez aprobadas, las órdenes no pueden modificarse.'
+        message: 'Solo se pueden editar órdenes pendientes de aprobación o rechazadas. Una vez aprobadas y enviadas, las órdenes no pueden modificarse.'
       });
     }
 
@@ -722,6 +724,14 @@ export const actualizarOrdenCompra = async (req, res) => {
       orden.fecha_llegada_estimada = fecha_llegada_estimada;
     }
 
+    // Si la orden estaba rechazada, cambiarla a pendiente_aprobacion y limpiar datos de rechazo
+    if (estadoAnterior === 'rechazada') {
+      orden.estado = 'pendiente_aprobacion';
+      orden.motivo_rechazo = null;
+      orden.aprobado_por_id = null;
+      orden.fecha_aprobacion = null;
+    }
+
     await orden.save({ transaction });
 
     // Commit de la transacción
@@ -749,9 +759,22 @@ export const actualizarOrdenCompra = async (req, res) => {
       ]
     });
 
+    // Si la orden estaba rechazada, enviar email de aprobación al admin
+    if (estadoAnterior === 'rechazada') {
+      try {
+        await enviarEmailAprobacion(ordenActualizada);
+        console.log(`📧 Email de aprobación enviado para orden ${ordenActualizada.ticket_id} (reeditada después de rechazo)`);
+      } catch (emailError) {
+        console.error('❌ Error al enviar email de aprobación:', emailError);
+        // No fallar la operación si el email falla
+      }
+    }
+
     res.status(200).json({
       success: true,
-      message: 'Orden de compra actualizada exitosamente',
+      message: estadoAnterior === 'rechazada'
+        ? 'Orden de compra actualizada y enviada a aprobación exitosamente'
+        : 'Orden de compra actualizada exitosamente',
       data: { orden: ordenActualizada }
     });
 
