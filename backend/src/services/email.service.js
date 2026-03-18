@@ -1,44 +1,8 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import jwt from 'jsonwebtoken';
-import dns from 'dns';
 
-// Configurar DNS resolver para IPv4 solamente
-dns.setDefaultResultOrder('ipv4first');
-
-// Lazy transporter - solo se crea cuando se necesita
-let _transporter = null;
-function getTransporter() {
-    if (!_transporter) {
-        // Usar IP IPv4 directa para evitar resolución DNS a IPv6
-        // Esta IP puede cambiar, pero es la única forma de forzar IPv4 en Railway
-        const gmailHost = process.env.SMTP_HOST || '142.251.186.109'; // IP IPv4 de smtp.gmail.com
-
-        _transporter = nodemailer.createTransport({
-            host: gmailHost,
-            port: 465,
-            secure: true,
-            auth: {
-                user: process.env.EMAIL_USER || '3gvelarias@gmail.com',
-                pass: process.env.EMAIL_PASS
-            },
-            tls: {
-                rejectUnauthorized: false,
-                minVersion: 'TLSv1.2',
-                servername: 'smtp.gmail.com' // SNI para certificado SSL
-            },
-            // Forzar IPv4 (Railway no soporta IPv6 a Gmail)
-            family: 4,
-            dnsTimeout: 5000,
-            connectionTimeout: 10000,
-            greetingTimeout: 10000,
-            socketTimeout: 15000,
-            // Logger para debugging
-            logger: false,
-            debug: false
-        });
-    }
-    return _transporter;
-}
+// Inicializar Resend
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 // Destinatarios de notificaciones de órdenes
 const ADMIN_EMAILS = [
@@ -103,7 +67,7 @@ const generarEmailAprobacion = (orden, tokenAprobar, frontendUrl) => {
 </head>
 <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
     <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-        
+
         <!-- Header -->
         <div style="background: linear-gradient(135deg, #991b1b 0%, #dc2626 100%); border-radius: 12px 12px 0 0; padding: 30px; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">
@@ -116,7 +80,7 @@ const generarEmailAprobacion = (orden, tokenAprobar, frontendUrl) => {
 
         <!-- Body -->
         <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.07);">
-            
+
             <!-- Info principal -->
             <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
                 <p style="margin: 0; font-size: 14px; color: #92400e;">
@@ -181,7 +145,7 @@ const generarEmailAprobacion = (orden, tokenAprobar, frontendUrl) => {
             <!-- Botones de acción -->
             <div style="text-align: center; margin-top: 32px;">
                 <p style="font-size: 13px; color: #6b7280; margin: 0 0 16px;">¿Qué deseas hacer con esta orden?</p>
-                
+
                 <table style="width: 100%; max-width: 400px; margin: 0 auto;">
                     <tr>
                         <td style="padding: 0 8px;">
@@ -217,36 +181,38 @@ const generarEmailAprobacion = (orden, tokenAprobar, frontendUrl) => {
 };
 
 /**
- * Enviar email de aprobación de orden
+ * Enviar email de aprobación de orden usando Resend
  */
 export const enviarEmailAprobacion = async (orden) => {
     try {
-        console.log('📧 [EMAIL] Iniciando envío de email de aprobación para orden:', orden?.ticket_id);
-        console.log('📧 [EMAIL] EMAIL_USER:', process.env.EMAIL_USER ? 'configurado' : 'NO configurado');
-        console.log('📧 [EMAIL] EMAIL_PASS:', process.env.EMAIL_PASS ? 'configurado (' + process.env.EMAIL_PASS.length + ' chars)' : 'NO configurado');
+        console.log('📧 [RESEND] Iniciando envío de email de aprobación para orden:', orden?.ticket_id);
+        console.log('📧 [RESEND] RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'configurado (' + process.env.RESEND_API_KEY.substring(0, 10) + '...)' : 'NO configurado');
 
-        if (!process.env.EMAIL_PASS) {
-            console.log('⚠️ EMAIL_PASS no configurado, no se puede enviar email');
+        if (!resend) {
+            console.log('⚠️ RESEND_API_KEY no configurado, no se puede enviar email');
             return false;
         }
 
         const tokenAprobar = generarTokenAprobacion(orden.id, 'aprobar');
         const html = generarEmailAprobacion(orden, tokenAprobar);
 
-        const mailOptions = {
-            from: `"3G Inventario" <${process.env.EMAIL_USER || '3gvelarias@gmail.com'}>`,
-            to: ADMIN_EMAILS.join(', '),
+        const { data, error } = await resend.emails.send({
+            from: '3G Inventario <onboarding@resend.dev>',
+            to: ADMIN_EMAILS,
             subject: `🔔 Orden ${orden.ticket_id} pendiente de aprobación — $${parseFloat(orden.total_estimado || 0).toFixed(2)}`,
             html
-        };
+        });
 
-        console.log('📧 [EMAIL] Enviando a:', mailOptions.to);
-        const info = await getTransporter().sendMail(mailOptions);
-        console.log(`📧 [EMAIL] ✅ Email enviado exitosamente: ${info.messageId}`);
+        if (error) {
+            console.error('❌ [RESEND] Error al enviar email:', error);
+            return false;
+        }
+
+        console.log(`📧 [RESEND] ✅ Email enviado exitosamente: ${data.id}`);
         return true;
     } catch (error) {
-        console.error('❌ [EMAIL] Error al enviar email de aprobación:', error.message);
-        console.error('❌ [EMAIL] Stack:', error.stack);
+        console.error('❌ [RESEND] Error al enviar email de aprobación:', error.message);
+        console.error('❌ [RESEND] Stack:', error.stack);
         return false;
     }
 };
@@ -257,31 +223,36 @@ export const enviarEmailAprobacion = async (orden) => {
 export const testEmail = async (req, res) => {
     try {
         const config = {
-            EMAIL_USER: process.env.EMAIL_USER ? 'configurado' : 'NO configurado',
-            EMAIL_PASS: process.env.EMAIL_PASS ? `configurado (${process.env.EMAIL_PASS.length} chars)` : 'NO configurado',
+            RESEND_API_KEY: process.env.RESEND_API_KEY ? `configurado (${process.env.RESEND_API_KEY.substring(0, 10)}...)` : 'NO configurado',
             BACKEND_URL: process.env.BACKEND_URL || 'NO configurado'
         };
 
         console.log('🧪 [TEST EMAIL] Config:', config);
 
-        if (!process.env.EMAIL_PASS) {
-            return res.json({ success: false, message: 'EMAIL_PASS no configurado', config });
+        if (!resend) {
+            return res.json({ success: false, message: 'RESEND_API_KEY no configurado', config });
         }
 
-        const info = await getTransporter().sendMail({
-            from: `"3G Inventario - Test" <${process.env.EMAIL_USER || '3gvelarias@gmail.com'}>`,
-            to: ADMIN_EMAILS.join(', '),
+        const { data, error } = await resend.emails.send({
+            from: '3G Inventario <onboarding@resend.dev>',
+            to: ADMIN_EMAILS,
             subject: '🧪 Email de prueba - Inventario 3G',
-            html: '<h1>✅ Email de prueba exitoso</h1><p>Si ves este email, la configuración está correcta.</p>'
+            html: '<h1>✅ Email de prueba exitoso</h1><p>Si ves este email, la configuración de Resend está correcta.</p>'
         });
 
-        return res.json({ success: true, messageId: info.messageId, config });
+        if (error) {
+            console.error('❌ [TEST EMAIL] Error:', error);
+            return res.json({ success: false, error: error.message, config });
+        }
+
+        return res.json({ success: true, messageId: data.id, config });
     } catch (error) {
         console.error('❌ [TEST EMAIL] Error:', error.message);
         return res.json({
-            success: false, error: error.message, config: {
-                EMAIL_USER: process.env.EMAIL_USER ? 'configurado' : 'NO',
-                EMAIL_PASS: process.env.EMAIL_PASS ? 'configurado' : 'NO'
+            success: false,
+            error: error.message,
+            config: {
+                RESEND_API_KEY: process.env.RESEND_API_KEY ? 'configurado' : 'NO'
             }
         });
     }
@@ -292,7 +263,7 @@ export const testEmail = async (req, res) => {
  */
 export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprobadoPor = null) => {
     try {
-        if (!process.env.EMAIL_PASS) return false;
+        if (!resend) return false;
 
         const esAprobada = estado === 'aprobada';
         const creadorEmail = orden.creador?.email;
@@ -313,7 +284,7 @@ export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprob
         </div>
         <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.07);">
             <p style="font-size: 14px; color: #374151;">
-                Tu orden <strong>${orden.ticket_id}</strong> ha sido 
+                Tu orden <strong>${orden.ticket_id}</strong> ha sido
                 <strong style="color: ${esAprobada ? '#059669' : '#dc2626'};">
                     ${esAprobada ? 'aprobada' : 'rechazada'}
                 </strong>
@@ -331,17 +302,22 @@ export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprob
 </body>
 </html>`;
 
-        await getTransporter().sendMail({
-            from: `"3G Inventario" <${process.env.EMAIL_USER || '3gvelarias@gmail.com'}>`,
+        const { data, error } = await resend.emails.send({
+            from: '3G Inventario <onboarding@resend.dev>',
             to: creadorEmail,
             subject: `${esAprobada ? '✅' : '❌'} Orden ${orden.ticket_id} ${esAprobada ? 'aprobada' : 'rechazada'}`,
             html
         });
 
-        console.log(`📧 Email de ${estado} enviado a ${creadorEmail}`);
+        if (error) {
+            console.error('❌ [RESEND] Error al enviar email de estado:', error);
+            return false;
+        }
+
+        console.log(`📧 [RESEND] Email de ${estado} enviado a ${creadorEmail}: ${data.id}`);
         return true;
     } catch (error) {
-        console.error('❌ Error al enviar email de estado:', error.message);
+        console.error('❌ [RESEND] Error al enviar email de estado:', error.message);
         return false;
     }
 };
