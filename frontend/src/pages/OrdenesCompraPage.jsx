@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit, Clock } from 'lucide-react';
+import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, AlertTriangle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit, Clock } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import articulosService from '../services/articulos.service';
 import proveedoresService from '../services/proveedores.service';
@@ -1536,6 +1536,9 @@ const OrdenesCompraPage = () => {
 
 // Modal para crear nueva orden
 const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
+  const { usuario } = useAuth();
+  const esAdmin = usuario?.rol === 'administrador';
+
   const [articulos, setArticulos] = useState([]);
   const [proveedores, setProveedores] = useState([]);
   const [articulosSeleccionados, setArticulosSeleccionados] = useState([]);
@@ -1549,6 +1552,11 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
   const [mostrarModalNuevoArticulo, setMostrarModalNuevoArticulo] = useState(false);
   const [categorias, setCategorias] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
+
+  // Estados para consolidación de órdenes (solo admin)
+  const [articulosPendientes, setArticulosPendientes] = useState([]);
+  const [ordenesSeleccionadas, setOrdenesSeleccionadas] = useState(new Set());
+  const [loadingPendientes, setLoadingPendientes] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -1617,6 +1625,30 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
       toast.error('Error al cargar datos');
     }
   };
+
+  // Cargar artículos pendientes cuando cambia el proveedor (solo admin)
+  useEffect(() => {
+    const fetchArticulosPendientes = async () => {
+      if (!esAdmin || !proveedorId) {
+        setArticulosPendientes([]);
+        setOrdenesSeleccionadas(new Set());
+        return;
+      }
+
+      setLoadingPendientes(true);
+      try {
+        const response = await ordenesCompraService.obtenerArticulosPendientes(proveedorId);
+        setArticulosPendientes(response?.data?.articulos || []);
+      } catch (error) {
+        console.error('Error al cargar artículos pendientes:', error);
+        setArticulosPendientes([]);
+      } finally {
+        setLoadingPendientes(false);
+      }
+    };
+
+    fetchArticulosPendientes();
+  }, [proveedorId, esAdmin]);
 
   const articulosFiltrados = articulos.filter((art) => {
     const searchLower = searchTerm.toLowerCase();
@@ -1734,7 +1766,11 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
         })),
         proveedor_id: proveedorId ? parseInt(proveedorId) : undefined,
         observaciones: observaciones.trim() || undefined,
-        fecha_llegada_estimada: fechaLlegadaEstimada || undefined
+        fecha_llegada_estimada: fechaLlegadaEstimada || undefined,
+        // Incluir órdenes a consolidar si el admin las seleccionó
+        ...(esAdmin && ordenesSeleccionadas.size > 0 && {
+          consolidar_ordenes: Array.from(ordenesSeleccionadas)
+        })
       };
 
       const response = await ordenesCompraService.crearOrden(ordenData);
@@ -1793,6 +1829,88 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
             ))}
           </select>
         </div>
+
+        {/* Sección de consolidación de órdenes (solo para admin) */}
+        {esAdmin && proveedorId && articulosPendientes.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <AlertTriangle className="text-yellow-600" size={18} />
+                  Artículos en otras órdenes pendientes
+                </h4>
+                <p className="text-sm text-gray-600 mt-1">
+                  Hay {articulosPendientes.length} artículo{articulosPendientes.length !== 1 ? 's' : ''} de este proveedor en órdenes pendientes/rechazadas.
+                  Puedes consolidarlos en esta orden.
+                </p>
+              </div>
+              {loadingPendientes && (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-600"></div>
+              )}
+            </div>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {articulosPendientes.map((item) => (
+                <div key={item.articulo_id} className="bg-white rounded-lg p-3 border border-gray-200">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{item.articulo?.nombre}</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        En {item.ordenes_count} orden{item.ordenes_count !== 1 ? 'es' : ''} •
+                        Total: {item.cantidad_total} {item.articulo?.unidad || 'uds'}
+                      </p>
+                      <div className="mt-2 space-y-1">
+                        {item.ordenes.map((orden) => (
+                          <label
+                            key={orden.orden_id}
+                            className="flex items-center gap-2 text-xs text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={ordenesSeleccionadas.has(orden.orden_id)}
+                              onChange={(e) => {
+                                const newSet = new Set(ordenesSeleccionadas);
+                                if (e.target.checked) {
+                                  newSet.add(orden.orden_id);
+                                } else {
+                                  newSet.delete(orden.orden_id);
+                                }
+                                setOrdenesSeleccionadas(newSet);
+                              }}
+                              className="rounded border-gray-300"
+                            />
+                            <span className="font-mono">{orden.orden_ticket}</span>
+                            <span className="text-gray-400">•</span>
+                            <span>{orden.cantidad_solicitada} {item.articulo?.unidad}</span>
+                            <span className="text-gray-400">•</span>
+                            <span className={`px-1.5 py-0.5 rounded text-xs ${
+                              orden.orden_estado === 'pendiente_aprobacion'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {orden.orden_estado === 'pendiente_aprobacion' ? 'Pendiente' : 'Rechazada'}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {ordenesSeleccionadas.size > 0 && (
+              <div className="mt-3 p-2 bg-yellow-100 rounded-lg">
+                <p className="text-sm font-medium text-yellow-900">
+                  ✓ {ordenesSeleccionadas.size} orden{ordenesSeleccionadas.size !== 1 ? 'es' : ''} seleccionada{ordenesSeleccionadas.size !== 1 ? 's' : ''} para consolidar
+                </p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  Los artículos duplicados se eliminarán de estas órdenes al crear la nueva orden.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">

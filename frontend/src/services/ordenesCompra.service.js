@@ -142,6 +142,12 @@ const ordenesCompraService = {
   eliminarOrden: async (id) => {
     const response = await api.delete(`/ordenes-compra/${id}`);
     return response.data;
+  },
+
+  // Obtener artículos de órdenes pendientes/rechazadas por proveedor (solo admin)
+  obtenerArticulosPendientes: async (proveedor_id) => {
+    const response = await api.get(`/ordenes-compra/articulos-pendientes/${proveedor_id}`);
+    return response.data;
   }
 };
 
