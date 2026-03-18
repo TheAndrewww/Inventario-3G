@@ -1536,8 +1536,8 @@ const OrdenesCompraPage = () => {
 
 // Modal para crear nueva orden
 const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
-  const { usuario } = useAuth();
-  const esAdmin = usuario?.rol === 'administrador';
+  const { user } = useAuth();
+  const esAdmin = user?.rol === 'administrador';
 
   const [articulos, setArticulos] = useState([]);
   const [proveedores, setProveedores] = useState([]);
