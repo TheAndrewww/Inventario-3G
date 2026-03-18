@@ -746,12 +746,12 @@ const PedidoPage = () => {
                     )}
                   </div>
 
-                  {/* Selector de Camioneta */}
+                  {/* Selector de Equipo */}
                   <div className="pt-2 border-t border-gray-100">
                     <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                       <div className="flex items-center gap-2">
                         <Truck size={14} />
-                        <span>Camioneta (Opcional)</span>
+                        <span>Equipo (Opcional)</span>
                       </div>
                     </label>
                     <select
@@ -760,10 +760,10 @@ const PedidoPage = () => {
                       className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
                       disabled={cargandoCamionetas}
                     >
-                      <option value="">Selecciona una camioneta...</option>
+                      <option value="">Selecciona un equipo...</option>
                       {camionetas.map((camioneta) => (
                         <option key={camioneta.id} value={camioneta.id}>
-                          {camioneta.nombre} {camioneta.matricula ? `(${camioneta.matricula})` : ''}
+                          {camioneta.nombre}
                         </option>
                       ))}
                     </select>
@@ -793,7 +793,7 @@ const PedidoPage = () => {
                       <option value="">Proyecto específico (ingresa nombre abajo)</option>
                       {ubicaciones.map((ubicacion) => (
                         <option key={ubicacion.id} value={ubicacion.id}>
-                          {ubicacion.almacen.includes('Camioneta') ? '🚛' : '📦'} {ubicacion.almacen}
+                          {ubicacion.almacen.includes('Camioneta') || ubicacion.almacen.includes('Equipo') ? '💼' : '📦'} {ubicacion.almacen}
                         </option>
                       ))}
                     </select>

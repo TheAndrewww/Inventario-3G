@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Plus, Edit, Trash2, Package, Settings } from 'lucide-react';
+import { Briefcase, Plus, Edit, Trash2, Package, Settings } from 'lucide-react';
 import camionetasService from '../services/camionetas.service';
 import usuariosService from '../services/usuarios.service';
 import ubicacionesService from '../services/ubicaciones.service';
@@ -131,7 +131,7 @@ const CamionetasPage = () => {
     e.preventDefault();
 
     if (!formData.nombre.trim()) {
-      toast.error('El nombre de la camioneta es obligatorio');
+      toast.error('El nombre del equipo es obligatorio');
       return;
     }
 
@@ -152,32 +152,32 @@ const CamionetasPage = () => {
         toast.success('Camioneta actualizada exitosamente');
       } else {
         await camionetasService.crear(dataToSend);
-        toast.success('Camioneta creada exitosamente');
+        toast.success('Equipo creado exitosamente');
       }
       cerrarModal();
       cargarCamionetas();
     } catch (error) {
-      console.error('Error al guardar camioneta:', error);
-      toast.error(error.response?.data?.message || 'Error al guardar la camioneta');
+      console.error('Error al guardar equipo:', error);
+      toast.error(error.response?.data?.message || 'Error al guardar el equipo');
     }
   };
 
   const handleEliminar = async (camionetaId) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta camioneta?')) {
+    if (!confirm('¿Estás seguro de que deseas eliminar este equipo?')) {
       return;
     }
 
     try {
       await camionetasService.eliminar(camionetaId);
-      toast.success('Camioneta eliminada exitosamente');
+      toast.success('Equipo eliminado exitosamente');
       cargarCamionetas();
     } catch (error) {
-      console.error('Error al eliminar camioneta:', error);
-      toast.error(error.response?.data?.message || 'Error al eliminar la camioneta');
+      console.error('Error al eliminar equipo:', error);
+      toast.error(error.response?.data?.message || 'Error al eliminar el equipo');
     }
   };
 
-  const getTipoCamionetaBadge = (tipo) => {
+  const getTipoEquipoBadge = (tipo) => {
     const tipos = {
       instalacion: { label: 'Instalación', color: 'bg-blue-100 text-blue-800' },
       mantenimiento: { label: 'Mantenimiento', color: 'bg-green-100 text-green-800' },
@@ -206,9 +206,9 @@ const CamionetasPage = () => {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Camionetas</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de Equipos</h1>
           <p className="text-gray-600 mt-1">
-            Administra los vehículos de la empresa y su inventario
+            Administra los equipos/áreas de la empresa y su inventario
           </p>
         </div>
         <button
@@ -216,25 +216,25 @@ const CamionetasPage = () => {
           className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 transition-colors font-medium"
         >
           <Plus size={20} />
-          Nueva Camioneta
+          Nuevo Equipo
         </button>
       </div>
 
-      {/* Lista de camionetas */}
+      {/* Lista de equipos */}
       {camionetas.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <Truck size={64} className="mx-auto text-gray-300 mb-4" />
+          <Briefcase size={64} className="mx-auto text-gray-300 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No hay camionetas registradas
+            No hay equipos registrados
           </h3>
           <p className="text-gray-600 mb-4">
-            Registra tu primera camioneta para comenzar
+            Registra tu primer equipo para comenzar
           </p>
           <button
             onClick={abrirModalNuevo}
             className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 transition-colors"
           >
-            Crear Camioneta
+            Crear Equipo
           </button>
         </div>
       ) : (
@@ -247,17 +247,12 @@ const CamionetasPage = () => {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                    <Truck size={24} className="text-red-700" />
+                    <Briefcase size={24} className="text-red-700" />
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-900">{camioneta.nombre}</h3>
                     <div className="flex gap-2 mt-1">
-                      {getTipoCamionetaBadge(camioneta.tipo_camioneta)}
-                      {camioneta.matricula && (
-                        <span className="text-xs text-gray-600 px-2 py-1 bg-gray-100 rounded">
-                          {camioneta.matricula}
-                        </span>
-                      )}
+                      {getTipoEquipoBadge(camioneta.tipo_camioneta)}
                     </div>
                   </div>
                 </div>
@@ -325,50 +320,37 @@ const CamionetasPage = () => {
         </div>
       )}
 
-      {/* Modal de crear/editar camioneta */}
+      {/* Modal de crear/editar equipo */}
       {mostrarModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <Truck size={24} className="text-red-700" />
+                <Briefcase size={24} className="text-red-700" />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900">
-                  {camionetaEditando ? 'Editar Camioneta' : 'Nueva Camioneta'}
+                  {camionetaEditando ? 'Editar Equipo' : 'Nuevo Equipo'}
                 </h3>
                 <p className="text-sm text-gray-600">
-                  {camionetaEditando ? 'Actualiza la información' : 'Completa los datos de la camioneta'}
+                  {camionetaEditando ? 'Actualiza la información' : 'Completa los datos del equipo'}
                 </p>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="col-span-1 md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nombre de la Camioneta *
+                    Nombre del Equipo *
                   </label>
                   <input
                     type="text"
                     value={formData.nombre}
                     onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    placeholder="Ej: Camioneta Norte 1"
+                    placeholder="Ej: Área Norte 1"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
                     required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Matrícula / Placas
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.matricula}
-                    onChange={(e) => setFormData({ ...formData, matricula: e.target.value.toUpperCase() })}
-                    placeholder="Ej: ABC-1234"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
                   />
                 </div>
               </div>
@@ -376,7 +358,7 @@ const CamionetasPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tipo de Camioneta *
+                    Tipo de Equipo *
                   </label>
                   <select
                     value={formData.tipo_camioneta}
@@ -433,7 +415,7 @@ const CamionetasPage = () => {
                   ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Almacén donde se estaciona habitualmente la camioneta
+                  Almacén de donde parte el equipo
                 </p>
               </div>
 
@@ -444,7 +426,7 @@ const CamionetasPage = () => {
                 <textarea
                   value={formData.descripcion}
                   onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                  placeholder="Descripción de la camioneta..."
+                  placeholder="Descripción del equipo..."
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 resize-none"
                 />

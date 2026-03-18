@@ -187,10 +187,7 @@ const ConfigurarStockMinimoModal = ({ camioneta, onClose, onActualizar }) => {
             <Package className="w-6 h-6" />
             <div>
               <h2 className="text-xl font-bold">Configurar Stock Mínimo</h2>
-              <p className="text-sm text-indigo-100">
-                {camioneta.nombre}
-                {camioneta.matricula && ` • ${camioneta.matricula}`}
-              </p>
+              <p className="text-gray-600">Equipo: {camioneta.nombre}</p>
             </div>
           </div>
           <button

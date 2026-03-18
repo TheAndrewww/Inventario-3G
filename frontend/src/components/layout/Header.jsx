@@ -12,7 +12,7 @@ const Header = ({ toggleSidebar, isMobile }) => {
       '/pedido': 'Pedido Actual',
       '/pedidos-pendientes': 'Pedidos Pendientes',
       '/aprobacion-pedidos': 'Aprobar Pedidos',
-      '/camionetas': 'Camionetas',
+      '/camionetas': 'Equipos',
       '/usuarios': 'Usuarios',
       '/historial': 'Historial de Movimientos',
       '/perfil': 'Mi Perfil',

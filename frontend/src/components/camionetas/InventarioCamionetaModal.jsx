@@ -80,9 +80,8 @@ const InventarioCamionetaModal = ({ camioneta, onClose }) => {
             <Wrench className="w-6 h-6" />
             <div>
               <h2 className="text-xl font-bold">Inventario de {camioneta.nombre}</h2>
-              <p className="text-sm text-blue-100">
+              <p className="text-gray-600">
                 Encargado: {camioneta.encargado?.nombre || 'N/A'}
-                {camioneta.matricula && ` • Matrícula: ${camioneta.matricula}`}
               </p>
             </div>
           </div>
@@ -130,7 +129,7 @@ const InventarioCamionetaModal = ({ camioneta, onClose }) => {
               {resumen.resumen.length === 0 ? (
                 <div className="text-center py-12">
                   <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No hay stock mínimo configurado para esta camioneta</p>
+                  <p className="text-gray-600">No hay stock mínimo configurado para este equipo</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -182,7 +181,7 @@ const InventarioCamionetaModal = ({ camioneta, onClose }) => {
                             {item.unidades.length > 0 && (
                               <div className="mt-3 pt-3 border-t border-current border-opacity-20">
                                 <div className="text-xs font-medium opacity-75 mb-2">
-                                  Unidades en camioneta ({item.unidades.length}):
+                                  Unidades en el equipo ({item.unidades.length}):
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {item.unidades.map((unidad) => (
