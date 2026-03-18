@@ -22,7 +22,8 @@ import {
     retryQueueItem,
     cleanProcessingQueue,
     diagnosticarImagenes,
-    getUltimoMovimiento
+    getUltimoMovimiento,
+    debugProveedor
 } from '../controllers/articulos.controller.js';
 import {
     verificarToken,
@@ -55,6 +56,13 @@ router.get('/ean13/:codigoEAN13', verificarToken, getArticuloByEAN13);
  * @access  Private
  */
 router.get('/buscar-herramienta/:codigo', verificarToken, buscarPorCodigoHerramienta);
+
+/**
+ * @route   GET /api/articulos/debug-proveedor/:nombre
+ * @desc    Depurar configuración de proveedores para un artículo
+ * @access  Private
+ */
+router.get('/debug-proveedor/:nombre', verificarToken, debugProveedor);
 
 /**
  * @route   POST /api/articulos/etiquetas/lote-mixto

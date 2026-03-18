@@ -2049,6 +2049,72 @@ export const getUltimoMovimiento = async (req, res) => {
     }
 };
 
+/**
+ * GET /api/articulos/debug-proveedor/:nombre
+ * Endpoint de depuración para inspeccionar configuración de proveedores
+ * Busca artículos por nombre y devuelve toda su información de proveedores
+ */
+export const debugProveedor = async (req, res) => {
+    try {
+        const { nombre } = req.params;
+
+        const articulos = await Articulo.findAll({
+            where: {
+                nombre: { [Op.iLike]: `%${nombre}%` }
+            },
+            include: [
+                {
+                    model: Proveedor,
+                    as: 'proveedor',
+                    attributes: ['id', 'nombre']
+                },
+                {
+                    model: Proveedor,
+                    as: 'proveedores',
+                    through: { attributes: [] },
+                    attributes: ['id', 'nombre']
+                },
+                {
+                    model: TipoHerramientaRenta,
+                    as: 'tipo_herramienta_migrado',
+                    include: [{
+                        model: Proveedor,
+                        as: 'proveedor',
+                        attributes: ['id', 'nombre']
+                    }]
+                }
+            ],
+            limit: 20
+        });
+
+        const resultado = articulos.map(art => ({
+            id: art.id,
+            nombre: art.nombre,
+            proveedor_id: art.proveedor_id,
+            proveedor_FK: art.proveedor ? {
+                id: art.proveedor.id,
+                nombre: art.proveedor.nombre
+            } : null,
+            proveedores_ManyToMany: art.proveedores?.map(p => ({
+                id: p.id,
+                nombre: p.nombre
+            })) || [],
+            proveedor_Migrado: art.tipo_herramienta_migrado?.proveedor ? {
+                id: art.tipo_herramienta_migrado.proveedor.id,
+                nombre: art.tipo_herramienta_migrado.proveedor.nombre
+            } : null
+        }));
+
+        res.json({
+            total: resultado.length,
+            articulos: resultado
+        });
+    } catch (error) {
+        console.error('Error en debugProveedor:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 export default {
     getArticulos,
     getArticuloById,
@@ -2069,5 +2135,6 @@ export default {
     retryQueueItem,
     cleanProcessingQueue,
     diagnosticarImagenes,
-    getUltimoMovimiento
+    getUltimoMovimiento,
+    debugProveedor
 };
