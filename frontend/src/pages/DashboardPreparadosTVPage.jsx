@@ -125,12 +125,9 @@ const DashboardPreparadosTVPage = () => {
                             </div>
                             <div className="flex-1">
                                 <h1 className="text-6xl font-bold text-white mb-2">Proyectos Completados</h1>
-                                <p className="text-gray-300 text-xl font-medium">Listos para entrega o completar</p>
-                            </div>
-                            <div className="ml-auto shrink-0">
-                                <div className="px-6 py-3 bg-blue-900/50 text-blue-300 border border-blue-800/50 rounded-full text-xl font-bold shadow-inner">
-                                    {proyectosPreparados.length} {proyectosPreparados.length === 1 ? 'Proyecto' : 'Proyectos'}
-                                </div>
+                                <p className="text-gray-300 text-xl font-medium">
+                                    <span className="font-bold text-blue-400">{proyectosPreparados.length}</span> proyecto{proyectosPreparados.length !== 1 ? 's' : ''} completado{proyectosPreparados.length !== 1 ? 's' : ''}
+                                </p>
                             </div>
                         </div>
                     </div>
