@@ -3024,7 +3024,7 @@ export const mostrarFormularioRechazo = async (req, res) => {
     }
 
     // Mostrar formulario
-    return res.send(paginaFormularioRechazo(orden, token));
+    return enviarHTML(res, paginaFormularioRechazo(orden, token));
 
   } catch (error) {
     console.error('Error al mostrar formulario de rechazo:', error);
@@ -3132,12 +3132,14 @@ function paginaResultado(titulo, mensaje, exito) {
         <div class="icon" style="font-size:72px;margin-bottom:16px;">${exito ? '✅' : '❌'}</div>
         <h1 style="font-size:26px;color:#111827;margin:0 0 12px;font-weight:700;">${titulo}</h1>
         <p style="font-size:15px;color:#6b7280;margin:0 0 28px;line-height:1.6;">${mensaje}</p>
-        <a href="${process.env.FRONTEND_URL || 'https://inventario-3-g.vercel.app'}/ordenes-compra"
-           style="display:inline-block;background:${color};color:white;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:600;font-size:15px;transition:transform 0.2s;"
+        <button
+           onclick="window.close(); setTimeout(() => alert('Puede cerrar esta pestaña manualmente'), 100);"
+           style="display:inline-block;background:${color};color:white;border:none;padding:14px 28px;border-radius:10px;font-weight:600;font-size:15px;transition:transform 0.2s;cursor:pointer;"
            onmouseover="this.style.transform='scale(1.05)'"
            onmouseout="this.style.transform='scale(1)'">
-            Ir al Sistema
-        </a>
+            Cerrar
+        </button>
+        <p style="font-size:13px;color:#9ca3af;margin:16px 0 0;">Puede cerrar esta ventana manualmente</p>
     </div>
 </body>
 </html>`;
