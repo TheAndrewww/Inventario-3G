@@ -54,9 +54,9 @@ const generarEmailAprobacion = (orden, tokenAprobar, frontendUrl) => {
     `).join('') || '';
 
     const backendUrl = process.env.BACKEND_URL || 'https://inventario-3g-production.up.railway.app';
-    const appUrl = frontendUrl || process.env.FRONTEND_URL || 'https://inventario-3-g.vercel.app';
+    const tokenRechazar = generarTokenAprobacion(orden.id, 'rechazar');
     const aprobarUrl = `${backendUrl}/api/ordenes-compra/aprobar-email?token=${tokenAprobar}`;
-    const rechazarUrl = `${appUrl}/ordenes-compra?rechazar=${orden.id}`;
+    const rechazarUrl = `${backendUrl}/api/ordenes-compra/rechazar-email?token=${tokenRechazar}`;
 
     return `
 <!DOCTYPE html>
@@ -162,8 +162,8 @@ const generarEmailAprobacion = (orden, tokenAprobar, frontendUrl) => {
                 </table>
 
                 <p style="font-size: 11px; color: #9ca3af; margin: 16px 0 0;">
-                    El botón de aprobar funciona directamente. Para rechazar, serás dirigido al sistema para escribir el motivo.
-                    <br>Este enlace expira en 72 horas.
+                    Ambos botones funcionan directamente desde el email. Al rechazar, se abrirá un formulario para escribir el motivo.
+                    <br>Estos enlaces expiran en 72 horas.
                 </p>
             </div>
         </div>

@@ -21,6 +21,8 @@ import {
   aprobarOrden,
   rechazarOrden,
   aprobarPorEmail,
+  mostrarFormularioRechazo,
+  rechazarPorEmail,
   eliminarOrden,
   reabrirOrden
 } from '../controllers/ordenesCompra.controller.js';
@@ -29,8 +31,10 @@ import { testEmail } from '../services/email.service.js';
 
 const router = express.Router();
 
-// Ruta pública para aprobar por email (usa token propio en query string)
+// Rutas públicas para aprobar/rechazar por email (usan token propio en query string/body)
 router.get('/ordenes-compra/aprobar-email', aprobarPorEmail);
+router.get('/ordenes-compra/rechazar-email', mostrarFormularioRechazo);
+router.post('/ordenes-compra/rechazar-email', rechazarPorEmail);
 
 // Ruta de prueba para verificar configuración de email
 router.get('/ordenes-compra/test-email', testEmail);

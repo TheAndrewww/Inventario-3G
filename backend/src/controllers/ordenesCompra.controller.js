@@ -2974,6 +2974,108 @@ export const reabrirOrden = async (req, res) => {
   }
 };
 
+/**
+ * Mostrar formulario para rechazar orden por email
+ */
+export const mostrarFormularioRechazo = async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).send(paginaResultado('Error', 'Token no proporcionado', false));
+    }
+
+    const decoded = verificarTokenAprobacion(token);
+    if (!decoded || decoded.accion !== 'rechazar') {
+      return res.status(400).send(paginaResultado('Error', 'El enlace ha expirado o es inválido. Ingresa al sistema para rechazar la orden.', false));
+    }
+
+    const orden = await OrdenCompra.findByPk(decoded.orden_id, {
+      include: [
+        { model: Usuario, as: 'creador', attributes: ['id', 'nombre'] },
+        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] }
+      ]
+    });
+
+    if (!orden) {
+      return res.status(404).send(paginaResultado('Error', 'Orden no encontrada', false));
+    }
+
+    if (orden.estado !== 'pendiente_aprobacion') {
+      return res.send(paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado}.`, false));
+    }
+
+    // Mostrar formulario
+    return res.send(paginaFormularioRechazo(orden, token));
+
+  } catch (error) {
+    console.error('Error al mostrar formulario de rechazo:', error);
+    return res.status(500).send(paginaResultado('Error', 'Error al cargar el formulario. Intenta nuevamente.', false));
+  }
+};
+
+/**
+ * Procesar rechazo de orden por email
+ */
+export const rechazarPorEmail = async (req, res) => {
+  try {
+    const { token, motivo } = req.body;
+
+    if (!token) {
+      return res.status(400).send(paginaResultado('Error', 'Token no proporcionado', false));
+    }
+
+    if (!motivo || motivo.trim() === '') {
+      return res.status(400).send(paginaResultado('Error', 'Debes proporcionar un motivo de rechazo', false));
+    }
+
+    const decoded = verificarTokenAprobacion(token);
+    if (!decoded || decoded.accion !== 'rechazar') {
+      return res.status(400).send(paginaResultado('Error', 'El enlace ha expirado o es inválido. Ingresa al sistema para rechazar la orden.', false));
+    }
+
+    const orden = await OrdenCompra.findByPk(decoded.orden_id, {
+      include: [
+        { model: Usuario, as: 'creador', attributes: ['id', 'nombre', 'email'] },
+        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] }
+      ]
+    });
+
+    if (!orden) {
+      return res.status(404).send(paginaResultado('Error', 'Orden no encontrada', false));
+    }
+
+    if (orden.estado !== 'pendiente_aprobacion') {
+      return res.send(paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado}.`, false));
+    }
+
+    await orden.update({
+      estado: 'rechazada',
+      motivo_rechazo: motivo.trim(),
+      fecha_aprobacion: new Date()
+    });
+
+    // Notificar al creador
+    try {
+      await crearNotificacion({
+        usuario_id: orden.usuario_creador_id,
+        tipo: 'orden_estado_cambiado',
+        titulo: '❌ Orden de compra rechazada',
+        mensaje: `Tu orden ${orden.ticket_id} ha sido rechazada por email. Motivo: ${motivo.trim()}`,
+        url: '/ordenes-compra'
+      });
+    } catch (e) { /* ignore */ }
+
+    enviarEmailEstadoOrden(orden, 'rechazada', motivo.trim(), 'Administrador (por email)').catch(() => { });
+
+    return res.send(paginaResultado('❌ Orden Rechazada', `La orden ${orden.ticket_id} ha sido rechazada. El creador fue notificado.`, false));
+
+  } catch (error) {
+    console.error('Error al rechazar por email:', error);
+    return res.status(500).send(paginaResultado('Error', 'Error al procesar el rechazo. Intenta nuevamente.', false));
+  }
+};
+
 // Página HTML de resultado para approve-by-email
 function paginaResultado(titulo, mensaje, exito) {
   return `
@@ -2993,6 +3095,59 @@ function paginaResultado(titulo, mensaje, exito) {
            style="display:inline-block;background:#991b1b;color:white;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">
             Ir al Sistema
         </a>
+    </div>
+</body>
+</html>`;
+}
+
+// Página HTML de formulario para rechazar orden
+function paginaFormularioRechazo(orden, token) {
+  const backendUrl = process.env.BACKEND_URL || 'https://inventario-3g-production.up.railway.app';
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rechazar Orden ${orden.ticket_id} - 3G Inventario</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;">
+    <div style="max-width:500px;padding:40px;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+        <div style="font-size:48px;text-align:center;margin-bottom:16px;">❌</div>
+        <h1 style="font-size:24px;color:#111827;margin:0 0 8px;text-align:center;">Rechazar Orden</h1>
+        <p style="font-size:14px;color:#6b7280;margin:0 0 24px;text-align:center;">
+            Orden <strong>${orden.ticket_id}</strong><br>
+            Proveedor: ${orden.proveedor?.nombre || 'N/A'}<br>
+            Total: $${parseFloat(orden.total_estimado || 0).toFixed(2)}
+        </p>
+
+        <form method="POST" action="${backendUrl}/api/ordenes-compra/rechazar-email" style="width:100%;">
+            <input type="hidden" name="token" value="${token}">
+
+            <label style="display:block;font-size:14px;font-weight:600;color:#374151;margin-bottom:8px;">
+                Motivo del rechazo <span style="color:#dc2626;">*</span>
+            </label>
+            <textarea
+                name="motivo"
+                required
+                rows="4"
+                placeholder="Explica por qué se rechaza esta orden..."
+                style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;box-sizing:border-box;"
+            ></textarea>
+
+            <button
+                type="submit"
+                style="width:100%;margin-top:16px;background:#dc2626;color:white;border:none;padding:14px;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;"
+                onmouseover="this.style.background='#b91c1c'"
+                onmouseout="this.style.background='#dc2626'"
+            >
+                Confirmar Rechazo
+            </button>
+        </form>
+
+        <p style="font-size:12px;color:#9ca3af;margin:16px 0 0;text-align:center;">
+            El creador de la orden será notificado inmediatamente.
+        </p>
     </div>
 </body>
 </html>`;
