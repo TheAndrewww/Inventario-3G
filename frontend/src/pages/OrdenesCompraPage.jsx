@@ -116,17 +116,17 @@ const OrdenesCompraPage = () => {
 
   // Helper: Obtener el proveedor correcto (de artículo o herramienta)
   const obtenerProveedorSolicitud = (solicitud) => {
-    // Si el artículo tiene tipo_herramienta_migrado con proveedor, usar ese
-    if (solicitud.articulo?.tipo_herramienta_migrado?.proveedor) {
-      return solicitud.articulo.tipo_herramienta_migrado.proveedor;
-    }
-    // Si tiene proveedor directo (FK), usar ese
+    // Prioridad 1: Si tiene proveedor directo (FK), usar ese (configuración actual)
     if (solicitud.articulo?.proveedor) {
       return solicitud.articulo.proveedor;
     }
-    // Si tiene proveedores via many-to-many (ArticuloProveedor), usar el primero
+    // Prioridad 2: Si tiene proveedores via many-to-many (ArticuloProveedor), usar el primero
     if (solicitud.articulo?.proveedores?.length > 0) {
       return solicitud.articulo.proveedores[0];
+    }
+    // Prioridad 3: Si el artículo tiene tipo_herramienta_migrado con proveedor, usar ese (datos antiguos)
+    if (solicitud.articulo?.tipo_herramienta_migrado?.proveedor) {
+      return solicitud.articulo.tipo_herramienta_migrado.proveedor;
     }
     return null;
   };
@@ -2424,17 +2424,17 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
 
   // Helper: Obtener el proveedor correcto (de artículo o herramienta)
   const obtenerProveedorSolicitud = (solicitud) => {
-    // Si el artículo tiene tipo_herramienta_migrado con proveedor, usar ese
-    if (solicitud.articulo?.tipo_herramienta_migrado?.proveedor) {
-      return solicitud.articulo.tipo_herramienta_migrado.proveedor;
-    }
-    // Si tiene proveedor directo (FK), usar ese
+    // Prioridad 1: Si tiene proveedor directo (FK), usar ese (configuración actual)
     if (solicitud.articulo?.proveedor) {
       return solicitud.articulo.proveedor;
     }
-    // Si tiene proveedores via many-to-many (ArticuloProveedor), usar el primero
+    // Prioridad 2: Si tiene proveedores via many-to-many (ArticuloProveedor), usar el primero
     if (solicitud.articulo?.proveedores?.length > 0) {
       return solicitud.articulo.proveedores[0];
+    }
+    // Prioridad 3: Si el artículo tiene tipo_herramienta_migrado con proveedor, usar ese (datos antiguos)
+    if (solicitud.articulo?.tipo_herramienta_migrado?.proveedor) {
+      return solicitud.articulo.tipo_herramienta_migrado.proveedor;
     }
     return null;
   };
