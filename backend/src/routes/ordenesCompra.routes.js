@@ -25,11 +25,15 @@ import {
   reabrirOrden
 } from '../controllers/ordenesCompra.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
+import { testEmail } from '../services/email.service.js';
 
 const router = express.Router();
 
 // Ruta pública para aprobar por email (usa token propio en query string)
 router.get('/ordenes-compra/aprobar-email', aprobarPorEmail);
+
+// Ruta de prueba para verificar configuración de email
+router.get('/ordenes-compra/test-email', testEmail);
 
 // Todas las rutas a partir de aquí requieren autenticación
 router.use(verificarToken);

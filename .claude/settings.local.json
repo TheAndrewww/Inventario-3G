@@ -10,7 +10,8 @@
       "Bash(railway status:*)",
       "Bash(railway run:*)",
       "Bash(railway logs:*)",
-      "Bash(railway shell)"
+      "Bash(railway shell)",
+      "Bash(railway variables:*)"
     ],
     "deny": [],
     "ask": []
