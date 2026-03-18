@@ -426,7 +426,7 @@ export const listarSolicitudesCompra = async (req, res) => {
             {
               model: Proveedor,
               as: 'proveedores',
-              through: { attributes: [] },
+              through: { attributes: ['es_preferido', 'costo_unitario'] },
               required: false
             },
             {

@@ -116,13 +116,21 @@ const OrdenesCompraPage = () => {
 
   // Helper: Obtener el proveedor correcto (de artículo o herramienta)
   const obtenerProveedorSolicitud = (solicitud) => {
-    // Prioridad 1: Si tiene proveedor directo (FK), usar ese (configuración actual)
+    // Prioridad 1: Si tiene proveedores via many-to-many, buscar el marcado como preferido
+    if (solicitud.articulo?.proveedores?.length > 0) {
+      // Buscar el proveedor preferido (es_preferido: true)
+      const proveedorPreferido = solicitud.articulo.proveedores.find(
+        p => p.ArticuloProveedor?.es_preferido === true
+      );
+      if (proveedorPreferido) {
+        return proveedorPreferido;
+      }
+      // Si no hay preferido, usar el primero
+      return solicitud.articulo.proveedores[0];
+    }
+    // Prioridad 2: Si tiene proveedor directo (FK legacy), usar ese
     if (solicitud.articulo?.proveedor) {
       return solicitud.articulo.proveedor;
-    }
-    // Prioridad 2: Si tiene proveedores via many-to-many (ArticuloProveedor), usar el primero
-    if (solicitud.articulo?.proveedores?.length > 0) {
-      return solicitud.articulo.proveedores[0];
     }
     // Prioridad 3: Si el artículo tiene tipo_herramienta_migrado con proveedor, usar ese (datos antiguos)
     if (solicitud.articulo?.tipo_herramienta_migrado?.proveedor) {
@@ -2424,13 +2432,21 @@ const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesInicia
 
   // Helper: Obtener el proveedor correcto (de artículo o herramienta)
   const obtenerProveedorSolicitud = (solicitud) => {
-    // Prioridad 1: Si tiene proveedor directo (FK), usar ese (configuración actual)
+    // Prioridad 1: Si tiene proveedores via many-to-many, buscar el marcado como preferido
+    if (solicitud.articulo?.proveedores?.length > 0) {
+      // Buscar el proveedor preferido (es_preferido: true)
+      const proveedorPreferido = solicitud.articulo.proveedores.find(
+        p => p.ArticuloProveedor?.es_preferido === true
+      );
+      if (proveedorPreferido) {
+        return proveedorPreferido;
+      }
+      // Si no hay preferido, usar el primero
+      return solicitud.articulo.proveedores[0];
+    }
+    // Prioridad 2: Si tiene proveedor directo (FK legacy), usar ese
     if (solicitud.articulo?.proveedor) {
       return solicitud.articulo.proveedor;
-    }
-    // Prioridad 2: Si tiene proveedores via many-to-many (ArticuloProveedor), usar el primero
-    if (solicitud.articulo?.proveedores?.length > 0) {
-      return solicitud.articulo.proveedores[0];
     }
     // Prioridad 3: Si el artículo tiene tipo_herramienta_migrado con proveedor, usar ese (datos antiguos)
     if (solicitud.articulo?.tipo_herramienta_migrado?.proveedor) {
