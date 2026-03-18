@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Snowflake, Package } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, Snowflake } from 'lucide-react';
 import { Loader } from '../components/common';
 import { Toaster } from 'react-hot-toast';
 import ProyectoTimeline from '../components/produccion/ProyectoTimeline';
@@ -114,22 +114,21 @@ const DashboardPreparadosTVPage = () => {
                 {/* Scrollable Area */}
                 <div className="h-full w-full overflow-auto" style={{ padding: px(16) }}>
                     {/* Header con título */}
-                    <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex items-center gap-3">
-                            <img
-                                src="https://res.cloudinary.com/dd93jrilg/image/upload/v1762289946/logo-page_qhpoey.png"
-                                alt="3G"
-                                className="h-14 w-14 object-contain rounded-xl"
-                            />
-                            <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-green-500 rounded-xl flex items-center justify-center text-white">
-                                <Package size={28} />
+                    <div className="mb-6 bg-gray-900 rounded-2xl shadow-xl border border-gray-800 p-6">
+                        <div className="flex items-center gap-6">
+                            <div className="h-24 px-4 flex items-center justify-center shrink-0">
+                                <img
+                                    src="https://res.cloudinary.com/dd93jrilg/image/upload/v1763171532/logo_web_blanco_j8xeyh.png"
+                                    alt="3G"
+                                    className="h-full w-auto object-contain"
+                                />
                             </div>
-                            <div>
-                                <h1 className="text-5xl font-bold text-gray-900">Proyectos Completados</h1>
-                                <p className="text-gray-500 text-lg">Listos para entrega o completar</p>
+                            <div className="flex-1">
+                                <h1 className="text-5xl font-bold text-white mb-2">Proyectos Completados</h1>
+                                <p className="text-gray-300 text-xl font-medium">Listos para entrega o completar</p>
                             </div>
-                            <div className="ml-auto">
-                                <div className="px-6 py-3 bg-blue-100 text-blue-700 rounded-full text-lg font-bold">
+                            <div className="ml-auto shrink-0">
+                                <div className="px-6 py-3 bg-blue-900/50 text-blue-300 border border-blue-800/50 rounded-full text-xl font-bold shadow-inner">
                                     {proyectosPreparados.length} {proyectosPreparados.length === 1 ? 'Proyecto' : 'Proyectos'}
                                 </div>
                             </div>
