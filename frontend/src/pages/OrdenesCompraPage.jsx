@@ -693,7 +693,7 @@ const OrdenesCompraPage = () => {
     // Filtrar según la vista seleccionada
     let matchesVista = true;
     if (vistaOrdenes === 'activas') {
-      // Vista activas: mostrar solo borrador, enviada, parcial (excluir recibida y cancelada)
+      // Vista activas: mostrar pendiente_aprobacion, enviada, parcial, rechazada (excluir recibida y cancelada)
       matchesVista = orden.estado !== 'recibida' && orden.estado !== 'cancelada';
     } else if (vistaOrdenes === 'completadas') {
       // Vista completadas: mostrar SOLO recibida
@@ -765,11 +765,11 @@ const OrdenesCompraPage = () => {
   };
 
   const handleReabrirOrden = async (orden) => {
-    if (!confirm(`¿Reabrir la orden ${orden.ticket_id} como borrador? Podrás editarla y enviarla nuevamente.`)) return;
+    if (!confirm(`¿Reabrir la orden ${orden.ticket_id}? Volverá a estar pendiente de aprobación.`)) return;
     setLoadingAprobacion(true);
     try {
       await ordenesCompraService.reabrirOrden(orden.id);
-      toast.success(`Orden ${orden.ticket_id} reabierta como borrador`);
+      toast.success(`Orden ${orden.ticket_id} reabierta. Ahora está pendiente de aprobación`);
       setModalDetalle(false);
       setOrdenSeleccionada(null);
       fetchData();
@@ -799,7 +799,6 @@ const OrdenesCompraPage = () => {
   const getEstadoBadge = (estado) => {
     const estados = {
       pendiente_aprobacion: { label: 'Pendiente Aprobación', color: 'bg-amber-100 text-amber-800', icon: AlertCircle },
-      borrador: { label: 'Aprobada', color: 'bg-gray-100 text-gray-800', icon: CheckCircle },
       enviada: { label: 'Enviada', color: 'bg-blue-100 text-blue-800', icon: Send },
       parcial: { label: 'Parcial', color: 'bg-yellow-100 text-yellow-800', icon: Package },
       recibida: { label: 'Recibida', color: 'bg-green-100 text-green-800', icon: CheckCircle },
@@ -807,7 +806,7 @@ const OrdenesCompraPage = () => {
       rechazada: { label: 'Rechazada', color: 'bg-red-200 text-red-900', icon: XCircle }
     };
 
-    const config = estados[estado] || estados.borrador;
+    const config = estados[estado] || estados.pendiente_aprobacion;
     const IconComponent = config.icon;
 
     return (
@@ -978,10 +977,11 @@ const OrdenesCompraPage = () => {
               className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
             >
               <option value="">Todos los estados</option>
-              <option value="borrador">Borrador</option>
+              <option value="pendiente_aprobacion">Pendiente Aprobación</option>
               <option value="enviada">Enviada</option>
               <option value="parcial">Parcial</option>
               <option value="recibida">Recibida</option>
+              <option value="rechazada">Rechazada</option>
               <option value="cancelada">Cancelada</option>
             </select>
 
@@ -1100,13 +1100,13 @@ const OrdenesCompraPage = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => generarPDFOrden(orden)}
-                            disabled={orden.estado !== 'borrador'}
+                            disabled={!['enviada', 'parcial', 'recibida'].includes(orden.estado)}
                             className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors text-sm ${
-                              orden.estado === 'borrador'
+                              ['enviada', 'parcial', 'recibida'].includes(orden.estado)
                                 ? 'bg-red-700 hover:bg-red-800 text-white'
                                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                             }`}
-                            title={orden.estado === 'borrador' ? 'Descargar PDF' : 'Solo disponible para órdenes aprobadas'}
+                            title={['enviada', 'parcial', 'recibida'].includes(orden.estado) ? 'Descargar PDF' : 'Solo disponible para órdenes aprobadas y enviadas'}
                           >
                             <Download size={16} />
                             PDF
@@ -2136,7 +2136,6 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
 // Modal para ver detalle de orden con trazabilidad
 const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, puedeReabrirOrdenes, onAbrirModalAnular, onEnviarOrden, onEditarOrden, esAdmin, onAprobar, onRechazar, onReabrir, onEliminar, loadingAprobacion }) => {
   const [tabActual, setTabActual] = React.useState('detalle'); // 'detalle' o 'historial'
-  const esBorrador = orden && orden.estado === 'borrador';
   const esPendienteAprobacion = orden && orden.estado === 'pendiente_aprobacion';
   const esRechazada = orden && orden.estado === 'rechazada';
 
@@ -2174,8 +2173,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
               <p className="text-sm text-gray-500">Estado</p>
               <p className="font-medium">
                 {orden.estado === 'pendiente_aprobacion' && '⏳ Pendiente de Aprobación'}
-                {orden.estado === 'borrador' && '✅ Aprobada'}
-                {orden.estado === 'enviada' && 'Enviada'}
+                {orden.estado === 'enviada' && '✅ Enviada'}
                 {orden.estado === 'parcial' && 'Parcial'}
                 {orden.estado === 'recibida' && 'Recibida'}
                 {orden.estado === 'cancelada' && 'Cancelada'}
@@ -2273,7 +2271,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
 
           <div className="flex gap-3 justify-between mt-6">
             <div className="flex gap-3">
-              {esAdmin && esBorrador && onEditarOrden && (
+              {esAdmin && esPendienteAprobacion && onEditarOrden && (
                 <Button
                   onClick={() => onEditarOrden(orden)}
                   variant="secondary"
@@ -2306,15 +2304,6 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                   </button>
                 </>
               )}
-              {esAdmin && esBorrador && onEnviarOrden && (
-                <button
-                  onClick={() => onEnviarOrden(orden.id)}
-                  className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                >
-                  <Send size={16} />
-                  Enviar Orden
-                </button>
-              )}
               {esAdmin && puedeAnularOrdenes && orden.estado !== 'cancelada' && orden.estado !== 'rechazada' && orden.estado !== 'pendiente_aprobacion' && (
                 <Button
                   onClick={() => onAbrirModalAnular(orden)}
@@ -2335,7 +2324,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                       className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
                     >
                       <RotateCcw size={16} />
-                      {loadingAprobacion ? 'Procesando...' : 'Reabrir como Borrador'}
+                      {loadingAprobacion ? 'Procesando...' : 'Reabrir Orden'}
                     </button>
                   )}
                   {puedeAnularOrdenes && onEliminar && (
@@ -2362,7 +2351,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
 
           <div className="flex gap-3 justify-between mt-6">
             <div className="flex gap-3">
-              {esAdmin && esBorrador && onEditarOrden && (
+              {esAdmin && esPendienteAprobacion && onEditarOrden && (
                 <Button
                   onClick={() => onEditarOrden(orden)}
                   variant="secondary"
@@ -2395,15 +2384,6 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                   </button>
                 </>
               )}
-              {esAdmin && esBorrador && onEnviarOrden && (
-                <button
-                  onClick={() => onEnviarOrden(orden.id)}
-                  className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                >
-                  <Send size={16} />
-                  Enviar Orden
-                </button>
-              )}
               {esAdmin && puedeAnularOrdenes && orden.estado !== 'cancelada' && orden.estado !== 'rechazada' && orden.estado !== 'pendiente_aprobacion' && (
                 <Button
                   onClick={() => onAbrirModalAnular(orden)}
@@ -2424,7 +2404,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                       className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
                     >
                       <RotateCcw size={16} />
-                      {loadingAprobacion ? 'Procesando...' : 'Reabrir como Borrador'}
+                      {loadingAprobacion ? 'Procesando...' : 'Reabrir Orden'}
                     </button>
                   )}
                   {puedeAnularOrdenes && onEliminar && (

@@ -21,7 +21,7 @@ import { enviarEmailAprobacion, enviarEmailEstadoOrden, verificarTokenAprobacion
  * Crear una nueva orden de compra
  * - Diseñadores, Almacenistas, Compras y Administradores pueden crear órdenes de compra
  * - Las órdenes de compra NO validan stock, ya que son para traer inventario desde proveedores
- * - Se crea en estado 'borrador' hasta que se envíe al proveedor
+ * - Se crea en estado 'pendiente_aprobacion' hasta que un administrador la apruebe
  */
 export const crearOrdenCompra = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -506,14 +506,16 @@ export const enviarOrdenCompra = async (req, res) => {
       });
     }
 
-    if (orden.estado !== 'borrador') {
+    // Nota: Las órdenes ahora van directamente de pendiente_aprobacion a enviada al aprobar
+    // Esta función se mantiene por compatibilidad pero ya no se usa en el flujo normal
+    if (orden.estado === 'pendiente_aprobacion') {
       return res.status(400).json({
         success: false,
-        message: 'Solo se pueden enviar órdenes en estado borrador'
+        message: 'La orden debe ser aprobada primero. Las órdenes aprobadas se marcan automáticamente como enviadas.'
       });
     }
 
-    orden.estado = 'enviada';
+    // Permitir "reenviar" órdenes que ya están enviadas (actualizar fecha de envío)
     orden.fecha_envio = new Date();
     await orden.save();
 
@@ -605,7 +607,7 @@ export const actualizarEstadoOrden = async (req, res) => {
 
 /**
  * Actualizar una orden de compra existente
- * - Solo se pueden actualizar órdenes en estado 'borrador'
+ * - Solo se pueden actualizar órdenes en estado 'pendiente_aprobacion'
  * - Permite actualizar proveedor, observaciones, fecha estimada y artículos
  * - Recalcula el total estimado
  */
@@ -645,12 +647,12 @@ export const actualizarOrdenCompra = async (req, res) => {
       });
     }
 
-    // Verificar que la orden está en estado 'borrador'
-    if (orden.estado !== 'borrador') {
+    // Verificar que la orden está en estado 'pendiente_aprobacion'
+    if (orden.estado !== 'pendiente_aprobacion') {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
-        message: 'Solo se pueden editar órdenes en estado borrador'
+        message: 'Solo se pueden editar órdenes pendientes de aprobación. Una vez aprobadas, las órdenes no pueden modificarse.'
       });
     }
 
@@ -2640,10 +2642,11 @@ export const aprobarOrden = async (req, res) => {
     }
 
     await orden.update({
-      estado: 'borrador',
+      estado: 'enviada',
       motivo_rechazo: null,
       aprobado_por_id: req.usuario.id,
-      fecha_aprobacion: new Date()
+      fecha_aprobacion: new Date(),
+      fecha_envio: new Date()
     });
 
     // Notificar al creador de la orden
@@ -2798,13 +2801,14 @@ export const aprobarPorEmail = async (req, res) => {
     }
 
     if (orden.estado !== 'pendiente_aprobacion') {
-      return enviarHTML(res, paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado === 'borrador' ? 'aprobada' : orden.estado}.`, orden.estado === 'borrador'));
+      return enviarHTML(res, paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado === 'enviada' ? 'aprobada y enviada' : orden.estado}.`, orden.estado === 'enviada'));
     }
 
     await orden.update({
-      estado: 'borrador',
+      estado: 'enviada',
       motivo_rechazo: null,
-      fecha_aprobacion: new Date()
+      fecha_aprobacion: new Date(),
+      fecha_envio: new Date()
     });
 
     // Notificar al creador
@@ -2820,7 +2824,7 @@ export const aprobarPorEmail = async (req, res) => {
 
     enviarEmailEstadoOrden(orden, 'aprobada', null, 'Administrador (por email)').catch(() => { });
 
-    return enviarHTML(res, paginaResultado('✅ Orden Aprobada', `La orden ${orden.ticket_id} ha sido aprobada exitosamente. Ya está lista para enviar al proveedor.`, true));
+    return enviarHTML(res, paginaResultado('✅ Orden Aprobada y Enviada', `La orden ${orden.ticket_id} ha sido aprobada y enviada al proveedor exitosamente.`, true));
 
   } catch (error) {
     console.error('Error al aprobar por email:', error);
@@ -2922,9 +2926,9 @@ export const eliminarOrden = async (req, res) => {
 };
 
 /**
- * Reabrir orden rechazada a estado borrador
+ * Reabrir orden rechazada
  * - Solo administradores y compras pueden reabrir
- * - La orden vuelve a estado borrador para poder editarla y reenviarla
+ * - La orden vuelve a estado pendiente_aprobacion para pasar nuevamente por el proceso de aprobación
  */
 export const reabrirOrden = async (req, res) => {
   try {
@@ -2952,7 +2956,7 @@ export const reabrirOrden = async (req, res) => {
     }
 
     await orden.update({
-      estado: 'borrador',
+      estado: 'pendiente_aprobacion',
       motivo_rechazo: null,
       aprobado_por_id: null,
       fecha_aprobacion: null
@@ -2964,7 +2968,7 @@ export const reabrirOrden = async (req, res) => {
         usuario_id: orden.usuario_creador_id,
         tipo: 'orden_estado_cambiado',
         titulo: '🔄 Orden reabierta',
-        mensaje: `${req.usuario.nombre} reabrió tu orden ${orden.ticket_id}. Ahora puedes editarla y reenviarla.`,
+        mensaje: `${req.usuario.nombre} reabrió tu orden ${orden.ticket_id}. Vuelve a estar pendiente de aprobación.`,
         url: '/ordenes-compra',
         datos_adicionales: {
           orden_id: orden.id,
@@ -2978,7 +2982,7 @@ export const reabrirOrden = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Orden ${orden.ticket_id} reabierta como borrador`,
+      message: `Orden ${orden.ticket_id} reabierta. Ahora está pendiente de aprobación`,
       data: { orden }
     });
 
