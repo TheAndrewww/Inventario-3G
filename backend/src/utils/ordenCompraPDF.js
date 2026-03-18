@@ -2,16 +2,74 @@ import PDFDocument from 'pdfkit';
 import axios from 'axios';
 
 /**
- * Generar PDF de orden de compra
+ * Cargar imagen desde URL y convertir a buffer
+ */
+async function cargarImagen(url) {
+  try {
+    const response = await axios.get(url, {
+      responseType: 'arraybuffer',
+      timeout: 10000
+    });
+    return Buffer.from(response.data);
+  } catch (error) {
+    console.error(`Error cargando imagen ${url}:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Calcular altura estimada del PDF
+ */
+function calcularAlturaEstimada(articulosPorCategoria) {
+  let altura = 100; // Header inicial
+  Object.keys(articulosPorCategoria).forEach(categoria => {
+    altura += 8; // Título de categoría
+    articulosPorCategoria[categoria].forEach(detalle => {
+      altura += 20; // Espacio por artículo con imagen
+      const descripcion = detalle.articulo?.descripcion || '';
+      if (descripcion) {
+        const lineasDesc = Math.ceil(descripcion.length / 50);
+        altura += lineasDesc * 4;
+      }
+    });
+    altura += 5; // Espacio entre categorías
+  });
+  altura += 10; // Margen final
+  return altura;
+}
+
+/**
+ * Generar PDF de orden de compra (IDÉNTICO al frontend)
  * @param {Object} orden - Orden completa con detalles, proveedor y creador
  * @returns {Promise<Buffer>} - Buffer del PDF generado
  */
 export async function generarPDFOrdenCompra(orden) {
   return new Promise(async (resolve, reject) => {
     try {
+      // URLs de los logos (MISMO que frontend)
+      const logoCompletoUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1762292854/logo_completo_web_eknzcb.png';
+      const marcaAguaUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1763602391/iso_black_1_mmxd6k.png';
+
+      // Agrupar artículos por categoría
+      const articulos = orden.detalles || [];
+      const articulosPorCategoria = {};
+      articulos.forEach(detalle => {
+        const categoria = detalle.articulo?.categoria?.nombre || 'GENERAL';
+        if (!articulosPorCategoria[categoria]) {
+          articulosPorCategoria[categoria] = [];
+        }
+        articulosPorCategoria[categoria].push(detalle);
+      });
+
+      // Calcular altura dinámica
+      const alturaEstimada = calcularAlturaEstimada(articulosPorCategoria);
+      const anchoTicket = 226.77; // 80mm en puntos
+      const altoTicket = Math.max(566.93, alturaEstimada * 2.83465); // Mínimo 200mm, convertir mm a puntos
+
+      // Crear documento con formato ticket (MISMO que frontend)
       const doc = new PDFDocument({
-        size: [226.77, 800], // 80mm width, height variable (aprox)
-        margins: { top: 20, bottom: 20, left: 15, right: 15 }
+        size: [anchoTicket, altoTicket],
+        margins: { top: 0, bottom: 0, left: 0, right: 0 }
       });
 
       const buffers = [];
@@ -22,113 +80,201 @@ export async function generarPDFOrdenCompra(orden) {
       });
       doc.on('error', reject);
 
+      // Constantes (convertir mm a puntos: 1mm = 2.83465 puntos)
+      const margen = 5 * 2.83465; // 5mm
+      const anchoUtil = anchoTicket - (margen * 2);
+      let yPos = 5 * 2.83465; // 5mm
+
+      // === CARGAR IMÁGENES ===
+      const [logoBuffer, marcaAguaBuffer] = await Promise.all([
+        cargarImagen(logoCompletoUrl),
+        cargarImagen(marcaAguaUrl)
+      ]);
+
+      // Cargar imágenes de artículos
+      const imagenesArticulos = {};
+      for (const detalle of articulos) {
+        if (detalle.articulo?.imagen_url) {
+          const imgBuffer = await cargarImagen(detalle.articulo.imagen_url);
+          if (imgBuffer) {
+            imagenesArticulos[detalle.articulo_id] = imgBuffer;
+          }
+        }
+      }
+
       // === HEADER ===
-      // Logo (intentar cargar, si falla continuar sin él)
-      try {
-        const logoUrl = 'https://res.cloudinary.com/dd93jrilg/image/upload/v1762292854/logo_completo_web_eknzcb.png';
-        const logoResponse = await axios.get(logoUrl, { responseType: 'arraybuffer', timeout: 5000 });
-        const logoBuffer = Buffer.from(logoResponse.data);
-        doc.image(logoBuffer, (doc.page.width - 150) / 2, doc.y, { width: 150 });
-        doc.moveDown(0.5);
-      } catch (error) {
-        console.log('⚠️ No se pudo cargar el logo para el PDF');
+      // Logo completo centrado (MISMO que frontend: 60mm width)
+      if (logoBuffer) {
+        const logoWidth = 60 * 2.83465; // 60mm
+        const logoHeight = logoWidth * 0.3; // Ajustar según aspect ratio aproximado
+        const logoX = (anchoTicket - logoWidth) / 2;
+        doc.image(logoBuffer, logoX, yPos, { width: logoWidth, height: logoHeight });
+        yPos += logoHeight + (5 * 2.83465);
       }
 
-      // Información de la orden
-      doc.fontSize(8).font('Helvetica-Bold');
+      // === INFORMACIÓN DE LA ORDEN (centrada) ===
+      doc.fontSize(8);
 
-      // Proveedor
-      doc.text('PROVEEDOR', { align: 'center' });
-      doc.font('Helvetica').fontSize(7);
-      doc.text(orden.proveedor?.nombre || 'Sin proveedor', { align: 'center' });
-      doc.moveDown(0.3);
+      // PROVEEDOR
+      doc.font('Helvetica-Bold');
+      doc.text('PROVEEDOR', margen, yPos, { width: anchoUtil, align: 'center' });
+      yPos += 4 * 2.83465;
+      doc.font('Helvetica');
+      const proveedor = orden.proveedor?.nombre || 'Sin proveedor';
+      doc.text(proveedor, margen, yPos, { width: anchoUtil, align: 'center' });
+      yPos += 3.5 * 2.83465 + 2 * 2.83465;
 
-      // Creado por
-      doc.font('Helvetica-Bold').fontSize(8);
-      doc.text('CREADO POR', { align: 'center' });
-      doc.font('Helvetica').fontSize(7);
-      doc.text(orden.creador?.nombre || 'N/A', { align: 'center' });
-      doc.moveDown(0.3);
+      // CREADO POR
+      doc.font('Helvetica-Bold');
+      doc.text('CREADO POR', margen, yPos, { width: anchoUtil, align: 'center' });
+      yPos += 4 * 2.83465;
+      doc.font('Helvetica');
+      const creador = orden.creador?.nombre || 'N/A';
+      doc.text(creador, margen, yPos, { width: anchoUtil, align: 'center' });
+      yPos += 3.5 * 2.83465 + 2 * 2.83465;
 
-      // Fecha de pedido
-      doc.font('Helvetica-Bold').fontSize(8);
-      doc.text('FECHA DE PEDIDO', { align: 'center' });
-      doc.font('Helvetica').fontSize(7);
-      const fechaPedido = orden.created_at ? new Date(orden.created_at).toLocaleDateString('es-MX') : 'N/A';
-      doc.text(fechaPedido, { align: 'center' });
-      doc.moveDown(0.3);
+      // FECHA DE PEDIDO
+      doc.font('Helvetica-Bold');
+      doc.text('FECHA DE PEDIDO', margen, yPos, { width: anchoUtil, align: 'center' });
+      yPos += 4 * 2.83465;
+      doc.font('Helvetica');
+      const fechaPedido = orden.created_at
+        ? new Date(orden.created_at).toLocaleDateString('es-MX', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          })
+        : 'N/A';
+      doc.text(fechaPedido, margen, yPos, { width: anchoUtil, align: 'center' });
+      yPos += 4 * 2.83465;
 
-      // Fecha de llegada estimada
-      if (orden.fecha_llegada_estimada) {
-        doc.font('Helvetica-Bold').fontSize(8);
-        doc.text('FECHA DE LLEGADA', { align: 'center' });
-        doc.font('Helvetica').fontSize(7);
-        const fechaLlegada = new Date(orden.fecha_llegada_estimada).toLocaleDateString('es-MX');
-        doc.text(fechaLlegada, { align: 'center' });
-        doc.moveDown(0.3);
-      }
+      // FECHA DE LLEGADA
+      doc.font('Helvetica-Bold');
+      doc.text('FECHA DE LLEGADA', margen, yPos, { width: anchoUtil, align: 'center' });
+      yPos += 4 * 2.83465;
+      doc.font('Helvetica');
+      const fechaLlegada = orden.fecha_llegada_estimada
+        ? new Date(orden.fecha_llegada_estimada).toLocaleDateString('es-MX', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          })
+        : 'Sin definir';
+      doc.text(fechaLlegada, margen, yPos, { width: anchoUtil, align: 'center' });
+      yPos += 6 * 2.83465;
 
-      // Título principal
-      doc.moveDown(0.5);
-      doc.font('Helvetica-Bold').fontSize(10);
-      doc.text('ORDEN DE COMPRA', { align: 'center' });
-      doc.text(orden.ticket_id, { align: 'center' });
-      doc.moveDown(0.5);
+      // === TÍTULO PRINCIPAL ===
+      doc.fontSize(10);
+      doc.font('Helvetica-Bold');
+      doc.text('ORDEN DE COMPRA', margen, yPos, { width: anchoUtil, align: 'center' });
+      yPos += 6 * 2.83465;
 
       // Línea divisoria
-      doc.moveTo(15, doc.y).lineTo(doc.page.width - 15, doc.y).stroke();
-      doc.moveDown(0.5);
+      doc.strokeColor('#c8c8c8')
+         .lineWidth(0.3 * 2.83465)
+         .moveTo(margen, yPos)
+         .lineTo(anchoTicket - margen, yPos)
+         .stroke();
+      yPos += 5 * 2.83465;
 
       // === ARTÍCULOS AGRUPADOS POR CATEGORÍA ===
-      const articulos = orden.detalles || [];
-
-      // Agrupar por categoría
-      const articulosPorCategoria = {};
-      articulos.forEach(detalle => {
-        const categoria = detalle.articulo?.categoria?.nombre || 'GENERAL';
-        if (!articulosPorCategoria[categoria]) {
-          articulosPorCategoria[categoria] = [];
-        }
-        articulosPorCategoria[categoria].push(detalle);
-      });
-
-      // Renderizar artículos por categoría
+      doc.fontSize(8);
       Object.keys(articulosPorCategoria).forEach(categoria => {
-        doc.font('Helvetica-Bold').fontSize(8);
-        doc.text(categoria.toUpperCase(), 15, doc.y);
-        doc.moveDown(0.3);
+        // Nombre de categoría
+        doc.font('Helvetica-Bold');
+        doc.text(categoria.toUpperCase(), margen, yPos, { width: anchoUtil });
+        yPos += 4 * 2.83465;
 
-        doc.font('Helvetica').fontSize(7);
+        // Lista de artículos
+        doc.font('Helvetica');
         articulosPorCategoria[categoria].forEach(detalle => {
-          const nombre = detalle.articulo?.nombre || `Artículo ID: ${detalle.articulo_id}`;
+          const nombreArticulo = detalle.articulo?.nombre || `Artículo ID: ${detalle.articulo_id}`;
+          const descripcion = detalle.articulo?.descripcion || '';
           const cantidad = detalle.cantidad_solicitada;
           const unidad = detalle.articulo?.unidad || 'uds';
-          const descripcion = detalle.articulo?.descripcion || '';
+          const imagenArticulo = imagenesArticulos[detalle.articulo_id];
 
-          // Nombre y cantidad
-          doc.font('Helvetica-Bold').fontSize(7);
-          doc.text(`• ${nombre} - ${cantidad} ${unidad}`, 20, doc.y, { width: doc.page.width - 40 });
+          // Dibujar imagen del artículo si existe (12mm de tamaño)
+          const imgSize = 12 * 2.83465; // 12mm
+          let textX = margen;
+          let textStartY = yPos;
+
+          if (imagenArticulo) {
+            const imgWidth = imgSize;
+            const imgHeight = imgSize; // Mantener cuadrado
+
+            // Borde de imagen
+            doc.strokeColor('#c8c8c8')
+               .lineWidth(0.2 * 2.83465)
+               .rect(margen, yPos, imgWidth, imgHeight)
+               .stroke();
+
+            // Agregar imagen
+            doc.image(imagenArticulo, margen, yPos, {
+              width: imgWidth,
+              height: imgHeight,
+              fit: [imgWidth, imgHeight]
+            });
+
+            textX = margen + imgWidth + (2 * 2.83465);
+            textStartY = yPos + (3 * 2.83465);
+            yPos = Math.max(yPos + imgHeight, textStartY);
+          } else {
+            textStartY = yPos + (3 * 2.83465);
+          }
+
+          // Nombre y cantidad en negrita
+          doc.font('Helvetica-Bold');
+          const texto = `• ${nombreArticulo} - ${cantidad} ${unidad}`;
+          const textoWidth = imagenArticulo ? anchoUtil - imgSize - (2 * 2.83465) : anchoUtil;
+          doc.text(texto, textX, textStartY, {
+            width: textoWidth,
+            lineGap: 3.5 * 2.83465 - doc.currentLineHeight()
+          });
+          const altoTexto = doc.y - textStartY;
 
           // Descripción si existe
           if (descripcion) {
-            doc.font('Helvetica').fontSize(6);
-            doc.text(`  ${descripcion}`, 25, doc.y, { width: doc.page.width - 45 });
+            doc.font('Helvetica');
+            doc.fontSize(7);
+            doc.text(`  ${descripcion}`, textX, doc.y, {
+              width: textoWidth,
+              lineGap: 3 * 2.83465 - doc.currentLineHeight()
+            });
+            yPos = Math.max(yPos, doc.y);
+            doc.fontSize(8);
+          } else {
+            yPos = Math.max(yPos, textStartY + altoTexto);
           }
 
-          doc.moveDown(0.3);
+          yPos += 3 * 2.83465;
         });
 
-        doc.moveDown(0.3);
+        yPos += 3 * 2.83465; // Espacio entre categorías
       });
 
-      // === FOOTER ===
-      doc.moveDown(1);
-      doc.font('Helvetica').fontSize(6).fillColor('#999999');
-      doc.text('3G Arquitectura Textil', { align: 'center' });
-      doc.text('Sistema de Inventario', { align: 'center' });
+      // === MARCA DE AGUA ===
+      if (marcaAguaBuffer) {
+        doc.save();
+        doc.opacity(0.05);
+
+        const watermarkWidth = 60 * 2.83465; // 60mm
+        const watermarkHeight = watermarkWidth; // Mantener proporción aproximada
+        const watermarkX = (anchoTicket - watermarkWidth) / 2;
+        const watermarkY = (altoTicket / 2) - (watermarkHeight / 2);
+
+        doc.image(marcaAguaBuffer, watermarkX, watermarkY, {
+          width: watermarkWidth,
+          height: watermarkHeight,
+          fit: [watermarkWidth, watermarkHeight]
+        });
+
+        doc.restore();
+      }
 
       doc.end();
     } catch (error) {
+      console.error('Error generando PDF:', error);
       reject(error);
     }
   });
