@@ -9,8 +9,12 @@ dns.setDefaultResultOrder('ipv4first');
 let _transporter = null;
 function getTransporter() {
     if (!_transporter) {
+        // Usar IP IPv4 directa para evitar resolución DNS a IPv6
+        // Esta IP puede cambiar, pero es la única forma de forzar IPv4 en Railway
+        const gmailHost = process.env.SMTP_HOST || '142.251.186.109'; // IP IPv4 de smtp.gmail.com
+
         _transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
+            host: gmailHost,
             port: 465,
             secure: true,
             auth: {
@@ -19,7 +23,8 @@ function getTransporter() {
             },
             tls: {
                 rejectUnauthorized: false,
-                minVersion: 'TLSv1.2'
+                minVersion: 'TLSv1.2',
+                servername: 'smtp.gmail.com' // SNI para certificado SSL
             },
             // Forzar IPv4 (Railway no soporta IPv6 a Gmail)
             family: 4,

@@ -12,7 +12,8 @@
       "Bash(railway logs:*)",
       "Bash(railway shell)",
       "Bash(railway variables:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(dig:*)"
     ],
     "deny": [],
     "ask": []
