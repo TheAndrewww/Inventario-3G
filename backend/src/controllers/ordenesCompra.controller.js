@@ -539,6 +539,80 @@ export const cancelarSolicitudesPorOrdenCreada = async (articulos_ids, orden_com
 };
 
 /**
+ * Función auxiliar: Cancelar solicitudes pendientes que ya tienen órdenes de compra existentes
+ * Revisa todas las solicitudes pendientes y las cancela si ya existe una orden con ese artículo
+ */
+export const cancelarSolicitudesConOrdenesExistentes = async () => {
+  try {
+    console.log('🔄 [cancelarSolicitudesConOrdenesExistentes] Buscando solicitudes pendientes con órdenes existentes...');
+
+    // Buscar todas las solicitudes pendientes
+    const solicitudesPendientes = await SolicitudCompra.findAll({
+      where: { estado: 'pendiente' },
+      include: [
+        {
+          model: Articulo,
+          as: 'articulo',
+          attributes: ['id', 'nombre', 'unidad']
+        }
+      ]
+    });
+
+    if (solicitudesPendientes.length === 0) {
+      console.log('   ✓ No hay solicitudes pendientes para revisar');
+      return 0;
+    }
+
+    console.log(`   📋 Revisando ${solicitudesPendientes.length} solicitud(es) pendiente(s)...`);
+
+    let canceladas = 0;
+
+    for (const solicitud of solicitudesPendientes) {
+      // Buscar si existe alguna orden de compra con este artículo (que no esté cancelada o rechazada)
+      const ordenExistente = await OrdenCompra.findOne({
+        where: {
+          estado: {
+            [Op.notIn]: ['cancelada', 'rechazada']
+          }
+        },
+        include: [
+          {
+            model: DetalleOrdenCompra,
+            as: 'detalles',
+            where: {
+              articulo_id: solicitud.articulo_id
+            },
+            required: true
+          }
+        ]
+      });
+
+      if (ordenExistente) {
+        await solicitud.update({
+          estado: 'cancelada',
+          orden_compra_id: ordenExistente.id,
+          observaciones: `[Cancelada automáticamente] Ya existe orden de compra ${ordenExistente.ticket_id} que incluye este artículo. La solicitud fue atendida mediante la orden.`
+        });
+
+        console.log(`   ✅ Solicitud ${solicitud.ticket_id} cancelada: ${solicitud.articulo?.nombre} ya está en orden ${ordenExistente.ticket_id}`);
+        canceladas++;
+      }
+    }
+
+    if (canceladas > 0) {
+      console.log(`✅ [cancelarSolicitudesConOrdenesExistentes] Se cancelaron ${canceladas} solicitud(es) que ya tenían órdenes existentes`);
+    } else {
+      console.log(`   ✓ No hay solicitudes pendientes con órdenes existentes`);
+    }
+
+    return canceladas;
+  } catch (error) {
+    console.error('❌ [cancelarSolicitudesConOrdenesExistentes] Error:', error.message);
+    return 0;
+  }
+};
+
+/**
  * Listar todas las solicitudes de compra
  * - Ejecuta limpieza automática de solicitudes obsoletas antes de listar
  */
@@ -546,6 +620,9 @@ export const listarSolicitudesCompra = async (req, res) => {
   try {
     // Ejecutar limpieza de solicitudes obsoletas antes de listar
     await cancelarSolicitudesObsoletas();
+
+    // Ejecutar limpieza de solicitudes que ya tienen órdenes existentes
+    await cancelarSolicitudesConOrdenesExistentes();
 
     const {
       estado,
