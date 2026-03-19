@@ -489,7 +489,8 @@ export const cancelarSolicitudesPorOrdenCreada = async (articulos_ids, orden_com
       return 0;
     }
 
-    console.log(`🔄 Verificando solicitudes pendientes para ${articulos_ids.length} artículo(s) de orden ${orden_ticket_id}...`);
+    console.log(`🔄 [cancelarSolicitudesPorOrdenCreada] Verificando solicitudes pendientes para orden ${orden_ticket_id}`);
+    console.log(`   Artículo IDs a buscar: [${articulos_ids.join(', ')}]`);
 
     // Buscar solicitudes pendientes para estos artículos
     const solicitudes = await SolicitudCompra.findAll({
@@ -507,6 +508,8 @@ export const cancelarSolicitudesPorOrdenCreada = async (articulos_ids, orden_com
       transaction
     });
 
+    console.log(`   📋 Solicitudes pendientes encontradas: ${solicitudes.length}`);
+
     let canceladas = 0;
 
     for (const solicitud of solicitudes) {
@@ -522,9 +525,10 @@ export const cancelarSolicitudesPorOrdenCreada = async (articulos_ids, orden_com
     }
 
     if (canceladas > 0) {
-      console.log(`✅ Se cancelaron ${canceladas} solicitud(es) porque ya están en la orden ${orden_ticket_id}`);
+      console.log(`✅ [cancelarSolicitudesPorOrdenCreada] Se cancelaron ${canceladas} solicitud(es) porque ya están en la orden ${orden_ticket_id}`);
     } else {
-      console.log(`✓ No hay solicitudes pendientes para los artículos de la orden ${orden_ticket_id}`);
+      console.log(`ℹ️  [cancelarSolicitudesPorOrdenCreada] No hay solicitudes pendientes para los artículos de la orden ${orden_ticket_id}`);
+      console.log(`   (Buscando solicitudes con estado='pendiente' y articulo_id en [${articulos_ids.join(', ')}])`);
     }
 
     return canceladas;
