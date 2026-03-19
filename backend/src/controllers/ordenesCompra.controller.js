@@ -293,7 +293,10 @@ export const crearOrdenCompra = async (req, res) => {
     });
 
   } catch (error) {
-    await transaction.rollback();
+    // Solo hacer rollback si la transacción aún no fue commiteada
+    if (transaction && !transaction.finished) {
+      await transaction.rollback();
+    }
     console.error('Error al crear orden de compra:', error);
     res.status(500).json({
       success: false,
@@ -1228,7 +1231,10 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
     });
 
   } catch (error) {
-    await transaction.rollback();
+    // Solo hacer rollback si la transacción aún no fue commiteada
+    if (transaction && !transaction.finished) {
+      await transaction.rollback();
+    }
     console.error('Error al crear orden desde solicitudes:', error);
     res.status(500).json({
       success: false,
