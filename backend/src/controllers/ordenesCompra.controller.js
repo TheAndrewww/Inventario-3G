@@ -274,6 +274,9 @@ export const crearOrdenCompra = async (req, res) => {
  */
 export const listarOrdenesCompra = async (req, res) => {
   try {
+    // Ejecutar limpieza de órdenes viejas antes de listar
+    await anularOrdenesViejas();
+
     const {
       estado,
       proveedor_id,
@@ -539,6 +542,104 @@ export const cancelarSolicitudesPorOrdenCreada = async (articulos_ids, orden_com
 };
 
 /**
+ * Función auxiliar: Anular órdenes viejas (más de 3 días) en estado pendiente_aprobacion o rechazada
+ * Revierte los artículos a solicitudes pendientes automáticamente
+ */
+export const anularOrdenesViejas = async () => {
+  try {
+    console.log('🔄 [anularOrdenesViejas] Buscando órdenes viejas para anular...');
+
+    // Calcular fecha límite (hace 3 días)
+    const fechaLimite = new Date();
+    fechaLimite.setDate(fechaLimite.getDate() - 3);
+
+    // Buscar órdenes pendientes o rechazadas con más de 3 días
+    const ordenesViejas = await OrdenCompra.findAll({
+      where: {
+        estado: { [Op.in]: ['pendiente_aprobacion', 'rechazada'] },
+        fecha_creacion: { [Op.lt]: fechaLimite }
+      },
+      include: [
+        {
+          model: SolicitudCompra,
+          as: 'solicitudes_origen',
+          attributes: ['id', 'ticket_id', 'articulo_id', 'cantidad_solicitada']
+        },
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalles',
+          include: [{
+            model: Articulo,
+            as: 'articulo',
+            attributes: ['id', 'nombre']
+          }]
+        }
+      ]
+    });
+
+    if (ordenesViejas.length === 0) {
+      console.log('   ✓ No hay órdenes viejas para anular');
+      return 0;
+    }
+
+    console.log(`   📋 Encontradas ${ordenesViejas.length} orden(es) vieja(s) (más de 3 días en pendiente/rechazada)`);
+
+    let anuladas = 0;
+
+    for (const orden of ordenesViejas) {
+      const transaction = await sequelize.transaction();
+
+      try {
+        const diasTranscurridos = Math.floor((new Date() - new Date(orden.fecha_creacion)) / (1000 * 60 * 60 * 24));
+
+        // Anular la orden
+        await orden.update({
+          estado: 'cancelada',
+          observaciones: `${orden.observaciones || ''}\n\n[Anulada automáticamente] Orden con más de 3 días (${diasTranscurridos} días) sin aprobación. Las solicitudes fueron revertidas a pendiente.`.trim()
+        }, { transaction });
+
+        // Revertir solicitudes asociadas a pendiente
+        if (orden.solicitudes_origen && orden.solicitudes_origen.length > 0) {
+          await SolicitudCompra.update(
+            {
+              estado: 'pendiente',
+              orden_compra_id: null,
+              observaciones: `[Revertida automáticamente] La orden ${orden.ticket_id} fue anulada por antigüedad (${diasTranscurridos} días sin aprobación).`
+            },
+            {
+              where: {
+                orden_compra_id: orden.id,
+                estado: { [Op.in]: ['en_orden', 'cancelada'] }
+              },
+              transaction
+            }
+          );
+
+          console.log(`   ✅ Orden ${orden.ticket_id} anulada (${diasTranscurridos} días) - ${orden.solicitudes_origen.length} solicitud(es) revertida(s)`);
+        } else {
+          console.log(`   ✅ Orden ${orden.ticket_id} anulada (${diasTranscurridos} días) - sin solicitudes asociadas`);
+        }
+
+        await transaction.commit();
+        anuladas++;
+      } catch (error) {
+        await transaction.rollback();
+        console.error(`   ❌ Error al anular orden ${orden.ticket_id}:`, error.message);
+      }
+    }
+
+    if (anuladas > 0) {
+      console.log(`✅ [anularOrdenesViejas] Se anularon ${anuladas} orden(es) vieja(s)`);
+    }
+
+    return anuladas;
+  } catch (error) {
+    console.error('❌ [anularOrdenesViejas] Error:', error.message);
+    return 0;
+  }
+};
+
+/**
  * Función auxiliar: Cancelar solicitudes pendientes que ya tienen órdenes de compra existentes
  * Revisa todas las solicitudes pendientes y las cancela si ya existe una orden con ese artículo
  */
@@ -618,6 +719,9 @@ export const cancelarSolicitudesConOrdenesExistentes = async () => {
  */
 export const listarSolicitudesCompra = async (req, res) => {
   try {
+    // Ejecutar limpieza de órdenes viejas (esto también revierte sus solicitudes)
+    await anularOrdenesViejas();
+
     // Ejecutar limpieza de solicitudes obsoletas antes de listar
     await cancelarSolicitudesObsoletas();
 
