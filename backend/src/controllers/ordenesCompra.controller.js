@@ -247,43 +247,6 @@ export const crearOrdenCompra = async (req, res) => {
       });
     }
 
-    // --- INTEGRACIÓN IMPRESIÓN AUTOMÁTICA ---
-    try {
-      const db = admin.firestore();
-
-      // Preparar datos de la orden para el agente de impresión
-      const datosOrden = {
-        ticket_id: ticket_id,
-        fecha: new Date().toISOString(),
-        proveedor: ordenCompleta.proveedor?.nombre || 'Sin proveedor',
-        creador: ordenCompleta.creador?.nombre || 'Sistema',
-        total_estimado: totalEstimado,
-        observaciones: observaciones || '',
-        articulos: ordenCompleta.detalles.map(d => ({
-          nombre: d.articulo?.nombre || 'Artículo',
-          cantidad: d.cantidad_solicitada,
-          unidad: d.articulo?.unidad || 'pz',
-          costo_unitario: d.costo_unitario,
-          subtotal: d.subtotal
-        }))
-      };
-
-      await db.collection('cola_impresion').add({
-        tipo: 'orden_compra',
-        datos: datosOrden,
-        orden_id: ordenCompra.id,
-        ticket_id: ticket_id,
-        estado: 'pendiente',
-        created_at: new Date(),
-        printer: 'TicketPrinter'
-      });
-      console.log(`🖨️ Solicitud de impresión enviada a Firebase para orden ${ticket_id}`);
-    } catch (printError) {
-      console.error('❌ Error al enviar a cola de impresión:', printError);
-      // No bloqueamos la respuesta si falla la impresión
-    }
-    // ----------------------------------------
-
     res.status(201).json({
       success: true,
       message: 'Orden de compra creada exitosamente',
