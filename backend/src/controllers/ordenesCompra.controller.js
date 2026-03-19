@@ -239,6 +239,12 @@ export const crearOrdenCompra = async (req, res) => {
       enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
     } else {
       console.log(`✅ Orden ${ticket_id} creada por administrador - enviada directamente (sin aprobación)`);
+
+      // Enviar email con PDF a usuarios de compras (fire-and-forget)
+      enviarEmailEstadoOrden(ordenCompleta, 'aprobada', null, usuario_nombre).catch(e => {
+        console.error('❌ [crearOrdenCompra] Error al enviar email a compras:', e.message);
+        console.error('   Stack:', e.stack);
+      });
     }
 
     // --- INTEGRACIÓN IMPRESIÓN AUTOMÁTICA ---
@@ -1204,6 +1210,12 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
       enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
     } else {
       console.log(`✅ Orden ${ticket_id} creada por administrador desde solicitudes - enviada directamente (sin aprobación)`);
+
+      // Enviar email con PDF a usuarios de compras (fire-and-forget)
+      enviarEmailEstadoOrden(ordenCompleta, 'aprobada', null, usuario_nombre).catch(e => {
+        console.error('❌ [crearOrdenDesdeSolicitudes] Error al enviar email a compras:', e.message);
+        console.error('   Stack:', e.stack);
+      });
     }
 
     res.status(201).json({
