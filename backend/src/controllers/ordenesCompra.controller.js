@@ -2907,11 +2907,14 @@ export const aprobarOrden = async (req, res) => {
  * Rechazar una orden de compra (solo administradores)
  */
 export const rechazarOrden = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
   try {
     const { id } = req.params;
     const { motivo } = req.body;
 
     if (!motivo || motivo.trim() === '') {
+      await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: 'Se requiere un motivo de rechazo'
@@ -2922,14 +2925,17 @@ export const rechazarOrden = async (req, res) => {
       include: [
         { model: Usuario, as: 'creador', attributes: ['id', 'nombre', 'email'] },
         { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] }
-      ]
+      ],
+      transaction
     });
 
     if (!orden) {
+      await transaction.rollback();
       return res.status(404).json({ success: false, message: 'Orden no encontrada' });
     }
 
     if (orden.estado !== 'pendiente_aprobacion') {
+      await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: `No se puede rechazar una orden con estado "${orden.estado}". Solo se pueden rechazar órdenes pendientes de aprobación.`
@@ -2941,7 +2947,29 @@ export const rechazarOrden = async (req, res) => {
       motivo_rechazo: motivo.trim(),
       aprobado_por_id: req.usuario.id,
       fecha_aprobacion: new Date()
-    });
+    }, { transaction });
+
+    // Revertir solicitudes asociadas a esta orden (canceladas o en_orden) a pendiente
+    const solicitudesRevertidas = await SolicitudCompra.update(
+      {
+        estado: 'pendiente',
+        orden_compra_id: null,
+        observaciones: `[Revertida automáticamente] La orden ${orden.ticket_id} fue rechazada. Solicitud vuelve a estado pendiente.`
+      },
+      {
+        where: {
+          orden_compra_id: id,
+          estado: { [Op.in]: ['cancelada', 'en_orden'] }
+        },
+        transaction
+      }
+    );
+
+    if (solicitudesRevertidas[0] > 0) {
+      console.log(`✅ ${solicitudesRevertidas[0]} solicitud(es) revertidas a pendiente por rechazo de orden ${orden.ticket_id}`);
+    }
+
+    await transaction.commit();
 
     // Notificar al creador de la orden
     try {
@@ -2968,10 +2996,14 @@ export const rechazarOrden = async (req, res) => {
     res.json({
       success: true,
       message: `Orden ${orden.ticket_id} rechazada`,
-      data: { orden }
+      data: {
+        orden,
+        solicitudes_revertidas: solicitudesRevertidas[0]
+      }
     });
 
   } catch (error) {
+    await transaction.rollback();
     console.error('Error al rechazar orden:', error);
     res.status(500).json({
       success: false,
@@ -3101,18 +3133,24 @@ export const eliminarOrden = async (req, res) => {
 
     const ticket_id = orden.ticket_id;
 
-    // Si hay solicitudes vinculadas, desvincularse y volver a pendiente
-    if (orden.solicitudes_origen && orden.solicitudes_origen.length > 0) {
-      await SolicitudCompra.update(
-        {
-          orden_compra_id: null,
-          estado: 'pendiente'
+    // Revertir TODAS las solicitudes vinculadas (canceladas o en_orden) a pendiente
+    const solicitudesRevertidas = await SolicitudCompra.update(
+      {
+        orden_compra_id: null,
+        estado: 'pendiente',
+        observaciones: `[Revertida automáticamente] La orden ${ticket_id} fue eliminada. Solicitud vuelve a estado pendiente.`
+      },
+      {
+        where: {
+          orden_compra_id: id,
+          estado: { [Op.in]: ['cancelada', 'en_orden'] }
         },
-        {
-          where: { orden_compra_id: id },
-          transaction
-        }
-      );
+        transaction
+      }
+    );
+
+    if (solicitudesRevertidas[0] > 0) {
+      console.log(`✅ ${solicitudesRevertidas[0]} solicitud(es) revertidas a pendiente por eliminación de orden ${ticket_id}`);
     }
 
     // Eliminar detalles primero (cascade debería hacerlo, pero por seguridad)
@@ -3128,7 +3166,10 @@ export const eliminarOrden = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Orden ${ticket_id} eliminada exitosamente`
+      message: `Orden ${ticket_id} eliminada exitosamente`,
+      data: {
+        solicitudes_revertidas: solicitudesRevertidas[0]
+      }
     });
 
   } catch (error) {
