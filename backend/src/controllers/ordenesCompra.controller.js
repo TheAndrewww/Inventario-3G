@@ -143,6 +143,10 @@ export const crearOrdenCompra = async (req, res) => {
     ordenCompra.total_estimado = totalEstimado;
     await ordenCompra.save({ transaction });
 
+    // Cancelar solicitudes pendientes que tengan los mismos artículos de esta orden
+    const articulos_ids = articulos.map(a => parseInt(a.articulo_id));
+    await cancelarSolicitudesPorOrdenCreada(articulos_ids, ordenCompra.id, ticket_id, transaction);
+
     // CONSOLIDACIÓN: Si el admin especificó órdenes a consolidar, eliminar artículos duplicados
     if (consolidar_ordenes && Array.isArray(consolidar_ordenes) && consolidar_ordenes.length > 0) {
       console.log(`🔄 Consolidando artículos de ${consolidar_ordenes.length} órdenes anteriores...`);
@@ -499,6 +503,61 @@ export const cancelarSolicitudesObsoletas = async (articulo_id = null, transacti
     return canceladas;
   } catch (error) {
     console.error('❌ Error al cancelar solicitudes obsoletas:', error.message);
+    return 0;
+  }
+};
+
+/**
+ * Función auxiliar: Cancelar solicitudes pendientes cuando se crea una orden con esos artículos
+ * Se ejecuta automáticamente al crear órdenes de compra
+ */
+export const cancelarSolicitudesPorOrdenCreada = async (articulos_ids, orden_compra_id, orden_ticket_id, transaction = null) => {
+  try {
+    if (!articulos_ids || articulos_ids.length === 0) {
+      return 0;
+    }
+
+    console.log(`🔄 Verificando solicitudes pendientes para ${articulos_ids.length} artículo(s) de orden ${orden_ticket_id}...`);
+
+    // Buscar solicitudes pendientes para estos artículos
+    const solicitudes = await SolicitudCompra.findAll({
+      where: {
+        articulo_id: { [Op.in]: articulos_ids },
+        estado: 'pendiente'
+      },
+      include: [
+        {
+          model: Articulo,
+          as: 'articulo',
+          attributes: ['id', 'nombre', 'unidad']
+        }
+      ],
+      transaction
+    });
+
+    let canceladas = 0;
+
+    for (const solicitud of solicitudes) {
+      // Cancelar la solicitud y asociarla con la orden de compra
+      await solicitud.update({
+        estado: 'cancelada',
+        orden_compra_id: orden_compra_id,
+        observaciones: `[Cancelada automáticamente] Ya existe orden de compra ${orden_ticket_id} que incluye este artículo. La solicitud fue atendida mediante la orden.`
+      }, { transaction });
+
+      console.log(`   ✅ Solicitud ${solicitud.ticket_id} cancelada: ${solicitud.articulo?.nombre} ya está en orden ${orden_ticket_id}`);
+      canceladas++;
+    }
+
+    if (canceladas > 0) {
+      console.log(`✅ Se cancelaron ${canceladas} solicitud(es) porque ya están en la orden ${orden_ticket_id}`);
+    } else {
+      console.log(`✓ No hay solicitudes pendientes para los artículos de la orden ${orden_ticket_id}`);
+    }
+
+    return canceladas;
+  } catch (error) {
+    console.error('❌ Error al cancelar solicitudes por orden creada:', error.message);
     return 0;
   }
 };
@@ -1073,6 +1132,10 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
         transaction
       }
     );
+
+    // Cancelar OTRAS solicitudes pendientes que tengan los mismos artículos (pero que NO se usaron para esta orden)
+    const articulos_ids = Array.from(articulosMap.keys());
+    await cancelarSolicitudesPorOrdenCreada(articulos_ids, ordenCompra.id, ticket_id, transaction);
 
     await transaction.commit();
 
