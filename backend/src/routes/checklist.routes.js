@@ -19,19 +19,19 @@ const router = Router();
 router.use(verificarToken);
 
 // ─── Ítems de checklist (catálogo global) ───
-router.post('/importar', verificarRol('admin'), importarItems);
+router.post('/importar', verificarRol('administrador'), importarItems);
 router.get('/items', listarItems);
-router.put('/items/:id', verificarRol('admin'), editarItem);
-router.delete('/items/:id', verificarRol('admin'), eliminarItem);
+router.put('/items/:id', verificarRol('administrador'), editarItem);
+router.delete('/items/:id', verificarRol('administrador'), eliminarItem);
 
 // ─── Enlazar artículos del inventario ───
-router.post('/items/:id/articulos', verificarRol('admin'), enlazarArticulos);
+router.post('/items/:id/articulos', verificarRol('administrador'), enlazarArticulos);
 router.get('/items/:id/sugerencias', sugerirArticulos);
 router.get('/buscar-articulos', buscarArticulos);
 
 // ─── Checklist por equipo ───
 router.get('/equipo/:equipoId', obtenerChecklistEquipo);
-router.post('/equipo/:equipoId/asignar', verificarRol('admin'), asignarItemsAEquipo);
-router.delete('/equipo/:equipoId/items/:itemId', verificarRol('admin'), quitarItemDeEquipo);
+router.post('/equipo/:equipoId/asignar', verificarRol('administrador'), asignarItemsAEquipo);
+router.delete('/equipo/:equipoId/items/:itemId', verificarRol('administrador'), quitarItemDeEquipo);
 
 export default router;
