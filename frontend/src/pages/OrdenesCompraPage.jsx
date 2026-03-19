@@ -1746,6 +1746,39 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
     setArticulosSeleccionados(nuevosArticulos);
   };
 
+  // Agregar artículo desde sugerencias (órdenes, solicitudes o bajo stock)
+  const handleAgregarDesdeSugerencias = (item, cantidad, tipo) => {
+    // Verificar si ya está en la lista
+    const yaExiste = articulosSeleccionados.find(art => art.articulo_id === item.articulo_id);
+
+    if (yaExiste) {
+      toast.error('Este artículo ya está en la lista');
+      return;
+    }
+
+    // Agregar a la lista de artículos seleccionados
+    setArticulosSeleccionados([
+      ...articulosSeleccionados,
+      {
+        articulo_id: item.articulo_id,
+        articulo: item.articulo,
+        cantidad: cantidad,
+        costo_unitario: item.articulo?.costo_unitario || 0
+      }
+    ]);
+
+    // Quitar de la lista correspondiente
+    if (tipo === 'orden') {
+      setArticulosOrdenes(articulosOrdenes.filter(art => art.articulo_id !== item.articulo_id));
+    } else if (tipo === 'solicitud') {
+      setArticulosSolicitudes(articulosSolicitudes.filter(art => art.articulo_id !== item.articulo_id));
+    } else if (tipo === 'bajo_stock') {
+      setArticulosBajoStock(articulosBajoStock.filter(art => art.articulo_id !== item.articulo_id));
+    }
+
+    toast.success(`${item.articulo?.nombre} agregado a la orden`);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -1866,7 +1899,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                   </h5>
                   {articulosOrdenes.map((item) => (
                     <div key={`orden-${item.articulo_id}`} className="bg-white rounded-lg p-3 border border-gray-200">
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900">{item.articulo?.nombre}</p>
                           <p className="text-sm text-gray-500 mt-1">
@@ -1908,6 +1941,14 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                             ))}
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAgregarDesdeSugerencias(item, item.cantidad_total, 'orden')}
+                          className="px-3 py-1.5 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center gap-1 whitespace-nowrap"
+                        >
+                          <Plus size={16} />
+                          Agregar
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1923,7 +1964,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                   </h5>
                   {articulosSolicitudes.map((item) => (
                     <div key={`solicitud-${item.articulo_id}`} className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900">{item.articulo?.nombre}</p>
                           <p className="text-sm text-gray-600 mt-1">
@@ -1952,6 +1993,14 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                             ))}
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAgregarDesdeSugerencias(item, item.cantidad_total, 'solicitud')}
+                          className="px-3 py-1.5 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center gap-1 whitespace-nowrap"
+                        >
+                          <Plus size={16} />
+                          Agregar
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1967,7 +2016,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                   </h5>
                   {articulosBajoStock.map((item) => (
                     <div key={`stock-${item.articulo_id}`} className="bg-red-50 rounded-lg p-3 border border-red-200">
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900">{item.articulo?.nombre}</p>
                           <p className="text-sm text-gray-600 mt-1">
@@ -1979,6 +2028,14 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                             Cantidad sugerida: {item.cantidad_sugerida} {item.articulo?.unidad}
                           </p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAgregarDesdeSugerencias(item, item.cantidad_sugerida, 'bajo_stock')}
+                          className="px-3 py-1.5 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center gap-1 whitespace-nowrap"
+                        >
+                          <Plus size={16} />
+                          Agregar
+                        </button>
                       </div>
                     </div>
                   ))}
