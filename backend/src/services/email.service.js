@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import jwt from 'jsonwebtoken';
 import { generarPDFOrdenCompra } from '../utils/ordenCompraPDF.js';
+import { Usuario } from '../models/index.js';
 
 // Inicializar Resend
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -260,19 +261,41 @@ export const testEmail = async (req, res) => {
 };
 
 /**
- * Enviar email de notificación al creador cuando se aprueba/rechaza
+ * Enviar email de notificación cuando se aprueba/rechaza una orden
+ * - Si se aprueba: envía a usuarios con rol 'compras' con el PDF adjunto
+ * - Si se rechaza: envía al creador con el motivo
  */
 export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprobadoPor = null) => {
     try {
         if (!resend) return false;
 
         const esAprobada = estado === 'aprobada';
-        const creadorEmail = orden.creador?.email;
+        let destinatarios = [];
 
-        // Si no tenemos email del creador, no enviamos
-        if (!creadorEmail) {
-            console.log('⚠️ No se pudo enviar email: creador sin email');
-            return false;
+        if (esAprobada) {
+            // Si la orden fue aprobada, enviar a usuarios con rol 'compras'
+            const usuariosCompras = await Usuario.findAll({
+                where: { rol: 'compras', activo: true },
+                attributes: ['email', 'nombre']
+            });
+
+            if (!usuariosCompras || usuariosCompras.length === 0) {
+                console.log('⚠️ No hay usuarios con rol "compras" para enviar email de aprobación');
+                return false;
+            }
+
+            destinatarios = usuariosCompras.map(u => u.email).filter(e => e);
+            console.log(`📧 Enviando email de aprobación a usuarios de compras: ${destinatarios.join(', ')}`);
+        } else {
+            // Si la orden fue rechazada, enviar al creador
+            const creadorEmail = orden.creador?.email;
+
+            if (!creadorEmail) {
+                console.log('⚠️ No se pudo enviar email: creador sin email');
+                return false;
+            }
+
+            destinatarios = [creadorEmail];
         }
 
         const html = `
@@ -308,7 +331,7 @@ export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprob
 
         const emailData = {
             from: '3G Inventario <notificaciones@3gvelarias.com>',
-            to: creadorEmail,
+            to: destinatarios,
             subject: `${esAprobada ? '✅' : '❌'} Orden ${orden.ticket_id} ${esAprobada ? 'aprobada' : 'rechazada'}`,
             html
         };
@@ -336,7 +359,7 @@ export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprob
             return false;
         }
 
-        console.log(`📧 [RESEND] Email de ${estado} enviado a ${creadorEmail}: ${data.id}`);
+        console.log(`📧 [RESEND] Email de ${estado} enviado a ${destinatarios.join(', ')}: ${data.id}`);
         return true;
     } catch (error) {
         console.error('❌ [RESEND] Error al enviar email de estado:', error.message);
