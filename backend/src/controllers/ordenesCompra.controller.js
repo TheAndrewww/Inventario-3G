@@ -94,8 +94,8 @@ export const crearOrdenCompra = async (req, res) => {
     // disponibilidad de stock actual.
 
     // Crear la orden de compra
-    // Si es administrador, aprobar automáticamente; si no, dejar en pendiente
-    const estadoInicial = usuario_rol === 'administrador' ? 'aprobada' : 'pendiente_aprobacion';
+    // Si es administrador, enviar directamente; si no, dejar en pendiente de aprobación
+    const estadoInicial = usuario_rol === 'administrador' ? 'enviada' : 'pendiente_aprobacion';
 
     const ordenCompra = await OrdenCompra.create({
       ticket_id,
@@ -105,10 +105,11 @@ export const crearOrdenCompra = async (req, res) => {
       total_estimado: 0,
       observaciones: observaciones || null,
       fecha_llegada_estimada: fecha_llegada_estimada || null,
-      // Si es admin, marcar como aprobada por el mismo creador
+      // Si es admin, marcar como enviada directamente (sin aprobación)
       ...(usuario_rol === 'administrador' && {
         aprobado_por_id: usuario_id,
-        fecha_aprobacion: new Date()
+        fecha_aprobacion: new Date(),
+        fecha_envio: new Date()
       })
     }, { transaction });
 
@@ -233,7 +234,7 @@ export const crearOrdenCompra = async (req, res) => {
       // Enviar email de aprobación a admins (fire-and-forget, no bloquear respuesta)
       enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
     } else {
-      console.log(`✅ Orden ${ticket_id} creada por administrador - aprobada automáticamente`);
+      console.log(`✅ Orden ${ticket_id} creada por administrador - enviada directamente (sin aprobación)`);
     }
 
     // --- INTEGRACIÓN IMPRESIÓN AUTOMÁTICA ---
@@ -441,10 +442,76 @@ export const obtenerOrdenCompra = async (req, res) => {
 };
 
 /**
+ * Función auxiliar: Cancelar solicitudes obsoletas (stock_actual >= stock_minimo)
+ * Se ejecuta automáticamente antes de listar solicitudes y cuando se actualiza stock
+ */
+export const cancelarSolicitudesObsoletas = async (articulo_id = null, transaction = null) => {
+  try {
+    console.log('🔄 Verificando solicitudes obsoletas...');
+
+    // Construir condición WHERE
+    const where = {
+      estado: 'pendiente'
+    };
+
+    // Si se especifica un artículo, solo revisar ese
+    if (articulo_id) {
+      where.articulo_id = articulo_id;
+    }
+
+    // Buscar solicitudes pendientes
+    const solicitudes = await SolicitudCompra.findAll({
+      where,
+      include: [
+        {
+          model: Articulo,
+          as: 'articulo',
+          attributes: ['id', 'nombre', 'stock_actual', 'stock_minimo', 'unidad']
+        }
+      ],
+      transaction
+    });
+
+    let canceladas = 0;
+
+    for (const solicitud of solicitudes) {
+      const articulo = solicitud.articulo;
+
+      // Verificar si el stock actual ya está por encima o igual al mínimo
+      if (articulo && parseFloat(articulo.stock_actual) >= parseFloat(articulo.stock_minimo)) {
+        // Cancelar automáticamente esta solicitud
+        await solicitud.update({
+          estado: 'cancelada',
+          observaciones: `[Cancelada automáticamente] El stock actual (${articulo.stock_actual} ${articulo.unidad}) ya cumple con el mínimo requerido (${articulo.stock_minimo} ${articulo.unidad}). Solicitud ya no necesaria.`
+        }, { transaction });
+
+        console.log(`   ✅ Solicitud ${solicitud.ticket_id} cancelada: ${articulo.nombre} tiene ${articulo.stock_actual} >= ${articulo.stock_minimo}`);
+        canceladas++;
+      }
+    }
+
+    if (canceladas > 0) {
+      console.log(`✅ Se cancelaron ${canceladas} solicitud(es) obsoleta(s)`);
+    } else {
+      console.log('✓ No hay solicitudes obsoletas que cancelar');
+    }
+
+    return canceladas;
+  } catch (error) {
+    console.error('❌ Error al cancelar solicitudes obsoletas:', error.message);
+    return 0;
+  }
+};
+
+/**
  * Listar todas las solicitudes de compra
+ * - Ejecuta limpieza automática de solicitudes obsoletas antes de listar
  */
 export const listarSolicitudesCompra = async (req, res) => {
   try {
+    // Ejecutar limpieza de solicitudes obsoletas antes de listar
+    await cancelarSolicitudesObsoletas();
+
     const {
       estado,
       prioridad,
@@ -961,8 +1028,8 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
     }
 
     // Crear la orden de compra
-    // Si es administrador, aprobar automáticamente; si no, dejar en pendiente
-    const estadoInicial = usuario_rol === 'administrador' ? 'aprobada' : 'pendiente_aprobacion';
+    // Si es administrador, enviar directamente; si no, dejar en pendiente de aprobación
+    const estadoInicial = usuario_rol === 'administrador' ? 'enviada' : 'pendiente_aprobacion';
 
     const ordenCompra = await OrdenCompra.create({
       ticket_id,
@@ -972,10 +1039,11 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
       total_estimado: totalEstimado,
       observaciones: observaciones || `Orden creada desde ${solicitudes.length} solicitud(es) pendiente(s)`,
       fecha_llegada_estimada: fecha_llegada_estimada || null,
-      // Si es admin, marcar como aprobada por el mismo creador
+      // Si es admin, marcar como enviada directamente (sin aprobación)
       ...(usuario_rol === 'administrador' && {
         aprobado_por_id: usuario_id,
-        fecha_aprobacion: new Date()
+        fecha_aprobacion: new Date(),
+        fecha_envio: new Date()
       })
     }, { transaction });
 
@@ -1072,7 +1140,7 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
       // Enviar email de aprobación a admins (fire-and-forget)
       enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
     } else {
-      console.log(`✅ Orden ${ticket_id} creada por administrador desde solicitudes - aprobada automáticamente`);
+      console.log(`✅ Orden ${ticket_id} creada por administrador desde solicitudes - enviada directamente (sin aprobación)`);
     }
 
     res.status(201).json({
@@ -2150,6 +2218,9 @@ export const recibirMercancia = async (req, res) => {
       await articulo.update({
         stock_actual: stockDespues
       }, { transaction });
+
+      // Validar y cancelar solicitudes obsoletas para este artículo
+      await cancelarSolicitudesObsoletas(articulo.id, transaction);
 
       // Crear detalle del movimiento
       detallesMovimiento.push({
@@ -3304,9 +3375,13 @@ function paginaFormularioRechazo(orden, token) {
  * GET /api/ordenes-compra/articulos-pendientes/:proveedor_id
  * Obtener artículos de órdenes pendientes/rechazadas, solicitudes pendientes y stock bajo
  * de un proveedor específico para consolidar órdenes
+ * - Ejecuta limpieza automática de solicitudes obsoletas antes de retornar
  */
 export const obtenerArticulosPendientesPorProveedor = async (req, res) => {
   try {
+    // Ejecutar limpieza de solicitudes obsoletas antes de obtener artículos
+    await cancelarSolicitudesObsoletas();
+
     const { proveedor_id } = req.params;
 
     // ========================================
