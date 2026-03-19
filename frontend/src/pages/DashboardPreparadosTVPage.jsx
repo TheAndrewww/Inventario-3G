@@ -114,7 +114,7 @@ const DashboardPreparadosTVPage = () => {
                 {/* Scrollable Area */}
                 <div className="h-full w-full overflow-auto" style={{ padding: px(16) }}>
                     {/* Header */}
-                    <div className="mb-5 bg-gray-900 rounded-2xl shadow-xl border border-gray-800 p-5">
+                    <div className="mb-5 bg-slate-800 rounded-2xl shadow-xl border border-slate-700 p-5">
                         <div className="flex items-center gap-5">
                             <div className="h-16 px-3 flex items-center justify-center shrink-0">
                                 <img

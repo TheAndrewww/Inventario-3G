@@ -184,7 +184,7 @@ const DashboardManufacturaTVPage = () => {
             >
                 <div className="h-full w-full overflow-auto" style={{ padding: px(16) }}>
                     {/* Header */}
-                    <div className="mb-6 bg-gray-900 rounded-2xl shadow-xl border border-gray-800 p-6">
+                    <div className="mb-6 bg-slate-800 rounded-2xl shadow-xl border border-slate-700 p-6">
                         <div className="flex items-center gap-6">
                             <div className="h-24 px-4 flex items-center justify-center shrink-0">
                                 <img
