@@ -267,31 +267,51 @@ export const testEmail = async (req, res) => {
  */
 export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprobadoPor = null) => {
     try {
-        if (!resend) return false;
+        console.log(`📧 [enviarEmailEstadoOrden] Iniciando envío para orden ${orden?.ticket_id || 'sin ticket'}, estado: ${estado}`);
+
+        if (!resend) {
+            console.error('❌ [enviarEmailEstadoOrden] Resend no está configurado (RESEND_API_KEY faltante)');
+            return false;
+        }
 
         const esAprobada = estado === 'aprobada';
         let destinatarios = [];
 
         if (esAprobada) {
+            console.log('📧 [enviarEmailEstadoOrden] Buscando usuarios con rol "compras" activos...');
+
             // Si la orden fue aprobada, enviar a usuarios con rol 'compras'
             const usuariosCompras = await Usuario.findAll({
                 where: { rol: 'compras', activo: true },
-                attributes: ['email', 'nombre']
+                attributes: ['email', 'nombre', 'rol', 'activo']
+            });
+
+            console.log(`📧 [enviarEmailEstadoOrden] Usuarios encontrados: ${usuariosCompras.length}`);
+            usuariosCompras.forEach(u => {
+                console.log(`   - ${u.nombre} (${u.email || 'SIN EMAIL'}) - rol: ${u.rol}, activo: ${u.activo}`);
             });
 
             if (!usuariosCompras || usuariosCompras.length === 0) {
-                console.log('⚠️ No hay usuarios con rol "compras" para enviar email de aprobación');
+                console.error('❌ [enviarEmailEstadoOrden] No hay usuarios con rol "compras" activos en la base de datos');
                 return false;
             }
 
-            destinatarios = usuariosCompras.map(u => u.email).filter(e => e);
-            console.log(`📧 Enviando email de aprobación a usuarios de compras: ${destinatarios.join(', ')}`);
+            destinatarios = usuariosCompras.map(u => u.email).filter(e => e && e.trim());
+
+            if (destinatarios.length === 0) {
+                console.error('❌ [enviarEmailEstadoOrden] Usuarios de compras encontrados pero ninguno tiene email válido');
+                return false;
+            }
+
+            console.log(`📧 [enviarEmailEstadoOrden] Enviando email de aprobación a ${destinatarios.length} usuario(s) de compras: ${destinatarios.join(', ')}`);
         } else {
             // Si la orden fue rechazada, enviar al creador
             const creadorEmail = orden.creador?.email;
 
+            console.log(`📧 [enviarEmailEstadoOrden] Enviando email de rechazo al creador: ${creadorEmail || 'SIN EMAIL'}`);
+
             if (!creadorEmail) {
-                console.log('⚠️ No se pudo enviar email: creador sin email');
+                console.error('❌ [enviarEmailEstadoOrden] No se pudo enviar email: creador sin email');
                 return false;
             }
 
@@ -339,30 +359,39 @@ export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprob
         // Si la orden fue aprobada, generar y adjuntar el PDF
         if (esAprobada) {
             try {
-                console.log('📄 Generando PDF para orden:', orden.ticket_id);
+                console.log(`📄 [enviarEmailEstadoOrden] Generando PDF para orden: ${orden.ticket_id}`);
                 const pdfBuffer = await generarPDFOrdenCompra(orden);
                 emailData.attachments = [{
                     filename: `Orden-Compra-${orden.ticket_id}.pdf`,
                     content: pdfBuffer
                 }];
-                console.log('✅ PDF generado exitosamente');
+                console.log(`✅ [enviarEmailEstadoOrden] PDF generado exitosamente (${pdfBuffer.length} bytes)`);
             } catch (pdfError) {
-                console.error('❌ Error al generar PDF:', pdfError);
+                console.error(`❌ [enviarEmailEstadoOrden] Error al generar PDF:`, pdfError);
+                console.error(`   Stack:`, pdfError.stack);
                 // Continuar enviando el email sin el PDF
             }
         }
 
+        console.log(`📧 [enviarEmailEstadoOrden] Enviando email a través de Resend...`);
+        console.log(`   From: ${emailData.from}`);
+        console.log(`   To: ${emailData.to.join(', ')}`);
+        console.log(`   Subject: ${emailData.subject}`);
+
         const { data, error } = await resend.emails.send(emailData);
 
         if (error) {
-            console.error('❌ [RESEND] Error al enviar email de estado:', error);
+            console.error(`❌ [enviarEmailEstadoOrden] Error al enviar email de estado:`, error);
+            console.error(`   Error details:`, JSON.stringify(error, null, 2));
             return false;
         }
 
-        console.log(`📧 [RESEND] Email de ${estado} enviado a ${destinatarios.join(', ')}: ${data.id}`);
+        console.log(`✅ [enviarEmailEstadoOrden] Email enviado exitosamente. ID: ${data?.id}`);
+        console.log(`   Destinatarios: ${destinatarios.join(', ')}`);
         return true;
     } catch (error) {
-        console.error('❌ [RESEND] Error al enviar email de estado:', error.message);
+        console.error(`❌ [enviarEmailEstadoOrden] Error inesperado:`, error);
+        console.error(`   Stack:`, error.stack);
         return false;
     }
 };

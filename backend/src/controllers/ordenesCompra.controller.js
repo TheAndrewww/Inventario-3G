@@ -2884,8 +2884,11 @@ export const aprobarOrden = async (req, res) => {
       console.error('Error al notificar aprobación:', notifError);
     }
 
-    // Enviar email al creador (fire-and-forget)
-    enviarEmailEstadoOrden(orden, 'aprobada', null, req.usuario.nombre).catch(e => console.error('Error email:', e.message));
+    // Enviar email a usuarios de compras (fire-and-forget)
+    enviarEmailEstadoOrden(orden, 'aprobada', null, req.usuario.nombre).catch(e => {
+      console.error('❌ [aprobarOrden] Error al enviar email:', e.message);
+      console.error('   Stack:', e.stack);
+    });
 
     res.json({
       success: true,
@@ -2991,7 +2994,10 @@ export const rechazarOrden = async (req, res) => {
     }
 
     // Enviar email al creador (fire-and-forget)
-    enviarEmailEstadoOrden(orden, 'rechazada', motivo.trim(), req.usuario.nombre).catch(e => console.error('Error email:', e.message));
+    enviarEmailEstadoOrden(orden, 'rechazada', motivo.trim(), req.usuario.nombre).catch(e => {
+      console.error('❌ [rechazarOrden] Error al enviar email:', e.message);
+      console.error('   Stack:', e.stack);
+    });
 
     res.json({
       success: true,
@@ -3071,7 +3077,10 @@ export const aprobarPorEmail = async (req, res) => {
       });
     } catch (e) { /* ignore */ }
 
-    enviarEmailEstadoOrden(orden, 'aprobada', null, 'Administrador (por email)').catch(() => { });
+    enviarEmailEstadoOrden(orden, 'aprobada', null, 'Administrador (por email)').catch(e => {
+      console.error('❌ [aprobarPorEmail] Error al enviar email:', e.message);
+      console.error('   Stack:', e.stack);
+    });
 
     return enviarHTML(res, paginaResultado('✅ Orden Aprobada y Enviada', `La orden ${orden.ticket_id} ha sido aprobada y enviada al proveedor exitosamente.`, true));
 
@@ -3346,7 +3355,10 @@ export const rechazarPorEmail = async (req, res) => {
       });
     } catch (e) { /* ignore */ }
 
-    enviarEmailEstadoOrden(orden, 'rechazada', motivo.trim(), 'Administrador (por email)').catch(() => { });
+    enviarEmailEstadoOrden(orden, 'rechazada', motivo.trim(), 'Administrador (por email)').catch(e => {
+      console.error('❌ [rechazarPorEmail] Error al enviar email:', e.message);
+      console.error('   Stack:', e.stack);
+    });
 
     return enviarHTML(res, paginaResultado('❌ Orden Rechazada', `La orden ${orden.ticket_id} ha sido rechazada. El creador fue notificado.`, false));
 
