@@ -241,7 +241,7 @@ export const crearOrdenCompra = async (req, res) => {
       console.log(`✅ Orden ${ticket_id} creada por administrador - enviada directamente (sin aprobación)`);
 
       // Enviar email con PDF a usuarios de compras (fire-and-forget)
-      enviarEmailEstadoOrden(ordenCompleta, 'aprobada', null, usuario_nombre).catch(e => {
+      enviarEmailEstadoOrden(ordenCompleta, 'aprobada', null, req.usuario.nombre).catch(e => {
         console.error('❌ [crearOrdenCompra] Error al enviar email a compras:', e.message);
         console.error('   Stack:', e.stack);
       });
@@ -1215,7 +1215,7 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
       console.log(`✅ Orden ${ticket_id} creada por administrador desde solicitudes - enviada directamente (sin aprobación)`);
 
       // Enviar email con PDF a usuarios de compras (fire-and-forget)
-      enviarEmailEstadoOrden(ordenCompleta, 'aprobada', null, usuario_nombre).catch(e => {
+      enviarEmailEstadoOrden(ordenCompleta, 'aprobada', null, req.usuario.nombre).catch(e => {
         console.error('❌ [crearOrdenDesdeSolicitudes] Error al enviar email a compras:', e.message);
         console.error('   Stack:', e.stack);
       });
