@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { User, Clock } from 'lucide-react';
+import { User, Clock, Calendar } from 'lucide-react';
 import { s, px } from '../../utils/produccion';
 import { ETAPAS_CONFIG, getColorPorTipo, calcularPorcentaje, usaTimelineSimplificado } from './constants';
 
@@ -99,40 +99,23 @@ const TimelineHeader = memo(({ proyecto }) => {
             {/* Círculo de progreso + días restantes */}
             <div className="flex flex-col items-center" style={{ marginLeft: px(12) }}>
                 {!timelineSimplificado && (
-                    <div className="relative" style={{ width: px(64), height: px(64) }}>
-                        <svg className="transform -rotate-90" viewBox="0 0 100 100" style={{ width: px(64), height: px(64) }}>
-                            <circle cx="50%" cy="50%" r="45%" stroke="#E5E7EB" strokeWidth="10%" fill="none" />
-                            <circle
-                                cx="50%" cy="50%" r="45%"
-                                stroke={porcentaje > 0 ? ETAPAS_CONFIG[proyecto.etapa_actual]?.color : 'transparent'}
-                                strokeWidth="10%" fill="none"
-                                strokeLinecap={porcentaje > 0 ? "round" : "butt"}
-                                strokeDasharray={`${porcentaje * 2.8} 280`}
-                                className="transition-all duration-500"
-                            />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="font-bold text-gray-700" style={{ fontSize: s(1.1) }}>{porcentaje}%</span>
-                        </div>
-                    </div>
-                )}
-                {(proyecto.fecha_limite_original || proyecto.fecha_limite) && (
-                    <div
-                        className={`text-center font-medium ${diasRestantes !== null && (diasRestantes <= 3 && proyecto.etapa_actual !== 'instalacion' || (proyecto.etapa_actual === 'instalacion' && diasRestantes <= 2))
-                            ? 'text-red-600' : 'text-gray-500'
-                            }`}
-                        style={{ marginTop: px(4), fontSize: s(0.75) }}
-                    >
-                        <div className="flex items-center" style={{ gap: px(4) }}>
-                            <Clock style={{ width: s(0.7), height: s(0.7) }} />
-                            {
-                                diasRestantes !== null && diasRestantes < 0
-                                    ? 'Vencido'
-                                    : diasRestantes === 0
-                                        ? 'Hoy'
-                                        : `${diasRestantes}d`
-                            }
-                        </div>
+                    <div className="flex items-center justify-center mb-1">
+                        {proyecto._fechaCalendario ? (
+                            <div className="flex flex-col items-center justify-center bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5 shadow-sm min-w-[85px]">
+                                <div className="flex items-center gap-1 text-blue-600 font-bold uppercase tracking-wider mb-0.5" style={{ fontSize: s(0.65) }}>
+                                    <Calendar size={12} />
+                                    Cita agendada
+                                </div>
+                                <span className="font-bold text-blue-800 leading-tight whitespace-nowrap" style={{ fontSize: s(1.35) }}>
+                                    {new Date(proyecto.fecha_limite + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', '')}
+                                </span>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm min-w-[85px]">
+                                <span className="text-gray-400 font-bold uppercase tracking-wider mb-0.5" style={{ fontSize: s(0.65) }}>AVANCE</span>
+                                <span className="font-bold text-gray-700 leading-tight" style={{ fontSize: s(1.15) }}>{porcentaje}%</span>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
