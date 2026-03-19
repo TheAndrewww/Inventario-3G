@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Plus, Edit, Trash2, Package, Settings } from 'lucide-react';
+import { Briefcase, Plus, Edit, Trash2, Package, Settings, ClipboardList, ClipboardCheck } from 'lucide-react';
 import camionetasService from '../services/camionetas.service';
 import usuariosService from '../services/usuarios.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import InventarioCamionetaModal from '../components/camionetas/InventarioCamionetaModal';
 import ConfigurarStockMinimoModal from '../components/camionetas/ConfigurarStockMinimoModal';
+import ChecklistManager from '../components/equipos/ChecklistManager';
+import ChecklistEquipoModal from '../components/equipos/ChecklistEquipoModal';
 import toast from 'react-hot-toast';
 
 const CamionetasPage = () => {
@@ -18,6 +20,8 @@ const CamionetasPage = () => {
   const [camionetaInventario, setCamionetaInventario] = useState(null);
   const [mostrarConfiguracion, setMostrarConfiguracion] = useState(false);
   const [camionetaConfiguracion, setCamionetaConfiguracion] = useState(null);
+  const [mostrarChecklistManager, setMostrarChecklistManager] = useState(false);
+  const [equipoChecklist, setEquipoChecklist] = useState(null);
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
@@ -211,13 +215,22 @@ const CamionetasPage = () => {
             Administra los equipos/áreas de la empresa y su inventario
           </p>
         </div>
-        <button
-          onClick={abrirModalNuevo}
-          className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 transition-colors font-medium"
-        >
-          <Plus size={20} />
-          Nuevo Equipo
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMostrarChecklistManager(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors font-medium"
+          >
+            <ClipboardList size={20} />
+            Catálogo Checklist
+          </button>
+          <button
+            onClick={abrirModalNuevo}
+            className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 transition-colors font-medium"
+          >
+            <Plus size={20} />
+            Nuevo Equipo
+          </button>
+        </div>
       </div>
 
       {/* Lista de equipos */}
@@ -297,6 +310,15 @@ const CamionetasPage = () => {
                   >
                     <Settings size={16} />
                     Configurar
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEquipoChecklist(camioneta)}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+                  >
+                    <ClipboardCheck size={16} />
+                    Checklist
                   </button>
                 </div>
                 <div className="flex gap-2">
@@ -468,6 +490,19 @@ const CamionetasPage = () => {
           onActualizar={cargarCamionetas}
         />
       )}
+
+      {/* Modal de Checklist Manager (catálogo global) */}
+      <ChecklistManager
+        isOpen={mostrarChecklistManager}
+        onClose={() => setMostrarChecklistManager(false)}
+      />
+
+      {/* Modal de Checklist por equipo */}
+      <ChecklistEquipoModal
+        isOpen={!!equipoChecklist}
+        onClose={() => setEquipoChecklist(null)}
+        equipo={equipoChecklist}
+      />
     </div>
   );
 };

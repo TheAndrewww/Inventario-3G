@@ -15,7 +15,12 @@
       "Bash(curl:*)",
       "Bash(dig:*)",
       "Bash(railway up:*)",
-      "Bash(npm version:*)"
+      "Bash(npm version:*)",
+      "Bash(node -e:*)",
+      "Bash(npm run dev:*)",
+      "Bash(cat:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

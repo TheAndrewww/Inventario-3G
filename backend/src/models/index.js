@@ -26,6 +26,9 @@ import CampanaControl from './CampanaControl.js';
 import ConteoCiclico from './ConteoCiclico.js';
 import RolloMembrana from './RolloMembrana.js';
 import ConteoArticulo from './ConteoArticulo.js';
+import ChecklistItem from './ChecklistItem.js';
+import ChecklistItemArticulo from './ChecklistItemArticulo.js';
+import ChecklistEquipo from './ChecklistEquipo.js';
 
 // Definir relaciones
 
@@ -591,6 +594,62 @@ Articulo.hasMany(RolloMembrana, {
     as: 'rollos_membrana'
 });
 
+// ========== RELACIONES CHECKLIST DE EQUIPOS ==========
+
+// ChecklistItem - ChecklistItemArticulo (Uno a Muchos)
+ChecklistItem.hasMany(ChecklistItemArticulo, {
+    foreignKey: 'checklist_item_id',
+    as: 'articulosVinculados'
+});
+ChecklistItemArticulo.belongsTo(ChecklistItem, {
+    foreignKey: 'checklist_item_id',
+    as: 'checklistItem'
+});
+
+// Articulo - ChecklistItemArticulo (Uno a Muchos)
+Articulo.hasMany(ChecklistItemArticulo, {
+    foreignKey: 'articulo_id',
+    as: 'checklistItems'
+});
+ChecklistItemArticulo.belongsTo(Articulo, {
+    foreignKey: 'articulo_id',
+    as: 'articulo'
+});
+
+// ChecklistItem - Articulo (Muchos a Muchos a través de ChecklistItemArticulo)
+ChecklistItem.belongsToMany(Articulo, {
+    through: ChecklistItemArticulo,
+    foreignKey: 'checklist_item_id',
+    otherKey: 'articulo_id',
+    as: 'articulos'
+});
+Articulo.belongsToMany(ChecklistItem, {
+    through: ChecklistItemArticulo,
+    foreignKey: 'articulo_id',
+    otherKey: 'checklist_item_id',
+    as: 'checklistItemsRelacion'
+});
+
+// ChecklistItem - ChecklistEquipo (Uno a Muchos)
+ChecklistItem.hasMany(ChecklistEquipo, {
+    foreignKey: 'checklist_item_id',
+    as: 'equiposAsignados'
+});
+ChecklistEquipo.belongsTo(ChecklistItem, {
+    foreignKey: 'checklist_item_id',
+    as: 'checklistItem'
+});
+
+// Equipo - ChecklistEquipo (Uno a Muchos)
+Equipo.hasMany(ChecklistEquipo, {
+    foreignKey: 'equipo_id',
+    as: 'checklistAsignado'
+});
+ChecklistEquipo.belongsTo(Equipo, {
+    foreignKey: 'equipo_id',
+    as: 'equipo'
+});
+
 // Exportar todos los modelos
 export {
     sequelize,
@@ -620,7 +679,10 @@ export {
     CampanaControl,
     ConteoCiclico,
     ConteoArticulo,
-    RolloMembrana
+    RolloMembrana,
+    ChecklistItem,
+    ChecklistItemArticulo,
+    ChecklistEquipo
 };
 
 export default {
@@ -651,5 +713,8 @@ export default {
     CampanaControl,
     ConteoCiclico,
     ConteoArticulo,
-    RolloMembrana
+    RolloMembrana,
+    ChecklistItem,
+    ChecklistItemArticulo,
+    ChecklistEquipo
 };

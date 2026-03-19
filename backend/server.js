@@ -115,6 +115,7 @@ import conteosCiclicosRoutes from './src/routes/conteosCiclicos.routes.js';
 import descontarAlmacenRoutes from './src/routes/descontarAlmacen.routes.js';
 import almacenesRoutes from './src/routes/almacenes.routes.js';
 import rollosMembrana from './src/routes/rollosMembrana.routes.js';
+import checklistRoutes from './src/routes/checklist.routes.js';
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -147,7 +148,8 @@ app.get('/', (req, res) => {
             conteosCiclicos: '/api/conteos-ciclicos',
             descontarAlmacen: '/api/descontar-almacen',
             almacenes: '/api/almacenes',
-            rollosMembrana: '/api/rollos-membrana'
+            rollosMembrana: '/api/rollos-membrana',
+            checklist: '/api/checklist'
         }
     });
 });
@@ -211,6 +213,7 @@ app.use('/api/conteos-ciclicos', conteosCiclicosRoutes);
 app.use('/api/descontar-almacen', descontarAlmacenRoutes);
 app.use('/api/almacenes', almacenesRoutes);
 app.use('/api/rollos-membrana', rollosMembrana);
+app.use('/api/checklist', checklistRoutes);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
 
@@ -274,6 +277,48 @@ const startServer = async () => {
                 }
             } catch (e) {
                 console.log('⚠️ No se pudo verificar/agregar es_extensivo:', e.message);
+            }
+
+            // Auto-crear tablas de checklist si no existen
+            try {
+                await sequelize.query(`
+                    CREATE TABLE IF NOT EXISTS checklist_items (
+                        id SERIAL PRIMARY KEY,
+                        nombre VARCHAR(200) NOT NULL,
+                        especificacion VARCHAR(200),
+                        seccion VARCHAR(100),
+                        tipo VARCHAR(20) NOT NULL DEFAULT 'herramienta',
+                        cantidad_requerida INTEGER NOT NULL DEFAULT 1,
+                        activo BOOLEAN NOT NULL DEFAULT TRUE,
+                        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                    )
+                `);
+                await sequelize.query(`
+                    CREATE TABLE IF NOT EXISTS checklist_item_articulos (
+                        id SERIAL PRIMARY KEY,
+                        checklist_item_id INTEGER NOT NULL REFERENCES checklist_items(id) ON DELETE CASCADE,
+                        articulo_id INTEGER NOT NULL REFERENCES articulos(id) ON DELETE CASCADE,
+                        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        UNIQUE(checklist_item_id, articulo_id)
+                    )
+                `);
+                await sequelize.query(`
+                    CREATE TABLE IF NOT EXISTS checklist_equipos (
+                        id SERIAL PRIMARY KEY,
+                        equipo_id INTEGER NOT NULL REFERENCES camionetas(id) ON DELETE CASCADE,
+                        checklist_item_id INTEGER NOT NULL REFERENCES checklist_items(id) ON DELETE CASCADE,
+                        cantidad_requerida INTEGER NOT NULL DEFAULT 1,
+                        notas TEXT,
+                        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        UNIQUE(equipo_id, checklist_item_id)
+                    )
+                `);
+                console.log('✅ Tablas de checklist verificadas/creadas');
+            } catch (checklistErr) {
+                console.log('⚠️ Error con tablas de checklist:', checklistErr.message);
             }
         } else {
             // En producción, ejecutar setup automático si no hay tablas
@@ -454,6 +499,49 @@ const startServer = async () => {
                     await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN es_extensivo BOOLEAN DEFAULT FALSE NOT NULL");
                     console.log('✅ Columna es_extensivo agregada');
                 }
+            }
+
+            // Verificar/crear tablas de checklist
+            try {
+                console.log('🔍 Verificando tablas de checklist...');
+                await sequelize.query(`
+                    CREATE TABLE IF NOT EXISTS checklist_items (
+                        id SERIAL PRIMARY KEY,
+                        nombre VARCHAR(200) NOT NULL,
+                        especificacion VARCHAR(200),
+                        seccion VARCHAR(100),
+                        tipo VARCHAR(20) NOT NULL DEFAULT 'herramienta',
+                        cantidad_requerida INTEGER NOT NULL DEFAULT 1,
+                        activo BOOLEAN NOT NULL DEFAULT TRUE,
+                        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                    )
+                `);
+                await sequelize.query(`
+                    CREATE TABLE IF NOT EXISTS checklist_item_articulos (
+                        id SERIAL PRIMARY KEY,
+                        checklist_item_id INTEGER NOT NULL REFERENCES checklist_items(id) ON DELETE CASCADE,
+                        articulo_id INTEGER NOT NULL REFERENCES articulos(id) ON DELETE CASCADE,
+                        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        UNIQUE(checklist_item_id, articulo_id)
+                    )
+                `);
+                await sequelize.query(`
+                    CREATE TABLE IF NOT EXISTS checklist_equipos (
+                        id SERIAL PRIMARY KEY,
+                        equipo_id INTEGER NOT NULL REFERENCES camionetas(id) ON DELETE CASCADE,
+                        checklist_item_id INTEGER NOT NULL REFERENCES checklist_items(id) ON DELETE CASCADE,
+                        cantidad_requerida INTEGER NOT NULL DEFAULT 1,
+                        notas TEXT,
+                        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        UNIQUE(equipo_id, checklist_item_id)
+                    )
+                `);
+                console.log('✅ Tablas de checklist verificadas/creadas');
+            } catch (checklistErr) {
+                console.log('⚠️ Error con tablas de checklist:', checklistErr.message);
             }
 
             // Auto-migración de herramientas de renta
