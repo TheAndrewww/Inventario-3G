@@ -15,7 +15,7 @@ import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { notificarPorRol, crearNotificacion } from './notificaciones.controller.js';
 import admin from '../config/firebase-admin.js'; // Importar Firebase Admin
-import { enviarEmailAprobacion, enviarEmailEstadoOrden, verificarTokenAprobacion } from '../services/email.service.js';
+import { enviarEmailAprobacion, enviarEmailEstadoOrden, enviarEmailOrdenCancelada, verificarTokenAprobacion } from '../services/email.service.js';
 
 /**
  * Crear una nueva orden de compra
@@ -1964,6 +1964,25 @@ export const anularOrdenCompra = async (req, res) => {
     } catch (notifError) {
       console.error('Error al enviar notificación:', notifError);
       // No fallar la anulación si falla la notificación
+    }
+
+    // 5. ENVIAR EMAIL A ADMINISTRADORES si el usuario NO es administrador
+    if (usuario_anulador.rol !== 'administrador') {
+      try {
+        console.log(`📧 Enviando notificación de cancelación a administradores (cancelado por ${usuario_anulador.rol})`);
+        await enviarEmailOrdenCancelada(
+          orden,
+          motivo,
+          usuario_anulador.nombre,
+          usuario_anulador.rol
+        );
+      } catch (emailError) {
+        console.error('❌ Error al enviar email de cancelación:', emailError.message);
+        console.error('   Stack:', emailError.stack);
+        // No fallar la anulación si falla el email
+      }
+    } else {
+      console.log(`ℹ️ No se envía email de cancelación (usuario es administrador)`);
     }
 
     res.status(200).json({

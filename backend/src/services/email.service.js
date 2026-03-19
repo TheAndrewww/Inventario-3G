@@ -396,9 +396,176 @@ export const enviarEmailEstadoOrden = async (orden, estado, motivo = null, aprob
     }
 };
 
+/**
+ * Enviar email de notificación cuando un no-administrador cancela una orden
+ * @param {Object} orden - Orden de compra cancelada con sus relaciones
+ * @param {string} motivo - Motivo de la cancelación
+ * @param {string} canceladoPor - Nombre del usuario que canceló
+ * @param {string} rolUsuario - Rol del usuario que canceló
+ * @returns {Promise<boolean>} - true si se envió exitosamente
+ */
+export const enviarEmailOrdenCancelada = async (orden, motivo, canceladoPor, rolUsuario) => {
+    try {
+        console.log(`📧 [enviarEmailOrdenCancelada] Notificando cancelación de orden ${orden?.ticket_id || 'sin ticket'}`);
+        console.log(`   Cancelado por: ${canceladoPor} (${rolUsuario})`);
+
+        if (!resend) {
+            console.error('❌ [enviarEmailOrdenCancelada] Resend no está configurado (RESEND_API_KEY faltante)');
+            return false;
+        }
+
+        // Generar detalles de artículos
+        const detallesHTML = orden.detalles?.map(d => `
+            <tr>
+                <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #374151;">
+                    ${d.articulo?.nombre || 'Sin nombre'}
+                </td>
+                <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #374151; text-align: center;">
+                    ${parseFloat(d.cantidad_solicitada).toFixed(0)} ${d.articulo?.unidad || ''}
+                </td>
+                <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #374151; text-align: right;">
+                    $${parseFloat(d.costo_unitario || 0).toFixed(2)}
+                </td>
+            </tr>
+        `).join('') || '<tr><td colspan="3" style="padding: 12px; text-align: center; color: #9ca3af;">Sin artículos</td></tr>';
+
+        const totalGeneral = orden.detalles?.reduce((sum, d) =>
+            sum + (parseFloat(d.cantidad_solicitada) * parseFloat(d.costo_unitario || 0)), 0
+        ) || 0;
+
+        const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orden Cancelada</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden;">
+            <!-- Header con alerta roja -->
+            <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 32px 24px; text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 12px;">⚠️</div>
+                <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 700;">Orden de Compra Cancelada</h1>
+            </div>
+
+            <!-- Contenido -->
+            <div style="padding: 32px 24px;">
+                <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; margin-bottom: 24px; border-radius: 4px;">
+                    <p style="margin: 0; color: #7f1d1d; font-size: 15px; line-height: 1.6;">
+                        <strong>${canceladoPor}</strong> (${rolUsuario}) ha cancelado la orden de compra <strong>${orden.ticket_id}</strong>.
+                    </p>
+                </div>
+
+                <!-- Información de la orden -->
+                <div style="margin-bottom: 24px;">
+                    <h2 style="margin: 0 0 16px 0; color: #111827; font-size: 18px; font-weight: 600;">Información de la Orden</h2>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Orden ID:</td>
+                            <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${orden.ticket_id}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Proveedor:</td>
+                            <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${orden.proveedor?.nombre || 'Sin proveedor'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Estado anterior:</td>
+                            <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${orden.estado}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Creado por:</td>
+                            <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${orden.creador?.nombre || 'N/A'}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Motivo de cancelación -->
+                <div style="margin-bottom: 24px;">
+                    <h2 style="margin: 0 0 12px 0; color: #111827; font-size: 18px; font-weight: 600;">Motivo de Cancelación</h2>
+                    <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px;">
+                        <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${motivo}</p>
+                    </div>
+                </div>
+
+                <!-- Artículos de la orden -->
+                <div style="margin-bottom: 24px;">
+                    <h2 style="margin: 0 0 16px 0; color: #111827; font-size: 18px; font-weight: 600;">Artículos</h2>
+                    <div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background-color: #f9fafb;">
+                                    <th style="padding: 12px; text-align: left; font-size: 13px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Artículo</th>
+                                    <th style="padding: 12px; text-align: center; font-size: 13px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Cantidad</th>
+                                    <th style="padding: 12px; text-align: right; font-size: 13px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Costo Unit.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${detallesHTML}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background-color: #f9fafb;">
+                                    <td colspan="2" style="padding: 16px 12px; font-weight: 600; font-size: 15px; color: #111827;">Total</td>
+                                    <td style="padding: 16px 12px; font-weight: 700; font-size: 16px; color: #111827; text-align: right;">$${totalGeneral.toFixed(2)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Información adicional -->
+                <div style="background-color: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
+                    <p style="margin: 0; color: #78350f; font-size: 13px; line-height: 1.6;">
+                        ℹ️ Esta es una notificación automática porque un usuario con rol <strong>${rolUsuario}</strong> canceló una orden.
+                        Si tiene dudas, contacte a <strong>${canceladoPor}</strong>.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="background-color: #f9fafb; padding: 20px 24px; text-align: center; border-top: 1px solid #e5e7eb;">
+                <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 13px;">Sistema de Inventario 3G Velarias</p>
+                <p style="margin: 0; color: #9ca3af; font-size: 12px;">Este es un mensaje automático, por favor no responder a este correo</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>`;
+
+        const emailData = {
+            from: '3G Inventario <notificaciones@3gvelarias.com>',
+            to: ADMIN_EMAILS,
+            subject: `⚠️ Orden ${orden.ticket_id} cancelada por ${canceladoPor}`,
+            html
+        };
+
+        console.log(`📧 [enviarEmailOrdenCancelada] Enviando email a través de Resend...`);
+        console.log(`   From: ${emailData.from}`);
+        console.log(`   To: ${emailData.to.join(', ')}`);
+        console.log(`   Subject: ${emailData.subject}`);
+
+        const { data, error } = await resend.emails.send(emailData);
+
+        if (error) {
+            console.error(`❌ [enviarEmailOrdenCancelada] Error al enviar email:`, error);
+            console.error(`   Error details:`, JSON.stringify(error, null, 2));
+            return false;
+        }
+
+        console.log(`✅ [enviarEmailOrdenCancelada] Email enviado exitosamente. ID: ${data?.id}`);
+        console.log(`   Destinatarios: ${ADMIN_EMAILS.join(', ')}`);
+        return true;
+    } catch (error) {
+        console.error(`❌ [enviarEmailOrdenCancelada] Error inesperado:`, error);
+        console.error(`   Stack:`, error.stack);
+        return false;
+    }
+};
+
 export default {
     enviarEmailAprobacion,
     enviarEmailEstadoOrden,
+    enviarEmailOrdenCancelada,
     generarTokenAprobacion,
     verificarTokenAprobacion
 };
