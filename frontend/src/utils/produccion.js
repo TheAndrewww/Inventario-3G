@@ -374,6 +374,10 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
     const nombresCalendario = Object.keys(fechasPorNombre);
     if (nombresCalendario.length === 0) return proyectos;
 
+    // Debug: mostrar nombres del calendario y sus días
+    console.log('📅 Calendario → Producción matching:');
+    console.log('   Calendario:', Object.entries(fechasPorNombre).map(([k, v]) => `"${k}" → día ${v}`).join(', '));
+
     return proyectos.map(p => {
         const nombreProd = normalizarNombre(p.nombre);
         if (!nombreProd) return p;
@@ -392,9 +396,14 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
                 const d = String(fechaCompletado.getUTCDate()).padStart(2, '0');
                 const nuevaFechaLimite = `${y}-${m}-${d}`;
 
+                console.log(`   ✅ MATCH: prod="${nombreProd}" ↔ cal="${nombreCal}" → día ${diaCal} → fecha_limite=${nuevaFechaLimite}`);
                 // El calendario manda. Siempre overridear la fecha_limite con la del calendario.
                 return { ...p, fecha_limite: nuevaFechaLimite, _fechaCalendario: true };
             }
+        }
+        // Solo loguear los que NO matchearon para diagnóstico
+        if (p.etapa_actual !== 'completado') {
+            console.log(`   ❌ SIN MATCH: prod="${nombreProd}" (${p.nombre})`);
         }
         return p;
     });
