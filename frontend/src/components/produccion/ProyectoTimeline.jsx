@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { px } from '../../utils/produccion';
+import { px, calcularDiasPorEtapa } from '../../utils/produccion';
 import { ETAPAS_CONFIG, getColorPorTipo, usaTimelineSimplificado } from './constants';
 import TimelineHeader from './TimelineHeader';
 import TimelineStepper from './TimelineStepper';
@@ -23,7 +23,19 @@ const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePaus
         const diasRestantes = proyecto.diasRestantes;
         const esGarantia = proyecto.tipo_proyecto?.toUpperCase() === 'GTIA';
         const estadoRetraso = proyecto.estadoRetraso || { enRetraso: false };
-        const enRetraso = estadoRetraso.enRetraso;
+        let enRetraso = estadoRetraso.enRetraso;
+
+        // Si el proyecto tiene fecha de calendario, recalcular con calcularDiasPorEtapa
+        if (enRetraso && proyecto._fechaCalendario) {
+            const diasPorEtapa = calcularDiasPorEtapa(proyecto);
+            if (diasPorEtapa) {
+                const etapaKey = proyecto.etapa_actual === 'produccion' ? 'produccion' : proyecto.etapa_actual;
+                const info = diasPorEtapa[etapaKey];
+                if (info && info.dias >= 0) {
+                    enRetraso = false;
+                }
+            }
+        }
 
         // Estado pausado/congelado tiene prioridad visual
         if (proyecto.pausado) {
