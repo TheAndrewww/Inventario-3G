@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { User, Clock, Calendar } from 'lucide-react';
-import { s, px } from '../../utils/produccion';
+import { s, px, calcularDiasPorEtapa } from '../../utils/produccion';
 import { ETAPAS_CONFIG, getColorPorTipo, calcularPorcentaje, usaTimelineSimplificado } from './constants';
 
 /**
@@ -15,6 +15,22 @@ const TimelineHeader = memo(({ proyecto }) => {
 
     const estadoRetraso = proyecto.estadoRetraso || { enRetraso: false };
     let enRetraso = estadoRetraso.enRetraso;
+    let diasRetrasoDisplay = estadoRetraso.diasRetraso || 0;
+
+    // Si el proyecto tiene fecha de calendario, recalcular con calcularDiasPorEtapa
+    // ya que el backend no considera la fecha_limite del calendario
+    if (enRetraso && proyecto._fechaCalendario) {
+        const diasPorEtapa = calcularDiasPorEtapa(proyecto);
+        if (diasPorEtapa) {
+            const etapaKey = proyecto.etapa_actual === 'produccion' ? 'produccion' : proyecto.etapa_actual;
+            const info = diasPorEtapa[etapaKey];
+            if (info && info.dias >= 0) {
+                enRetraso = false;  // Está a tiempo según calendario
+            } else if (info && info.dias < 0) {
+                diasRetrasoDisplay = Math.abs(info.dias);  // Usar días de atraso reales
+            }
+        }
+    }
 
     // Lógica especial para Instalación: Ignorar "retraso" de etapas previas.
     // "ya es como si hubiera terminado" -> No mostrar badge de atraso ni urgencia por fecha
@@ -55,7 +71,7 @@ const TimelineHeader = memo(({ proyecto }) => {
                             className="inline-flex items-center font-bold rounded-full bg-red-600 text-white animate-pulse"
                             style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, gap: px(4) }}
                         >
-                            ⚠️ {estadoRetraso.diasRetraso}d atraso
+                            ⚠️ {diasRetrasoDisplay}d atraso
                         </span>
                     )}
                     {esUrgente && !enRetraso && (
