@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import produccionService from '../services/produccion.service';
 import { obtenerCalendarioActualPublico } from '../services/calendario.service';
-import { flattenProyectos, aplicarFechasCalendario } from '../utils/produccion';
+import { flattenProyectos, aplicarFechasCalendario, calcularDiasHabiles, getHoyStr } from '../utils/produccion';
 import toast from 'react-hot-toast';
 
 /**
@@ -50,6 +50,16 @@ export const useProduccionData = ({
                 }));
 
                 result = aplicarFechasCalendario(result, calResponse.data.proyectos, anio, mes);
+
+                // Recalcular diasRestantes para proyectos con fecha del calendario
+                const hoy = getHoyStr();
+                result = result.map(p => {
+                    if (p._fechaCalendario && p.fecha_limite) {
+                        return { ...p, diasRestantes: calcularDiasHabiles(hoy, p.fecha_limite) };
+                    }
+                    return p;
+                });
+
                 console.log(`📅 Fechas del calendario aplicadas (${anio}-${String(mes).padStart(2, '0')})`);
                 return result;
             } else {

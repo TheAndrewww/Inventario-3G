@@ -354,7 +354,10 @@ export const matchNombre = (nombreA, nombreB) => {
 export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, mes) => {
     if (!calendarioProyectos?.length || !proyectos?.length) return proyectos;
 
-    // Crear mapa de nombre calendario → menor día encontrado
+    // Crear mapa de nombre calendario → mayor día encontrado
+    // Usamos el MAYOR día porque si un proyecto se mueve de un día a otro,
+    // la celda anterior puede quedar con texto residual. El día más reciente
+    // es el que representa la cita actual.
     const fechasPorNombre = {};
     calendarioProyectos.forEach(cp => {
         if (!cp.nombre || !cp.dia) return;
@@ -362,8 +365,8 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
         if (!key) return;
         // Ignorar entradas de cimentación
         if (key.includes('cimentacion')) return;
-        // Guardar el menor día (primera aparición del proyecto en el calendario)
-        if (!fechasPorNombre[key] || cp.dia < fechasPorNombre[key]) {
+        // Guardar el mayor día (última aparición / cita más reciente)
+        if (!fechasPorNombre[key] || cp.dia > fechasPorNombre[key]) {
             fechasPorNombre[key] = cp.dia;
         }
     });

@@ -399,7 +399,7 @@ const TimelineStepper = memo(({ proyecto }) => {
                 >
                     <span className="font-bold text-gray-700 text-center uppercase tracking-wide leading-tight" style={{ fontSize: s(1.5), marginBottom: px(2) }}>FECHA<br/>MÁXIMA</span>
                     <span className="font-bold" style={{ fontSize: s(1.5) }}>
-                        {new Date((proyecto.fecha_limite_original || proyecto.fecha_limite) + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                        {new Date(((proyecto._fechaCalendario ? proyecto.fecha_limite : proyecto.fecha_limite_original) || proyecto.fecha_limite) + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
                     </span>
                     <span
                         className={`font-semibold ${diasRestantes !== null && (diasRestantes < 0 && proyecto.etapa_actual !== 'instalacion')
