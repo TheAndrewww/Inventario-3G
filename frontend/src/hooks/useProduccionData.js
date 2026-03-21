@@ -26,6 +26,41 @@ export const useProduccionData = ({
 
     const mountedRef = useRef(true);
 
+    /**
+     * Obtiene las citas del calendario y las aplica a una lista de proyectos.
+     * Retorna los proyectos con fecha_limite actualizada según el calendario.
+     */
+    const aplicarCalendarioAProyectos = useCallback(async (proys) => {
+        try {
+            const calResponse = await obtenerCalendarioActualPublico();
+            if (calResponse?.success && calResponse?.data?.proyectos?.length) {
+                const now = new Date();
+                const mexicoOffset = -6 * 60;
+                const mexicoTime = new Date(now.getTime() + (now.getTimezoneOffset() + mexicoOffset) * 60 * 1000);
+                const anio = mexicoTime.getFullYear();
+                const mes = mexicoTime.getMonth() + 1;
+
+                // Guardar la fecha original (usar la que ya tenía si es re-aplicación)
+                let result = proys.map(p => ({
+                    ...p,
+                    fecha_limite_original: p.fecha_limite_original || p.fecha_limite,
+                    // Restaurar fecha_limite original antes de re-aplicar para evitar drift
+                    fecha_limite: p.fecha_limite_original || p.fecha_limite,
+                    _fechaCalendario: false
+                }));
+
+                result = aplicarFechasCalendario(result, calResponse.data.proyectos, anio, mes);
+                console.log(`📅 Fechas del calendario aplicadas (${anio}-${String(mes).padStart(2, '0')})`);
+                return result;
+            } else {
+                console.log('ℹ️ No hay proyectos en el calendario este mes');
+            }
+        } catch (calError) {
+            console.warn('⚠️ No se pudo cargar calendario para fechas:', calError.message);
+        }
+        return proys;
+    }, []);
+
     // Cargar datos del dashboard
     const cargarDatos = useCallback(async () => {
         try {
@@ -38,29 +73,7 @@ export const useProduccionData = ({
                 let proys = flattenProyectos(response.data.resumen);
 
                 // Integrar fechas del calendario (silencioso, no bloquea si falla)
-                try {
-                    const calResponse = await obtenerCalendarioActualPublico();
-                    if (calResponse?.success && calResponse?.data?.proyectos?.length) {
-                        const now = new Date();
-                        // Usar hora de México para determinar el mes actual
-                        const mexicoOffset = -6 * 60;
-                        const mexicoTime = new Date(now.getTime() + (now.getTimezoneOffset() + mexicoOffset) * 60 * 1000);
-                        const anio = mexicoTime.getFullYear();
-                        const mes = mexicoTime.getMonth() + 1;
-
-                        // Guardar la fecha original antes de aplicar el calendario
-                        proys = proys.map(p => ({ ...p, fecha_limite_original: p.fecha_limite }));
-
-                        // Aplicar fechas del calendario (recalcula automáticamente)
-                        proys = aplicarFechasCalendario(proys, calResponse.data.proyectos, anio, mes);
-
-                        console.log(`📅 Fechas del calendario aplicadas (${anio}-${String(mes).padStart(2, '0')})`);
-                    } else {
-                        console.log('ℹ️ No hay proyectos en el calendario este mes');
-                    }
-                } catch (calError) {
-                    console.warn('⚠️ No se pudo cargar calendario para fechas:', calError.message);
-                }
+                proys = await aplicarCalendarioAProyectos(proys);
 
                 setProyectos(proys);
                 setEstadisticas(response.data.estadisticas);
@@ -75,7 +88,7 @@ export const useProduccionData = ({
                 setLoading(false);
             }
         }
-    }, [isPublic]);
+    }, [isPublic, aplicarCalendarioAProyectos]);
 
     // Sincronizar con Google Sheets
     const sincronizarSheets = useCallback(async () => {
@@ -235,7 +248,7 @@ export const useProduccionData = ({
 
         inicializar();
 
-        // Auto-refresh
+        // Auto-refresh completo (datos + calendario)
         const interval = setInterval(() => {
             if (autoSync) {
                 produccionService.sincronizarConSheets()
@@ -245,11 +258,38 @@ export const useProduccionData = ({
             cargarDatos();
         }, refreshInterval);
 
+        // Auto-refresh de solo calendario (cada 2 min, ligero)
+        const CAL_REFRESH_MS = 2 * 60 * 1000;
+        const calInterval = setInterval(async () => {
+            if (!mountedRef.current) return;
+            try {
+                const proysActuales = await new Promise(resolve => {
+                    setProyectos(prev => { resolve(prev); return prev; });
+                });
+                if (!proysActuales?.length) return;
+
+                const proysActualizados = await aplicarCalendarioAProyectos(proysActuales);
+
+                // Solo actualizar state si alguna fecha cambió
+                const cambio = proysActualizados.some((p, i) =>
+                    p.fecha_limite !== proysActuales[i]?.fecha_limite ||
+                    p._fechaCalendario !== proysActuales[i]?._fechaCalendario
+                );
+                if (cambio && mountedRef.current) {
+                    console.log('🔄 Citas del calendario actualizadas (refresh automático)');
+                    setProyectos(proysActualizados);
+                }
+            } catch (err) {
+                console.warn('⚠️ Error en refresh de calendario:', err.message);
+            }
+        }, CAL_REFRESH_MS);
+
         return () => {
             mountedRef.current = false;
             clearInterval(interval);
+            clearInterval(calInterval);
         };
-    }, [autoSync, refreshInterval, cargarDatos]);
+    }, [autoSync, refreshInterval, cargarDatos, aplicarCalendarioAProyectos]);
 
     return {
         proyectos,
