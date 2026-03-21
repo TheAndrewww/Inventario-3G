@@ -26,6 +26,15 @@ const pedidosService = {
   },
 
   /**
+   * Listar pedidos terminados/entregados
+   */
+  listarCompletados: async () => {
+    // Usamos el endpoint genérico filtrando por estado 'entregado'
+    const response = await api.get('/pedidos', { params: { estado: 'entregado', limit: 20 } });
+    return response.data;
+  },
+
+  /**
    * Obtener un pedido por ID
    */
   obtenerPorId: async (id) => {

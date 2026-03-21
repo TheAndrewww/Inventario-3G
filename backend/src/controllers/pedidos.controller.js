@@ -2444,14 +2444,8 @@ export const marcarPedidoEntregadoDirecto = async (req, res) => {
     const usuario_id = req.usuario.id;
     const usuario_rol = req.usuario.rol;
 
-    // Solo administradores pueden usar esta función
-    if (usuario_rol !== 'administrador') {
-      await transaction.rollback();
-      return res.status(403).json({
-        success: false,
-        message: 'Solo los administradores pueden marcar pedidos como terminados directamente'
-      });
-    }
+    // Permitir a cualquier rol marcar como terminado directamente
+    // (Ya no es exclusivo de administradores)
 
     // Obtener el pedido
     const pedido = await Movimiento.findOne({

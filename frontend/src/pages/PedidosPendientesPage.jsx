@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 
 const PedidosPendientesPage = () => {
   const [pedidos, setPedidos] = useState([]);
+  const [pedidosCompletados, setPedidosCompletados] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -22,12 +23,22 @@ const PedidosPendientesPage = () => {
   const esAdmin = user?.rol === 'administrador';
 
   useEffect(() => {
-    cargarPedidosPendientes();
+    cargarDatos();
   }, []);
+
+  const cargarDatos = async () => {
+    try {
+      setLoading(true);
+      await Promise.all([cargarPedidosPendientes(), cargarPedidosCompletados()]);
+    } catch (error) {
+      console.error('Error al cargar datos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const cargarPedidosPendientes = async () => {
     try {
-      setLoading(true);
       const response = await pedidosService.listarPendientes();
       setPedidos(response.data?.pedidos || []);
     } catch (error) {
@@ -35,6 +46,16 @@ const PedidosPendientesPage = () => {
       toast.error('Error al cargar pedidos pendientes');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cargarPedidosCompletados = async () => {
+    try {
+      const response = await pedidosService.listarCompletados();
+      setPedidosCompletados(response.data?.pedidos || []);
+    } catch (error) {
+      console.error('Error al cargar pedidos completados:', error);
+      toast.error('Error al cargar pedidos completados');
     }
   };
 
@@ -49,34 +70,17 @@ const PedidosPendientesPage = () => {
   };
 
   const handleAbrirModalMarcarListo = async () => {
+    // Ya no abrimos el modal, directamente entregamos el pedido
     if (pedidoSeleccionado.progreso_dispersion !== 100) {
       toast.error('Debes completar todos los artículos antes de marcar como listo');
       return;
     }
-    await cargarSupervisores();
-    setShowModalMarcarListo(true);
-  };
-
-  const handleMarcarListo = async () => {
-    if (!supervisorSeleccionado) {
-      toast.error('Debes seleccionar un supervisor');
+    
+    if (!confirm('¿Marcar este pedido como COMPLETADO?\n\nEsto actualizará el inventario y no requerirá revisión del supervisor.')) {
       return;
     }
 
-    try {
-      setProcesando(true);
-      await pedidosService.marcarListo(pedidoSeleccionado.id, supervisorSeleccionado);
-      toast.success('Pedido marcado como listo. El supervisor lo recibirá para aprobación.');
-      setShowModalMarcarListo(false);
-      setShowModal(false);
-      setSupervisorSeleccionado('');
-      await cargarPedidosPendientes();
-    } catch (error) {
-      console.error('Error al marcar pedido como listo:', error);
-      toast.error(error.response?.data?.message || 'Error al marcar pedido como listo');
-    } finally {
-      setProcesando(false);
-    }
+    await handleEntregarDirecto();
   };
 
   const handleVerDetalle = async (pedido) => {
@@ -212,9 +216,9 @@ const PedidosPendientesPage = () => {
     try {
       setProcesando(true);
       await pedidosService.entregarDirecto(pedidoSeleccionado.id);
-      toast.success('Pedido marcado como entregado exitosamente');
+      toast.success('Pedido marcado como completado exitosamente');
       setShowModal(false);
-      await cargarPedidosPendientes();
+      await cargarDatos();
     } catch (error) {
       console.error('Error al entregar pedido:', error);
       toast.error(error.response?.data?.message || 'Error al entregar pedido');
@@ -336,6 +340,67 @@ const PedidosPendientesPage = () => {
           ))}
         </div>
       )}
+
+      {/* Sección de Pedidos Completados */}
+      <div className="mt-8 border-t border-gray-200 pt-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <CheckCircle size={24} className="text-green-600" />
+           Últimos Pedidos Completados
+        </h2>
+
+        {pedidosCompletados.length === 0 ? (
+          <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
+            <CheckCircle size={48} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-gray-500 font-medium">No hay pedidos completados recientes</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pedidosCompletados.map((pedido) => (
+              <div 
+                key={pedido.id} 
+                className="bg-white border border-gray-200 rounded-xl p-4 hover:border-green-300 transition-colors cursor-pointer"
+                onClick={() => handleVerDetalle(pedido)}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700">
+                      <CheckCircle size={16} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 truncate max-w-[150px]" title={pedido.ubicacionDestino?.almacen || pedido.proyecto}>
+                        {pedido.ubicacionDestino?.almacen || pedido.proyecto || 'Sin especificar'}
+                      </h4>
+                      <p className="text-xs font-mono text-gray-500">{pedido.ticket_id}</p>
+                    </div>
+                  </div>
+                  <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                    Completado
+                  </span>
+                </div>
+                
+                <div className="space-y-1.5 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <User size={14} className="text-gray-400" />
+                    <span>Solicitó: {pedido.usuario?.nombre || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckSquare size={14} className="text-gray-400" />
+                    <span>Preparó: {pedido.detalles?.[0]?.dispersadoPor?.nombre || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} className="text-gray-400" />
+                    <span>{new Date(pedido.updated_at || pedido.fecha_hora).toLocaleDateString('es-MX')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Package size={14} className="text-gray-400" />
+                    <span className="font-semibold">{pedido.detalles?.length || 0} artículos</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <Modal
         isOpen={showModal}
@@ -573,85 +638,19 @@ const PedidosPendientesPage = () => {
                   disabled={procesando}
                   className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:opacity-50"
                 >
-                  <Send size={20} />
-                  Marcar como Listo para Entrega
+                  <CheckCircle size={20} />
+                  Marcar como Completado
                 </button>
                 <p className="text-sm text-gray-600 text-center">
-                  El pedido será enviado al supervisor para su recepción
+                  El pedido se dará por terminado sin revisión del supervisor
                 </p>
-
-                {esAdmin && (
-                  <button
-                    onClick={handleEntregarDirecto}
-                    disabled={procesando}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50"
-                  >
-                    <CheckCircle size={20} />
-                    Marcar como Terminado (Admin)
-                  </button>
-                )}
               </div>
             )}
           </div>
         )}
       </Modal>
 
-      {/* Modal para seleccionar supervisor */}
-      {showModalMarcarListo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <Send size={24} className="text-green-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Marcar como Listo</h3>
-                <p className="text-sm text-gray-600">
-                  Selecciona el supervisor que recibirá el pedido
-                </p>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Supervisor *
-              </label>
-              <select
-                value={supervisorSeleccionado}
-                onChange={(e) => setSupervisorSeleccionado(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-700"
-                autoFocus
-              >
-                <option value="">Selecciona un supervisor...</option>
-                {supervisores.map((supervisor) => (
-                  <option key={supervisor.id} value={supervisor.id}>
-                    {supervisor.nombre} - {supervisor.puesto || 'Supervisor'}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowModalMarcarListo(false);
-                  setSupervisorSeleccionado('');
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleMarcarListo}
-                disabled={!supervisorSeleccionado || procesando}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {procesando ? 'Enviando...' : 'Confirmar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal para seleccionar supervisor quitado */}
 
       {/* Modal para anular pedido */}
       {showModalAnular && pedidoAAnular && (

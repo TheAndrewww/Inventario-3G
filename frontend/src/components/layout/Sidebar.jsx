@@ -45,12 +45,7 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       label: 'Monitor Pedidos',
       roles: ['administrador', 'encargado']
     },
-    {
-      path: '/recibir-pedidos',
-      icon: CheckSquare,
-      label: 'Recibir Pedidos',
-      roles: ['administrador', 'encargado']
-    },
+
     {
       path: '/camionetas',
       icon: Briefcase,
