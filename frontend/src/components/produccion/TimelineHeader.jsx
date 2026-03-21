@@ -123,7 +123,7 @@ const TimelineHeader = memo(({ proyecto }) => {
                                     Cita agendada
                                 </div>
                                 <span className="font-bold text-blue-800 leading-tight whitespace-nowrap" style={{ fontSize: s(1.35) }}>
-                                    {new Date(proyecto.fecha_limite + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', '')}
+                                    {new Date((proyecto._fechaInstalacion || proyecto.fecha_limite) + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', '')}
                                 </span>
                             </div>
                         ) : (

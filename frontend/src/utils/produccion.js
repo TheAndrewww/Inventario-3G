@@ -396,9 +396,9 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
                 const d = String(fechaCompletado.getUTCDate()).padStart(2, '0');
                 const nuevaFechaLimite = `${y}-${m}-${d}`;
 
-                console.log(`   ✅ MATCH: prod="${nombreProd}" ↔ cal="${nombreCal}" → día ${diaCal} → fecha_limite=${nuevaFechaLimite}`);
+                console.log(`   ✅ MATCH: prod="${nombreProd}" ↔ cal="${nombreCal}" → día ${diaCal} → instalación=${fechaInstalacionStr} → fecha_limite=${nuevaFechaLimite}`);
                 // El calendario manda. Siempre overridear la fecha_limite con la del calendario.
-                return { ...p, fecha_limite: nuevaFechaLimite, _fechaCalendario: true };
+                return { ...p, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
             }
         }
         // Solo loguear los que NO matchearon para diagnóstico
