@@ -248,7 +248,12 @@ export const sincronizarProyecto = async (proyecto) => {
         // GTIA nunca necesita carpeta, MTO solo si es extensivo
         const tipoProyecto = proyecto.tipo_proyecto?.toUpperCase();
         const esGTIA = tipoProyecto === 'GTIA';
-        const esMTONoExtensivo = tipoProyecto === 'MTO' && !proyecto.es_extensivo;
+        const esMTO = tipoProyecto === 'MTO';
+        const esMTONoExtensivo = esMTO && !proyecto.es_extensivo;
+
+        if (esMTO) {
+            console.log(`🔍 MTO detectado: "${proyecto.nombre}" - es_extensivo: ${proyecto.es_extensivo}`);
+        }
 
         if (esGTIA || esMTONoExtensivo) {
 
@@ -267,6 +272,10 @@ export const sincronizarProyecto = async (proyecto) => {
                 tieneManufactura: false,
                 tieneHerreria: false
             };
+        }
+
+        if (esMTO && proyecto.es_extensivo) {
+            console.log(`📂 MTO Extensivo "${proyecto.nombre}" - procesando carpeta en Drive...`);
         }
 
         // Buscar la carpeta del proyecto (solo para A, B, C y MTO extensivo)
