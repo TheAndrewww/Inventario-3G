@@ -24,10 +24,8 @@ const TimelineStepper = memo(({ proyecto }) => {
     const diasRestantes = proyecto.diasRestantes;
     const esGarantia = proyecto.tipo_proyecto?.toUpperCase() === 'GTIA';
     const esMTO = proyecto.tipo_proyecto?.toUpperCase() === 'MTO';
-    const esMTOExtensivo = esMTO && proyecto.es_extensivo;
     const timelineSimplificado = usaTimelineSimplificado(proyecto);
-    // MTO extensivo siempre usa producción completa (manufactura + herrería)
-    const tieneProduccion = proyecto.tiene_manufactura || proyecto.tiene_herreria || esMTOExtensivo;
+    const tieneProduccion = proyecto.tiene_manufactura || proyecto.tiene_herreria;
 
     const estadoRetraso = proyecto.estadoRetraso || { enRetraso: false };
     let enRetraso = estadoRetraso.enRetraso;
@@ -71,8 +69,8 @@ const TimelineStepper = memo(({ proyecto }) => {
             return ETAPAS_ORDEN.indexOf(proyecto.etapa_actual) > ETAPAS_ORDEN.indexOf(baseStage) ? '#10B981' : '#CBD5E1';
         };
 
-        const tieneManufacturaLocal = proyecto.tiene_manufactura !== false || esMTOExtensivo;
-        const tieneHerreriaLocal = proyecto.tiene_herreria !== false || esMTOExtensivo;
+        const tieneManufacturaLocal = proyecto.tiene_manufactura !== false;
+        const tieneHerreriaLocal = proyecto.tiene_herreria !== false;
         const tieneAmbas = tieneManufacturaLocal && tieneHerreriaLocal;
 
         const getSubStageStroke = (subStage) => {
@@ -223,8 +221,8 @@ const TimelineStepper = memo(({ proyecto }) => {
         }
 
         // Timeline normal
-        const tieneManufacturaLocal = proyecto.tiene_manufactura !== false || esMTOExtensivo;
-        const tieneHerreriaLocal = proyecto.tiene_herreria !== false || esMTOExtensivo;
+        const tieneManufacturaLocal = proyecto.tiene_manufactura !== false;
+        const tieneHerreriaLocal = proyecto.tiene_herreria !== false;
 
         let nodes = [];
 

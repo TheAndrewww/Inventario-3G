@@ -149,14 +149,12 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
                                 { key: 'herreria', label: 'Herrería', done: proyecto.estadoSubEtapas?.herreria?.completado || proyecto.herreria_completado, color: 'red' },
                                 { key: 'instalacion', label: 'Completado', done: !!proyecto.instalacion_completado_en, color: 'blue' }
                             ].filter((etapa) => {
-                                // MTO extensivo siempre muestra manufactura y herrería
-                                const esMTOExtensivo = proyecto.tipo_proyecto?.toUpperCase() === 'MTO' && proyecto.es_extensivo;
                                 // Ocultar Manufactura/Herrería si el proyecto no las tiene activas
                                 if (etapa.key === 'manufactura') {
-                                    return proyecto.tiene_manufactura || etapa.done || esMTOExtensivo;
+                                    return proyecto.tiene_manufactura || etapa.done;
                                 }
                                 if (etapa.key === 'herreria') {
-                                    return proyecto.tiene_herreria || etapa.done || esMTOExtensivo;
+                                    return proyecto.tiene_herreria || etapa.done;
                                 }
                                 return true;
                             }).map((etapa) => (
