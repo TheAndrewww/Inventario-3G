@@ -86,13 +86,28 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
         // Primero obtener las carpetas de meses
         const carpetasMeses = await listarSubcarpetas(PRODUCCION_FOLDER_ID);
 
+        // Generar variantes del nombre para búsqueda más flexible
+        // Ej: "THELMA PADILLA  / MTO" → ["THELMA PADILLA  / MTO", "THELMA PADILLA"]
+        const normalizarNombre = (nombre) =>
+            nombre
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toUpperCase()
+                .trim();
 
-        // Normalizar nombre para búsqueda (quitar acentos, mayúsculas)
-        const nombreNormalizado = nombreProyecto
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toUpperCase()
+        const nombreNormalizado = normalizarNombre(nombreProyecto);
+
+        // Crear variantes sin sufijos tipo /MTO, /GTIA, etc.
+        const variantes = [nombreNormalizado];
+        // Quitar "/ MTO", "/MTO", "/ GTIA", "/GTIA", "/ MTO ESTRUCTURA", etc.
+        const sinSufijo = nombreNormalizado
+            .replace(/\s*\/\s*(MTO|GTIA)(\s+\w+)*\s*$/i, '')
             .trim();
+        if (sinSufijo && sinSufijo !== nombreNormalizado) {
+            variantes.push(sinSufijo);
+        }
+
+        console.log(`🔍 Buscando carpeta Drive para: "${nombreProyecto}" → variantes: [${variantes.map(v => `"${v}"`).join(', ')}]`);
 
         // Buscar en cada carpeta de mes
         for (const carpetaMes of carpetasMeses) {
@@ -107,27 +122,26 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
 
             // Buscar coincidencia por nombre
             for (const carpeta of carpetasProyectos) {
-                const carpetaNormalizada = carpeta.name
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '')
-                    .toUpperCase()
-                    .trim();
+                const carpetaNormalizada = normalizarNombre(carpeta.name);
 
-                // Coincidencia exacta o si el nombre está contenido
-                if (carpetaNormalizada === nombreNormalizado ||
-                    carpetaNormalizada.includes(nombreNormalizado) ||
-                    nombreNormalizado.includes(carpetaNormalizada)) {
+                // Probar cada variante del nombre
+                for (const variante of variantes) {
+                    if (carpetaNormalizada === variante ||
+                        carpetaNormalizada.includes(variante) ||
+                        variante.includes(carpetaNormalizada)) {
 
-                    return {
-                        id: carpeta.id,
-                        name: carpeta.name,
-                        mes: carpetaMes.name
-                    };
+                        console.log(`✅ Carpeta encontrada: "${carpeta.name}" en ${carpetaMes.name} (match con variante: "${variante}")`);
+                        return {
+                            id: carpeta.id,
+                            name: carpeta.name,
+                            mes: carpetaMes.name
+                        };
+                    }
                 }
             }
         }
 
-
+        console.log(`⚠️ No se encontró carpeta en Drive para: "${nombreProyecto}"`);
         return null;
     } catch (error) {
         console.error('❌ Error al buscar carpeta de proyecto:', error);
