@@ -270,6 +270,14 @@ const sincronizarMes = async (mes) => {
                 cambios.fecha_completado = new Date();
             }
 
+            // Si el proyecto estaba completado en la DB pero ya NO está marcado en el Excel,
+            // revertir a 'diseno' para que vuelva a aparecer en el dashboard
+            if (!proyecto.estaEntregado && existente.etapa_actual === 'completado') {
+                cambios.etapa_actual = 'diseno';
+                cambios.fecha_completado = null;
+                console.log(`⚠️ Proyecto "${proyecto.nombre}" desmarcado como completado en Excel, revirtiendo a diseño`);
+            }
+
             if (proyecto.tipoProyecto && existente.tipo_proyecto !== proyecto.tipoProyecto.toUpperCase()) {
                 cambios.tipo_proyecto = proyecto.tipoProyecto.toUpperCase();
             }
