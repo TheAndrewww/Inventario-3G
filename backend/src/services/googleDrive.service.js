@@ -87,12 +87,12 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
         const carpetasMeses = await listarSubcarpetas(PRODUCCION_FOLDER_ID);
 
         // Generar variantes del nombre para búsqueda más flexible
-        // Ej: "THELMA PADILLA  / MTO" → ["THELMA PADILLA  / MTO", "THELMA PADILLA"]
         const normalizarNombre = (nombre) =>
             nombre
                 .normalize('NFD')
                 .replace(/[\u0300-\u036f]/g, '')
                 .toUpperCase()
+                .replace(/\s+/g, ' ') // Colapsar múltiples espacios en uno
                 .trim();
 
         const nombreNormalizado = normalizarNombre(nombreProyecto);
@@ -107,7 +107,9 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
             variantes.push(sinSufijo);
         }
 
-        console.log(`🔍 Buscando carpeta Drive para: "${nombreProyecto}" → variantes: [${variantes.map(v => `"${v}"`).join(', ')}]`);
+        console.log(`🔍 Buscando carpeta Drive para: "${nombreProyecto}"`);
+        console.log(`   Variantes normalizadas: [${variantes.map(v => `"${v}"`).join(', ')}]`);
+        console.log(`   Carpetas de meses encontradas: ${carpetasMeses.map(c => c.name).join(', ')}`);
 
         // Buscar en cada carpeta de mes
         for (const carpetaMes of carpetasMeses) {
@@ -119,6 +121,15 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
             });
 
             const carpetasProyectos = response.data.files || [];
+
+            // Log: listar las carpetas que contienen "THELMA" o "PADILLA" para diagnóstico
+            const posiblesCoincidencias = carpetasProyectos.filter(c => {
+                const norm = normalizarNombre(c.name);
+                return variantes.some(v => norm.includes(v.substring(0, 6)) || v.includes(norm.substring(0, 6)));
+            });
+            if (posiblesCoincidencias.length > 0) {
+                console.log(`   📁 ${carpetaMes.name}: posibles coincidencias: [${posiblesCoincidencias.map(c => `"${c.name}"`).join(', ')}]`);
+            }
 
             // Buscar coincidencia por nombre
             for (const carpeta of carpetasProyectos) {
