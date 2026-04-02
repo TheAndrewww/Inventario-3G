@@ -87,13 +87,18 @@ export const obtenerPorArea = async (req, res) => {
         // 2. Tienen archivos de manufactura/herreria en Drive (independientemente de la etapa actual)
         if (area === 'manufactura') {
             // Obtener proyectos que tienen manufactura pendiente o tienen archivos de manufactura
+            // MTO extensivo siempre aparece en manufactura
             proyectos = await ProduccionProyecto.findAll({
                 where: {
                     activo: true,
                     manufactura_completado: false,
                     [Op.or]: [
                         { etapa_actual: 'produccion' },
-                        { tiene_manufactura: true } // Tiene archivos de manufactura en Drive
+                        { tiene_manufactura: true }, // Tiene archivos de manufactura en Drive
+                        { // MTO extensivo siempre usa manufactura
+                            tipo_proyecto: 'MTO',
+                            es_extensivo: true
+                        }
                     ]
                 },
                 order: [
@@ -103,13 +108,18 @@ export const obtenerPorArea = async (req, res) => {
             });
         } else if (area === 'herreria') {
             // Obtener proyectos que tienen herrería pendiente o tienen archivos de herrería
+            // MTO extensivo siempre aparece en herrería
             proyectos = await ProduccionProyecto.findAll({
                 where: {
                     activo: true,
                     herreria_completado: false,
                     [Op.or]: [
                         { etapa_actual: 'produccion' },
-                        { tiene_herreria: true } // Tiene archivos de herrería en Drive
+                        { tiene_herreria: true }, // Tiene archivos de herrería en Drive
+                        { // MTO extensivo siempre usa herrería
+                            tipo_proyecto: 'MTO',
+                            es_extensivo: true
+                        }
                     ]
                 },
                 order: [
