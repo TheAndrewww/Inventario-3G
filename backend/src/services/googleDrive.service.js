@@ -63,7 +63,9 @@ const listarSubcarpetas = async (parentId) => {
         const response = await drive.files.list({
             q: `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
             fields: 'files(id, name)',
-            pageSize: 1000
+            pageSize: 1000,
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true
         });
 
         return response.data.files || [];
@@ -117,7 +119,9 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
             const response = await drive.files.list({
                 q: `'${carpetaMes.id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
                 fields: 'files(id, name)',
-                pageSize: 500
+                pageSize: 500,
+                supportsAllDrives: true,
+                includeItemsFromAllDrives: true
             });
 
             const carpetasProyectos = response.data.files || [];
@@ -176,7 +180,9 @@ export const clasificarArchivosPDF = async (carpetaId) => {
         const response = await drive.files.list({
             q: `'${carpetaId}' in parents and mimeType = 'application/pdf' and trashed = false`,
             fields: 'files(id, name, webViewLink, webContentLink, size, createdTime)',
-            pageSize: 100
+            pageSize: 100,
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true
         });
 
         const archivos = response.data.files || [];
