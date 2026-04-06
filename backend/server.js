@@ -217,6 +217,121 @@ app.use('/api/checklist', checklistRoutes);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
 
+// ===== ENDPOINT TEMPORAL: Limpieza de espacio en BD =====
+app.get('/api/admin/limpiar-db', async (req, res) => {
+    try {
+        const resultado = { diagnostico: {}, limpieza: null };
+
+        // 1. Tamaño total
+        const [dbSize] = await sequelize.query(
+            "SELECT pg_size_pretty(pg_database_size(current_database())) as total"
+        );
+        resultado.diagnostico.tamano_total = dbSize[0].total;
+
+        // 2. Top tablas por tamaño
+        const [tablas] = await sequelize.query(`
+            SELECT 
+                tablename as tabla,
+                pg_size_pretty(pg_total_relation_size('public.' || tablename)) as total,
+                pg_total_relation_size('public.' || tablename) as bytes
+            FROM pg_tables WHERE schemaname = 'public'
+            ORDER BY pg_total_relation_size('public.' || tablename) DESC
+            LIMIT 15
+        `);
+        resultado.diagnostico.tablas = tablas;
+
+        // 3. Conteos
+        const conteos = {};
+        for (const t of ['notificaciones', 'image_processing_queue', 'movimientos', 'detalle_movimientos', 'fcm_tokens']) {
+            try {
+                const [c] = await sequelize.query(`SELECT COUNT(*) as total FROM ${t}`);
+                conteos[t] = parseInt(c[0].total);
+            } catch (e) { }
+        }
+        resultado.diagnostico.conteos = conteos;
+
+        // 4. Notificaciones antiguas
+        try {
+            const [antiguas] = await sequelize.query("SELECT COUNT(*) as total FROM notificaciones WHERE created_at < NOW() - INTERVAL '30 days'");
+            const [leidas] = await sequelize.query("SELECT COUNT(*) as total FROM notificaciones WHERE leida = true");
+            resultado.diagnostico.notificaciones = {
+                leidas: parseInt(leidas[0].total),
+                antiguas_30d: parseInt(antiguas[0].total)
+            };
+        } catch (e) { }
+
+        // 5. Cola de imágenes por estado
+        try {
+            const [queue] = await sequelize.query("SELECT status, COUNT(*) as total FROM image_processing_queue GROUP BY status");
+            resultado.diagnostico.image_queue = queue;
+        } catch (e) { }
+
+        // 6. Dead tuples
+        try {
+            const [dead] = await sequelize.query(`
+                SELECT relname as tabla, n_dead_tup as muertas, n_live_tup as vivas
+                FROM pg_stat_user_tables WHERE n_dead_tup > 50
+                ORDER BY n_dead_tup DESC LIMIT 10
+            `);
+            resultado.diagnostico.dead_tuples = dead;
+        } catch (e) { }
+
+        // LIMPIEZA (solo si ?limpiar=1)
+        if (req.query.limpiar === '1') {
+            resultado.limpieza = {};
+
+            // Limpiar notificaciones
+            try {
+                const [r] = await sequelize.query(`
+                    DELETE FROM notificaciones 
+                    WHERE (leida = true AND created_at < NOW() - INTERVAL '7 days')
+                       OR created_at < NOW() - INTERVAL '60 days'
+                `);
+                resultado.limpieza.notificaciones_eliminadas = r?.rowCount || 'ejecutado';
+            } catch (e) { resultado.limpieza.notificaciones_error = e.message; }
+
+            // Limpiar cola de imágenes
+            try {
+                const [r] = await sequelize.query(`
+                    DELETE FROM image_processing_queue 
+                    WHERE status IN ('completed', 'failed', 'error')
+                       OR created_at < NOW() - INTERVAL '30 days'
+                `);
+                resultado.limpieza.image_queue_eliminados = r?.rowCount || 'ejecutado';
+            } catch (e) { resultado.limpieza.image_queue_error = e.message; }
+
+            // Limpiar JSON de proyectos completados antiguos
+            try {
+                const [r] = await sequelize.query(`
+                    UPDATE produccion_proyectos 
+                    SET archivos_manufactura = '[]'::jsonb, archivos_herreria = '[]'::jsonb
+                    WHERE etapa_actual = 'completado' 
+                      AND fecha_completado < NOW() - INTERVAL '90 days'
+                      AND (jsonb_array_length(COALESCE(archivos_manufactura, '[]'::jsonb)) > 0
+                           OR jsonb_array_length(COALESCE(archivos_herreria, '[]'::jsonb)) > 0)
+                `);
+                resultado.limpieza.proyectos_json_limpiados = r?.[1]?.rowCount || 'ejecutado';
+            } catch (e) { resultado.limpieza.proyectos_error = e.message; }
+
+            // VACUUM
+            try {
+                await sequelize.query('VACUUM');
+                resultado.limpieza.vacuum = 'completado';
+            } catch (e) { resultado.limpieza.vacuum_error = e.message; }
+
+            // Tamaño final
+            const [finalSize] = await sequelize.query(
+                "SELECT pg_size_pretty(pg_database_size(current_database())) as total"
+            );
+            resultado.limpieza.tamano_final = finalSize[0].total;
+        }
+
+        res.json({ success: true, data: resultado });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Manejo de errores
 app.use((err, req, res, next) => {
     console.error(err.stack);
@@ -317,6 +432,15 @@ const startServer = async () => {
                     )
                 `);
                 console.log('✅ Tablas de checklist verificadas/creadas');
+
+                // Agregar columnas de cumplimiento si no existen
+                try {
+                    await sequelize.query(`ALTER TABLE checklist_equipos ADD COLUMN IF NOT EXISTS cantidad_actual INTEGER NOT NULL DEFAULT 0`);
+                    await sequelize.query(`ALTER TABLE checklist_equipos ADD COLUMN IF NOT EXISTS cumplido BOOLEAN NOT NULL DEFAULT FALSE`);
+                    console.log('✅ Columnas de cumplimiento verificadas');
+                } catch (colErr) {
+                    // Las columnas ya existen, OK
+                }
             } catch (checklistErr) {
                 console.log('⚠️ Error con tablas de checklist:', checklistErr.message);
             }
@@ -540,6 +664,15 @@ const startServer = async () => {
                     )
                 `);
                 console.log('✅ Tablas de checklist verificadas/creadas');
+
+                // Agregar columnas de cumplimiento si no existen
+                try {
+                    await sequelize.query(`ALTER TABLE checklist_equipos ADD COLUMN IF NOT EXISTS cantidad_actual INTEGER NOT NULL DEFAULT 0`);
+                    await sequelize.query(`ALTER TABLE checklist_equipos ADD COLUMN IF NOT EXISTS cumplido BOOLEAN NOT NULL DEFAULT FALSE`);
+                    console.log('✅ Columnas de cumplimiento verificadas');
+                } catch (colErr) {
+                    // Las columnas ya existen, OK
+                }
             } catch (checklistErr) {
                 console.log('⚠️ Error con tablas de checklist:', checklistErr.message);
             }
