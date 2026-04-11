@@ -113,6 +113,32 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
         console.log(`   Variantes normalizadas: [${variantes.map(v => `"${v}"`).join(', ')}]`);
         console.log(`   Carpetas de meses encontradas: ${carpetasMeses.map(c => c.name).join(', ')}`);
 
+        // Función auxiliar para buscar coincidencia en una lista de carpetas
+        const buscarEnCarpetas = (carpetas, carpetaMes, subcarpeta) => {
+            const ubicacion = subcarpeta ? `${carpetaMes.name}/${subcarpeta}` : carpetaMes.name;
+
+            const posiblesCoincidencias = carpetas.filter(c => {
+                const norm = normalizarNombre(c.name);
+                return variantes.some(v => norm.includes(v.substring(0, 6)) || v.includes(norm.substring(0, 6)));
+            });
+            if (posiblesCoincidencias.length > 0) {
+                console.log(`   📁 ${ubicacion}: posibles coincidencias: [${posiblesCoincidencias.map(c => `"${c.name}"`).join(', ')}]`);
+            }
+
+            for (const carpeta of carpetas) {
+                const carpetaNormalizada = normalizarNombre(carpeta.name);
+                for (const variante of variantes) {
+                    if (carpetaNormalizada === variante ||
+                        carpetaNormalizada.includes(variante) ||
+                        variante.includes(carpetaNormalizada)) {
+                        console.log(`✅ Carpeta encontrada: "${carpeta.name}" en ${ubicacion} (match con variante: "${variante}")`);
+                        return { id: carpeta.id, name: carpeta.name, mes: carpetaMes.name };
+                    }
+                }
+            }
+            return null;
+        };
+
         // Buscar en cada carpeta de mes
         for (const carpetaMes of carpetasMeses) {
             // Buscar carpetas de proyectos dentro del mes
@@ -126,33 +152,29 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
 
             const carpetasProyectos = response.data.files || [];
 
-            // Log: listar las carpetas que contienen "THELMA" o "PADILLA" para diagnóstico
-            const posiblesCoincidencias = carpetasProyectos.filter(c => {
+            // Buscar directamente en la carpeta del mes
+            const resultado = buscarEnCarpetas(carpetasProyectos, carpetaMes, null);
+            if (resultado) return resultado;
+
+            // Buscar dentro de subcarpetas tipo MANTENIMIENTO, GARANTIA, etc.
+            const subcarpetasEspeciales = carpetasProyectos.filter(c => {
                 const norm = normalizarNombre(c.name);
-                return variantes.some(v => norm.includes(v.substring(0, 6)) || v.includes(norm.substring(0, 6)));
+                return norm.includes('MANTENIMIENTO') || norm.includes('MTO') ||
+                       norm.includes('GARANTIA') || norm.includes('GTIA');
             });
-            if (posiblesCoincidencias.length > 0) {
-                console.log(`   📁 ${carpetaMes.name}: posibles coincidencias: [${posiblesCoincidencias.map(c => `"${c.name}"`).join(', ')}]`);
-            }
 
-            // Buscar coincidencia por nombre
-            for (const carpeta of carpetasProyectos) {
-                const carpetaNormalizada = normalizarNombre(carpeta.name);
+            for (const subcarpeta of subcarpetasEspeciales) {
+                const subResponse = await drive.files.list({
+                    q: `'${subcarpeta.id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+                    fields: 'files(id, name)',
+                    pageSize: 500,
+                    supportsAllDrives: true,
+                    includeItemsFromAllDrives: true
+                });
 
-                // Probar cada variante del nombre
-                for (const variante of variantes) {
-                    if (carpetaNormalizada === variante ||
-                        carpetaNormalizada.includes(variante) ||
-                        variante.includes(carpetaNormalizada)) {
-
-                        console.log(`✅ Carpeta encontrada: "${carpeta.name}" en ${carpetaMes.name} (match con variante: "${variante}")`);
-                        return {
-                            id: carpeta.id,
-                            name: carpeta.name,
-                            mes: carpetaMes.name
-                        };
-                    }
-                }
+                const carpetasDentro = subResponse.data.files || [];
+                const resultadoSub = buscarEnCarpetas(carpetasDentro, carpetaMes, subcarpeta.name);
+                if (resultadoSub) return resultadoSub;
             }
         }
 
