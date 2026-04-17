@@ -109,7 +109,25 @@ const DashboardProduccionTVPage = () => {
             >
                 {/* Scrollable Area */}
                 <div className="h-full w-full overflow-auto" style={{ padding: px(16) }}>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-4">Panel de Producción</h1>
+                    {/* Header */}
+                    <div className="mb-5 bg-slate-600 rounded-2xl shadow-xl border border-slate-500 p-5">
+                        <div className="flex items-center gap-5">
+                            <div className="h-16 px-3 flex items-center justify-center shrink-0">
+                                <img
+                                    src="https://res.cloudinary.com/dd93jrilg/image/upload/v1763171532/logo_web_blanco_j8xeyh.png"
+                                    alt="3G"
+                                    className="h-full w-auto object-contain"
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <h1 className="text-4xl font-bold text-white mb-1">Panel de Producción</h1>
+                                <p className="text-gray-300 text-lg font-medium">
+                                    <span className="font-bold text-emerald-400">{proyectosActivos.length}</span> proyecto{proyectosActivos.length !== 1 ? 's' : ''} en producción
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="flex gap-4 mb-6">
                         <div className="flex-1">
                             <EstadisticasHeader estadisticas={estadisticas} />
