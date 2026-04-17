@@ -227,7 +227,7 @@ export const eliminarUbicacion = async (req, res) => {
             if (!ubicacionSinAsignar) {
                 ubicacionSinAsignar = await Ubicacion.create({
                     codigo: 'SIN-ASIGNAR',
-                    almacen: 'General',
+                    almacen: 'Principal',
                     descripcion: 'Artículos sin ubicación asignada'
                 });
             }

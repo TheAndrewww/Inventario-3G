@@ -50,7 +50,7 @@ const InventarioPage = () => {
   const [herramientasEncontradasPorCodigo, setHerramientasEncontradasPorCodigo] = useState([]); // Herramientas encontradas por búsqueda parcial
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState(null);
-  const [almacenSeleccionado, setAlmacenSeleccionado] = useState('todos'); // Filtro de almacén (ID o 'todos')
+  const [almacenSeleccionado, setAlmacenSeleccionado] = useState(null); // Filtro de almacén (ID o null = gate sin seleccionar)
   const [almacenesData, setAlmacenesData] = useState([]); // Almacenes desde la API
   const [tabActivo, setTabActivo] = useState('consumibles'); // Nuevo: 'consumibles' o 'herramientas'
   const [mostrarCategorias, setMostrarCategorias] = useState(false);
@@ -147,13 +147,9 @@ const InventarioPage = () => {
 
   // Cuando cambia el almacén seleccionado, recargar categorías y ubicaciones filtradas
   useEffect(() => {
-    if (almacenSeleccionado !== 'todos') {
-      fetchCategorias(almacenSeleccionado);
-      fetchUbicaciones(almacenSeleccionado);
-    } else {
-      fetchCategorias();
-      fetchUbicaciones();
-    }
+    if (almacenSeleccionado === null) return; // Gate activo, no fetchear
+    fetchCategorias(almacenSeleccionado);
+    fetchUbicaciones(almacenSeleccionado);
     // Limpiar filtros de categoría y ubicación al cambiar almacén
     setCategoriaSeleccionada(null);
     setUbicacionSeleccionada(null);
@@ -315,8 +311,7 @@ const InventarioPage = () => {
           const matchesActiveFilter = mostrarDesactivados ? !isActive : isActive;
           const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
           const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
-          const matchesAlmacen = almacenSeleccionado === 'todos' ||
-            (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
+          const matchesAlmacen = item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
 
           return matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen;
         })
@@ -365,8 +360,7 @@ const InventarioPage = () => {
         const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
 
         // Filtrar por almacén
-        const matchesAlmacen = almacenSeleccionado === 'todos' ||
-          (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
+        const matchesAlmacen = item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
 
         // Filtrar por tipo según el tab activo
         const estaEnTabCorrecto = tabActivo === 'consumibles'
@@ -1267,6 +1261,57 @@ const InventarioPage = () => {
     return <Loader fullScreen />;
   }
 
+  // Gate: si no hay almacén seleccionado, mostrar selector de almacenes
+  if (almacenSeleccionado === null) {
+    return (
+      <div className="p-4 md:p-6 min-h-[70vh] flex flex-col items-center justify-center">
+        <div className="max-w-4xl w-full">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Selecciona un almacén</h1>
+            <p className="text-gray-600">Elige el almacén cuyo inventario deseas consultar</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+            {almacenesDisponibles.length === 0 ? (
+              <div className="col-span-full text-center text-gray-500 py-8">
+                No hay almacenes disponibles
+              </div>
+            ) : (
+              almacenesDisponibles.map((almacen) => (
+                <button
+                  key={almacen.id}
+                  onClick={() => setAlmacenSeleccionado(almacen.id)}
+                  className="group bg-white border-2 border-gray-200 rounded-2xl p-8 hover:border-red-700 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
+                >
+                  <div className="w-20 h-20 rounded-full bg-red-50 group-hover:bg-red-700 transition-colors flex items-center justify-center">
+                    <Package size={40} className="text-red-700 group-hover:text-white transition-colors" />
+                  </div>
+                  <span className="text-xl md:text-2xl font-bold text-gray-900 uppercase tracking-wide">
+                    {almacen.nombre}
+                  </span>
+                  {typeof almacen.articulos_count === 'number' && (
+                    <span className="text-sm text-gray-500">
+                      {almacen.articulos_count} artículo{almacen.articulos_count === 1 ? '' : 's'}
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+          {esAdministrador && (
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => setModalAlmacenesOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-purple-700 hover:text-purple-900 hover:bg-purple-50 rounded-lg transition-colors"
+              >
+                <Plus size={16} /> Gestionar almacenes
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-6">
       {/* Indicador de escaneo activo */}
@@ -1297,20 +1342,22 @@ const InventarioPage = () => {
 
         {/* Selector de Almacén y Tabs */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Selector de Almacén con botón de gestión */}
-          <div className="flex gap-2 flex-shrink-0">
-            <select
-              value={almacenSeleccionado}
-              onChange={(e) => setAlmacenSeleccionado(e.target.value)}
-              className="flex-1 sm:w-auto px-4 py-2.5 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 bg-white cursor-pointer hover:bg-gray-50"
+          {/* Almacén actual + botón para cambiar */}
+          <div className="flex gap-2 flex-shrink-0 items-center">
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-lg">
+              <Package size={18} className="text-red-700" />
+              <span className="font-semibold text-red-700 uppercase tracking-wide text-sm md:text-base">
+                {almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén'}
+              </span>
+            </div>
+            <button
+              onClick={() => setAlmacenSeleccionado(null)}
+              className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-2 text-sm"
+              title="Cambiar almacén"
             >
-              <option value="todos">📦 Todos los almacenes</option>
-              {almacenesDisponibles.map((almacen) => (
-                <option key={almacen.id} value={almacen.id}>
-                  🏢 {almacen.nombre}
-                </option>
-              ))}
-            </select>
+              <ArrowUpDown size={16} />
+              <span className="hidden md:inline">Cambiar</span>
+            </button>
             {esAdministrador && (
               <button
                 onClick={() => setModalAlmacenesOpen(true)}
