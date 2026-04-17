@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { Loader2, Check, X, Trash2, Save, XCircle } from 'lucide-react';
+import { Loader2, Check, X, Trash2, Save, XCircle, Download } from 'lucide-react';
 import { campanaControlService } from '../services/campanaControl.service';
 
 const QUARTERS = [
@@ -153,6 +153,42 @@ const ControlCampanaPage = () => {
         }
     };
 
+    const exportarComentarios = () => {
+        const rows = [['TRIMESTRE', 'ÁREA', 'SEMANA', 'ESTADO', 'COMENTARIO']];
+
+        QUARTERS.forEach(quarter => {
+            AREAS.forEach(area => {
+                quarter.weeks.forEach(week => {
+                    const key = getCellKey(quarter.id, area.id, week);
+                    const cellData = data[key];
+                    if (cellData?.note && cellData.note.trim()) {
+                        const estado = cellData.status === 'good' ? 'BIEN' : cellData.status === 'bad' ? 'INCIDENCIA' : 'SIN MARCAR';
+                        const nota = cellData.note.trim().replace(/\n/g, ' | ');
+                        rows.push([quarter.name, area.name, `Semana ${week}`, estado, nota]);
+                    }
+                });
+            });
+        });
+
+        if (rows.length === 1) {
+            toast.error('No hay comentarios para exportar');
+            return;
+        }
+
+        const csvContent = '\uFEFF' + rows.map(row =>
+            row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+        ).join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Comentarios_Campana_2026.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast.success(`${rows.length - 1} comentarios exportados`);
+    };
+
     const getQuarterTotal = (quarterId, type) => {
         return totals.byQuarter?.[quarterId]?.[type] || 0;
     };
@@ -178,6 +214,13 @@ const ControlCampanaPage = () => {
                         CAMPAÑA DE <span className="text-red-700">CONTROL</span> 2026
                     </h1>
                 </div>
+                <button
+                    onClick={exportarComentarios}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 active:transform active:scale-95 transition-all flex items-center gap-2 shadow-md text-sm md:text-base"
+                >
+                    <Download className="w-4 h-4 md:w-5 md:h-5" />
+                    Exportar Comentarios
+                </button>
             </header>
 
             <div className="space-y-6 md:space-y-8 pb-20">
