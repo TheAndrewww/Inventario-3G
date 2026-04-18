@@ -40,6 +40,10 @@ const formatearCantidad = (cantidad, unidad) => {
   return valor.toFixed(0);
 };
 
+const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'stockTotal', 'stockDisp', 'unidad', 'acciones'];
+const DEFAULT_COL_WIDTHS = { articulo: 320, categoria: 140, ubicacion: 160, stockTotal: 120, stockDisp: 140, unidad: 100, acciones: 220 };
+const STORAGE_KEY_COL_WIDTHS = 'inventario_col_widths_v1';
+
 const InventarioPage = () => {
   const [articulos, setArticulos] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -54,6 +58,41 @@ const InventarioPage = () => {
   const [almacenesData, setAlmacenesData] = useState([]); // Almacenes desde la API
   const [tabActivo, setTabActivo] = useState('consumibles'); // Nuevo: 'consumibles' o 'herramientas'
   const [mostrarDesactivados, setMostrarDesactivados] = useState(false);
+
+  // Anchos de columna redimensionables (estilo Excel), persistidos en localStorage
+  const [colWidths, setColWidths] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_COL_WIDTHS);
+      return saved ? { ...DEFAULT_COL_WIDTHS, ...JSON.parse(saved) } : DEFAULT_COL_WIDTHS;
+    } catch { return DEFAULT_COL_WIDTHS; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY_COL_WIDTHS, JSON.stringify(colWidths)); } catch {}
+  }, [colWidths]);
+
+  const startResizeCol = useCallback((key, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = colWidths[key];
+    const onMove = (ev) => {
+      const next = Math.max(80, startWidth + ev.clientX - startX);
+      setColWidths(prev => ({ ...prev, [key]: next }));
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [colWidths]);
+
+  const resetColWidths = useCallback(() => setColWidths(DEFAULT_COL_WIDTHS), []);
   const [ordenamiento, setOrdenamiento] = useState('nombre-asc');
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
   const [articuloAEditar, setArticuloAEditar] = useState(null);
@@ -1521,16 +1560,37 @@ const InventarioPage = () => {
 
         {/* Vista Desktop: Tabla */}
         <div className="hidden md:block overflow-x-auto max-h-[calc(100vh-300px)] overflow-y-auto">
-          <table className="w-full">
+          <div className="flex justify-end px-4 py-1">
+            <button onClick={resetColWidths} className="text-xs text-gray-500 hover:text-gray-700 underline" title="Restablecer anchos de columna">
+              Restablecer columnas
+            </button>
+          </div>
+          <table className="w-full" style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              {COLS_INVENTARIO.map((k) => (
+                <col key={k} style={{ width: `${colWidths[k]}px` }} />
+              ))}
+            </colgroup>
             <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Artículo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Total</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Disponible</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                {[
+                  { key: 'articulo', label: 'Artículo', align: 'left' },
+                  { key: 'categoria', label: 'Categoría', align: 'left' },
+                  { key: 'ubicacion', label: 'Ubicación', align: 'left' },
+                  { key: 'stockTotal', label: 'Stock Total', align: 'left' },
+                  { key: 'stockDisp', label: 'Stock Disponible', align: 'left' },
+                  { key: 'unidad', label: 'Unidad', align: 'left' },
+                  { key: 'acciones', label: 'Acciones', align: 'right' },
+                ].map(({ key, label, align }) => (
+                  <th key={key} className={`relative px-4 py-3 text-${align} text-xs font-medium text-gray-500 uppercase tracking-wider select-none overflow-hidden`}>
+                    <span className="block truncate">{label}</span>
+                    <div
+                      onMouseDown={(e) => startResizeCol(key, e)}
+                      className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors"
+                      title="Arrastrar para redimensionar"
+                    />
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
