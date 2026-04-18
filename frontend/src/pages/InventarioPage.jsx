@@ -1398,29 +1398,6 @@ const InventarioPage = () => {
             )}
           </div>
 
-          {/* Tabs: Consumibles / Herramientas (ocultos en modo herramientas global) */}
-          {almacenSeleccionado !== 'herramientas' && (
-            <div className="flex bg-gray-100 rounded-lg p-1 flex-1 sm:flex-initial">
-              <button
-                onClick={() => setTabActivo('consumibles')}
-                className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${tabActivo === 'consumibles'
-                  ? 'bg-white text-red-700 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-                  }`}
-              >
-                📦 Consumibles
-              </button>
-              <button
-                onClick={() => setTabActivo('herramientas')}
-                className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${tabActivo === 'herramientas'
-                  ? 'bg-white text-red-700 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-                  }`}
-              >
-                🔧 Herramientas
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Botones de acción - wrapeables en móvil */}
