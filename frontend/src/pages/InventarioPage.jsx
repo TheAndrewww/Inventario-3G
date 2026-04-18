@@ -56,6 +56,9 @@ const InventarioPage = () => {
   const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState(null);
   const [almacenSeleccionado, setAlmacenSeleccionado] = useState(null); // Filtro de almacén (ID o null = gate sin seleccionar)
   const [almacenesData, setAlmacenesData] = useState([]); // Almacenes desde la API
+  const [todasCategorias, setTodasCategorias] = useState([]); // Todas las categorías (para edición rápida)
+  const [todasUbicaciones, setTodasUbicaciones] = useState([]); // Todas las ubicaciones con su almacén (para edición rápida)
+  const [actualizandoArt, setActualizandoArt] = useState(new Set()); // IDs siendo actualizados
   const [tabActivo, setTabActivo] = useState('consumibles'); // Nuevo: 'consumibles' o 'herramientas'
   const [mostrarDesactivados, setMostrarDesactivados] = useState(false);
 
@@ -180,7 +183,61 @@ const InventarioPage = () => {
     fetchCategorias();
     fetchUbicaciones();
     fetchArticulosConteo();
+    fetchTodasCategorias();
+    fetchTodasUbicaciones();
   }, []);
+
+  const fetchTodasCategorias = async () => {
+    try {
+      const data = await categoriasService.getAll();
+      setTodasCategorias(Array.isArray(data) ? data : []);
+    } catch (e) { console.error('Error cargando todas las categorías:', e); }
+  };
+
+  const fetchTodasUbicaciones = async () => {
+    try {
+      const data = await ubicacionesService.getAll();
+      setTodasUbicaciones(Array.isArray(data) ? data : []);
+    } catch (e) { console.error('Error cargando todas las ubicaciones:', e); }
+  };
+
+  const handleQuickUpdate = async (item, field, value) => {
+    const parsed = value === '' ? null : Number(value);
+    if (item[field] === parsed) return;
+    setActualizandoArt(prev => new Set(prev).add(item.id));
+    try {
+      await articulosService.update(item.id, { [field]: parsed });
+      // Actualizar localmente sin refetch completo
+      setArticulos(prev => prev.map(a => {
+        if (a.id !== item.id) return a;
+        const updated = { ...a, [field]: parsed };
+        if (field === 'categoria_id') {
+          updated.categoria = todasCategorias.find(c => c.id === parsed) || null;
+        } else if (field === 'ubicacion_id') {
+          const ub = todasUbicaciones.find(u => u.id === parsed) || null;
+          updated.ubicacion = ub;
+        }
+        return updated;
+      }));
+      toast.success('Artículo actualizado');
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Error al actualizar');
+    } finally {
+      setActualizandoArt(prev => { const n = new Set(prev); n.delete(item.id); return n; });
+    }
+  };
+
+  // Ubicaciones agrupadas por almacén para el dropdown
+  const ubicacionesPorAlmacen = React.useMemo(() => {
+    const grupos = {};
+    todasUbicaciones.forEach(u => {
+      const nomAl = u.almacen_ref?.nombre || u.almacen || 'SIN ALMACÉN';
+      if (!grupos[nomAl]) grupos[nomAl] = [];
+      grupos[nomAl].push(u);
+    });
+    return grupos;
+  }, [todasUbicaciones]);
 
   // Cuando cambia el almacén seleccionado, recargar categorías y ubicaciones filtradas
   useEffect(() => {
@@ -1661,16 +1718,46 @@ const InventarioPage = () => {
                           </div>
                         </td>
 
-                        {/* Categoría */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                            {item.categoria?.nombre || 'Sin categoría'}
-                          </span>
+                        {/* Categoría — editable inline */}
+                        <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                          {puedeEditarArticulos ? (
+                            <select
+                              value={item.categoria_id ?? ''}
+                              onChange={(e) => handleQuickUpdate(item, 'categoria_id', e.target.value)}
+                              disabled={actualizandoArt.has(item.id)}
+                              className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border-0 cursor-pointer hover:bg-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none disabled:opacity-50"
+                            >
+                              <option value="">Sin categoría</option>
+                              {todasCategorias.map(c => (
+                                <option key={c.id} value={c.id}>{c.nombre}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                              {item.categoria?.nombre || 'Sin categoría'}
+                            </span>
+                          )}
                         </td>
 
-                        {/* Ubicación */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm">
-                          {esUbicacionRevisar ? (
+                        {/* Ubicación — editable inline (incluye cambio de almacén) */}
+                        <td className="px-2 py-2 overflow-hidden text-sm" onClick={(e) => e.stopPropagation()}>
+                          {puedeEditarArticulos ? (
+                            <select
+                              value={item.ubicacion_id ?? ''}
+                              onChange={(e) => handleQuickUpdate(item, 'ubicacion_id', e.target.value)}
+                              disabled={actualizandoArt.has(item.id)}
+                              className={`w-full px-2 py-1 rounded border cursor-pointer focus:ring-2 focus:outline-none disabled:opacity-50 ${esUbicacionRevisar ? 'bg-yellow-100 border-yellow-400 text-yellow-900 font-bold focus:ring-yellow-400' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-red-400'}`}
+                            >
+                              <option value="">Sin asignar</option>
+                              {Object.entries(ubicacionesPorAlmacen).map(([nomAl, ubics]) => (
+                                <optgroup key={nomAl} label={nomAl}>
+                                  {ubics.map(u => (
+                                    <option key={u.id} value={u.id}>{u.codigo || u.nombre}</option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                            </select>
+                          ) : esUbicacionRevisar ? (
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border-2 border-yellow-400">
                               ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
                             </span>
@@ -1856,16 +1943,46 @@ const InventarioPage = () => {
                             </div>
                           </td>
 
-                          {/* Categoría */}
-                          <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                              {item.categoria?.nombre || 'Sin categoría'}
-                            </span>
+                          {/* Categoría — editable inline */}
+                          <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            {puedeEditarArticulos ? (
+                              <select
+                                value={item.categoria_id ?? ''}
+                                onChange={(e) => handleQuickUpdate(item, 'categoria_id', e.target.value)}
+                                disabled={actualizandoArt.has(item.id)}
+                                className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border-0 cursor-pointer hover:bg-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none disabled:opacity-50"
+                              >
+                                <option value="">Sin categoría</option>
+                                {todasCategorias.map(c => (
+                                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                {item.categoria?.nombre || 'Sin categoría'}
+                              </span>
+                            )}
                           </td>
 
-                          {/* Ubicación */}
-                          <td className="px-4 py-4 whitespace-nowrap text-sm cursor-pointer" onClick={() => handleVerDetalle(item)}>
-                            {esUbicacionRevisar ? (
+                          {/* Ubicación — editable inline */}
+                          <td className="px-2 py-2 overflow-hidden text-sm" onClick={(e) => e.stopPropagation()}>
+                            {puedeEditarArticulos ? (
+                              <select
+                                value={item.ubicacion_id ?? ''}
+                                onChange={(e) => handleQuickUpdate(item, 'ubicacion_id', e.target.value)}
+                                disabled={actualizandoArt.has(item.id)}
+                                className={`w-full px-2 py-1 rounded border cursor-pointer focus:ring-2 focus:outline-none disabled:opacity-50 ${esUbicacionRevisar ? 'bg-yellow-100 border-yellow-400 text-yellow-900 font-bold focus:ring-yellow-400' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-red-400'}`}
+                              >
+                                <option value="">Sin asignar</option>
+                                {Object.entries(ubicacionesPorAlmacen).map(([nomAl, ubics]) => (
+                                  <optgroup key={nomAl} label={nomAl}>
+                                    {ubics.map(u => (
+                                      <option key={u.id} value={u.id}>{u.codigo || u.nombre}</option>
+                                    ))}
+                                  </optgroup>
+                                ))}
+                              </select>
+                            ) : esUbicacionRevisar ? (
                               <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border-2 border-yellow-400">
                                 ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
                               </span>
