@@ -1562,17 +1562,22 @@ const InventarioPage = () => {
                     // Detectar si el artículo está en el conteo cíclico activo
                     const esEnConteo = articulosEnConteo.has(item.id);
 
+                    // Stock 0 con mínimo > 0 → necesita resurtido urgente
+                    const esSinStockCritico = parseFloat(item.stock_actual) === 0 && parseFloat(item.stock_minimo) > 0;
+
                     return (
                       <tr
                         key={item.id}
                         onClick={() => handleVerDetalle(item)}
                         className={`transition-colors cursor-pointer ${esPendienteRevision
                           ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
-                          : esUbicacionRevisar
-                            ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
-                            : esEnConteo
-                              ? 'bg-blue-50 hover:bg-blue-100 border-l-4 border-blue-400'
-                              : 'hover:bg-gray-50'
+                          : esSinStockCritico
+                            ? 'bg-red-100 hover:bg-red-200 border-l-4 border-red-600'
+                            : esUbicacionRevisar
+                              ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                              : esEnConteo
+                                ? 'bg-blue-50 hover:bg-blue-100 border-l-4 border-blue-400'
+                                : 'hover:bg-gray-50'
                           }`}
                       >
                         {/* Artículo con imagen */}
@@ -2046,17 +2051,22 @@ const InventarioPage = () => {
                 // Detectar si el artículo está en el conteo cíclico activo
                 const esEnConteo = articulosEnConteo.has(item.id);
 
+                // Stock 0 con mínimo > 0 → necesita resurtido urgente
+                const esSinStockCritico = parseFloat(item.stock_actual) === 0 && parseFloat(item.stock_minimo) > 0;
+
                 return (
                   <div
                     key={`consumible-${item.id}`}
                     onClick={() => handleVerDetalle(item)}
                     className={`p-3 transition-colors cursor-pointer ${esPendienteRevision
                       ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
-                      : esUbicacionRevisar
-                        ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
-                        : esEnConteo
-                          ? 'bg-blue-50 hover:bg-blue-100 border-l-4 border-blue-400'
-                          : 'hover:bg-gray-50'
+                      : esSinStockCritico
+                        ? 'bg-red-100 hover:bg-red-200 border-l-4 border-red-600'
+                        : esUbicacionRevisar
+                          ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                          : esEnConteo
+                            ? 'bg-blue-50 hover:bg-blue-100 border-l-4 border-blue-400'
+                            : 'hover:bg-gray-50'
                       }`}
                   >
                     <div className="flex gap-3">
