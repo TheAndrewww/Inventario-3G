@@ -4,6 +4,7 @@ import { Modal, ImageUpload } from '../common';
 import toast from 'react-hot-toast';
 import categoriasService from '../../services/categorias.service';
 import ubicacionesService from '../../services/ubicaciones.service';
+import almacenesService from '../../services/almacenes.service';
 import proveedoresService from '../../services/proveedores.service';
 import articulosService from '../../services/articulos.service';
 import movimientosService from '../../services/movimientos.service';
@@ -16,6 +17,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
+  const [almacenes, setAlmacenes] = useState([]);
+  const [almacenSeleccionadoForm, setAlmacenSeleccionadoForm] = useState('');
   const [proveedores, setProveedores] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
@@ -102,6 +105,10 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
           es_herramienta: articulo.es_herramienta || false
         });
 
+        // Pre-seleccionar el almacén basado en la ubicación del artículo
+        const almacenIdArt = articulo.ubicacion?.almacen_id || articulo.ubicacion?.almacen_ref?.id || '';
+        setAlmacenSeleccionadoForm(almacenIdArt ? String(almacenIdArt) : '');
+
         // Cargar proveedores seleccionados si existen
         if (articulo.proveedores && articulo.proveedores.length > 0) {
           setProveedoresSeleccionados(
@@ -154,6 +161,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         setArticuloSeleccionado(null);
         setCantidadIngreso('');
         setObservacionesIngreso('');
+        setAlmacenSeleccionadoForm('');
 
         // Cargar todos los artículos para el autocomplete
         fetchTodosArticulos();
@@ -177,14 +185,16 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
 
   const fetchCatalogos = async () => {
     try {
-      const [categoriasData, ubicacionesData, proveedoresResponse] = await Promise.all([
+      const [categoriasData, ubicacionesData, almacenesData, proveedoresResponse] = await Promise.all([
         categoriasService.getAll(),
         ubicacionesService.getAll(),
+        almacenesService.getAll(),
         proveedoresService.listar({ activo: true })
       ]);
 
       setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       setUbicaciones(Array.isArray(ubicacionesData) ? ubicacionesData : []);
+      setAlmacenes(Array.isArray(almacenesData) ? almacenesData.filter(a => a.activo !== false) : []);
 
       // El servicio devuelve response.data que es { data: { proveedores: [...] } }
       console.log('Respuesta completa de proveedores:', proveedoresResponse);
@@ -1124,6 +1134,38 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
               </div>
             )}
 
+            {/* Almacén - Solo visible para admin y encargado */}
+            {!esAlmacen && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Almacén <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={almacenSeleccionadoForm}
+                  onChange={(e) => {
+                    setAlmacenSeleccionadoForm(e.target.value);
+                    // Si la ubicación actual no pertenece al nuevo almacén, limpiarla
+                    const nuevoId = e.target.value;
+                    const ubicActual = ubicaciones.find(u => String(u.id) === String(formData.ubicacion_id));
+                    const ubicAlmId = ubicActual?.almacen_id || ubicActual?.almacen_ref?.id;
+                    if (!nuevoId || (ubicAlmId && String(ubicAlmId) !== String(nuevoId))) {
+                      setFormData(prev => ({ ...prev, ubicacion_id: '' }));
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                  disabled={loading}
+                  required
+                >
+                  <option value="">Seleccionar almacén...</option>
+                  {almacenes.map(al => (
+                    <option key={al.id} value={al.id}>
+                      📦 {al.nombre.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Ubicación - Solo visible para admin y encargado */}
             {!esAlmacen && (
               <div>
@@ -1132,25 +1174,35 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                 </label>
 
                 {!showNuevaUbicacion ? (
-                  <select
-                    key={`ubicacion-select-${ubicaciones.length}`}
-                    name="ubicacion_id"
-                    value={formData.ubicacion_id}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                    disabled={loading}
-                    required={!esAlmacen}
-                  >
-                    <option value="">Seleccionar...</option>
-                    {ubicaciones.map(ub => (
-                      <option key={ub.id} value={ub.id}>
-                        {ub.codigo} - {ub.descripcion}
-                      </option>
-                    ))}
-                    <option value="nueva_ubicacion" className="text-red-700 font-medium">
-                      + Crear nueva ubicación
-                    </option>
-                  </select>
+                  <>
+                    <select
+                      key={`ubicacion-select-${ubicaciones.length}-${almacenSeleccionadoForm}`}
+                      name="ubicacion_id"
+                      value={formData.ubicacion_id}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 disabled:bg-gray-100"
+                      disabled={loading || !almacenSeleccionadoForm}
+                      required={!esAlmacen}
+                    >
+                      <option value="">{almacenSeleccionadoForm ? 'Seleccionar...' : 'Primero elige un almacén'}</option>
+                      {ubicaciones
+                        .filter(ub => {
+                          if (!almacenSeleccionadoForm) return false;
+                          const ubAl = ub.almacen_id || ub.almacen_ref?.id;
+                          return String(ubAl) === String(almacenSeleccionadoForm);
+                        })
+                        .map(ub => (
+                          <option key={ub.id} value={ub.id}>
+                            {ub.codigo}{ub.descripcion ? ` - ${ub.descripcion}` : ''}
+                          </option>
+                        ))}
+                      {almacenSeleccionadoForm && (
+                        <option value="nueva_ubicacion" className="text-red-700 font-medium">
+                          + Crear nueva ubicación
+                        </option>
+                      )}
+                    </select>
+                  </>
                 ) : (
                   <div className="space-y-2">
                     <div className="flex gap-2">
@@ -1468,17 +1520,20 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             </div>
 
             {/* Toggle Es Herramienta */}
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className={`flex items-center gap-3 p-3 rounded-lg border ${formData.es_herramienta ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-200'}`}>
               <input
                 type="checkbox"
                 id="es_herramienta"
                 name="es_herramienta"
                 checked={formData.es_herramienta}
                 onChange={(e) => setFormData({ ...formData, es_herramienta: e.target.checked })}
-                className="w-4 h-4 text-red-700 bg-gray-100 border-gray-300 rounded focus:ring-red-700 focus:ring-2"
+                className="w-5 h-5 text-blue-700 bg-gray-100 border-gray-300 rounded focus:ring-blue-700 focus:ring-2"
               />
-              <label htmlFor="es_herramienta" className="text-sm font-medium text-gray-700 cursor-pointer">
-                ¿Es una herramienta para renta?
+              <label htmlFor="es_herramienta" className="text-sm font-medium text-gray-700 cursor-pointer flex-1">
+                🔧 <strong>Es una herramienta</strong>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  Si marcas esto, el artículo aparecerá en la sección "HERRAMIENTAS" del gate principal en lugar de en su almacén.
+                </span>
               </label>
             </div>
 
