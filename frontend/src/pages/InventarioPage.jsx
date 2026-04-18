@@ -148,8 +148,14 @@ const InventarioPage = () => {
   // Cuando cambia el almacén seleccionado, recargar categorías y ubicaciones filtradas
   useEffect(() => {
     if (almacenSeleccionado === null) return; // Gate activo, no fetchear
-    fetchCategorias(almacenSeleccionado);
-    fetchUbicaciones(almacenSeleccionado);
+    if (almacenSeleccionado === 'herramientas') {
+      // Modo herramientas: sin filtro de almacén
+      fetchCategorias();
+      fetchUbicaciones();
+    } else {
+      fetchCategorias(almacenSeleccionado);
+      fetchUbicaciones(almacenSeleccionado);
+    }
     // Limpiar filtros de categoría y ubicación al cambiar almacén
     setCategoriaSeleccionada(null);
     setUbicacionSeleccionada(null);
@@ -311,7 +317,8 @@ const InventarioPage = () => {
           const matchesActiveFilter = mostrarDesactivados ? !isActive : isActive;
           const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
           const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
-          const matchesAlmacen = item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
+          const matchesAlmacen = almacenSeleccionado === 'herramientas' ||
+            (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
 
           return matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen;
         })
@@ -360,7 +367,8 @@ const InventarioPage = () => {
         const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
 
         // Filtrar por almacén
-        const matchesAlmacen = item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
+        const matchesAlmacen = almacenSeleccionado === 'herramientas' ||
+          (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
 
         // Filtrar por tipo según el tab activo
         const estaEnTabCorrecto = tabActivo === 'consumibles'
@@ -1261,42 +1269,53 @@ const InventarioPage = () => {
     return <Loader fullScreen />;
   }
 
-  // Gate: si no hay almacén seleccionado, mostrar selector de almacenes
+  // Gate: si no hay almacén seleccionado, mostrar selector
   if (almacenSeleccionado === null) {
     return (
       <div className="p-4 md:p-6 min-h-[70vh] flex flex-col items-center justify-center">
-        <div className="max-w-4xl w-full">
+        <div className="max-w-5xl w-full">
           <div className="text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Selecciona un almacén</h1>
-            <p className="text-gray-600">Elige el almacén cuyo inventario deseas consultar</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">¿Qué deseas consultar?</h1>
+            <p className="text-gray-600">Elige un almacén o ve directamente a herramientas</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
-            {almacenesDisponibles.length === 0 ? (
-              <div className="col-span-full text-center text-gray-500 py-8">
-                No hay almacenes disponibles
-              </div>
-            ) : (
-              almacenesDisponibles.map((almacen) => (
-                <button
-                  key={almacen.id}
-                  onClick={() => setAlmacenSeleccionado(almacen.id)}
-                  className="group bg-white border-2 border-gray-200 rounded-2xl p-8 hover:border-red-700 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
-                >
-                  <div className="w-20 h-20 rounded-full bg-red-50 group-hover:bg-red-700 transition-colors flex items-center justify-center">
-                    <Package size={40} className="text-red-700 group-hover:text-white transition-colors" />
-                  </div>
-                  <span className="text-xl md:text-2xl font-bold text-gray-900 uppercase tracking-wide">
-                    {almacen.nombre}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {almacenesDisponibles.map((almacen) => (
+              <button
+                key={almacen.id}
+                onClick={() => { setAlmacenSeleccionado(almacen.id); setTabActivo('consumibles'); }}
+                className="group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-red-700 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
+              >
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-50 group-hover:bg-red-700 transition-colors flex items-center justify-center">
+                  <Package size={36} className="text-red-700 group-hover:text-white transition-colors" />
+                </div>
+                <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">
+                  {almacen.nombre}
+                </span>
+                {typeof almacen.articulos_count === 'number' && (
+                  <span className="text-sm text-gray-500">
+                    {almacen.articulos_count} artículo{almacen.articulos_count === 1 ? '' : 's'}
                   </span>
-                  {typeof almacen.articulos_count === 'number' && (
-                    <span className="text-sm text-gray-500">
-                      {almacen.articulos_count} artículo{almacen.articulos_count === 1 ? '' : 's'}
-                    </span>
-                  )}
-                </button>
-              ))
-            )}
+                )}
+              </button>
+            ))}
+            <button
+              onClick={() => { setAlmacenSeleccionado('herramientas'); setTabActivo('herramientas'); }}
+              className="group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-blue-700 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
+            >
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-50 group-hover:bg-blue-700 transition-colors flex items-center justify-center">
+                <Wrench size={36} className="text-blue-700 group-hover:text-white transition-colors" />
+              </div>
+              <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">
+                Herramientas
+              </span>
+              <span className="text-sm text-gray-500">Todos los almacenes</span>
+            </button>
           </div>
+          {almacenesDisponibles.length === 0 && (
+            <div className="text-center text-gray-500 py-8">
+              No hay almacenes disponibles
+            </div>
+          )}
           {esAdministrador && (
             <div className="mt-6 text-center">
               <button
@@ -1344,12 +1363,21 @@ const InventarioPage = () => {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           {/* Almacén actual + botón para cambiar */}
           <div className="flex gap-2 flex-shrink-0 items-center">
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-lg">
-              <Package size={18} className="text-red-700" />
-              <span className="font-semibold text-red-700 uppercase tracking-wide text-sm md:text-base">
-                {almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén'}
-              </span>
-            </div>
+            {almacenSeleccionado === 'herramientas' ? (
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                <Wrench size={18} className="text-blue-700" />
+                <span className="font-semibold text-blue-700 uppercase tracking-wide text-sm md:text-base">
+                  Herramientas
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-lg">
+                <Package size={18} className="text-red-700" />
+                <span className="font-semibold text-red-700 uppercase tracking-wide text-sm md:text-base">
+                  {almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén'}
+                </span>
+              </div>
+            )}
             <button
               onClick={() => setAlmacenSeleccionado(null)}
               className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-2 text-sm"
@@ -1370,27 +1398,29 @@ const InventarioPage = () => {
             )}
           </div>
 
-          {/* Tabs: Consumibles / Herramientas */}
-          <div className="flex bg-gray-100 rounded-lg p-1 flex-1 sm:flex-initial">
-            <button
-              onClick={() => setTabActivo('consumibles')}
-              className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${tabActivo === 'consumibles'
-                ? 'bg-white text-red-700 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              📦 Consumibles
-            </button>
-            <button
-              onClick={() => setTabActivo('herramientas')}
-              className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${tabActivo === 'herramientas'
-                ? 'bg-white text-red-700 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              🔧 Herramientas
-            </button>
-          </div>
+          {/* Tabs: Consumibles / Herramientas (ocultos en modo herramientas global) */}
+          {almacenSeleccionado !== 'herramientas' && (
+            <div className="flex bg-gray-100 rounded-lg p-1 flex-1 sm:flex-initial">
+              <button
+                onClick={() => setTabActivo('consumibles')}
+                className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${tabActivo === 'consumibles'
+                  ? 'bg-white text-red-700 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+                  }`}
+              >
+                📦 Consumibles
+              </button>
+              <button
+                onClick={() => setTabActivo('herramientas')}
+                className={`flex-1 sm:flex-initial px-4 md:px-6 py-2 text-sm md:text-base font-medium rounded-md transition-all ${tabActivo === 'herramientas'
+                  ? 'bg-white text-red-700 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+                  }`}
+              >
+                🔧 Herramientas
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Botones de acción - wrapeables en móvil */}
