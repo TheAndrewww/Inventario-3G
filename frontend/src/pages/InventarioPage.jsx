@@ -53,8 +53,6 @@ const InventarioPage = () => {
   const [almacenSeleccionado, setAlmacenSeleccionado] = useState(null); // Filtro de almacén (ID o null = gate sin seleccionar)
   const [almacenesData, setAlmacenesData] = useState([]); // Almacenes desde la API
   const [tabActivo, setTabActivo] = useState('consumibles'); // Nuevo: 'consumibles' o 'herramientas'
-  const [mostrarCategorias, setMostrarCategorias] = useState(false);
-  const [mostrarUbicaciones, setMostrarUbicaciones] = useState(false);
   const [mostrarDesactivados, setMostrarDesactivados] = useState(false);
   const [ordenamiento, setOrdenamiento] = useState('nombre-asc');
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
@@ -1421,26 +1419,59 @@ const InventarioPage = () => {
             <ArrowUpDown size={16} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
 
-          <button
-            onClick={() => setMostrarCategorias(!mostrarCategorias)}
-            className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border rounded-lg transition-colors ${mostrarCategorias
-              ? 'bg-red-700 text-white border-red-700 hover:bg-red-800'
-              : 'border-gray-300 hover:bg-gray-50'
-              }`}
-          >
-            <Package size={18} />
-            <span className="hidden sm:inline">Categorías</span>
-          </button>
-          <button
-            onClick={() => setMostrarUbicaciones(!mostrarUbicaciones)}
-            className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border rounded-lg transition-colors ${mostrarUbicaciones
-              ? 'bg-red-700 text-white border-red-700 hover:bg-red-800'
-              : 'border-gray-300 hover:bg-gray-50'
-              }`}
-          >
-            <MapPin size={18} />
-            <span className="hidden sm:inline">Ubicaciones</span>
-          </button>
+          {/* Filtro de categoría */}
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <select
+                value={categoriaSeleccionada ?? ''}
+                onChange={(e) => setCategoriaSeleccionada(e.target.value ? Number(e.target.value) : null)}
+                className="appearance-none pl-9 pr-8 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-700"
+              >
+                <option value="">Todas las categorías</option>
+                {categorias.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                ))}
+              </select>
+              <Package size={16} className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none" />
+              <ChevronDown size={14} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            {puedeCrearArticulos && (
+              <button
+                onClick={() => handleAbrirModalCategoria()}
+                className="px-2 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                title="Nueva categoría"
+              >
+                <Plus size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Filtro de ubicación */}
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <select
+                value={ubicacionSeleccionada ?? ''}
+                onChange={(e) => setUbicacionSeleccionada(e.target.value ? Number(e.target.value) : null)}
+                className="appearance-none pl-9 pr-8 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-700"
+              >
+                <option value="">Todas las ubicaciones</option>
+                {ubicaciones.map((ub) => (
+                  <option key={ub.id} value={ub.id}>{ub.codigo || ub.nombre}</option>
+                ))}
+              </select>
+              <MapPin size={16} className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none" />
+              <ChevronDown size={14} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            {puedeCrearArticulos && (
+              <button
+                onClick={() => handleAbrirModalUbicacion()}
+                className="px-2 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                title="Nueva ubicación"
+              >
+                <Plus size={16} />
+              </button>
+            )}
+          </div>
           {puedeCrearArticulos && (
             <>
               <button
@@ -1475,143 +1506,6 @@ const InventarioPage = () => {
           )}
         </div>
 
-        {/* Filtros de categorías */}
-        {mostrarCategorias && (
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Package size={18} className="text-gray-600" />
-                <h3 className="font-medium text-gray-900">Filtrar por categoría</h3>
-              </div>
-              {puedeCrearArticulos && (
-                <button
-                  onClick={() => handleAbrirModalCategoria()}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors"
-                >
-                  <Plus size={16} />
-                  Nueva
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setCategoriaSeleccionada(null)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${categoriaSeleccionada === null
-                  ? 'bg-red-700 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-              >
-                Todas
-              </button>
-              {categorias.map((categoria) => (
-                <div key={categoria.id} className="relative group">
-                  <button
-                    onClick={() => setCategoriaSeleccionada(categoria.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${categoriaSeleccionada === categoria.id
-                      ? 'bg-red-700 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      } ${puedeCrearArticulos ? 'pr-8' : ''}`}
-                  >
-                    {categoria.nombre}
-                  </button>
-                  {puedeCrearArticulos && (
-                    <div className="absolute top-0 right-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAbrirModalCategoria(categoria);
-                        }}
-                        className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
-                        title="Editar"
-                      >
-                        <Edit2 size={10} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEliminarCategoria(categoria);
-                        }}
-                        className="p-1.5 bg-red-600 text-white rounded hover:bg-red-700"
-                        title="Eliminar"
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Filtros de ubicaciones */}
-        {mostrarUbicaciones && (
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <MapPin size={18} className="text-gray-600" />
-                <h3 className="font-medium text-gray-900">Filtrar por ubicación</h3>
-              </div>
-              {puedeCrearArticulos && (
-                <button
-                  onClick={() => handleAbrirModalUbicacion()}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors"
-                >
-                  <Plus size={16} />
-                  Nueva
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setUbicacionSeleccionada(null)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${ubicacionSeleccionada === null
-                  ? 'bg-red-700 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-              >
-                Todas
-              </button>
-              {ubicaciones.map((ubicacion) => (
-                <div key={ubicacion.id} className="relative group">
-                  <button
-                    onClick={() => setUbicacionSeleccionada(ubicacion.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${ubicacionSeleccionada === ubicacion.id
-                      ? 'bg-red-700 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      } ${puedeCrearArticulos ? 'pr-8' : ''}`}
-                  >
-                    {ubicacion.codigo || ubicacion.nombre}
-                  </button>
-                  {puedeCrearArticulos && (
-                    <div className="absolute top-0 right-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAbrirModalUbicacion(ubicacion);
-                        }}
-                        className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
-                        title="Editar"
-                      >
-                        <Edit2 size={10} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEliminarUbicacion(ubicacion);
-                        }}
-                        className="p-1.5 bg-red-600 text-white rounded hover:bg-red-700"
-                        title="Eliminar"
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Sección Unificada: Artículos (Consumibles + Herramientas) */}
