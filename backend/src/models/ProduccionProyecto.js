@@ -386,9 +386,8 @@ ProduccionProyecto.prototype.regresarEtapa = async function (usuarioId) {
  * @param {number} usuarioId - ID del usuario que completa
  */
 ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEtapa, usuarioId) {
-    if (this.etapa_actual !== 'produccion') {
-        throw new Error('El proyecto no está en la etapa de Producción');
-    }
+    // ETAPAS PARALELAS: se permite completar manufactura/herrería aunque el proyecto
+    // aún no esté formalmente en 'produccion' (archivos pueden subirse antes).
 
     const ahora = new Date();
 
