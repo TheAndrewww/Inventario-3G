@@ -113,61 +113,18 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
         console.log(`   Variantes normalizadas: [${variantes.map(v => `"${v}"`).join(', ')}]`);
         console.log(`   Carpetas de meses encontradas: ${carpetasMeses.map(c => c.name).join(', ')}`);
 
-        // Función auxiliar para buscar coincidencia en una lista de carpetas.
-        // Estrategia en 2 pasadas para evitar que proyectos con nombres parecidos
-        // (p.ej. "MIGUEL ANGEL GONZALEZ" vs "ING. MIGUEL ANGEL GONZALEZ") caigan en
-        // la misma carpeta por un substring laxo.
-        //   Pasada 1: match exacto normalizado (si existe, gana siempre).
-        //   Pasada 2: mejor substring por cercanía de longitud a la variante.
-        const buscarEnCarpetas = (carpetas, carpetaMes, subcarpeta) => {
-            const ubicacion = subcarpeta ? `${carpetaMes.name}/${subcarpeta}` : carpetaMes.name;
+        // ESTRATEGIA: primero recolectamos TODAS las carpetas candidatas en todos
+        // los meses (y subcarpetas MTO/GTIA), luego corremos 2 pasadas de matching:
+        //   Pasada 1: match exacto — si existe en cualquier mes, gana siempre.
+        //   Pasada 2: mejor substring — ranking global por cercanía de longitud.
+        //
+        // La alternativa ingenua (retornar en el primer mes con match) hacía que,
+        // por ejemplo, "GERARDO HERNANDEZ" (tipo C, carpeta propia) cayera en
+        // "GERARDO HERNÁNDEZ / GTIA" de ENERO si ese mes se escaneaba antes que
+        // ABRIL.
+        const todasLasCarpetas = []; // {carpeta, carpetaMes, subcarpetaName}
 
-            const posiblesCoincidencias = carpetas.filter(c => {
-                const norm = normalizarNombre(c.name);
-                return variantes.some(v => norm.includes(v.substring(0, 6)) || v.includes(norm.substring(0, 6)));
-            });
-            if (posiblesCoincidencias.length > 0) {
-                console.log(`   📁 ${ubicacion}: posibles coincidencias: [${posiblesCoincidencias.map(c => `"${c.name}"`).join(', ')}]`);
-            }
-
-            // Pasada 1: match exacto
-            for (const carpeta of carpetas) {
-                const carpetaNormalizada = normalizarNombre(carpeta.name);
-                if (variantes.some(v => carpetaNormalizada === v)) {
-                    console.log(`✅ Carpeta encontrada (exacto): "${carpeta.name}" en ${ubicacion}`);
-                    return { id: carpeta.id, name: carpeta.name, mes: carpetaMes.name };
-                }
-            }
-
-            // Pasada 2: mejor substring — ranking para resolver ambigüedad
-            let mejor = null;
-            for (const carpeta of carpetas) {
-                const carpetaNormalizada = normalizarNombre(carpeta.name);
-                for (const variante of variantes) {
-                    let score = 0;
-                    if (carpetaNormalizada.includes(variante)) {
-                        // Folder contiene la variante → preferir el folder más corto (más cercano)
-                        score = 500 - (carpetaNormalizada.length - variante.length);
-                    } else if (variante.includes(carpetaNormalizada) && carpetaNormalizada.length >= 6) {
-                        // Variante contiene al folder → solo si folder es suficientemente largo
-                        score = 100 + carpetaNormalizada.length;
-                    }
-                    if (score > 0 && (!mejor || score > mejor.score)) {
-                        mejor = { carpeta, variante, score };
-                    }
-                }
-            }
-
-            if (mejor) {
-                console.log(`✅ Carpeta encontrada (substring, score=${mejor.score}): "${mejor.carpeta.name}" en ${ubicacion} (variante: "${mejor.variante}")`);
-                return { id: mejor.carpeta.id, name: mejor.carpeta.name, mes: carpetaMes.name };
-            }
-            return null;
-        };
-
-        // Buscar en cada carpeta de mes
         for (const carpetaMes of carpetasMeses) {
-            // Buscar carpetas de proyectos dentro del mes
             const response = await drive.files.list({
                 q: `'${carpetaMes.id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
                 fields: 'files(id, name)',
@@ -175,14 +132,14 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
                 supportsAllDrives: true,
                 includeItemsFromAllDrives: true
             });
-
             const carpetasProyectos = response.data.files || [];
 
-            // Buscar directamente en la carpeta del mes
-            const resultado = buscarEnCarpetas(carpetasProyectos, carpetaMes, null);
-            if (resultado) return resultado;
+            // Carpetas directamente dentro del mes
+            for (const carpeta of carpetasProyectos) {
+                todasLasCarpetas.push({ carpeta, carpetaMes, subcarpetaName: null });
+            }
 
-            // Buscar dentro de subcarpetas tipo MANTENIMIENTO, GARANTIA, etc.
+            // Subcarpetas especiales tipo MANTENIMIENTO, GARANTIA
             const subcarpetasEspeciales = carpetasProyectos.filter(c => {
                 const norm = normalizarNombre(c.name);
                 return norm.includes('MANTENIMIENTO') || norm.includes('MTO') ||
@@ -197,11 +154,45 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
                     supportsAllDrives: true,
                     includeItemsFromAllDrives: true
                 });
-
-                const carpetasDentro = subResponse.data.files || [];
-                const resultadoSub = buscarEnCarpetas(carpetasDentro, carpetaMes, subcarpeta.name);
-                if (resultadoSub) return resultadoSub;
+                for (const carpeta of (subResponse.data.files || [])) {
+                    todasLasCarpetas.push({ carpeta, carpetaMes, subcarpetaName: subcarpeta.name });
+                }
             }
+        }
+
+        const ubicacionDe = (c) => c.subcarpetaName ? `${c.carpetaMes.name}/${c.subcarpetaName}` : c.carpetaMes.name;
+
+        // Pasada 1: match exacto (global — gana siempre, sin importar el mes)
+        for (const item of todasLasCarpetas) {
+            const norm = normalizarNombre(item.carpeta.name);
+            if (variantes.some(v => norm === v)) {
+                console.log(`✅ Carpeta encontrada (exacto): "${item.carpeta.name}" en ${ubicacionDe(item)}`);
+                return { id: item.carpeta.id, name: item.carpeta.name, mes: item.carpetaMes.name };
+            }
+        }
+
+        // Pasada 2: mejor substring — ranking global.
+        let mejor = null;
+        for (const item of todasLasCarpetas) {
+            const norm = normalizarNombre(item.carpeta.name);
+            for (const variante of variantes) {
+                let score = 0;
+                if (norm.includes(variante)) {
+                    // Folder contiene la variante → preferir el folder más corto
+                    score = 500 - (norm.length - variante.length);
+                } else if (variante.includes(norm) && norm.length >= 6) {
+                    // Variante contiene al folder → solo si folder es suficientemente largo
+                    score = 100 + norm.length;
+                }
+                if (score > 0 && (!mejor || score > mejor.score)) {
+                    mejor = { ...item, variante, score };
+                }
+            }
+        }
+
+        if (mejor) {
+            console.log(`✅ Carpeta encontrada (substring, score=${mejor.score}): "${mejor.carpeta.name}" en ${ubicacionDe(mejor)} (variante: "${mejor.variante}")`);
+            return { id: mejor.carpeta.id, name: mejor.carpeta.name, mes: mejor.carpetaMes.name };
         }
 
         console.log(`⚠️ No se encontró carpeta en Drive para: "${nombreProyecto}"`);
