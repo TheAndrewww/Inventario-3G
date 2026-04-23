@@ -301,7 +301,7 @@ const DashboardProduccionPage = () => {
                     type="text"
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
-                    placeholder="Buscar por nombre, cliente o tipo (A, B, C, MTO, GTIA)…"
+                    placeholder="Buscar por nombre del proyecto…"
                     className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-sm"
                 />
                 {busqueda && (

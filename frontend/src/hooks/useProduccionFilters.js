@@ -33,13 +33,9 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'activos') => {
         const q = normalizarTexto(busqueda).trim();
 
         const filtrados = proyectos.filter(p => {
-            // Búsqueda libre sobre nombre, cliente y tipo_proyecto (ignora acentos y mayúsculas)
-            if (q) {
-                const coincide =
-                    normalizarTexto(p.nombre).includes(q) ||
-                    normalizarTexto(p.cliente).includes(q) ||
-                    normalizarTexto(p.tipo_proyecto).includes(q);
-                if (!coincide) return false;
+            // Búsqueda por nombre del proyecto (ignora acentos y mayúsculas)
+            if (q && !normalizarTexto(p.nombre).includes(q)) {
+                return false;
             }
 
             switch (filtro) {
