@@ -76,12 +76,19 @@ const listarSubcarpetas = async (parentId) => {
 };
 
 /**
- * Buscar carpeta de proyecto por nombre dentro de PRODUCCION
- * Busca en todas las carpetas de meses
+ * Buscar carpeta de proyecto por nombre dentro de PRODUCCION.
+ *
+ * Si se provee `mesHint` (p.ej. "MARZO"), la búsqueda se restringe primero
+ * a las carpetas de mes cuyo nombre empieza con ese prefijo ("MARZO 01-28").
+ * Si no se encuentra match dentro del mes hinted, cae a búsqueda global
+ * como salvaguarda. Esto evita que proyectos con nombres parecidos pero
+ * en distintos meses (p.ej. ANGELICA CORMAR) se crucen.
+ *
  * @param {string} nombreProyecto - Nombre del proyecto a buscar
+ * @param {string|null} mesHint - Mes del Sheet (opcional, e.g. "MARZO")
  * @returns {Promise<Object|null>} - Carpeta encontrada o null
  */
-export const buscarCarpetaProyecto = async (nombreProyecto) => {
+export const buscarCarpetaProyecto = async (nombreProyecto, mesHint = null) => {
     try {
         const drive = await authenticate();
 
@@ -109,91 +116,115 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
             variantes.push(sinSufijo);
         }
 
-        console.log(`🔍 Buscando carpeta Drive para: "${nombreProyecto}"`);
+        console.log(`🔍 Buscando carpeta Drive para: "${nombreProyecto}"${mesHint ? ` [mes hint: ${mesHint}]` : ''}`);
         console.log(`   Variantes normalizadas: [${variantes.map(v => `"${v}"`).join(', ')}]`);
         console.log(`   Carpetas de meses encontradas: ${carpetasMeses.map(c => c.name).join(', ')}`);
 
-        // ESTRATEGIA: primero recolectamos TODAS las carpetas candidatas en todos
-        // los meses (y subcarpetas MTO/GTIA), luego corremos 2 pasadas de matching:
-        //   Pasada 1: match exacto — si existe en cualquier mes, gana siempre.
-        //   Pasada 2: mejor substring — ranking global por cercanía de longitud.
-        //
-        // La alternativa ingenua (retornar en el primer mes con match) hacía que,
-        // por ejemplo, "GERARDO HERNANDEZ" (tipo C, carpeta propia) cayera en
-        // "GERARDO HERNÁNDEZ / GTIA" de ENERO si ese mes se escaneaba antes que
-        // ABRIL.
-        const todasLasCarpetas = []; // {carpeta, carpetaMes, subcarpetaName}
-
-        for (const carpetaMes of carpetasMeses) {
-            const response = await drive.files.list({
-                q: `'${carpetaMes.id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-                fields: 'files(id, name)',
-                pageSize: 500,
-                supportsAllDrives: true,
-                includeItemsFromAllDrives: true
-            });
-            const carpetasProyectos = response.data.files || [];
-
-            // Carpetas directamente dentro del mes
-            for (const carpeta of carpetasProyectos) {
-                todasLasCarpetas.push({ carpeta, carpetaMes, subcarpetaName: null });
-            }
-
-            // Subcarpetas especiales tipo MANTENIMIENTO, GARANTIA
-            const subcarpetasEspeciales = carpetasProyectos.filter(c => {
-                const norm = normalizarNombre(c.name);
-                return norm.includes('MANTENIMIENTO') || norm.includes('MTO') ||
-                       norm.includes('GARANTIA') || norm.includes('GTIA');
-            });
-
-            for (const subcarpeta of subcarpetasEspeciales) {
-                const subResponse = await drive.files.list({
-                    q: `'${subcarpeta.id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+        // Helper para recolectar candidatos de una lista de meses.
+        // Devuelve todos los items: { carpeta, carpetaMes, subcarpetaName }.
+        const recolectarCarpetas = async (mesesAUsar) => {
+            const items = [];
+            for (const carpetaMes of mesesAUsar) {
+                const response = await drive.files.list({
+                    q: `'${carpetaMes.id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
                     fields: 'files(id, name)',
                     pageSize: 500,
                     supportsAllDrives: true,
                     includeItemsFromAllDrives: true
                 });
-                for (const carpeta of (subResponse.data.files || [])) {
-                    todasLasCarpetas.push({ carpeta, carpetaMes, subcarpetaName: subcarpeta.name });
+                const carpetasProyectos = response.data.files || [];
+
+                // Carpetas directamente dentro del mes
+                for (const carpeta of carpetasProyectos) {
+                    items.push({ carpeta, carpetaMes, subcarpetaName: null });
+                }
+
+                // Subcarpetas especiales tipo MANTENIMIENTO, GARANTIA
+                const subcarpetasEspeciales = carpetasProyectos.filter(c => {
+                    const norm = normalizarNombre(c.name);
+                    return norm.includes('MANTENIMIENTO') || norm.includes('MTO') ||
+                           norm.includes('GARANTIA') || norm.includes('GTIA');
+                });
+
+                for (const subcarpeta of subcarpetasEspeciales) {
+                    const subResponse = await drive.files.list({
+                        q: `'${subcarpeta.id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+                        fields: 'files(id, name)',
+                        pageSize: 500,
+                        supportsAllDrives: true,
+                        includeItemsFromAllDrives: true
+                    });
+                    for (const carpeta of (subResponse.data.files || [])) {
+                        items.push({ carpeta, carpetaMes, subcarpetaName: subcarpeta.name });
+                    }
                 }
             }
-        }
+            return items;
+        };
 
         const ubicacionDe = (c) => c.subcarpetaName ? `${c.carpetaMes.name}/${c.subcarpetaName}` : c.carpetaMes.name;
 
-        // Pasada 1: match exacto (global — gana siempre, sin importar el mes)
-        for (const item of todasLasCarpetas) {
-            const norm = normalizarNombre(item.carpeta.name);
-            if (variantes.some(v => norm === v)) {
-                console.log(`✅ Carpeta encontrada (exacto): "${item.carpeta.name}" en ${ubicacionDe(item)}`);
-                return { id: item.carpeta.id, name: item.carpeta.name, mes: item.carpetaMes.name };
+        // Match exacto > substring, buscando sobre una lista de candidatos.
+        const buscarEn = (items) => {
+            // Pasada 1: match exacto
+            for (const item of items) {
+                const norm = normalizarNombre(item.carpeta.name);
+                if (variantes.some(v => norm === v)) {
+                    console.log(`✅ Carpeta encontrada (exacto): "${item.carpeta.name}" en ${ubicacionDe(item)}`);
+                    return { id: item.carpeta.id, name: item.carpeta.name, mes: item.carpetaMes.name };
+                }
+            }
+
+            // Pasada 2: mejor substring
+            let mejor = null;
+            for (const item of items) {
+                const norm = normalizarNombre(item.carpeta.name);
+                for (const variante of variantes) {
+                    let score = 0;
+                    if (norm.includes(variante)) {
+                        score = 500 - (norm.length - variante.length);
+                    } else if (variante.includes(norm) && norm.length >= 6) {
+                        score = 100 + norm.length;
+                    }
+                    if (score > 0 && (!mejor || score > mejor.score)) {
+                        mejor = { ...item, variante, score };
+                    }
+                }
+            }
+
+            if (mejor) {
+                console.log(`✅ Carpeta encontrada (substring, score=${mejor.score}): "${mejor.carpeta.name}" en ${ubicacionDe(mejor)} (variante: "${mejor.variante}")`);
+                return { id: mejor.carpeta.id, name: mejor.carpeta.name, mes: mejor.carpetaMes.name };
+            }
+            return null;
+        };
+
+        // ESTRATEGIA:
+        //   1) Si hay mesHint: intentar primero SOLO en ese mes (y sus subcarpetas
+        //      MTO/GTIA). Esto es preciso cuando hay clientes repetidos en el año.
+        //   2) Si no hay match en el mes hinted (o no se dio hint), caer a búsqueda
+        //      global en todos los meses.
+        if (mesHint) {
+            const mesHintNorm = normalizarNombre(mesHint);
+            const mesesDelHint = carpetasMeses.filter(m =>
+                normalizarNombre(m.name).startsWith(mesHintNorm)
+            );
+
+            if (mesesDelHint.length > 0) {
+                console.log(`   🎯 Restringiendo búsqueda al mes del Sheet: ${mesesDelHint.map(m => m.name).join(', ')}`);
+                const itemsMes = await recolectarCarpetas(mesesDelHint);
+                const resultado = buscarEn(itemsMes);
+                if (resultado) return resultado;
+                console.log(`   ↩ No hay match en mes "${mesHint}", caigo a búsqueda global`);
+            } else {
+                console.log(`   ⚠️ No existe carpeta de mes en Drive que empiece con "${mesHint}", caigo a búsqueda global`);
             }
         }
 
-        // Pasada 2: mejor substring — ranking global.
-        let mejor = null;
-        for (const item of todasLasCarpetas) {
-            const norm = normalizarNombre(item.carpeta.name);
-            for (const variante of variantes) {
-                let score = 0;
-                if (norm.includes(variante)) {
-                    // Folder contiene la variante → preferir el folder más corto
-                    score = 500 - (norm.length - variante.length);
-                } else if (variante.includes(norm) && norm.length >= 6) {
-                    // Variante contiene al folder → solo si folder es suficientemente largo
-                    score = 100 + norm.length;
-                }
-                if (score > 0 && (!mejor || score > mejor.score)) {
-                    mejor = { ...item, variante, score };
-                }
-            }
-        }
-
-        if (mejor) {
-            console.log(`✅ Carpeta encontrada (substring, score=${mejor.score}): "${mejor.carpeta.name}" en ${ubicacionDe(mejor)} (variante: "${mejor.variante}")`);
-            return { id: mejor.carpeta.id, name: mejor.carpeta.name, mes: mejor.carpetaMes.name };
-        }
+        // Fallback: buscar en todos los meses.
+        const todasLasCarpetas = await recolectarCarpetas(carpetasMeses);
+        const resultado = buscarEn(todasLasCarpetas);
+        if (resultado) return resultado;
 
         console.log(`⚠️ No se encontró carpeta en Drive para: "${nombreProyecto}"`);
         return null;
@@ -357,8 +388,12 @@ export const sincronizarProyecto = async (proyecto) => {
             };
         }
 
-        // Buscar la carpeta del proyecto (A, B, C y todos los MTO)
-        const carpeta = await buscarCarpetaProyecto(proyecto.nombre);
+        // Buscar la carpeta del proyecto (A, B, C y todos los MTO).
+        // Usamos el mes del spreadsheet_row_id como hint para restringir la
+        // búsqueda al mes correspondiente del Drive y evitar ambigüedad cuando
+        // hay clientes con el mismo nombre en distintos meses del año.
+        const mesHint = proyecto.spreadsheet_row_id?.split('_')[0] || null;
+        const carpeta = await buscarCarpetaProyecto(proyecto.nombre, mesHint);
 
         if (!carpeta) {
             return {
