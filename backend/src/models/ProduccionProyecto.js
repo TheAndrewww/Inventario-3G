@@ -293,11 +293,11 @@ ProduccionProyecto.prototype.completarEtapaActual = async function (usuarioId, o
     const ahora = new Date();
     const etapaActual = this.etapa_actual;
 
-    // Detectar si es MTO/GTIA con timeline simplificado
+    // Detectar si usa timeline simplificado: MTO o GTIA que NO son EXTENSIVO
+    // pasan directo a Preparado sin producción.
     const tipoProyecto = this.tipo_proyecto?.toUpperCase();
-    const esGTIA = tipoProyecto === 'GTIA';
-    const esMTONoExtensivo = tipoProyecto === 'MTO' && !this.es_extensivo;
-    const usaTimelineSimplificado = esGTIA || esMTONoExtensivo;
+    const esMTOoGTIA = tipoProyecto === 'MTO' || tipoProyecto === 'GTIA';
+    const usaTimelineSimplificado = esMTOoGTIA && !this.es_extensivo;
 
     // Para MTO/GTIA con timeline simplificado: van a instalacion (Preparado), luego a completado
     if (usaTimelineSimplificado) {
@@ -723,17 +723,17 @@ ProduccionProyecto.obtenerResumenDashboard = async function () {
 
     proyectos.forEach(p => {
         const tipoProyecto = p.tipo_proyecto?.toUpperCase();
-        const esGTIA = tipoProyecto === 'GTIA';
-        const esMTONoExtensivo = tipoProyecto === 'MTO' && !p.es_extensivo;
+        const esMTOoGTIA = tipoProyecto === 'MTO' || tipoProyecto === 'GTIA';
+        const usaTimelineSimplificado = esMTOoGTIA && !p.es_extensivo;
 
         // Agrupar en resumen según etapa real
         resumen[p.etapa_actual].push(p);
 
-        // Para estadísticas: MTO/GTIA no extensivo siempre cuentan como instalación
+        // Para estadísticas: MTO/GTIA no EXTENSIVO cuentan como instalación
         // (excepto si ya están completados)
         let etapaParaEstadistica = p.etapa_actual;
 
-        if ((esGTIA || esMTONoExtensivo) && p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente') {
+        if (usaTimelineSimplificado && p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente') {
             etapaParaEstadistica = 'instalacion';
         }
 

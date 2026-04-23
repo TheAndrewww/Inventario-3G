@@ -68,10 +68,10 @@ const DashboardPreparadosTVPage = () => {
         };
     };
 
-    // Helper: detectar proyectos MTO/GTIA con timeline simplificado
+    // Helper: MTO o GTIA que NO son EXTENSIVO van directo a Preparados
     const usaTimelineSimplificado = (p) => {
         const tipo = p.tipo_proyecto?.toUpperCase();
-        return tipo === 'GTIA' || (tipo === 'MTO' && !p.es_extensivo);
+        return (tipo === 'MTO' || tipo === 'GTIA') && !p.es_extensivo;
     };
 
     // Proyectos PREPARADOS: etapa 'instalacion' O proyectos MTO/GTIA simplificados activos

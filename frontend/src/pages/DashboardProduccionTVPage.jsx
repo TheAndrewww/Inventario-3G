@@ -68,10 +68,10 @@ const DashboardProduccionTVPage = () => {
         };
     };
 
-    // Helper: detectar proyectos MTO/GTIA con timeline simplificado (van directo a Preparados)
+    // Helper: MTO o GTIA que NO son EXTENSIVO van directo a Preparados
     const usaTimelineSimplificado = (p) => {
         const tipo = p.tipo_proyecto?.toUpperCase();
-        return tipo === 'GTIA' || (tipo === 'MTO' && !p.es_extensivo);
+        return (tipo === 'MTO' || tipo === 'GTIA') && !p.es_extensivo;
     };
 
     // Proyectos EN PRODUCCIÓN (diseño, compras, produccion) excluyendo preparados, pausados y MTO/GTIA simplificados

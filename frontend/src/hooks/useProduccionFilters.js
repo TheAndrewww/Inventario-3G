@@ -45,14 +45,15 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'activos') => {
                     return p.etapa_actual === 'instalacion';
                 case 'urgentes':
                     return p.prioridad === 1 || (p.diasRestantes !== null && p.diasRestantes <= 3);
-                case 'produccion_diseno':
-                    // Proyectos normales de producción/diseño (excluyendo los que son solo MTO/GTIA sin extensivo)
-                    return p.etapa_actual !== 'completado' &&
-                        !p.tipo_proyecto?.toUpperCase().startsWith('CANCELADO') &&
-                        (
-                            (p.tipo_proyecto !== 'MTO' && p.tipo_proyecto !== 'GTIA') ||
-                            (p.tipo_proyecto === 'MTO' && p.es_extensivo)
-                        );
+                case 'produccion_diseno': {
+                    // Proyectos que entran a producción: A/B/C, o MTO/GTIA con EXTENSIVO.
+                    // Se excluyen completados y cancelados.
+                    if (p.etapa_actual === 'completado') return false;
+                    if (p.tipo_proyecto?.toUpperCase().startsWith('CANCELADO')) return false;
+                    const tipo = p.tipo_proyecto?.toUpperCase();
+                    const esMTOoGTIA = tipo === 'MTO' || tipo === 'GTIA';
+                    return !esMTOoGTIA || p.es_extensivo;
+                }
                 case 'manufactura':
                     return p.tiene_manufactura && p.etapa_actual !== 'completado';
                 case 'herreria':

@@ -60,9 +60,9 @@ export const getColorPorTipo = (tipo) => {
  * Calcula el porcentaje de avance del proyecto
  */
 export const calcularPorcentaje = (proyecto) => {
-    const esGarantia = proyecto.tipo_proyecto?.toUpperCase() === 'GTIA';
-    const esMTO = proyecto.tipo_proyecto?.toUpperCase() === 'MTO';
-    const usaTimelineSimplificado = esGarantia || (esMTO && !proyecto.es_extensivo);
+    const tipo = proyecto.tipo_proyecto?.toUpperCase();
+    const esMTOoGTIA = tipo === 'MTO' || tipo === 'GTIA';
+    const usaTimelineSimplificado = esMTOoGTIA && !proyecto.es_extensivo;
     const tieneProduccion = proyecto.tiene_manufactura || proyecto.tiene_herreria;
 
     if (usaTimelineSimplificado) {
@@ -83,10 +83,12 @@ export const calcularPorcentaje = (proyecto) => {
 };
 
 /**
- * Determina si un proyecto usa timeline simplificado (MTO no extensivo / GTIA)
+ * Determina si un proyecto usa timeline simplificado.
+ * Regla: MTO o GTIA que NO son EXTENSIVO pasan directo a Preparado.
+ * Los A/B/C y los EXTENSIVO (MTO o GTIA) siguen el timeline completo.
  */
 export const usaTimelineSimplificado = (proyecto) => {
-    const esGarantia = proyecto.tipo_proyecto?.toUpperCase() === 'GTIA';
-    const esMTO = proyecto.tipo_proyecto?.toUpperCase() === 'MTO';
-    return esGarantia || (esMTO && !proyecto.es_extensivo);
+    const tipo = proyecto.tipo_proyecto?.toUpperCase();
+    const esMTOoGTIA = tipo === 'MTO' || tipo === 'GTIA';
+    return esMTOoGTIA && !proyecto.es_extensivo;
 };

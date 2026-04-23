@@ -20,21 +20,18 @@ export const sincronizarProyectosConDrive = async (options = {}) => {
     console.log(`   Opciones: soloSinCarpeta=${soloSinCarpeta}, limite=${limite}`);
 
     try {
-        // Construir query
-        // OPTIMIZACIÓN: Se excluyen GTIA (nunca requiere carpeta) y MTO PREMIUM
-        // (no tiene producción de manufactura/herrería).
-        // MTO regular o EXTENSIVO se procesa igual que A/B/C.
+        // Construir query — incluye solo proyectos que entran a producción:
+        //   - A/B/C (o tipo null): siempre
+        //   - MTO o GTIA: solo si son EXTENSIVO
+        // Excluye siempre los PREMIUM.
         const where = {
             activo: true,
             etapa_actual: { [Op.notIn]: ['completado', 'pendiente'] },
-            [Op.and]: [
-                {
-                    [Op.or]: [
-                        { tipo_proyecto: { [Op.ne]: 'GTIA' } },
-                        { tipo_proyecto: { [Op.is]: null } }
-                    ]
-                },
-                { es_premium: false }
+            es_premium: false,
+            [Op.or]: [
+                { tipo_proyecto: { [Op.notIn]: ['MTO', 'GTIA'] } },
+                { tipo_proyecto: { [Op.is]: null } },
+                { es_extensivo: true }
             ]
         };
 

@@ -192,9 +192,12 @@ export const leerProyectosProduccion = async (mes = null) => {
                 entregadoCheck === 'x'
             );
 
-            // Determinar flags de columna J (solo aplican para MTO)
-            const esExtensivo = extensivoFlag === 'EXTENSIVO';
-            const esPremium = extensivoFlag === 'PREMIUM';
+            // Determinar flags de columna J — SOLO aplican cuando columna K es MTO o GTIA.
+            // Para A/B/C, cualquier valor en J se ignora (siempre entran a producción).
+            const tipoUpper = tipoProyecto.toUpperCase();
+            const aplicaFlagJ = tipoUpper === 'MTO' || tipoUpper === 'GTIA';
+            const esExtensivo = aplicaFlagJ && extensivoFlag === 'EXTENSIVO';
+            const esPremium = aplicaFlagJ && extensivoFlag === 'PREMIUM';
 
             const proyecto = {
                 nombre,

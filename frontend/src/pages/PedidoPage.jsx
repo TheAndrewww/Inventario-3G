@@ -142,14 +142,14 @@ const PedidoPage = () => {
           const response = await produccionService.obtenerDashboard();
           if (response.success) {
             const todos = flattenProyectos(response.data.resumen);
-            setProyectosProduccion(todos.filter(p =>
-              p.etapa_actual !== 'completado' &&
-              !p.tipo_proyecto?.toUpperCase().startsWith('CANCELADO') &&
-              (
-                (p.tipo_proyecto !== 'MTO' && p.tipo_proyecto !== 'GTIA') ||
-                (p.tipo_proyecto === 'MTO' && p.es_extensivo)
-              )
-            ));
+            setProyectosProduccion(todos.filter(p => {
+              if (p.etapa_actual === 'completado') return false;
+              if (p.tipo_proyecto?.toUpperCase().startsWith('CANCELADO')) return false;
+              const tipo = p.tipo_proyecto?.toUpperCase();
+              const esMTOoGTIA = tipo === 'MTO' || tipo === 'GTIA';
+              // A/B/C entran siempre; MTO/GTIA solo si son EXTENSIVO
+              return !esMTOoGTIA || p.es_extensivo;
+            }));
           }
         } catch (error) {
           console.error('Error al cargar proyectos:', error);
