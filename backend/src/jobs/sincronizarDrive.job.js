@@ -21,15 +21,20 @@ export const sincronizarProyectosConDrive = async (options = {}) => {
 
     try {
         // Construir query
-        // OPTIMIZACIÓN: Solo se excluye GTIA (nunca requiere carpeta en Drive).
-        // MTO — extensivo o no — se procesa igual que A/B/C para que la existencia
-        // de la carpeta y sus PDFs determine tiene_manufactura / tiene_herreria.
+        // OPTIMIZACIÓN: Se excluyen GTIA (nunca requiere carpeta) y MTO PREMIUM
+        // (no tiene producción de manufactura/herrería).
+        // MTO regular o EXTENSIVO se procesa igual que A/B/C.
         const where = {
             activo: true,
             etapa_actual: { [Op.notIn]: ['completado', 'pendiente'] },
-            [Op.or]: [
-                { tipo_proyecto: { [Op.ne]: 'GTIA' } },
-                { tipo_proyecto: { [Op.is]: null } }
+            [Op.and]: [
+                {
+                    [Op.or]: [
+                        { tipo_proyecto: { [Op.ne]: 'GTIA' } },
+                        { tipo_proyecto: { [Op.is]: null } }
+                    ]
+                },
+                { es_premium: false }
             ]
         };
 

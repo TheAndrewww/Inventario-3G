@@ -323,13 +323,14 @@ export const sincronizarProyecto = async (proyecto) => {
     try {
 
 
-        // OPTIMIZACIÓN: GTIA nunca necesita carpeta en Drive.
-        // MTO (extensivo o no) sí se procesa: la existencia de la carpeta y sus PDFs
+        // OPTIMIZACIÓN: GTIA y MTO PREMIUM nunca tienen producción en manufactura/herrería.
+        // MTO regular o EXTENSIVO sí se procesa: la existencia de la carpeta y sus PDFs
         // determina si tiene_manufactura / tiene_herreria son true.
         const tipoProyecto = proyecto.tipo_proyecto?.toUpperCase();
         const esGTIA = tipoProyecto === 'GTIA';
+        const esMTOPremium = tipoProyecto === 'MTO' && proyecto.es_premium;
 
-        if (esGTIA) {
+        if (esGTIA || esMTOPremium) {
             await proyecto.update({
                 tiene_manufactura: false,
                 tiene_herreria: false,
@@ -338,7 +339,9 @@ export const sincronizarProyecto = async (proyecto) => {
 
             return {
                 success: true,
-                message: `Proyecto ${tipoProyecto} - no requiere carpeta en Drive`,
+                message: esMTOPremium
+                    ? 'Proyecto MTO PREMIUM - no requiere carpeta en Drive'
+                    : `Proyecto ${tipoProyecto} - no requiere carpeta en Drive`,
                 proyecto: proyecto.nombre,
                 tieneManufactura: false,
                 tieneHerreria: false

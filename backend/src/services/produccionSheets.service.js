@@ -192,8 +192,9 @@ export const leerProyectosProduccion = async (mes = null) => {
                 entregadoCheck === 'x'
             );
 
-            // Determinar si es EXTENSIVO (solo aplica para MTO)
+            // Determinar flags de columna J (solo aplican para MTO)
             const esExtensivo = extensivoFlag === 'EXTENSIVO';
+            const esPremium = extensivoFlag === 'PREMIUM';
 
             const proyecto = {
                 nombre,
@@ -202,6 +203,7 @@ export const leerProyectosProduccion = async (mes = null) => {
                 estaEntregado,
                 tipoProyecto,
                 esExtensivo,
+                esPremium,
                 filaOriginal: i + 6, // Para referencia (fila real en el sheet)
                 spreadsheetRowId: `${mes}_${i + 6}` // ID único para sincronización
             };
@@ -286,6 +288,10 @@ const sincronizarMes = async (mes) => {
                 cambios.es_extensivo = proyecto.esExtensivo;
             }
 
+            if (existente.es_premium !== proyecto.esPremium) {
+                cambios.es_premium = proyecto.esPremium;
+            }
+
             if (Object.keys(cambios).length > 0) {
                 await existente.update(cambios);
                 actualizados++;
@@ -300,6 +306,7 @@ const sincronizarMes = async (mes) => {
                 spreadsheet_row_id: proyecto.spreadsheetRowId,
                 tipo_proyecto: proyecto.tipoProyecto ? proyecto.tipoProyecto.toUpperCase() : null,
                 es_extensivo: proyecto.esExtensivo,
+                es_premium: proyecto.esPremium,
                 prioridad: 3,
                 activo: true
             });

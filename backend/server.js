@@ -400,6 +400,21 @@ const startServer = async () => {
                 console.log('⚠️ No se pudo verificar/agregar es_extensivo:', e.message);
             }
 
+            // Verificar columna es_premium
+            try {
+                const [esPremiumCheck] = await sequelize.query(
+                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'produccion_proyectos' AND column_name = 'es_premium'"
+                );
+
+                if (parseInt(esPremiumCheck[0]?.count || 0) === 0) {
+                    console.log('🔄 Agregando columna es_premium...');
+                    await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS es_premium BOOLEAN DEFAULT FALSE NOT NULL");
+                    console.log('✅ Columna es_premium agregada');
+                }
+            } catch (e) {
+                console.log('⚠️ No se pudo verificar/agregar es_premium:', e.message);
+            }
+
             // Auto-crear tablas de checklist si no existen
             try {
                 await sequelize.query(`
@@ -628,6 +643,17 @@ const startServer = async () => {
                     console.log('🔄 Agregando columna es_extensivo...');
                     await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN es_extensivo BOOLEAN DEFAULT FALSE NOT NULL");
                     console.log('✅ Columna es_extensivo agregada');
+                }
+
+                // Verificar si existe la columna es_premium
+                const [esPremiumCheckProd] = await sequelize.query(
+                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'produccion_proyectos' AND column_name = 'es_premium'"
+                );
+
+                if (parseInt(esPremiumCheckProd[0].count) === 0) {
+                    console.log('🔄 Agregando columna es_premium...');
+                    await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN es_premium BOOLEAN DEFAULT FALSE NOT NULL");
+                    console.log('✅ Columna es_premium agregada');
                 }
             }
 

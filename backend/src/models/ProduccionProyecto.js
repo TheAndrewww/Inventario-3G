@@ -253,6 +253,16 @@ const ProduccionProyecto = sequelize.define('ProduccionProyecto', {
         comment: 'Si el proyecto MTO es EXTENSIVO (columna J del spreadsheet)'
     },
 
+    // ===== Flag para MTO premium =====
+    // Los MTO PREMIUM no tienen producción (manufactura/herrería); se tratan como GTIA
+    // para el sync con Drive y los dashboards de sub-áreas.
+    es_premium: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Si el proyecto MTO es PREMIUM (columna J del spreadsheet)'
+    },
+
     // ===== Estado general =====
     activo: {
         type: DataTypes.BOOLEAN,
