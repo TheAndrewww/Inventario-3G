@@ -302,6 +302,17 @@ ProduccionProyecto.prototype.completarEtapaActual = async function (usuarioId, o
             this.etapa_actual = 'instalacion';
             this.instalacion_completado_en = ahora;
             this.instalacion_completado_por = usuarioId;
+            // Auto-marcar sub-etapas para que no sigan apareciendo en las TV de manufactura/herrería
+            if (!this.manufactura_completado) {
+                this.manufactura_completado = true;
+                this.manufactura_completado_en = ahora;
+                this.manufactura_completado_por = usuarioId;
+            }
+            if (!this.herreria_completado) {
+                this.herreria_completado = true;
+                this.herreria_completado_en = ahora;
+                this.herreria_completado_por = usuarioId;
+            }
             await this.save();
             return this;
         }
@@ -328,6 +339,21 @@ ProduccionProyecto.prototype.completarEtapaActual = async function (usuarioId, o
     }
     if (config.obs && observaciones) {
         this[config.obs] = observaciones;
+    }
+
+    // Al avanzar de produccion → instalacion, auto-marcar las sub-etapas paralelas
+    // para que los dashboards de manufactura/herrería dejen de mostrar el proyecto.
+    if (etapaActual === 'produccion' && config.siguiente === 'instalacion') {
+        if (!this.manufactura_completado) {
+            this.manufactura_completado = true;
+            this.manufactura_completado_en = ahora;
+            this.manufactura_completado_por = usuarioId;
+        }
+        if (!this.herreria_completado) {
+            this.herreria_completado = true;
+            this.herreria_completado_en = ahora;
+            this.herreria_completado_por = usuarioId;
+        }
     }
 
     // Avanzar a siguiente etapa
@@ -371,6 +397,19 @@ ProduccionProyecto.prototype.regresarEtapa = async function (usuarioId) {
     // Si estaba completado, limpiar fecha de completado
     if (etapaActual === 'completado') {
         this.fecha_completado = null;
+    }
+
+    // Al regresar de instalacion → produccion, también limpiar las sub-etapas paralelas
+    // que quedaron auto-marcadas al avanzar, para que vuelvan a mostrarse en las TV.
+    if (etapaActual === 'instalacion' && config.anterior === 'produccion') {
+        this.manufactura_completado = false;
+        this.manufactura_completado_en = null;
+        this.manufactura_completado_por = null;
+        this.herreria_completado = false;
+        this.herreria_completado_en = null;
+        this.herreria_completado_por = null;
+        this.instalacion_completado_en = null;
+        this.instalacion_completado_por = null;
     }
 
     // Regresar a la etapa anterior

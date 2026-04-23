@@ -528,6 +528,30 @@ export const toggleEtapa = async (req, res) => {
             if (config.bool) proyecto[config.bool] = false;
         }
 
+        // Al marcar/desmarcar "Preparado" (instalacion), propagar a las sub-etapas
+        // paralelas para que los dashboards de manufactura/herrería queden consistentes.
+        if (etapa === 'instalacion') {
+            if (completado) {
+                if (!proyecto.manufactura_completado) {
+                    proyecto.manufactura_completado = true;
+                    proyecto.manufactura_completado_en = ahora;
+                    proyecto.manufactura_completado_por = usuarioId;
+                }
+                if (!proyecto.herreria_completado) {
+                    proyecto.herreria_completado = true;
+                    proyecto.herreria_completado_en = ahora;
+                    proyecto.herreria_completado_por = usuarioId;
+                }
+            } else {
+                proyecto.manufactura_completado = false;
+                proyecto.manufactura_completado_en = null;
+                proyecto.manufactura_completado_por = null;
+                proyecto.herreria_completado = false;
+                proyecto.herreria_completado_en = null;
+                proyecto.herreria_completado_por = null;
+            }
+        }
+
         // Recalcular etapa_actual basada en la etapa más avanzada marcada
         // Permite marcar etapas de forma independiente sin seguir orden estricto
         let nuevaEtapa = 'diseno';

@@ -113,7 +113,12 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
         console.log(`   Variantes normalizadas: [${variantes.map(v => `"${v}"`).join(', ')}]`);
         console.log(`   Carpetas de meses encontradas: ${carpetasMeses.map(c => c.name).join(', ')}`);
 
-        // Función auxiliar para buscar coincidencia en una lista de carpetas
+        // Función auxiliar para buscar coincidencia en una lista de carpetas.
+        // Estrategia en 2 pasadas para evitar que proyectos con nombres parecidos
+        // (p.ej. "MIGUEL ANGEL GONZALEZ" vs "ING. MIGUEL ANGEL GONZALEZ") caigan en
+        // la misma carpeta por un substring laxo.
+        //   Pasada 1: match exacto normalizado (si existe, gana siempre).
+        //   Pasada 2: mejor substring por cercanía de longitud a la variante.
         const buscarEnCarpetas = (carpetas, carpetaMes, subcarpeta) => {
             const ubicacion = subcarpeta ? `${carpetaMes.name}/${subcarpeta}` : carpetaMes.name;
 
@@ -125,16 +130,37 @@ export const buscarCarpetaProyecto = async (nombreProyecto) => {
                 console.log(`   📁 ${ubicacion}: posibles coincidencias: [${posiblesCoincidencias.map(c => `"${c.name}"`).join(', ')}]`);
             }
 
+            // Pasada 1: match exacto
+            for (const carpeta of carpetas) {
+                const carpetaNormalizada = normalizarNombre(carpeta.name);
+                if (variantes.some(v => carpetaNormalizada === v)) {
+                    console.log(`✅ Carpeta encontrada (exacto): "${carpeta.name}" en ${ubicacion}`);
+                    return { id: carpeta.id, name: carpeta.name, mes: carpetaMes.name };
+                }
+            }
+
+            // Pasada 2: mejor substring — ranking para resolver ambigüedad
+            let mejor = null;
             for (const carpeta of carpetas) {
                 const carpetaNormalizada = normalizarNombre(carpeta.name);
                 for (const variante of variantes) {
-                    if (carpetaNormalizada === variante ||
-                        carpetaNormalizada.includes(variante) ||
-                        variante.includes(carpetaNormalizada)) {
-                        console.log(`✅ Carpeta encontrada: "${carpeta.name}" en ${ubicacion} (match con variante: "${variante}")`);
-                        return { id: carpeta.id, name: carpeta.name, mes: carpetaMes.name };
+                    let score = 0;
+                    if (carpetaNormalizada.includes(variante)) {
+                        // Folder contiene la variante → preferir el folder más corto (más cercano)
+                        score = 500 - (carpetaNormalizada.length - variante.length);
+                    } else if (variante.includes(carpetaNormalizada) && carpetaNormalizada.length >= 6) {
+                        // Variante contiene al folder → solo si folder es suficientemente largo
+                        score = 100 + carpetaNormalizada.length;
+                    }
+                    if (score > 0 && (!mejor || score > mejor.score)) {
+                        mejor = { carpeta, variante, score };
                     }
                 }
+            }
+
+            if (mejor) {
+                console.log(`✅ Carpeta encontrada (substring, score=${mejor.score}): "${mejor.carpeta.name}" en ${ubicacion} (variante: "${mejor.variante}")`);
+                return { id: mejor.carpeta.id, name: mejor.carpeta.name, mes: carpetaMes.name };
             }
             return null;
         };
@@ -297,21 +323,13 @@ export const sincronizarProyecto = async (proyecto) => {
     try {
 
 
-        // OPTIMIZACIÓN: Saltar proyectos que no necesitan búsqueda en Drive
-        // GTIA nunca necesita carpeta, MTO solo si es extensivo
+        // OPTIMIZACIÓN: GTIA nunca necesita carpeta en Drive.
+        // MTO (extensivo o no) sí se procesa: la existencia de la carpeta y sus PDFs
+        // determina si tiene_manufactura / tiene_herreria son true.
         const tipoProyecto = proyecto.tipo_proyecto?.toUpperCase();
         const esGTIA = tipoProyecto === 'GTIA';
-        const esMTO = tipoProyecto === 'MTO';
-        const esMTONoExtensivo = esMTO && !proyecto.es_extensivo;
 
-        if (esMTO) {
-            console.log(`🔍 MTO detectado: "${proyecto.nombre}" - es_extensivo: ${proyecto.es_extensivo}`);
-        }
-
-        if (esGTIA || esMTONoExtensivo) {
-
-
-            // Marcar como procesado sin carpeta (tienen_manufactura y tiene_herreria en false)
+        if (esGTIA) {
             await proyecto.update({
                 tiene_manufactura: false,
                 tiene_herreria: false,
@@ -327,11 +345,7 @@ export const sincronizarProyecto = async (proyecto) => {
             };
         }
 
-        if (esMTO && proyecto.es_extensivo) {
-            console.log(`📂 MTO Extensivo "${proyecto.nombre}" - procesando carpeta en Drive...`);
-        }
-
-        // Buscar la carpeta del proyecto (solo para A, B, C y MTO extensivo)
+        // Buscar la carpeta del proyecto (A, B, C y todos los MTO)
         const carpeta = await buscarCarpetaProyecto(proyecto.nombre);
 
         if (!carpeta) {
