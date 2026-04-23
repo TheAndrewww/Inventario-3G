@@ -200,28 +200,33 @@ export const buscarCarpetaProyecto = async (nombreProyecto, mesHint = null) => {
         };
 
         // ESTRATEGIA:
-        //   1) Si hay mesHint: intentar primero SOLO en ese mes (y sus subcarpetas
-        //      MTO/GTIA). Esto es preciso cuando hay clientes repetidos en el año.
-        //   2) Si no hay match en el mes hinted (o no se dio hint), caer a búsqueda
-        //      global en todos los meses.
+        //   1) Si hay mesHint: buscar EXCLUSIVAMENTE en ese mes (y sus subcarpetas
+        //      MTO/GTIA). Si no hay match, retornar null — el proyecto simplemente
+        //      no tiene carpeta todavía. NO se hace fallback a otros meses para
+        //      evitar que clientes del mismo nombre de meses anteriores contaminen
+        //      el match (p.ej. ANGELICA CORMAR de ABRIL cayendo en FEBRERO).
+        //   2) Si no hay mesHint (caso raro), buscar globalmente como antes.
         if (mesHint) {
             const mesHintNorm = normalizarNombre(mesHint);
             const mesesDelHint = carpetasMeses.filter(m =>
                 normalizarNombre(m.name).startsWith(mesHintNorm)
             );
 
-            if (mesesDelHint.length > 0) {
-                console.log(`   🎯 Restringiendo búsqueda al mes del Sheet: ${mesesDelHint.map(m => m.name).join(', ')}`);
-                const itemsMes = await recolectarCarpetas(mesesDelHint);
-                const resultado = buscarEn(itemsMes);
-                if (resultado) return resultado;
-                console.log(`   ↩ No hay match en mes "${mesHint}", caigo a búsqueda global`);
-            } else {
-                console.log(`   ⚠️ No existe carpeta de mes en Drive que empiece con "${mesHint}", caigo a búsqueda global`);
+            if (mesesDelHint.length === 0) {
+                console.log(`⚠️ No existe carpeta de mes en Drive que empiece con "${mesHint}" para "${nombreProyecto}"`);
+                return null;
             }
+
+            console.log(`   🎯 Búsqueda restringida al mes del Sheet: ${mesesDelHint.map(m => m.name).join(', ')}`);
+            const itemsMes = await recolectarCarpetas(mesesDelHint);
+            const resultado = buscarEn(itemsMes);
+            if (resultado) return resultado;
+
+            console.log(`⚠️ No se encontró carpeta en mes "${mesHint}" para: "${nombreProyecto}"`);
+            return null;
         }
 
-        // Fallback: buscar en todos los meses.
+        // Sin mesHint (legacy): buscar globalmente.
         const todasLasCarpetas = await recolectarCarpetas(carpetasMeses);
         const resultado = buscarEn(todasLasCarpetas);
         if (resultado) return resultado;
@@ -396,6 +401,17 @@ export const sincronizarProyecto = async (proyecto) => {
         const carpeta = await buscarCarpetaProyecto(proyecto.nombre, mesHint);
 
         if (!carpeta) {
+            // Limpiar cualquier carpeta y banderas que hayan quedado de un
+            // sync anterior que hubiera matcheado mal. Así el proyecto sale
+            // de las TV de manufactura/herrería hasta que exista su carpeta.
+            await proyecto.update({
+                drive_folder_id: null,
+                tiene_manufactura: false,
+                tiene_herreria: false,
+                archivos_manufactura: [],
+                archivos_herreria: [],
+                drive_sync_at: new Date()
+            });
             return {
                 success: false,
                 message: 'Carpeta no encontrada',
