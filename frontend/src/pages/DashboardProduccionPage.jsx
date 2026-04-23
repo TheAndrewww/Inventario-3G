@@ -5,7 +5,9 @@ import {
     ExternalLink,
     Cloud,
     Database,
-    Plus
+    Plus,
+    Search,
+    X
 } from 'lucide-react';
 import { Loader, Modal, Button } from '../components/common';
 import toast from 'react-hot-toast';
@@ -175,7 +177,7 @@ const DashboardProduccionPage = () => {
         toggleEtapa
     } = useProduccionData({ autoSync: true, refreshInterval: 5 * 60 * 1000 });
 
-    const { filtro, setFiltro, proyectosFiltrados, opciones } = useProduccionFilters(proyectos);
+    const { filtro, setFiltro, busqueda, setBusqueda, proyectosFiltrados, opciones } = useProduccionFilters(proyectos);
 
     if (loading && proyectos.length === 0) {
         return (
@@ -291,6 +293,28 @@ const DashboardProduccionPage = () => {
 
             {/* Estadísticas */}
             <EstadisticasHeader estadisticas={estadisticas} />
+
+            {/* Buscador */}
+            <div className="relative mb-3 max-w-xl">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <input
+                    type="text"
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    placeholder="Buscar por nombre, cliente o tipo (A, B, C, MTO, GTIA)…"
+                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-sm"
+                />
+                {busqueda && (
+                    <button
+                        type="button"
+                        onClick={() => setBusqueda('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700"
+                        title="Limpiar búsqueda"
+                    >
+                        <X size={16} />
+                    </button>
+                )}
+            </div>
 
             {/* Filtros */}
             <FiltrosProyectos filtro={filtro} setFiltro={setFiltro} opciones={opciones} />
