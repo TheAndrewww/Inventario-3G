@@ -224,17 +224,30 @@ export const clasificarArchivosPDF = async (carpetaId) => {
     try {
         const drive = await authenticate();
 
-        // Listar solo archivos PDF
+        // Listar TODOS los archivos no-carpeta. El filtrado por "es PDF" se
+        // hace después en JS para cubrir mimeTypes raros y shortcuts.
         const response = await drive.files.list({
-            q: `'${carpetaId}' in parents and mimeType = 'application/pdf' and trashed = false`,
-            fields: 'files(id, name, webViewLink, webContentLink, size, createdTime)',
-            pageSize: 100,
+            q: `'${carpetaId}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
+            fields: 'files(id, name, mimeType, webViewLink, webContentLink, size, createdTime, shortcutDetails)',
+            pageSize: 500,
             supportsAllDrives: true,
             includeItemsFromAllDrives: true
         });
 
         const archivos = response.data.files || [];
 
+        // Aceptamos como PDF relevante:
+        //  - mimeType application/pdf (caso normal)
+        //  - shortcut cuyo target es application/pdf
+        //  - cualquier archivo cuyo nombre termine en .pdf (cubre octet-stream
+        //    y otros casos de uploads desde escáner / móvil)
+        const esPDFRelevante = (f) => {
+            if (f.mimeType === 'application/pdf') return true;
+            if (f.mimeType === 'application/vnd.google-apps.shortcut' &&
+                f.shortcutDetails?.targetMimeType === 'application/pdf') return true;
+            if (f.name?.toLowerCase().endsWith('.pdf')) return true;
+            return false;
+        };
 
         const resultado = {
             herreria: [],
@@ -243,6 +256,11 @@ export const clasificarArchivosPDF = async (carpetaId) => {
         };
 
         for (const archivo of archivos) {
+            if (!esPDFRelevante(archivo)) {
+                resultado.ignorados.push(`${archivo.name} [${archivo.mimeType}]`);
+                continue;
+            }
+
             // Normalizar nombre: quitar acentos y convertir a mayúsculas
             const nombreNormalizado = archivo.name
                 .normalize('NFD')
