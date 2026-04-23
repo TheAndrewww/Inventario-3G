@@ -674,6 +674,8 @@ ProduccionProyecto.obtenerResumenDashboard = async function () {
     const proyectos = await this.findAll({
         where: {
             activo: true,
+            // Ocultar proyectos ya entregados (casilla marcada en el Sheet → etapa_actual='completado')
+            etapa_actual: { [Op.ne]: 'completado' },
             // Excluir proyectos cancelados
             [Op.or]: [
                 { tipo_proyecto: null },

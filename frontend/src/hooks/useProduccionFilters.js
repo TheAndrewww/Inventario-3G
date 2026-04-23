@@ -9,7 +9,6 @@ export const FILTRO_OPCIONES = [
     { value: 'activos', label: 'En Proceso' },
     { value: 'preparados', label: '📦 Preparados' },
     { value: 'urgentes', label: '🔴 Urgentes' },
-    { value: 'completados', label: '✅ Completados' },
     { value: '_separator', label: '|' },
     { value: 'produccion_diseno', label: '🏗️ Producción / Diseño' },
     { value: 'manufactura', label: '🏭 Manufactura' },
@@ -35,8 +34,6 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'activos') => {
                     return p.etapa_actual === 'instalacion';
                 case 'urgentes':
                     return p.prioridad === 1 || (p.diasRestantes !== null && p.diasRestantes <= 3);
-                case 'completados':
-                    return p.etapa_actual === 'completado';
                 case 'produccion_diseno':
                     // Proyectos normales de producción/diseño (excluyendo los que son solo MTO/GTIA sin extensivo)
                     return p.etapa_actual !== 'completado' &&
