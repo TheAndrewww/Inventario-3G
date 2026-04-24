@@ -9,7 +9,7 @@ const Header = ({ toggleSidebar, isMobile }) => {
   const getTitleByPath = () => {
     const titles = {
       '/inventario': 'Inventario',
-      '/pedido': 'Pedido Actual',
+      '/pedido': 'Orden de Salida',
       '/pedidos-pendientes': 'Pedidos Pendientes',
       '/aprobacion-pedidos': 'Aprobar Pedidos',
       '/camionetas': 'Equipos',

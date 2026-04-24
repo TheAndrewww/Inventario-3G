@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import pedidosService from '../services/pedidos.service';
 import camionetasService from '../services/camionetas.service';
-import ubicacionesService from '../services/ubicaciones.service';
 import articulosService from '../services/articulos.service';
 import produccionService from '../services/produccion.service';
 import usuariosService from '../services/usuarios.service';
@@ -42,9 +41,6 @@ const PedidoPage = () => {
   const [camionetas, setCamionetas] = useState([]);
   const [camionetaSeleccionada, setCamionetaSeleccionada] = useState('');
   const [cargandoCamionetas, setCargandoCamionetas] = useState(false);
-  const [ubicaciones, setUbicaciones] = useState([]);
-  const [ubicacionDestino, setUbicacionDestino] = useState('');
-  const [cargandoUbicaciones, setCargandoUbicaciones] = useState(false);
   const [proyectosProduccion, setProyectosProduccion] = useState([]);
   const [cargandoProyectos, setCargandoProyectos] = useState(false);
   const [encargados, setEncargados] = useState([]);
@@ -105,33 +101,6 @@ const PedidoPage = () => {
 
     cargarCamionetas();
   }, [user]);
-
-  // Cargar ubicaciones (camionetas y stock general)
-  useEffect(() => {
-    const cargarUbicaciones = async () => {
-      try {
-        setCargandoUbicaciones(true);
-        const ubicacionesData = await ubicacionesService.getAll();
-        // Filtrar solo ubicaciones que son camionetas o stock general
-        const ubicacionesCamionetas = ubicacionesData.filter(ub =>
-          ub.almacen.includes('Camioneta') ||
-          ub.almacen.includes('Stock General') ||
-          ub.codigo.includes('NP300') ||
-          ub.codigo.includes('TORNADO') ||
-          ub.codigo.includes('SAVEIRO') ||
-          ub.codigo.includes('STOCK-GEN')
-        );
-        setUbicaciones(ubicacionesCamionetas);
-      } catch (error) {
-        console.error('Error al cargar ubicaciones:', error);
-        toast.error('Error al cargar ubicaciones de destino');
-      } finally {
-        setCargandoUbicaciones(false);
-      }
-    };
-
-    cargarUbicaciones();
-  }, []);
 
   // Cargar proyectos activos de producción (para diseñador/admin)
   useEffect(() => {
@@ -229,9 +198,9 @@ const PedidoPage = () => {
         return;
       }
     } else {
-      // Diseñador/Admin debe especificar proyecto O ubicación destino
-      if (!proyecto.trim() && !ubicacionDestino) {
-        toast.error('Debes especificar un proyecto o seleccionar una ubicación destino');
+      // Diseñador/Admin debe especificar proyecto
+      if (!proyecto.trim()) {
+        toast.error('Debes seleccionar un proyecto');
         return;
       }
     }
@@ -256,17 +225,7 @@ const PedidoPage = () => {
           data.camioneta_id = parseInt(camionetaSeleccionada);
         }
       } else {
-        // Si se seleccionó ubicación destino, no enviar proyecto
-        if (ubicacionDestino) {
-          data.ubicacion_destino_id = parseInt(ubicacionDestino);
-          // Agregar proyecto solo si hay texto
-          if (proyecto.trim()) {
-            data.proyecto = proyecto.trim();
-          }
-        } else {
-          // Si no hay ubicación destino, el proyecto es obligatorio
-          data.proyecto = proyecto.trim();
-        }
+        data.proyecto = proyecto.trim();
         if (encargadoSeleccionado) {
           data.supervisor_id = parseInt(encargadoSeleccionado);
         }
@@ -315,7 +274,6 @@ const PedidoPage = () => {
       setObservaciones('');
       setEquipoSeleccionado('');
       setCamionetaSeleccionada('');
-      setUbicacionDestino('');
       setEncargadoSeleccionado('');
 
       navigate('/historial');
@@ -775,67 +733,43 @@ const PedidoPage = () => {
                   </div>
                 </>
               ) : (
-                // Diseñador/Admin especifica destino (proyecto o ubicación)
+                // Diseñador/Admin: proyecto + encargado
                 <>
                   <div>
                     <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                       <div className="flex items-center gap-2">
-                        <Truck size={14} />
-                        <span>Destino del Pedido *</span>
+                        <Package size={14} />
+                        <span>Proyecto *</span>
                       </div>
                     </label>
                     <select
-                      value={ubicacionDestino}
-                      onChange={(e) => setUbicacionDestino(e.target.value)}
+                      value={proyecto}
+                      onChange={(e) => setProyecto(e.target.value)}
                       className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                      disabled={cargandoUbicaciones}
+                      disabled={cargandoProyectos}
+                      required
                     >
-                      <option value="">Proyecto específico (ingresa nombre abajo)</option>
-                      {ubicaciones.map((ubicacion) => (
-                        <option key={ubicacion.id} value={ubicacion.id}>
-                          {ubicacion.almacen.includes('Camioneta') || ubicacion.almacen.includes('Equipo') ? '💼' : '📦'} {ubicacion.almacen}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {!ubicacionDestino && (
-                    <div>
-                      <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
-                        <div className="flex items-center gap-2">
-                          <Package size={14} />
-                          <span>Proyecto *</span>
-                        </div>
-                      </label>
-                      <select
-                        value={proyecto}
-                        onChange={(e) => setProyecto(e.target.value)}
-                        className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                        disabled={cargandoProyectos}
-                        required={!ubicacionDestino}
-                      >
-                        <option value="">Selecciona un proyecto...</option>
-                        <optgroup label="Áreas fijas">
-                          <option value="MANUFACTURA">🏭 MANUFACTURA</option>
-                          <option value="HERRERÍA">⚒️ HERRERÍA</option>
+                      <option value="">Selecciona un proyecto...</option>
+                      <optgroup label="Áreas fijas">
+                        <option value="MANUFACTURA">🏭 MANUFACTURA</option>
+                        <option value="HERRERÍA">⚒️ HERRERÍA</option>
+                      </optgroup>
+                      {proyectosProduccion.length > 0 && (
+                        <optgroup label="Proyectos en producción">
+                          {proyectosProduccion.map(p => (
+                            <option key={p.id} value={p.nombre}>
+                              {p.nombre}{p.cliente ? ` — ${p.cliente}` : ''}
+                            </option>
+                          ))}
                         </optgroup>
-                        {proyectosProduccion.length > 0 && (
-                          <optgroup label="Proyectos en producción">
-                            {proyectosProduccion.map(p => (
-                              <option key={p.id} value={p.nombre}>
-                                {p.nombre}{p.cliente ? ` — ${p.cliente}` : ''}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                      </select>
-                      {proyectosProduccion.length === 0 && !cargandoProyectos && (
-                        <p className="text-xs text-amber-600 mt-1">
-                          No hay proyectos activos en producción
-                        </p>
                       )}
-                    </div>
-                  )}
+                    </select>
+                    {proyectosProduccion.length === 0 && !cargandoProyectos && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        No hay proyectos activos en producción
+                      </p>
+                    )}
+                  </div>
 
                   <div>
                     <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
