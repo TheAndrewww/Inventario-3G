@@ -37,9 +37,21 @@ const usuariosService = {
     return response.data;
   },
 
-  // Eliminar usuario
+  // Eliminar usuario (soft delete)
   eliminar: async (id) => {
     const response = await api.delete(`/usuarios/${id}`);
+    return response.data;
+  },
+
+  // Reactivar usuario desactivado
+  reactivar: async (id) => {
+    const response = await api.post(`/usuarios/${id}/reactivar`);
+    return response.data;
+  },
+
+  // Eliminar usuario permanentemente (hard delete)
+  eliminarPermanente: async (id) => {
+    const response = await api.delete(`/usuarios/${id}/permanente`);
     return response.data;
   }
 };

@@ -218,6 +218,93 @@ export const actualizarUsuario = async (req, res) => {
 };
 
 /**
+ * Reactivar usuario (deshacer soft delete)
+ */
+export const reactivarUsuario = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const usuario = await Usuario.findByPk(id);
+    if (!usuario) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    await usuario.update({ activo: true });
+
+    res.json({
+      success: true,
+      message: 'Usuario reactivado exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al reactivar usuario:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al reactivar usuario'
+    });
+  }
+};
+
+/**
+ * Eliminar usuario permanentemente (hard delete)
+ * Solo permitido para usuarios ya desactivados.
+ * Falla con 409 si tiene registros relacionados (movimientos, pedidos, etc.).
+ */
+export const eliminarUsuarioPermanente = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const usuarioActual = req.usuario.id;
+
+    if (parseInt(id) === usuarioActual) {
+      return res.status(400).json({
+        success: false,
+        message: 'No puedes eliminar tu propia cuenta'
+      });
+    }
+
+    const usuario = await Usuario.findByPk(id);
+    if (!usuario) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    if (usuario.activo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Solo se pueden eliminar permanentemente usuarios ya desactivados. Desactiva primero.'
+      });
+    }
+
+    try {
+      await usuario.destroy();
+    } catch (err) {
+      if (err.name === 'SequelizeForeignKeyConstraintError') {
+        return res.status(409).json({
+          success: false,
+          message: 'No se puede eliminar permanentemente: el usuario tiene registros históricos (movimientos, pedidos u órdenes). Permanecerá desactivado.'
+        });
+      }
+      throw err;
+    }
+
+    res.json({
+      success: true,
+      message: 'Usuario eliminado permanentemente'
+    });
+  } catch (error) {
+    console.error('Error al eliminar usuario permanentemente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar usuario'
+    });
+  }
+};
+
+/**
  * Eliminar usuario (soft delete)
  */
 export const eliminarUsuario = async (req, res) => {

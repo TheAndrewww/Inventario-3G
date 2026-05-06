@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Edit, Trash2, Search, Shield, UserCheck, UserX } from 'lucide-react';
+import { UserPlus, Edit, Trash2, Search, Shield, UserCheck, UserX, RotateCcw } from 'lucide-react';
 import usuariosService from '../services/usuarios.service';
 import toast from 'react-hot-toast';
 
@@ -136,6 +136,41 @@ const UsuariosPage = () => {
       cargarUsuarios();
     } catch (error) {
       console.error('Error al eliminar usuario:', error);
+      toast.error(error.response?.data?.message || 'Error al eliminar el usuario');
+    }
+  };
+
+  const handleReactivar = async (usuarioId) => {
+    try {
+      await usuariosService.reactivar(usuarioId);
+      toast.success('Usuario reactivado');
+      cargarUsuarios();
+    } catch (error) {
+      console.error('Error al reactivar usuario:', error);
+      toast.error(error.response?.data?.message || 'Error al reactivar el usuario');
+    }
+  };
+
+  const handleEliminarPermanente = async (usuario) => {
+    const confirmacion = prompt(
+      `⚠️ ELIMINACIÓN PERMANENTE\n\n` +
+      `Vas a borrar definitivamente al usuario "${usuario.nombre}" (${usuario.email}).\n` +
+      `Esta acción NO se puede deshacer.\n\n` +
+      `Si el usuario tiene movimientos, pedidos u órdenes históricas, la operación se rechazará y permanecerá desactivado.\n\n` +
+      `Para confirmar, escribe el correo del usuario:`
+    );
+    if (confirmacion === null) return;
+    if (confirmacion.trim().toLowerCase() !== usuario.email.toLowerCase()) {
+      toast.error('Confirmación incorrecta. Operación cancelada.');
+      return;
+    }
+
+    try {
+      await usuariosService.eliminarPermanente(usuario.id);
+      toast.success('Usuario eliminado permanentemente');
+      cargarUsuarios();
+    } catch (error) {
+      console.error('Error al eliminar permanentemente:', error);
       toast.error(error.response?.data?.message || 'Error al eliminar el usuario');
     }
   };
@@ -346,20 +381,44 @@ const UsuariosPage = () => {
                       {usuario.activo ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-2">
-                    <button
-                      onClick={() => abrirModalEditar(usuario)}
-                      className="text-blue-600 hover:text-blue-900 font-medium"
-                    >
-                      <Edit size={18} className="inline" />
-                    </button>
-                    <button
-                      onClick={() => handleEliminar(usuario.id)}
-                      className="text-red-600 hover:text-red-900 font-medium"
-                      disabled={!usuario.activo}
-                    >
-                      <Trash2 size={18} className="inline" />
-                    </button>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => abrirModalEditar(usuario)}
+                        className="inline-flex items-center gap-1 px-2 py-1.5 text-blue-700 hover:bg-blue-50 rounded-lg font-medium"
+                        title="Editar"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      {usuario.activo ? (
+                        <button
+                          onClick={() => handleEliminar(usuario.id)}
+                          className="inline-flex items-center gap-1 px-2 py-1.5 text-red-600 hover:bg-red-50 rounded-lg font-medium"
+                          title="Desactivar"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleReactivar(usuario.id)}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 text-green-700 hover:bg-green-50 rounded-lg font-medium text-xs"
+                            title="Reactivar"
+                          >
+                            <RotateCcw size={16} />
+                            <span className="hidden sm:inline">Reactivar</span>
+                          </button>
+                          <button
+                            onClick={() => handleEliminarPermanente(usuario)}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 bg-red-700 text-white hover:bg-red-800 rounded-lg font-medium text-xs"
+                            title="Eliminar permanentemente (irreversible)"
+                          >
+                            <Trash2 size={16} />
+                            <span className="hidden sm:inline">Eliminar</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

@@ -5,7 +5,9 @@ import {
   obtenerEncargados,
   crearUsuario,
   actualizarUsuario,
-  eliminarUsuario
+  eliminarUsuario,
+  reactivarUsuario,
+  eliminarUsuarioPermanente
 } from '../controllers/usuarios.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -81,6 +83,30 @@ router.delete(
   verificarToken,
   verificarRol('administrador'),
   eliminarUsuario
+);
+
+/**
+ * @route   POST /api/usuarios/:id/reactivar
+ * @desc    Reactivar usuario desactivado
+ * @access  Administrador
+ */
+router.post(
+  '/:id/reactivar',
+  verificarToken,
+  verificarRol('administrador'),
+  reactivarUsuario
+);
+
+/**
+ * @route   DELETE /api/usuarios/:id/permanente
+ * @desc    Eliminar usuario permanentemente (solo si ya está desactivado y sin FK)
+ * @access  Administrador
+ */
+router.delete(
+  '/:id/permanente',
+  verificarToken,
+  verificarRol('administrador'),
+  eliminarUsuarioPermanente
 );
 
 export default router;
