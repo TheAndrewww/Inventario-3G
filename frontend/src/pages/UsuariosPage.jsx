@@ -10,6 +10,7 @@ const UsuariosPage = () => {
   const [usuarioEditando, setUsuarioEditando] = useState(null);
   const [busqueda, setBusqueda] = useState('');
   const [filtroRol, setFiltroRol] = useState('');
+  const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
@@ -169,12 +170,15 @@ const UsuariosPage = () => {
     }
   };
 
+  const totalInactivos = usuarios.filter(u => !u.activo).length;
+
   const usuariosFiltrados = usuarios.filter((usuario) => {
     const matchBusqueda =
       usuario.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       usuario.email.toLowerCase().includes(busqueda.toLowerCase());
     const matchRol = filtroRol === '' || usuario.rol === filtroRol;
-    return matchBusqueda && matchRol;
+    const matchEstado = mostrarInactivos ? !usuario.activo : usuario.activo;
+    return matchBusqueda && matchRol && matchEstado;
   });
 
   if (cargando) {
@@ -232,6 +236,37 @@ const UsuariosPage = () => {
             <option value="compras">Compras</option>
           </select>
         </div>
+      </div>
+
+      {/* Toggle: mostrar/ocultar inactivos */}
+      <div className="mb-4 flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+        <div className="flex items-center gap-2 text-sm text-gray-700">
+          {mostrarInactivos ? (
+            <>
+              <UserX size={16} className="text-gray-500" />
+              <span>Mostrando <strong>{totalInactivos}</strong> usuario{totalInactivos === 1 ? '' : 's'} inactivo{totalInactivos === 1 ? '' : 's'}</span>
+            </>
+          ) : (
+            <>
+              <UserCheck size={16} className="text-green-600" />
+              <span>
+                Mostrando solo activos
+                {totalInactivos > 0 && (
+                  <span className="text-gray-500"> · {totalInactivos} inactivo{totalInactivos === 1 ? '' : 's'} oculto{totalInactivos === 1 ? '' : 's'}</span>
+                )}
+              </span>
+            </>
+          )}
+        </div>
+        <button
+          onClick={() => setMostrarInactivos(!mostrarInactivos)}
+          className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${mostrarInactivos
+            ? 'bg-red-700 text-white hover:bg-red-800'
+            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
+            }`}
+        >
+          {mostrarInactivos ? 'Ver activos' : 'Ver inactivos'}
+        </button>
       </div>
 
       {/* Tabla de usuarios */}
