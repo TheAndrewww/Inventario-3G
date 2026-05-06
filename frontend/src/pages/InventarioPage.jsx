@@ -40,9 +40,10 @@ const formatearCantidad = (cantidad, unidad) => {
   return valor.toFixed(0);
 };
 
-const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'stockTotal', 'stockDisp', 'unidad', 'acciones'];
-const DEFAULT_COL_WIDTHS = { articulo: 320, categoria: 140, ubicacion: 160, stockTotal: 120, stockDisp: 140, unidad: 100, acciones: 220 };
-const STORAGE_KEY_COL_WIDTHS = 'inventario_col_widths_v1';
+const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'seccion', 'stockTotal', 'stockDisp', 'unidad', 'acciones'];
+const DEFAULT_COL_WIDTHS = { articulo: 280, categoria: 130, ubicacion: 150, seccion: 120, stockTotal: 110, stockDisp: 130, unidad: 90, acciones: 220 };
+const STORAGE_KEY_COL_WIDTHS = 'inventario_col_widths_v2';
+const STORAGE_KEY_EXTRAS = 'inventario_extras_v1';
 
 const InventarioPage = () => {
   const [articulos, setArticulos] = useState([]);
@@ -55,6 +56,13 @@ const InventarioPage = () => {
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState(null);
   const [almacenSeleccionado, setAlmacenSeleccionado] = useState(null); // Filtro de almacén (ID o null = gate sin seleccionar)
+  const [seccionSeleccionada, setSeccionSeleccionada] = useState(null); // 'stock' | 'extras' | null (gate)
+  const [extrasIds, setExtrasIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_EXTRAS);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
   const [almacenesData, setAlmacenesData] = useState([]); // Almacenes desde la API
   const [todasCategorias, setTodasCategorias] = useState([]); // Todas las categorías (para edición rápida)
   const [todasUbicaciones, setTodasUbicaciones] = useState([]); // Todas las ubicaciones con su almacén (para edición rápida)
@@ -73,6 +81,26 @@ const InventarioPage = () => {
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY_COL_WIDTHS, JSON.stringify(colWidths)); } catch {}
   }, [colWidths]);
+
+  // Persistir IDs marcados como "Extras"
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY_EXTRAS, JSON.stringify(Array.from(extrasIds))); } catch {}
+  }, [extrasIds]);
+
+  // Helpers para sección Stock / Extras
+  const getSeccionArticulo = useCallback((item) => (
+    extrasIds.has(item.id) ? 'extras' : 'stock'
+  ), [extrasIds]);
+
+  const toggleSeccionArticulo = useCallback((itemId, e) => {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    setExtrasIds(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }, []);
 
   const startResizeCol = useCallback((key, e) => {
     e.preventDefault();
@@ -413,8 +441,9 @@ const InventarioPage = () => {
           const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
           const matchesAlmacen = almacenSeleccionado === 'herramientas' ||
             (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
+          const matchesSeccion = !seccionSeleccionada || getSeccionArticulo(item) === seccionSeleccionada;
 
-          return matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen;
+          return matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion;
         })
         .sort((a, b) => {
           // Ordenar según la opción seleccionada
@@ -464,12 +493,15 @@ const InventarioPage = () => {
         const matchesAlmacen = almacenSeleccionado === 'herramientas' ||
           (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
 
+        // Filtrar por sección Stock / Extras
+        const matchesSeccion = !seccionSeleccionada || getSeccionArticulo(item) === seccionSeleccionada;
+
         // Filtrar por tipo según el tab activo
         const estaEnTabCorrecto = tabActivo === 'consumibles'
           ? !item.es_herramienta  // Consumibles: artículos que NO son herramientas
           : item.es_herramienta;  // Herramientas: artículos que SÍ son herramientas
 
-        return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && estaEnTabCorrecto;
+        return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion && estaEnTabCorrecto;
       })
       .sort((a, b) => {
         // Ordenar según la opción seleccionada
@@ -1376,7 +1408,7 @@ const InventarioPage = () => {
             {almacenesDisponibles.map((almacen) => (
               <button
                 key={almacen.id}
-                onClick={() => { setAlmacenSeleccionado(almacen.id); setTabActivo('consumibles'); }}
+                onClick={() => { setAlmacenSeleccionado(almacen.id); setTabActivo('consumibles'); setSeccionSeleccionada(null); }}
                 className="group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-red-700 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
               >
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-50 group-hover:bg-red-700 transition-colors flex items-center justify-center">
@@ -1393,7 +1425,7 @@ const InventarioPage = () => {
               </button>
             ))}
             <button
-              onClick={() => { setAlmacenSeleccionado('herramientas'); setTabActivo('herramientas'); }}
+              onClick={() => { setAlmacenSeleccionado('herramientas'); setTabActivo('herramientas'); setSeccionSeleccionada(null); }}
               className="group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-blue-700 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
             >
               <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-50 group-hover:bg-blue-700 transition-colors flex items-center justify-center">
@@ -1420,6 +1452,66 @@ const InventarioPage = () => {
               </button>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Sub-gate: si ya hay almacén pero no sección, mostrar selector Stock / Extras
+  if (seccionSeleccionada === null) {
+    const nombreAlmacenActual = almacenSeleccionado === 'herramientas'
+      ? 'Herramientas'
+      : (almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén');
+    const articulosDelAlmacen = articulos.filter((item) => {
+      const isActive = item.activo !== false;
+      if (!isActive) return false;
+      if (almacenSeleccionado === 'herramientas') return item.es_herramienta;
+      return item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
+    });
+    const conteoStock = articulosDelAlmacen.filter(i => !extrasIds.has(i.id)).length;
+    const conteoExtras = articulosDelAlmacen.filter(i => extrasIds.has(i.id)).length;
+
+    return (
+      <div className="p-4 md:p-6 min-h-[70vh] flex flex-col items-center justify-center">
+        <div className="max-w-3xl w-full">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{nombreAlmacenActual}</h1>
+            <p className="text-gray-600">Selecciona la sección que deseas consultar</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+            <button
+              onClick={() => setSeccionSeleccionada('stock')}
+              className="group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-emerald-600 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
+            >
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-emerald-50 group-hover:bg-emerald-600 transition-colors flex items-center justify-center">
+                <Package size={36} className="text-emerald-600 group-hover:text-white transition-colors" />
+              </div>
+              <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">Stock</span>
+              <span className="text-sm text-gray-500">
+                {conteoStock} artículo{conteoStock === 1 ? '' : 's'}
+              </span>
+            </button>
+            <button
+              onClick={() => setSeccionSeleccionada('extras')}
+              className="group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-amber-600 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
+            >
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-amber-50 group-hover:bg-amber-600 transition-colors flex items-center justify-center">
+                <PackagePlus size={36} className="text-amber-600 group-hover:text-white transition-colors" />
+              </div>
+              <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">Extras</span>
+              <span className="text-sm text-gray-500">
+                {conteoExtras} artículo{conteoExtras === 1 ? '' : 's'}
+              </span>
+            </button>
+          </div>
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => { setAlmacenSeleccionado(null); setSeccionSeleccionada(null); }}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowUpDown size={16} /> Cambiar almacén
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1472,13 +1564,32 @@ const InventarioPage = () => {
                 </span>
               </div>
             )}
+            {/* Indicador de sección Stock / Extras */}
+            {seccionSeleccionada && (
+              <div className={`flex items-center gap-2 px-3 py-2.5 border rounded-lg ${seccionSeleccionada === 'extras' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                {seccionSeleccionada === 'extras'
+                  ? <PackagePlus size={16} className="text-amber-700" />
+                  : <Package size={16} className="text-emerald-700" />}
+                <span className={`font-semibold uppercase tracking-wide text-xs md:text-sm ${seccionSeleccionada === 'extras' ? 'text-amber-700' : 'text-emerald-700'}`}>
+                  {seccionSeleccionada === 'extras' ? 'Extras' : 'Stock'}
+                </span>
+              </div>
+            )}
             <button
-              onClick={() => setAlmacenSeleccionado(null)}
+              onClick={() => setSeccionSeleccionada(null)}
+              className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-2 text-sm"
+              title="Cambiar sección (Stock / Extras)"
+            >
+              <ArrowUpDown size={16} />
+              <span className="hidden md:inline">Sección</span>
+            </button>
+            <button
+              onClick={() => { setAlmacenSeleccionado(null); setSeccionSeleccionada(null); }}
               className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-2 text-sm"
               title="Cambiar almacén"
             >
               <ArrowUpDown size={16} />
-              <span className="hidden md:inline">Cambiar</span>
+              <span className="hidden md:inline">Almacén</span>
             </button>
             {esAdministrador && (
               <button
@@ -1634,6 +1745,7 @@ const InventarioPage = () => {
                   { key: 'articulo', label: 'Artículo', align: 'left' },
                   { key: 'categoria', label: 'Categoría', align: 'left' },
                   { key: 'ubicacion', label: 'Ubicación', align: 'left' },
+                  { key: 'seccion', label: 'Sección', align: 'left' },
                   { key: 'stockTotal', label: 'Stock Total', align: 'left' },
                   { key: 'stockDisp', label: 'Stock Disponible', align: 'left' },
                   { key: 'unidad', label: 'Unidad', align: 'left' },
@@ -1655,7 +1767,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => !item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-blue-50 sticky top-[49px] z-20 border-b border-blue-200 shadow-sm">
-                    <td colSpan="7" className="px-6 py-3">
+                    <td colSpan="8" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-blue-900">
                         📦 Consumibles
                         <span className="text-xs font-normal text-blue-700">
@@ -1766,6 +1878,26 @@ const InventarioPage = () => {
                           )}
                         </td>
 
+                        {/* Sección Stock / Extras — toggle inline */}
+                        <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                          {puedeEditarArticulos ? (
+                            <button
+                              onClick={(e) => toggleSeccionArticulo(item.id, e)}
+                              className={`w-full px-2 py-1 text-xs font-semibold rounded-full border transition-colors ${getSeccionArticulo(item) === 'extras'
+                                ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
+                                : 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+                                }`}
+                              title="Cambiar entre Stock y Extras"
+                            >
+                              {getSeccionArticulo(item) === 'extras' ? '✨ Extras' : '📦 Stock'}
+                            </button>
+                          ) : (
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                              {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
+                            </span>
+                          )}
+                        </td>
+
                         {/* Stock Total (para consumibles es stock actual) */}
                         <td className="px-4 py-4 whitespace-nowrap">
                           <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
@@ -1859,7 +1991,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-orange-50 sticky top-[49px] z-20 border-b border-orange-200 shadow-sm">
-                    <td colSpan="7" className="px-6 py-3">
+                    <td colSpan="8" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-orange-900">
                         🔧 Herramientas
                         <span className="text-xs font-normal text-orange-700">
@@ -1991,6 +2123,26 @@ const InventarioPage = () => {
                             )}
                           </td>
 
+                          {/* Sección Stock / Extras — toggle inline */}
+                          <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            {puedeEditarArticulos ? (
+                              <button
+                                onClick={(e) => toggleSeccionArticulo(item.id, e)}
+                                className={`w-full px-2 py-1 text-xs font-semibold rounded-full border transition-colors ${getSeccionArticulo(item) === 'extras'
+                                  ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
+                                  : 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+                                  }`}
+                                title="Cambiar entre Stock y Extras"
+                              >
+                                {getSeccionArticulo(item) === 'extras' ? '✨ Extras' : '📦 Stock'}
+                              </button>
+                            ) : (
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
+                              </span>
+                            )}
+                          </td>
+
                           {/* Stock Total */}
                           <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
                             <span className="font-medium text-gray-900">
@@ -2084,7 +2236,7 @@ const InventarioPage = () => {
                         {/* Filas de unidades expandidas */}
                         {estaExpandida && unidades.length > 0 && unidades.map((unidad) => (
                           <tr key={`unidad-${unidad.id}`} className="bg-gray-50">
-                            <td colSpan="6" className="px-4 py-3">
+                            <td colSpan="7" className="px-4 py-3">
                               <div
                                 onClick={(e) => handleVerDetalleUnidad(unidad, item.id, e)}
                                 className="ml-12 flex items-center gap-6 p-3 bg-white rounded-lg border-2 border-gray-200 hover:border-red-400 hover:shadow-md transition-all cursor-pointer group"
@@ -2265,11 +2417,20 @@ const InventarioPage = () => {
                         <h3 className="font-semibold text-gray-900 text-sm mb-0.5 line-clamp-1">{item.nombre}</h3>
                         <p className="text-xs text-gray-500 mb-2 line-clamp-2">{item.descripcion}</p>
 
-                        {/* Badge de categoría */}
-                        <div className="mb-2">
+                        {/* Badges: categoría + sección */}
+                        <div className="mb-2 flex flex-wrap gap-1.5">
                           <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
                             {item.categoria?.nombre || 'Sin categoría'}
                           </span>
+                          <button
+                            onClick={(e) => toggleSeccionArticulo(item.id, e)}
+                            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${getSeccionArticulo(item) === 'extras'
+                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                              : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              }`}
+                          >
+                            {getSeccionArticulo(item) === 'extras' ? '✨ Extras' : '📦 Stock'}
+                          </button>
                         </div>
 
                         {/* Ubicación y Stock en una línea */}
@@ -2444,11 +2605,20 @@ const InventarioPage = () => {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-gray-500 mb-2 line-clamp-2">{item.descripcion}</p>
 
-                          {/* Badge de categoría */}
-                          <div className="mb-2">
+                          {/* Badges: categoría + sección */}
+                          <div className="mb-2 flex flex-wrap gap-1.5">
                             <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
                               {item.categoria?.nombre || 'Sin categoría'}
                             </span>
+                            <button
+                              onClick={(e) => toggleSeccionArticulo(item.id, e)}
+                              className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${getSeccionArticulo(item) === 'extras'
+                                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                }`}
+                            >
+                              {getSeccionArticulo(item) === 'extras' ? '✨ Extras' : '📦 Stock'}
+                            </button>
                           </div>
 
                           {/* Ubicación */}
