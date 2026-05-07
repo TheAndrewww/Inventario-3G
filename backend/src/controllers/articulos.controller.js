@@ -1,5 +1,33 @@
 import { Op } from 'sequelize';
-import { Articulo, Categoria, Ubicacion, Almacen, Proveedor, ArticuloProveedor, DetalleMovimiento, Movimiento, Usuario, SolicitudCompra, DetalleOrdenCompra, TipoHerramientaRenta, ChecklistItemArticulo, ConteoArticulo } from '../models/index.js';
+import { Articulo, Categoria, Ubicacion, Almacen, Proveedor, ArticuloProveedor, DetalleMovimiento, Movimiento, Usuario, SolicitudCompra, DetalleOrdenCompra, TipoHerramientaRenta, ChecklistItemArticulo, ConteoArticulo, AlmacenCategoria } from '../models/index.js';
+
+/**
+ * Elimina una categoría si se quedó sin SKUs activos y sin otras dependencias
+ * (tipos de herramienta de renta). No borra la categoría "Sin Categoría".
+ * Se llama tras update/desactivar/eliminar artículos.
+ */
+async function intentarEliminarCategoriaHuerfana(categoriaId) {
+    if (!categoriaId) return;
+    try {
+        const categoria = await Categoria.findByPk(categoriaId);
+        if (!categoria) return;
+        if (categoria.nombre === 'Sin Categoría') return;
+
+        const skusActivos = await Articulo.count({ where: { categoria_id: categoriaId, activo: true } });
+        if (skusActivos > 0) return;
+
+        let tiposHerr = 0;
+        try { tiposHerr = await TipoHerramientaRenta.count({ where: { categoria_id: categoriaId } }); } catch (e) {}
+        if (tiposHerr > 0) return;
+
+        try { await AlmacenCategoria.destroy({ where: { categoria_id: categoriaId } }); } catch (e) {}
+
+        await categoria.destroy();
+        console.log(`🗑️ Categoría "${categoria.nombre}" (id=${categoriaId}) eliminada automáticamente al quedar sin SKUs`);
+    } catch (e) {
+        console.log('⚠️ Error verificando categoría huérfana:', e.message);
+    }
+}
 import { generarCodigoEAN13, generarCodigoEAN13Temporal, validarCodigoEAN13 } from '../utils/ean13-generator.js';
 import { generarImagenCodigoBarras, generarSVGCodigoBarras } from '../utils/barcode-generator.js';
 import { migrarArticulosPendientes, migrarArticuloIndividual } from '../utils/autoMigrate.js';
@@ -772,6 +800,9 @@ export const updateArticulo = async (req, res) => {
             });
         }
 
+        // Capturar categoría anterior para limpieza si cambia
+        const categoriaAnteriorId = articulo.categoria_id;
+
         // Verificar categoría si se proporciona
         if (categoria_id) {
             const categoria = await Categoria.findByPk(categoria_id);
@@ -1025,6 +1056,11 @@ export const updateArticulo = async (req, res) => {
             ]
         });
 
+        // Si cambió la categoría, verificar si la anterior quedó huérfana
+        if (categoria_id && categoriaAnteriorId && Number(categoria_id) !== Number(categoriaAnteriorId)) {
+            await intentarEliminarCategoriaHuerfana(categoriaAnteriorId);
+        }
+
         res.status(200).json({
             success: true,
             message: 'Artículo actualizado exitosamente',
@@ -1058,8 +1094,13 @@ export const deleteArticulo = async (req, res) => {
             });
         }
 
+        const categoriaAnteriorId = articulo.categoria_id;
+
         // Soft delete - solo desactivar
         await articulo.update({ activo: false });
+
+        // Verificar si la categoría quedó sin SKUs activos
+        await intentarEliminarCategoriaHuerfana(categoriaAnteriorId);
 
         res.status(200).json({
             success: true,
@@ -1150,8 +1191,13 @@ export const deleteArticuloPermanente = async (req, res) => {
             }
         }
 
+        const categoriaAnteriorId = articulo.categoria_id;
+
         // Hard delete - eliminar permanentemente
         await articulo.destroy();
+
+        // Verificar si la categoría quedó huérfana
+        await intentarEliminarCategoriaHuerfana(categoriaAnteriorId);
 
         res.status(200).json({
             success: true,
