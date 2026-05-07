@@ -37,9 +37,10 @@ const SolicitudesCambioPage = () => {
   const [loading, setLoading] = useState(false);
   const [procesandoId, setProcesandoId] = useState(null);
 
-  const cargar = async () => {
+  const cargar = async (opts = {}) => {
+    const { silent = false } = opts;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [resSol, resUb] = await Promise.all([
         solicitudesCambioService.listar(),
         ubicacionesService.getAll().catch(() => [])
@@ -48,13 +49,29 @@ const SolicitudesCambioPage = () => {
       setUbicaciones(Array.isArray(resUb) ? resUb : []);
     } catch (e) {
       console.error(e);
-      toast.error('Error al cargar solicitudes');
+      if (!silent) toast.error('Error al cargar solicitudes');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => { cargar(); }, []);
+
+  // Auto-refresh: cada 20s y al volver a la pestaña.
+  // Admin ve nuevas solicitudes y almacén ve resoluciones sin recargar.
+  // Silencioso — no parpadea ni rompe scroll.
+  useEffect(() => {
+    const refrescar = () => cargar({ silent: true });
+    const interval = setInterval(refrescar, 20000);
+    const onVisible = () => { if (document.visibilityState === 'visible') refrescar(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', refrescar);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', refrescar);
+    };
+  }, []);
 
   const aprobar = async (id) => {
     if (!window.confirm('¿Aprobar esta solicitud? El cambio se aplicará inmediatamente.')) return;

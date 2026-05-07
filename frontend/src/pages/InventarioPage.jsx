@@ -225,6 +225,24 @@ const InventarioPage = () => {
     fetchTodasUbicaciones();
   }, []);
 
+  // Auto-refresh: cada 30s y al volver a la pestaña (para que almacén
+  // vea cambios que admin aplica desde su panel de solicitudes).
+  // Silencioso — no parpadea el loader ni rompe el scroll.
+  useEffect(() => {
+    const refrescar = () => fetchArticulos({ silent: true });
+    const interval = setInterval(refrescar, 30000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refrescar();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', refrescar);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', refrescar);
+    };
+  }, []);
+
   const fetchTodasCategorias = async () => {
     try {
       const data = await categoriasService.getAll();
@@ -310,18 +328,18 @@ const InventarioPage = () => {
     setUbicacionSeleccionada(null);
   }, [almacenSeleccionado]);
 
-  const fetchArticulos = async () => {
+  const fetchArticulos = async (opts = {}) => {
+    const { silent = false } = opts;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const data = await articulosService.getAll();
-      console.log('Artículos recibidos:', data);
       setArticulos(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error al cargar artículos:', error);
-      toast.error('Error al cargar el inventario');
-      setArticulos([]);
+      if (!silent) toast.error('Error al cargar el inventario');
+      if (!silent) setArticulos([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
