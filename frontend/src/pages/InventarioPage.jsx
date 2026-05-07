@@ -334,6 +334,15 @@ const InventarioPage = () => {
     return grupos;
   }, [todasUbicaciones]);
 
+  // Categorías filtradas para el almacén del artículo (evita duplicados/inexistentes en el select inline)
+  const categoriasParaArticulo = (item) => {
+    const almacenId = item?.ubicacion?.almacen_id
+      ?? item?.ubicacion?.almacen_ref?.id
+      ?? (typeof almacenSeleccionado === 'number' ? almacenSeleccionado : null);
+    if (!almacenId) return todasCategorias;
+    return todasCategorias.filter(c => c.almacen_id === almacenId);
+  };
+
   // Cuando cambia el almacén seleccionado, recargar categorías y ubicaciones filtradas
   useEffect(() => {
     if (almacenSeleccionado === null) return; // Gate activo, no fetchear
@@ -2126,7 +2135,7 @@ const InventarioPage = () => {
                               className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border-0 cursor-pointer hover:bg-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none disabled:opacity-50"
                             >
                               <option value="">Sin categoría</option>
-                              {todasCategorias.map(c => (
+                              {categoriasParaArticulo(item).map(c => (
                                 <option key={c.id} value={c.id}>{c.nombre}</option>
                               ))}
                             </select>
@@ -2373,7 +2382,7 @@ const InventarioPage = () => {
                                 className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border-0 cursor-pointer hover:bg-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none disabled:opacity-50"
                               >
                                 <option value="">Sin categoría</option>
-                                {todasCategorias.map(c => (
+                                {categoriasParaArticulo(item).map(c => (
                                   <option key={c.id} value={c.id}>{c.nombre}</option>
                                 ))}
                               </select>
