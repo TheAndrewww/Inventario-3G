@@ -1,4 +1,4 @@
-import { Categoria, Articulo, Almacen, AlmacenCategoria } from '../models/index.js';
+import { Categoria, Articulo, Almacen, AlmacenCategoria, TipoHerramientaRenta } from '../models/index.js';
 
 /**
  * GET /api/categorias
@@ -184,25 +184,38 @@ export const eliminarCategoria = async (req, res) => {
             });
         }
 
-        // Contar artículos asociados
+        // Contar referencias en todas las tablas relacionadas
         const articulosAsociados = await Articulo.count({
             where: { categoria_id: id }
         });
+        let tiposHerramientaAsociados = 0;
+        try {
+            tiposHerramientaAsociados = await TipoHerramientaRenta.count({
+                where: { categoria_id: id }
+            });
+        } catch (e) {
+            // tabla puede no existir en bases legacy — ignorar conteo
+        }
 
-        // Si hay artículos y no se fuerza la eliminación, retornar advertencia
-        if (articulosAsociados > 0 && force !== 'true') {
+        const totalReferencias = articulosAsociados + tiposHerramientaAsociados;
+
+        // Si hay referencias y no se fuerza la eliminación, retornar advertencia
+        if (totalReferencias > 0 && force !== 'true') {
+            const partes = [];
+            if (articulosAsociados > 0) partes.push(`${articulosAsociados} artículo(s)`);
+            if (tiposHerramientaAsociados > 0) partes.push(`${tiposHerramientaAsociados} tipo(s) de herramienta de renta`);
             return res.status(400).json({
                 success: false,
                 requiresConfirmation: true,
                 articlesCount: articulosAsociados,
-                message: `Esta categoría tiene ${articulosAsociados} artículo(s) asociado(s). Si la eliminas, estos artículos quedarán sin categoría.`
+                rentalToolsCount: tiposHerramientaAsociados,
+                message: `Esta categoría tiene ${partes.join(' y ')} asociado(s). Si la eliminas, se moverán a "Sin Categoría".`
             });
         }
 
-        // Si se fuerza la eliminación o no hay artículos, proceder
-        if (articulosAsociados > 0 && force === 'true') {
-            // Desvincular artículos (poner categoria_id en NULL o una categoría por defecto)
-            // Por seguridad, mejor crear una categoría "Sin Categoría" si no existe
+        // Si se fuerza la eliminación o no hay referencias, proceder
+        if (totalReferencias > 0 && force === 'true') {
+            // Crear/obtener categoría "Sin Categoría"
             let categoriaSinAsignar = await Categoria.findOne({
                 where: { nombre: 'Sin Categoría' }
             });
@@ -214,19 +227,43 @@ export const eliminarCategoria = async (req, res) => {
                 });
             }
 
-            // Actualizar todos los artículos a la categoría "Sin Categoría"
-            await Articulo.update(
-                { categoria_id: categoriaSinAsignar.id },
-                { where: { categoria_id: id } }
-            );
+            // Reasignar artículos a "Sin Categoría"
+            if (articulosAsociados > 0) {
+                await Articulo.update(
+                    { categoria_id: categoriaSinAsignar.id },
+                    { where: { categoria_id: id } }
+                );
+            }
+
+            // Reasignar tipos de herramienta de renta a "Sin Categoría"
+            if (tiposHerramientaAsociados > 0) {
+                await TipoHerramientaRenta.update(
+                    { categoria_id: categoriaSinAsignar.id },
+                    { where: { categoria_id: id } }
+                );
+            }
+        }
+
+        // Limpiar vínculos en tabla pivote almacen-categoría (no requiere force)
+        try {
+            await AlmacenCategoria.destroy({ where: { categoria_id: id } });
+        } catch (e) {
+            console.log('⚠️ No se pudo limpiar almacen_categorias:', e.message?.substring(0, 80));
         }
 
         // Eliminar la categoría
         await categoria.destroy();
 
+        const mensajesMovimiento = [];
+        if (articulosAsociados > 0) mensajesMovimiento.push(`${articulosAsociados} artículo(s)`);
+        if (tiposHerramientaAsociados > 0) mensajesMovimiento.push(`${tiposHerramientaAsociados} tipo(s) de herramienta de renta`);
+        const sufijo = mensajesMovimiento.length > 0
+            ? `. ${mensajesMovimiento.join(' y ')} movido(s) a "Sin Categoría"`
+            : '';
+
         res.status(200).json({
             success: true,
-            message: `Categoría eliminada exitosamente${articulosAsociados > 0 ? `. ${articulosAsociados} artículo(s) movido(s) a "Sin Categoría"` : ''}`
+            message: `Categoría eliminada exitosamente${sufijo}`
         });
 
     } catch (error) {

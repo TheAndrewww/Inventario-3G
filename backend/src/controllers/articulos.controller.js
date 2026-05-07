@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { Articulo, Categoria, Ubicacion, Almacen, Proveedor, ArticuloProveedor, DetalleMovimiento, Movimiento, Usuario, SolicitudCompra, DetalleOrdenCompra, TipoHerramientaRenta } from '../models/index.js';
+import { Articulo, Categoria, Ubicacion, Almacen, Proveedor, ArticuloProveedor, DetalleMovimiento, Movimiento, Usuario, SolicitudCompra, DetalleOrdenCompra, TipoHerramientaRenta, ChecklistItemArticulo, ConteoArticulo } from '../models/index.js';
 import { generarCodigoEAN13, generarCodigoEAN13Temporal, validarCodigoEAN13 } from '../utils/ean13-generator.js';
 import { generarImagenCodigoBarras, generarSVGCodigoBarras } from '../utils/barcode-generator.js';
 import { migrarArticulosPendientes, migrarArticuloIndividual } from '../utils/autoMigrate.js';
@@ -1119,6 +1119,24 @@ export const deleteArticuloPermanente = async (req, res) => {
         // 4. Eliminar detalles de órdenes de compra
         if (DetalleOrdenCompra) {
             await DetalleOrdenCompra.destroy({ where: { articulo_id: id } });
+        }
+
+        // 5. Eliminar referencias en checklists de equipos/camionetas
+        if (ChecklistItemArticulo) {
+            try {
+                await ChecklistItemArticulo.destroy({ where: { articulo_id: id } });
+            } catch (e) {
+                console.log('⚠️ No se pudo limpiar checklist_item_articulos:', e.message?.substring(0, 80));
+            }
+        }
+
+        // 6. Eliminar referencias en conteos cíclicos
+        if (ConteoArticulo) {
+            try {
+                await ConteoArticulo.destroy({ where: { articulo_id: id } });
+            } catch (e) {
+                console.log('⚠️ No se pudo limpiar conteo_articulos:', e.message?.substring(0, 80));
+            }
         }
 
         // Eliminar imagen de Cloudinary si existe

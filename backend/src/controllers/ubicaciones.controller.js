@@ -1,4 +1,4 @@
-import { Ubicacion, Articulo, Almacen } from '../models/index.js';
+import { Ubicacion, Articulo, Almacen, TipoHerramientaRenta, Equipo, Camioneta, Movimiento } from '../models/index.js';
 
 /**
  * GET /api/ubicaciones
@@ -202,24 +202,44 @@ export const eliminarUbicacion = async (req, res) => {
             });
         }
 
-        // Contar artículos asociados
+        // Contar referencias en todas las tablas relacionadas
         const articulosAsociados = await Articulo.count({
             where: { ubicacion_id: id }
         });
+        let tiposHerramientaAsociados = 0;
+        let equiposAsociados = 0;
+        let camionetasAsociadas = 0;
+        let movimientosAsociados = 0;
+        try { tiposHerramientaAsociados = await TipoHerramientaRenta.count({ where: { ubicacion_id: id } }); } catch (e) {}
+        try { equiposAsociados = await Equipo.count({ where: { almacen_base_id: id } }); } catch (e) {}
+        try { camionetasAsociadas = await Camioneta.count({ where: { almacen_base_id: id } }); } catch (e) {}
+        try { movimientosAsociados = await Movimiento.count({ where: { ubicacion_destino_id: id } }); } catch (e) {}
 
-        // Si hay artículos y no se fuerza la eliminación, retornar advertencia
-        if (articulosAsociados > 0 && force !== 'true') {
+        const totalReferencias = articulosAsociados + tiposHerramientaAsociados + equiposAsociados + camionetasAsociadas + movimientosAsociados;
+
+        // Si hay referencias y no se fuerza la eliminación, retornar advertencia
+        if (totalReferencias > 0 && force !== 'true') {
+            const partes = [];
+            if (articulosAsociados > 0) partes.push(`${articulosAsociados} artículo(s)`);
+            if (tiposHerramientaAsociados > 0) partes.push(`${tiposHerramientaAsociados} tipo(s) de herramienta de renta`);
+            if (equiposAsociados > 0) partes.push(`${equiposAsociados} equipo(s)`);
+            if (camionetasAsociadas > 0) partes.push(`${camionetasAsociadas} camioneta(s)`);
+            if (movimientosAsociados > 0) partes.push(`${movimientosAsociados} movimiento(s)`);
             return res.status(400).json({
                 success: false,
                 requiresConfirmation: true,
                 articlesCount: articulosAsociados,
-                message: `Esta ubicación tiene ${articulosAsociados} artículo(s) asociado(s). Si la eliminas, estos artículos quedarán sin ubicación.`
+                rentalToolsCount: tiposHerramientaAsociados,
+                equipmentCount: equiposAsociados,
+                vehiclesCount: camionetasAsociadas,
+                movementsCount: movimientosAsociados,
+                message: `Esta ubicación tiene ${partes.join(', ')} asociado(s). Si la eliminas, las referencias se reasignarán o desvincularán.`
             });
         }
 
-        // Si se fuerza la eliminación o no hay artículos, proceder
-        if (articulosAsociados > 0 && force === 'true') {
-            // Desvincular artículos (poner ubicacion_id en NULL o una ubicación por defecto)
+        // Si se fuerza la eliminación o no hay referencias, proceder
+        if (totalReferencias > 0 && force === 'true') {
+            // Crear/obtener ubicación "SIN-ASIGNAR" para reasignaciones obligatorias
             let ubicacionSinAsignar = await Ubicacion.findOne({
                 where: { codigo: 'SIN-ASIGNAR' }
             });
@@ -232,19 +252,50 @@ export const eliminarUbicacion = async (req, res) => {
                 });
             }
 
-            // Actualizar todos los artículos a la ubicación "Sin Asignar"
-            await Articulo.update(
-                { ubicacion_id: ubicacionSinAsignar.id },
-                { where: { ubicacion_id: id } }
-            );
+            // Reasignar artículos a "SIN-ASIGNAR"
+            if (articulosAsociados > 0) {
+                await Articulo.update(
+                    { ubicacion_id: ubicacionSinAsignar.id },
+                    { where: { ubicacion_id: id } }
+                );
+            }
+
+            // Reasignar tipos de herramienta de renta (campo NOT NULL)
+            if (tiposHerramientaAsociados > 0) {
+                await TipoHerramientaRenta.update(
+                    { ubicacion_id: ubicacionSinAsignar.id },
+                    { where: { ubicacion_id: id } }
+                );
+            }
+
+            // Equipos, Camionetas y Movimientos: el FK permite NULL → desvincular
+            if (equiposAsociados > 0) {
+                try { await Equipo.update({ almacen_base_id: null }, { where: { almacen_base_id: id } }); } catch (e) {}
+            }
+            if (camionetasAsociadas > 0) {
+                try { await Camioneta.update({ almacen_base_id: null }, { where: { almacen_base_id: id } }); } catch (e) {}
+            }
+            if (movimientosAsociados > 0) {
+                try { await Movimiento.update({ ubicacion_destino_id: null }, { where: { ubicacion_destino_id: id } }); } catch (e) {}
+            }
         }
 
         // Eliminar la ubicación
         await ubicacion.destroy();
 
+        const mensajesMovimiento = [];
+        if (articulosAsociados > 0) mensajesMovimiento.push(`${articulosAsociados} artículo(s)`);
+        if (tiposHerramientaAsociados > 0) mensajesMovimiento.push(`${tiposHerramientaAsociados} tipo(s) de herramienta`);
+        if (equiposAsociados > 0) mensajesMovimiento.push(`${equiposAsociados} equipo(s)`);
+        if (camionetasAsociadas > 0) mensajesMovimiento.push(`${camionetasAsociadas} camioneta(s)`);
+        if (movimientosAsociados > 0) mensajesMovimiento.push(`${movimientosAsociados} movimiento(s)`);
+        const sufijo = mensajesMovimiento.length > 0
+            ? `. Reasignaciones: ${mensajesMovimiento.join(', ')}`
+            : '';
+
         res.status(200).json({
             success: true,
-            message: `Ubicación eliminada exitosamente${articulosAsociados > 0 ? `. ${articulosAsociados} artículo(s) movido(s) a "Sin Asignar"` : ''}`
+            message: `Ubicación eliminada exitosamente${sufijo}`
         });
 
     } catch (error) {
