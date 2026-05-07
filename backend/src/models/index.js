@@ -29,6 +29,7 @@ import ConteoArticulo from './ConteoArticulo.js';
 import ChecklistItem from './ChecklistItem.js';
 import ChecklistItemArticulo from './ChecklistItemArticulo.js';
 import ChecklistEquipo from './ChecklistEquipo.js';
+import SolicitudCambio from './SolicitudCambio.js';
 
 // Definir relaciones
 
@@ -650,6 +651,17 @@ ChecklistEquipo.belongsTo(Equipo, {
     as: 'equipo'
 });
 
+// ========== RELACIONES SOLICITUD CAMBIO ==========
+
+SolicitudCambio.belongsTo(Articulo, { foreignKey: 'articulo_id', as: 'articulo' });
+Articulo.hasMany(SolicitudCambio, { foreignKey: 'articulo_id', as: 'solicitudes_cambio' });
+
+SolicitudCambio.belongsTo(Usuario, { foreignKey: 'solicitante_id', as: 'solicitante' });
+Usuario.hasMany(SolicitudCambio, { foreignKey: 'solicitante_id', as: 'solicitudes_realizadas' });
+
+SolicitudCambio.belongsTo(Usuario, { foreignKey: 'aprobador_id', as: 'aprobador' });
+Usuario.hasMany(SolicitudCambio, { foreignKey: 'aprobador_id', as: 'solicitudes_aprobadas' });
+
 // Exportar todos los modelos
 export {
     sequelize,
@@ -682,7 +694,8 @@ export {
     RolloMembrana,
     ChecklistItem,
     ChecklistItemArticulo,
-    ChecklistEquipo
+    ChecklistEquipo,
+    SolicitudCambio
 };
 
 export default {
@@ -716,5 +729,6 @@ export default {
     RolloMembrana,
     ChecklistItem,
     ChecklistItemArticulo,
-    ChecklistEquipo
+    ChecklistEquipo,
+    SolicitudCambio
 };

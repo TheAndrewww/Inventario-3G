@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check } from 'lucide-react';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check, Inbox } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -14,6 +14,7 @@ const ALL_MENU_ITEMS = [
   { path: '/monitor-pedidos', icon: BarChart3, label: 'Monitor Pedidos', roles: ['administrador', 'encargado'] },
   { path: '/camionetas', icon: Briefcase, label: 'Equipos', roles: ['administrador', 'encargado'] },
   { path: '/usuarios', icon: UserCog, label: 'Usuarios', roles: ['administrador'] },
+  { path: '/solicitudes-cambio', icon: Inbox, label: 'Solicitudes', roles: ['administrador', 'almacen', 'encargado'] },
   { path: '/ordenes-compra', icon: FileText, label: 'Órdenes de Compra', roles: ['administrador', 'diseñador', 'ventas', 'compras'] },
   { path: '/renta-herramientas', icon: Wrench, label: 'Renta Herramientas', roles: ['administrador', 'encargado', 'almacen'] },
   { path: '/calendario', icon: Calendar, label: 'Calendario', roles: ['administrador', 'diseñador', 'ventas', 'encargado', 'almacen'] },

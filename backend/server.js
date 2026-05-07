@@ -122,6 +122,7 @@ import descontarAlmacenRoutes from './src/routes/descontarAlmacen.routes.js';
 import almacenesRoutes from './src/routes/almacenes.routes.js';
 import rollosMembrana from './src/routes/rollosMembrana.routes.js';
 import checklistRoutes from './src/routes/checklist.routes.js';
+import solicitudesCambioRoutes from './src/routes/solicitudesCambio.routes.js';
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -220,6 +221,7 @@ app.use('/api/descontar-almacen', descontarAlmacenRoutes);
 app.use('/api/almacenes', almacenesRoutes);
 app.use('/api/rollos-membrana', rollosMembrana);
 app.use('/api/checklist', checklistRoutes);
+app.use('/api/solicitudes-cambio', solicitudesCambioRoutes);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
 
@@ -561,6 +563,24 @@ const startServer = async () => {
                 console.log('✅ Tabla image_processing_queue creada exitosamente');
             } else {
                 console.log('✅ Tabla image_processing_queue ya existe');
+            }
+
+            // Verificar/crear tabla de solicitudes_cambio
+            try {
+                const [scTableCheck] = await sequelize.query(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'solicitudes_cambio'"
+                );
+                const scTableExists = parseInt(scTableCheck[0].count) > 0;
+                if (!scTableExists) {
+                    console.log('🔄 Creando tabla solicitudes_cambio...');
+                    const { SolicitudCambio } = await import('./src/models/index.js');
+                    await SolicitudCambio.sync({ force: false });
+                    console.log('✅ Tabla solicitudes_cambio creada exitosamente');
+                } else {
+                    console.log('✅ Tabla solicitudes_cambio ya existe');
+                }
+            } catch (scErr) {
+                console.error('⚠️ Error verificando tabla solicitudes_cambio:', scErr.message);
             }
 
             // Verificar/crear tabla de anuncios

@@ -14,6 +14,7 @@ import PedidosPendientesPage from './pages/PedidosPendientesPage';
 
 import CamionetasPage from './pages/CamionetasPage';
 import UsuariosPage from './pages/UsuariosPage';
+import SolicitudesCambioPage from './pages/SolicitudesCambioPage';
 import HistorialPage from './pages/HistorialPage';
 import PerfilPage from './pages/PerfilPage';
 import ProveedoresPage from './pages/ProveedoresPage';
@@ -114,6 +115,7 @@ function App() {
 
                       <Route path="camionetas" element={<CamionetasPage />} />
                       <Route path="usuarios" element={<UsuariosPage />} />
+                      <Route path="solicitudes-cambio" element={<SolicitudesCambioPage />} />
                       <Route path="ordenes-compra" element={<OrdenesCompraPage />} />
                       <Route path="renta-herramientas" element={<RentaHerramientasPage />} />
                       <Route path="renta-herramientas/imprimir-codigos" element={<ImpresionCodigosHerramientasPage />} />

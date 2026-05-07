@@ -14,6 +14,7 @@ const Header = ({ toggleSidebar, isMobile }) => {
       '/aprobacion-pedidos': 'Aprobar Pedidos',
       '/camionetas': 'Equipos',
       '/usuarios': 'Usuarios',
+      '/solicitudes-cambio': 'Solicitudes de cambio',
       '/historial': 'Historial de Movimientos',
       '/perfil': 'Mi Perfil',
       '/proveedores': 'Proveedores',

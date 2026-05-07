@@ -3,6 +3,7 @@ import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, Packa
 import api from '../services/api';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
+import solicitudesCambioService from '../services/solicitudesCambio.service';
 import categoriasService from '../services/categorias.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import almacenesService from '../services/almacenes.service';
@@ -241,6 +242,23 @@ const InventarioPage = () => {
   const handleQuickUpdate = async (item, field, value) => {
     const parsed = value === '' ? null : Number(value);
     if (item[field] === parsed) return;
+
+    // Almacén: cambio de ubicación requiere aprobación de admin
+    if (esAlmacen && field === 'ubicacion_id') {
+      try {
+        await solicitudesCambioService.crear({
+          tipo: 'cambio_ubicacion',
+          articulo_id: item.id,
+          payload: { ubicacion_id: parsed }
+        });
+        toast.success('Solicitud de cambio de ubicación enviada al administrador');
+      } catch (err) {
+        console.error(err);
+        toast.error(err.response?.data?.message || 'Error al enviar solicitud');
+      }
+      return;
+    }
+
     setActualizandoArt(prev => new Set(prev).add(item.id));
     try {
       await articulosService.update(item.id, { [field]: parsed });
@@ -817,6 +835,23 @@ const InventarioPage = () => {
   };
 
   const handleEliminar = async (articulo) => {
+    // Almacén: solicitar al administrador
+    if (esAlmacen) {
+      if (!window.confirm(`Se enviará al administrador una solicitud para desactivar "${articulo.nombre}". ¿Continuar?`)) return;
+      try {
+        await solicitudesCambioService.crear({
+          tipo: 'desactivar_articulo',
+          articulo_id: articulo.id,
+          payload: {}
+        });
+        toast.success('Solicitud de desactivación enviada al administrador');
+      } catch (error) {
+        console.error(error);
+        toast.error(error.response?.data?.message || 'Error al enviar solicitud');
+      }
+      return;
+    }
+
     if (!window.confirm(`¿Estás seguro de eliminar "${articulo.nombre}"? Esta acción desactivará el artículo.`)) {
       return;
     }
@@ -888,24 +923,38 @@ const InventarioPage = () => {
 
     try {
       setLoadingEntrada(true);
-      await movimientosService.create({
-        tipo: 'ajuste_entrada',
-        articulos: [
-          {
-            articulo_id: articuloParaEntrada.id,
+
+      // Almacén: solicita aprobación. Admin/encargado: aplica directo.
+      if (esAlmacen) {
+        await solicitudesCambioService.crear({
+          tipo: 'entrada_stock',
+          articulo_id: articuloParaEntrada.id,
+          payload: {
             cantidad: parseFloat(cantidadEntrada),
             observaciones: observacionesEntrada || null
           }
-        ],
-        observaciones: `Entrada de inventario: ${articuloParaEntrada.nombre}`
-      });
+        });
+        toast.success('Solicitud de entrada enviada al administrador');
+      } else {
+        await movimientosService.create({
+          tipo: 'ajuste_entrada',
+          articulos: [
+            {
+              articulo_id: articuloParaEntrada.id,
+              cantidad: parseFloat(cantidadEntrada),
+              observaciones: observacionesEntrada || null
+            }
+          ],
+          observaciones: `Entrada de inventario: ${articuloParaEntrada.nombre}`
+        });
+        toast.success('Entrada registrada exitosamente');
+      }
 
-      toast.success('Entrada registrada exitosamente');
       handleCerrarEntrada();
       fetchArticulos();
     } catch (error) {
       console.error('Error al registrar entrada:', error);
-      toast.error(error.message || 'Error al registrar entrada');
+      toast.error(error.response?.data?.message || error.message || 'Error al registrar entrada');
     } finally {
       setLoadingEntrada(false);
     }
@@ -933,24 +982,38 @@ const InventarioPage = () => {
 
     try {
       setLoadingSalida(true);
-      await movimientosService.create({
-        tipo: 'ajuste_salida',
-        articulos: [
-          {
-            articulo_id: articuloParaSalida.id,
+
+      // Almacén: solicita aprobación. Admin/encargado: aplica directo.
+      if (esAlmacen) {
+        await solicitudesCambioService.crear({
+          tipo: 'salida_stock',
+          articulo_id: articuloParaSalida.id,
+          payload: {
             cantidad: parseFloat(cantidadSalida),
             observaciones: observacionesSalida || null
           }
-        ],
-        observaciones: `Salida de inventario: ${articuloParaSalida.nombre}`
-      });
+        });
+        toast.success('Solicitud de salida enviada al administrador');
+      } else {
+        await movimientosService.create({
+          tipo: 'ajuste_salida',
+          articulos: [
+            {
+              articulo_id: articuloParaSalida.id,
+              cantidad: parseFloat(cantidadSalida),
+              observaciones: observacionesSalida || null
+            }
+          ],
+          observaciones: `Salida de inventario: ${articuloParaSalida.nombre}`
+        });
+        toast.success('Salida registrada exitosamente');
+      }
 
-      toast.success('Salida registrada exitosamente');
       handleCerrarSalida();
       fetchArticulos();
     } catch (error) {
       console.error('Error al registrar salida:', error);
-      toast.error(error.message || 'Error al registrar salida');
+      toast.error(error.response?.data?.message || error.message || 'Error al registrar salida');
     } finally {
       setLoadingSalida(false);
     }
