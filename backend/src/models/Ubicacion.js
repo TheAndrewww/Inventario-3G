@@ -10,8 +10,7 @@ const Ubicacion = sequelize.define('Ubicacion', {
     codigo: {
         type: DataTypes.STRING(20),
         allowNull: false,
-        unique: true,
-        comment: 'Código de ubicación (ej: A-12, B-05)'
+        comment: 'Código de ubicación (ej: A-12, B-05) — único por almacén'
     },
     almacen_id: {
         type: DataTypes.INTEGER,
@@ -53,7 +52,10 @@ const Ubicacion = sequelize.define('Ubicacion', {
     }
 }, {
     tableName: 'ubicaciones',
-    timestamps: true
+    timestamps: true,
+    indexes: [
+        { unique: true, fields: ['codigo', 'almacen_id'], name: 'ubicaciones_codigo_almacen_unique' }
+    ]
 });
 
 export default Ubicacion;

@@ -67,16 +67,22 @@ export const crearUbicacion = async (req, res) => {
                 message: 'El código de la ubicación es obligatorio'
             });
         }
+        if (!almacen_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Debes seleccionar un almacén antes de crear la ubicación'
+            });
+        }
 
-        // Verificar si ya existe una ubicación con ese código
+        // Verificar si ya existe una ubicación con ese código EN ESE ALMACÉN
         const ubicacionExistente = await Ubicacion.findOne({
-            where: { codigo: codigo.trim() }
+            where: { codigo: codigo.trim(), almacen_id }
         });
 
         if (ubicacionExistente) {
             return res.status(400).json({
                 success: false,
-                message: 'Ya existe una ubicación con ese código'
+                message: 'Ya existe una ubicación con ese código en este almacén'
             });
         }
 
@@ -143,15 +149,15 @@ export const actualizarUbicacion = async (req, res) => {
                 });
             }
 
-            // Verificar si ya existe otra ubicación con ese código
+            // Verificar si ya existe otra ubicación con ese código en el mismo almacén
             const ubicacionExistente = await Ubicacion.findOne({
-                where: { codigo: codigo.trim() }
+                where: { codigo: codigo.trim(), almacen_id: ubicacion.almacen_id }
             });
 
             if (ubicacionExistente && ubicacionExistente.id !== parseInt(id)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Ya existe otra ubicación con ese código'
+                    message: 'Ya existe otra ubicación con ese código en este almacén'
                 });
             }
         }

@@ -9,8 +9,16 @@ const Categoria = sequelize.define('Categoria', {
     },
     nombre: {
         type: DataTypes.STRING(100),
-        allowNull: false,
-        unique: true
+        allowNull: false
+    },
+    almacen_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'almacenes',
+            key: 'id'
+        },
+        comment: 'Almacén al que pertenece la categoría (aislamiento por almacén)'
     },
     descripcion: {
         type: DataTypes.TEXT,
@@ -33,7 +41,10 @@ const Categoria = sequelize.define('Categoria', {
     }
 }, {
     tableName: 'categorias',
-    timestamps: true
+    timestamps: true,
+    indexes: [
+        { unique: true, fields: ['nombre', 'almacen_id'], name: 'categorias_nombre_almacen_unique' }
+    ]
 });
 
 export default Categoria;

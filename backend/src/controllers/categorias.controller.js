@@ -11,25 +11,11 @@ export const getCategorias = async (req, res) => {
 
         let categorias;
         if (almacen_id) {
-            try {
-                // Obtener categorías vinculadas a un almacén específico
-                categorias = await Categoria.findAll({
-                    include: [{
-                        model: Almacen,
-                        as: 'almacenes',
-                        where: { id: almacen_id },
-                        attributes: [],
-                        through: { attributes: [] }
-                    }],
-                    order: [['nombre', 'ASC']]
-                });
-            } catch (includeError) {
-                // Fallback: si la tabla almacen_categorias no existe, devolver todas
-                console.log('⚠️ getCategorias fallback sin Almacen filter:', includeError.message?.substring(0, 80));
-                categorias = await Categoria.findAll({
-                    order: [['nombre', 'ASC']]
-                });
-            }
+            // Filtro directo por almacen_id (aislamiento por almacén)
+            categorias = await Categoria.findAll({
+                where: { almacen_id },
+                order: [['nombre', 'ASC']]
+            });
         } else {
             categorias = await Categoria.findAll({
                 order: [['nombre', 'ASC']]
@@ -59,7 +45,7 @@ export const getCategorias = async (req, res) => {
  */
 export const crearCategoria = async (req, res) => {
     try {
-        const { nombre, descripcion } = req.body;
+        const { nombre, descripcion, almacen_id } = req.body;
 
         // Validar campos requeridos
         if (!nombre || !nombre.trim()) {
@@ -68,23 +54,30 @@ export const crearCategoria = async (req, res) => {
                 message: 'El nombre de la categoría es obligatorio'
             });
         }
+        if (!almacen_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Debes seleccionar un almacén antes de crear la categoría'
+            });
+        }
 
-        // Verificar si ya existe una categoría con ese nombre
+        // Verificar si ya existe una categoría con ese nombre EN ESE ALMACÉN
         const categoriaExistente = await Categoria.findOne({
-            where: { nombre: nombre.trim() }
+            where: { nombre: nombre.trim(), almacen_id }
         });
 
         if (categoriaExistente) {
             return res.status(400).json({
                 success: false,
-                message: 'Ya existe una categoría con ese nombre'
+                message: 'Ya existe una categoría con ese nombre en este almacén'
             });
         }
 
         // Crear la categoría
         const nuevaCategoria = await Categoria.create({
             nombre: nombre.trim(),
-            descripcion: descripcion ? descripcion.trim() : 'Sin descripción'
+            descripcion: descripcion ? descripcion.trim() : 'Sin descripción',
+            almacen_id
         });
 
         res.status(201).json({
@@ -130,15 +123,15 @@ export const actualizarCategoria = async (req, res) => {
                 });
             }
 
-            // Verificar si ya existe otra categoría con ese nombre
+            // Verificar si ya existe otra categoría con ese nombre en el mismo almacén
             const categoriaExistente = await Categoria.findOne({
-                where: { nombre: nombre.trim() }
+                where: { nombre: nombre.trim(), almacen_id: categoria.almacen_id }
             });
 
             if (categoriaExistente && categoriaExistente.id !== parseInt(id)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Ya existe otra categoría con ese nombre'
+                    message: 'Ya existe otra categoría con ese nombre en este almacén'
                 });
             }
         }

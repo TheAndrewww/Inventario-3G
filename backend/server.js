@@ -1029,6 +1029,22 @@ const startServer = async () => {
             }
         }
 
+        // Aislamiento por almacén (categorías y ubicaciones) — aplica en dev y prod
+        try {
+            console.log('🔍 Verificando aislamiento por almacén (categorías/ubicaciones)...');
+            const fs = await import('fs');
+            const path = await import('path');
+            const { fileURLToPath } = await import('url');
+            const __filename = fileURLToPath(import.meta.url);
+            const __dirname = path.dirname(__filename);
+            const migrationPath = path.join(__dirname, 'migrations', '20260507_aislamiento_almacenes.sql');
+            const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+            await sequelize.query(migrationSQL);
+            console.log('✅ Aislamiento por almacén aplicado/verificado');
+        } catch (aisErr) {
+            console.error('⚠️ Error aplicando aislamiento por almacén:', aisErr.message);
+        }
+
         // Iniciar servidor
         app.listen(PORT, async () => {
             console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);

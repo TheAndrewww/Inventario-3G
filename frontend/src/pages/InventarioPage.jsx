@@ -1085,6 +1085,10 @@ const InventarioPage = () => {
       toast.error('El nombre de la categoría es requerido');
       return;
     }
+    if (!categoriaEditando && !almacenSeleccionado) {
+      toast.error('Selecciona un almacén antes de crear una categoría');
+      return;
+    }
 
     try {
       setLoadingCategoria(true);
@@ -1092,11 +1096,14 @@ const InventarioPage = () => {
         await categoriasService.update(categoriaEditando.id, { nombre: nombreCategoria.trim() });
         toast.success('Categoría actualizada exitosamente');
       } else {
-        await categoriasService.create({ nombre: nombreCategoria.trim() });
+        await categoriasService.create({
+          nombre: nombreCategoria.trim(),
+          almacen_id: almacenSeleccionado
+        });
         toast.success('Categoría creada exitosamente');
       }
       handleCerrarModalCategoria();
-      fetchCategorias();
+      fetchCategorias(almacenSeleccionado);
     } catch (error) {
       console.error('Error al guardar categoría:', error);
       toast.error(error.message || 'Error al guardar categoría');
@@ -1185,12 +1192,17 @@ const InventarioPage = () => {
       toast.error('El código de ubicación es requerido');
       return;
     }
+    if (!ubicacionEditando && !almacenSeleccionado) {
+      toast.error('Selecciona un almacén antes de crear una ubicación');
+      return;
+    }
 
     try {
       setLoadingUbicacion(true);
       const ubicacionData = {
         codigo: codigoUbicacion.trim(),
         almacen: almacenUbicacion.trim() || null,
+        almacen_id: ubicacionEditando ? ubicacionEditando.almacen_id : almacenSeleccionado,
         pasillo: pasilloUbicacion.trim() || null,
         estante: estanteUbicacion.trim() || null,
         nivel: nivelUbicacion ? parseInt(nivelUbicacion) : null,
@@ -1205,7 +1217,7 @@ const InventarioPage = () => {
         toast.success('Ubicación creada exitosamente');
       }
       handleCerrarModalUbicacion();
-      fetchUbicaciones();
+      fetchUbicaciones(almacenSeleccionado);
     } catch (error) {
       console.error('Error al guardar ubicación:', error);
       toast.error(error.message || 'Error al guardar ubicación');
