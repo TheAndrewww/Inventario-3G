@@ -97,6 +97,12 @@ export const generateTicketPDF = async (pedido) => {
       });
       alturaEstimada += 5; // Espacio entre categorías
     });
+    // Espacio reservado para observaciones (si existen)
+    const observacionesTexto = (pedido.observaciones || '').trim();
+    if (observacionesTexto) {
+      const lineasObs = Math.ceil(observacionesTexto.length / 45);
+      alturaEstimada += 12 + lineasObs * 4;
+    }
     alturaEstimada += 10; // Margen final
 
     // Crear documento con formato ticket (80mm de ancho, altura dinámica)
@@ -245,6 +251,28 @@ export const generateTicketPDF = async (pedido) => {
 
       yPos += 3; // Espacio entre categorías
     });
+
+    // === OBSERVACIONES ===
+    if (observacionesTexto) {
+      yPos += 2;
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(margen, yPos, anchoTicket - margen, yPos);
+      yPos += 4;
+
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'bold');
+      doc.text('OBSERVACIONES', margen, yPos);
+      yPos += 4;
+
+      doc.setFont(undefined, 'normal');
+      const obsLines = doc.splitTextToSize(observacionesTexto, anchoUtil);
+      obsLines.forEach(line => {
+        doc.text(line, margen, yPos);
+        yPos += 3.5;
+      });
+      yPos += 3;
+    }
 
     // === MARCA DE AGUA ===
     if (marcaAguaData) {

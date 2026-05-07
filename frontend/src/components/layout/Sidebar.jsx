@@ -23,7 +23,7 @@ const ALL_MENU_ITEMS = [
   { path: '/avance-produccion', icon: ClipboardCheck, label: 'Avance Producción', roles: ['administrador', 'almacen'] },
   { path: '/historial', icon: History, label: 'Historial', roles: ['administrador', 'diseñador'] },
   { path: '/proveedores', icon: Truck, label: 'Proveedores', roles: ['administrador', 'compras', 'encargado'] },
-  { path: '/control-campana', icon: Flag, label: 'Control Campaña', roles: ['administrador', 'diseñador', 'encargado'] },
+  { path: '/control-campana', icon: Flag, label: 'Control Campaña', roles: ['administrador', 'diseñador', 'encargado', 'compras'] },
   { path: '/conteo-ciclico', icon: ClipboardCheck, label: 'Conteo Cíclico', roles: ['administrador', 'almacen', 'encargado'] },
   { path: '/descontar-almacen', icon: PackageOpen, label: 'Descuento Almacén', roles: ['administrador', 'encargado'] },
   { path: '/rollos-membrana', icon: Layers, label: 'Rollos Membrana', roles: ['administrador', 'encargado'] },

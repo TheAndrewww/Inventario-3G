@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { Loader2, Check, X, Trash2, Save, XCircle, Download } from 'lucide-react';
+import { Loader2, Check, X, Trash2, Save, XCircle, Download, Eye } from 'lucide-react';
 import { campanaControlService } from '../services/campanaControl.service';
+import { useAuth } from '../context/AuthContext';
 
 const QUARTERS = [
     { id: 1, name: '1ER TRIMESTRE', weeks: Array.from({ length: 13 }, (_, i) => i + 1) },
@@ -28,6 +29,9 @@ const AREAS = [
 ];
 
 const ControlCampanaPage = () => {
+    const { user } = useAuth();
+    const esSoloLectura = user?.rol === 'compras';
+
     const [data, setData] = useState({});
     const [totals, setTotals] = useState({ byQuarter: {}, byArea: {} });
     const [loading, setLoading] = useState(true);
@@ -306,8 +310,13 @@ const ControlCampanaPage = () => {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200">
                         <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-xl">
-                            <h3 className="text-lg font-bold text-gray-800">
+                            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                                 {selectedCell.area.name} - Semana {selectedCell.week}
+                                {esSoloLectura && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full">
+                                        <Eye className="w-3 h-3" /> Solo lectura
+                                    </span>
+                                )}
                             </h3>
                             <button
                                 onClick={() => setModalOpen(false)}
@@ -320,29 +329,32 @@ const ControlCampanaPage = () => {
                         <div className="p-6 space-y-6">
                             <div className="grid grid-cols-3 gap-3">
                                 <button
-                                    onClick={() => setModalData({ ...modalData, status: null })}
+                                    onClick={() => !esSoloLectura && setModalData({ ...modalData, status: null })}
+                                    disabled={esSoloLectura}
                                     className={`p-3 rounded-lg border-2 font-bold transition-all ${modalData.status === null
                                         ? 'border-gray-800 bg-gray-100 text-gray-800 ring-2 ring-gray-200'
                                         : 'border-gray-200 text-gray-500 hover:border-gray-400'
-                                        }`}
+                                        } ${esSoloLectura ? 'cursor-not-allowed opacity-60 hover:border-gray-200' : ''}`}
                                 >
                                     Sin marcar
                                 </button>
                                 <button
-                                    onClick={() => setModalData({ ...modalData, status: 'good' })}
+                                    onClick={() => !esSoloLectura && setModalData({ ...modalData, status: 'good' })}
+                                    disabled={esSoloLectura}
                                     className={`p-3 rounded-lg border-2 font-bold transition-all flex items-center justify-center gap-2 ${modalData.status === 'good'
                                         ? 'border-green-600 bg-green-50 text-green-700 ring-2 ring-green-100'
                                         : 'border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600'
-                                        }`}
+                                        } ${esSoloLectura ? 'cursor-not-allowed opacity-60 hover:border-gray-200 hover:text-gray-500' : ''}`}
                                 >
                                     <Check className="w-5 h-5" /> Bien
                                 </button>
                                 <button
-                                    onClick={() => setModalData({ ...modalData, status: 'bad' })}
+                                    onClick={() => !esSoloLectura && setModalData({ ...modalData, status: 'bad' })}
+                                    disabled={esSoloLectura}
                                     className={`p-3 rounded-lg border-2 font-bold transition-all flex items-center justify-center gap-2 ${modalData.status === 'bad'
                                         ? 'border-red-600 bg-red-50 text-red-700 ring-2 ring-red-100'
                                         : 'border-gray-200 text-gray-500 hover:border-red-400 hover:text-red-600'
-                                        }`}
+                                        } ${esSoloLectura ? 'cursor-not-allowed opacity-60 hover:border-gray-200 hover:text-gray-500' : ''}`}
                                 >
                                     <X className="w-5 h-5" /> Mal
                                 </button>
@@ -355,37 +367,51 @@ const ControlCampanaPage = () => {
                                 <textarea
                                     value={modalData.note}
                                     onChange={(e) => setModalData({ ...modalData, note: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all outline-none resize-none h-32"
-                                    placeholder="Escribe una nota explicativa (opcional)..."
+                                    readOnly={esSoloLectura}
+                                    className={`w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all outline-none resize-none h-32 ${esSoloLectura ? 'bg-gray-50 cursor-default' : ''}`}
+                                    placeholder={esSoloLectura ? '— Sin nota —' : 'Escribe una nota explicativa (opcional)...'}
                                 />
                             </div>
                         </div>
 
                         <div className="p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl flex justify-between items-center">
-                            <button
-                                onClick={handleDelete}
-                                disabled={saving || (!data[selectedCell.key] && !modalData.note)}
-                                className="text-red-600 hover:text-red-800 hover:bg-red-50 px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Trash2 className="w-4 h-4" /> Eliminar
-                            </button>
+                            {esSoloLectura ? (
+                                <div className="w-full flex justify-end">
+                                    <button
+                                        onClick={() => setModalOpen(false)}
+                                        className="px-6 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-800 transition-colors"
+                                    >
+                                        Cerrar
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={handleDelete}
+                                        disabled={saving || (!data[selectedCell.key] && !modalData.note)}
+                                        className="text-red-600 hover:text-red-800 hover:bg-red-50 px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Trash2 className="w-4 h-4" /> Eliminar
+                                    </button>
 
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setModalOpen(false)}
-                                    className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-semibold transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleSave}
-                                    disabled={saving}
-                                    className="bg-red-700 text-white px-6 py-2 rounded-lg font-bold hover:bg-red-800 active:transform active:scale-95 transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-lg shadow-red-200"
-                                >
-                                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                    Guardar
-                                </button>
-                            </div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setModalOpen(false)}
+                                            className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-semibold transition-colors"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={handleSave}
+                                            disabled={saving}
+                                            className="bg-red-700 text-white px-6 py-2 rounded-lg font-bold hover:bg-red-800 active:transform active:scale-95 transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-lg shadow-red-200"
+                                        >
+                                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                            Guardar
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>

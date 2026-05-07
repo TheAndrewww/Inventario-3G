@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer, Wrench } from 'lucide-react';
 import api from '../services/api';
 import articulosService from '../services/articulos.service';
@@ -179,6 +179,9 @@ const InventarioPage = () => {
   const [categoriaEditando, setCategoriaEditando] = useState(null);
   const [nombreCategoria, setNombreCategoria] = useState('');
   const [loadingCategoria, setLoadingCategoria] = useState(false);
+  const [categoriaDropdownOpen, setCategoriaDropdownOpen] = useState(false);
+  const [categoriaEditMode, setCategoriaEditMode] = useState(false);
+  const categoriaDropdownRef = useRef(null);
 
   // Estados para gestión de ubicaciones
   const [modalUbicacionOpen, setModalUbicacionOpen] = useState(false);
@@ -190,6 +193,9 @@ const InventarioPage = () => {
   const [nivelUbicacion, setNivelUbicacion] = useState('');
   const [descripcionUbicacion, setDescripcionUbicacion] = useState('');
   const [loadingUbicacion, setLoadingUbicacion] = useState(false);
+  const [ubicacionDropdownOpen, setUbicacionDropdownOpen] = useState(false);
+  const [ubicacionEditMode, setUbicacionEditMode] = useState(false);
+  const ubicacionDropdownRef = useRef(null);
 
   // Estados para gestión de almacenes
   const [modalAlmacenesOpen, setModalAlmacenesOpen] = useState(false);
@@ -223,6 +229,22 @@ const InventarioPage = () => {
     fetchArticulosConteo();
     fetchTodasCategorias();
     fetchTodasUbicaciones();
+  }, []);
+
+  // Cerrar dropdowns de categorías/ubicaciones al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (categoriaDropdownRef.current && !categoriaDropdownRef.current.contains(e.target)) {
+        setCategoriaDropdownOpen(false);
+        setCategoriaEditMode(false);
+      }
+      if (ubicacionDropdownRef.current && !ubicacionDropdownRef.current.contains(e.target)) {
+        setUbicacionDropdownOpen(false);
+        setUbicacionEditMode(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Auto-refresh: cada 30s y al volver a la pestaña (para que almacén
@@ -1721,19 +1743,97 @@ const InventarioPage = () => {
 
           {/* Filtro de categoría */}
           <div className="flex items-center gap-1">
-            <div className="relative">
-              <select
-                value={categoriaSeleccionada ?? ''}
-                onChange={(e) => setCategoriaSeleccionada(e.target.value ? Number(e.target.value) : null)}
-                className="appearance-none pl-9 pr-8 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-700"
+            <div className="relative" ref={categoriaDropdownRef}>
+              <button
+                type="button"
+                onClick={() => { setCategoriaDropdownOpen(o => !o); setCategoriaEditMode(false); }}
+                className="appearance-none pl-9 pr-8 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-700 text-left min-w-[180px] truncate"
               >
-                <option value="">Todas las categorías</option>
-                {categorias.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                ))}
-              </select>
+                {categoriaSeleccionada
+                  ? (categorias.find(c => c.id === categoriaSeleccionada)?.nombre || 'Todas las categorías')
+                  : 'Todas las categorías'}
+              </button>
               <Package size={16} className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none" />
               <ChevronDown size={14} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+              {categoriaDropdownOpen && (
+                <div className="absolute z-50 mt-1 left-0 min-w-full w-max max-w-[320px] max-h-80 overflow-y-auto bg-white border border-gray-300 rounded-lg shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => { setCategoriaSeleccionada(null); setCategoriaDropdownOpen(false); setCategoriaEditMode(false); }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${!categoriaSeleccionada ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-700'}`}
+                  >
+                    Todas las categorías
+                  </button>
+                  <div className="border-t border-gray-200" />
+                  {categorias.length === 0 ? (
+                    <div className="px-3 py-3 text-sm text-gray-500 text-center">No hay categorías</div>
+                  ) : (
+                    categorias.map((cat) => (
+                      <div
+                        key={cat.id}
+                        className={`flex items-center justify-between gap-2 hover:bg-gray-50 ${categoriaSeleccionada === cat.id ? 'bg-red-50' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => { setCategoriaSeleccionada(cat.id); setCategoriaDropdownOpen(false); setCategoriaEditMode(false); }}
+                          className={`flex-1 text-left px-3 py-2 text-sm truncate ${categoriaSeleccionada === cat.id ? 'text-red-700 font-medium' : 'text-gray-700'}`}
+                        >
+                          {cat.nombre}
+                        </button>
+                        {categoriaEditMode && esAdministrador && (
+                          <div className="flex items-center gap-1 pr-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setCategoriaDropdownOpen(false); setCategoriaEditMode(false); handleAbrirModalCategoria(cat); }}
+                              className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                              title="Editar categoría"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`¿Eliminar la categoría "${cat.nombre}"?`)) {
+                                  setCategoriaDropdownOpen(false);
+                                  setCategoriaEditMode(false);
+                                  handleEliminarCategoria(cat);
+                                }
+                              }}
+                              className="p-1 text-red-600 hover:bg-red-100 rounded"
+                              title="Eliminar categoría"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                  {esAdministrador && categorias.length > 0 && (
+                    <>
+                      <div className="border-t border-gray-200" />
+                      <button
+                        type="button"
+                        onClick={() => setCategoriaEditMode(m => !m)}
+                        className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium ${categoriaEditMode ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                      >
+                        {categoriaEditMode ? (
+                          <>
+                            <X size={14} />
+                            Salir de edición
+                          </>
+                        ) : (
+                          <>
+                            <Edit2 size={14} />
+                            Editar / Eliminar
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             {puedeCrearArticulos && (
               <button
@@ -1748,19 +1848,100 @@ const InventarioPage = () => {
 
           {/* Filtro de ubicación */}
           <div className="flex items-center gap-1">
-            <div className="relative">
-              <select
-                value={ubicacionSeleccionada ?? ''}
-                onChange={(e) => setUbicacionSeleccionada(e.target.value ? Number(e.target.value) : null)}
-                className="appearance-none pl-9 pr-8 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-700"
+            <div className="relative" ref={ubicacionDropdownRef}>
+              <button
+                type="button"
+                onClick={() => { setUbicacionDropdownOpen(o => !o); setUbicacionEditMode(false); }}
+                className="appearance-none pl-9 pr-8 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-700 text-left min-w-[180px] truncate"
               >
-                <option value="">Todas las ubicaciones</option>
-                {ubicaciones.map((ub) => (
-                  <option key={ub.id} value={ub.id}>{ub.codigo || ub.nombre}</option>
-                ))}
-              </select>
+                {ubicacionSeleccionada
+                  ? (() => {
+                      const ub = ubicaciones.find(u => u.id === ubicacionSeleccionada);
+                      return ub ? (ub.codigo || ub.nombre) : 'Todas las ubicaciones';
+                    })()
+                  : 'Todas las ubicaciones'}
+              </button>
               <MapPin size={16} className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none" />
               <ChevronDown size={14} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+              {ubicacionDropdownOpen && (
+                <div className="absolute z-50 mt-1 left-0 min-w-full w-max max-w-[320px] max-h-80 overflow-y-auto bg-white border border-gray-300 rounded-lg shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => { setUbicacionSeleccionada(null); setUbicacionDropdownOpen(false); setUbicacionEditMode(false); }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${!ubicacionSeleccionada ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-700'}`}
+                  >
+                    Todas las ubicaciones
+                  </button>
+                  <div className="border-t border-gray-200" />
+                  {ubicaciones.length === 0 ? (
+                    <div className="px-3 py-3 text-sm text-gray-500 text-center">No hay ubicaciones</div>
+                  ) : (
+                    ubicaciones.map((ub) => (
+                      <div
+                        key={ub.id}
+                        className={`flex items-center justify-between gap-2 hover:bg-gray-50 ${ubicacionSeleccionada === ub.id ? 'bg-red-50' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => { setUbicacionSeleccionada(ub.id); setUbicacionDropdownOpen(false); setUbicacionEditMode(false); }}
+                          className={`flex-1 text-left px-3 py-2 text-sm truncate ${ubicacionSeleccionada === ub.id ? 'text-red-700 font-medium' : 'text-gray-700'}`}
+                        >
+                          {ub.codigo || ub.nombre}
+                        </button>
+                        {ubicacionEditMode && esAdministrador && (
+                          <div className="flex items-center gap-1 pr-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setUbicacionDropdownOpen(false); setUbicacionEditMode(false); handleAbrirModalUbicacion(ub); }}
+                              className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                              title="Editar ubicación"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`¿Eliminar la ubicación "${ub.codigo || ub.nombre}"?`)) {
+                                  setUbicacionDropdownOpen(false);
+                                  setUbicacionEditMode(false);
+                                  handleEliminarUbicacion(ub);
+                                }
+                              }}
+                              className="p-1 text-red-600 hover:bg-red-100 rounded"
+                              title="Eliminar ubicación"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                  {esAdministrador && ubicaciones.length > 0 && (
+                    <>
+                      <div className="border-t border-gray-200" />
+                      <button
+                        type="button"
+                        onClick={() => setUbicacionEditMode(m => !m)}
+                        className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium ${ubicacionEditMode ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                      >
+                        {ubicacionEditMode ? (
+                          <>
+                            <X size={14} />
+                            Salir de edición
+                          </>
+                        ) : (
+                          <>
+                            <Edit2 size={14} />
+                            Editar / Eliminar
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             {puedeCrearArticulos && (
               <button
