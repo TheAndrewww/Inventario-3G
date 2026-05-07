@@ -1113,6 +1113,7 @@ const InventarioPage = () => {
       }
       handleCerrarModalCategoria();
       fetchCategorias(almacenSeleccionado);
+      fetchTodasCategorias();
     } catch (error) {
       console.error('Error al guardar categoría:', error);
       toast.error(error.message || 'Error al guardar categoría');
@@ -1128,7 +1129,8 @@ const InventarioPage = () => {
 
       // Si no hay artículos, se elimina directamente
       toast.success('Categoría eliminada exitosamente');
-      fetchCategorias();
+      fetchCategorias(almacenSeleccionado);
+      fetchTodasCategorias();
       if (categoriaSeleccionada === categoria.id) {
         setCategoriaSeleccionada(null);
       }
@@ -1146,7 +1148,8 @@ const InventarioPage = () => {
             // Segundo intento: forzar eliminación
             await categoriasService.delete(categoria.id, true);
             toast.success('Categoría eliminada exitosamente');
-            fetchCategorias();
+            fetchCategorias(almacenSeleccionado);
+            fetchTodasCategorias();
             fetchArticulos(); // Recargar artículos para reflejar el cambio
             if (categoriaSeleccionada === categoria.id) {
               setCategoriaSeleccionada(null);
@@ -1227,6 +1230,7 @@ const InventarioPage = () => {
       }
       handleCerrarModalUbicacion();
       fetchUbicaciones(almacenSeleccionado);
+      fetchTodasUbicaciones();
     } catch (error) {
       console.error('Error al guardar ubicación:', error);
       toast.error(error.message || 'Error al guardar ubicación');
@@ -1242,7 +1246,8 @@ const InventarioPage = () => {
 
       // Si no hay artículos, se elimina directamente
       toast.success('Ubicación eliminada exitosamente');
-      fetchUbicaciones();
+      fetchUbicaciones(almacenSeleccionado);
+      fetchTodasUbicaciones();
       if (ubicacionSeleccionada === ubicacion.id) {
         setUbicacionSeleccionada(null);
       }
@@ -1260,7 +1265,8 @@ const InventarioPage = () => {
             // Segundo intento: forzar eliminación
             await ubicacionesService.delete(ubicacion.id, true);
             toast.success('Ubicación eliminada exitosamente');
-            fetchUbicaciones();
+            fetchUbicaciones(almacenSeleccionado);
+            fetchTodasUbicaciones();
             fetchArticulos(); // Recargar artículos para reflejar el cambio
             if (ubicacionSeleccionada === ubicacion.id) {
               setUbicacionSeleccionada(null);
