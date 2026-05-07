@@ -858,8 +858,9 @@ const InventarioPage = () => {
 
     try {
       await articulosService.delete(articulo.id);
-      toast.success('Artículo desactivado exitosamente');
-      fetchArticulos();
+      // Actualización local — sin refetch ni perder scroll
+      setArticulos(prev => prev.map(a => a.id === articulo.id ? { ...a, activo: false } : a));
+      toast.success('Artículo desactivado');
     } catch (error) {
       console.error('Error al eliminar artículo:', error);
       toast.error(error.message || 'Error al eliminar artículo');
@@ -873,8 +874,9 @@ const InventarioPage = () => {
 
     try {
       await articulosService.update(articulo.id, { activo: true });
-      toast.success('Artículo reactivado exitosamente');
-      fetchArticulos();
+      // Actualización local — sin refetch ni perder scroll
+      setArticulos(prev => prev.map(a => a.id === articulo.id ? { ...a, activo: true } : a));
+      toast.success('Artículo reactivado');
     } catch (error) {
       console.error('Error al reactivar artículo:', error);
       toast.error(error.message || 'Error al reactivar artículo');
@@ -893,8 +895,9 @@ const InventarioPage = () => {
 
     try {
       await articulosService.deletePermanente(articulo.id);
+      // Actualización local — quitar de la lista sin refetch
+      setArticulos(prev => prev.filter(a => a.id !== articulo.id));
       toast.success('Artículo eliminado permanentemente');
-      fetchArticulos();
     } catch (error) {
       console.error('Error al eliminar artículo permanentemente:', error);
       toast.error(error.message || 'Error al eliminar artículo permanentemente');

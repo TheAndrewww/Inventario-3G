@@ -60,9 +60,11 @@ const SolicitudesCambioPage = () => {
     if (!window.confirm('¿Aprobar esta solicitud? El cambio se aplicará inmediatamente.')) return;
     try {
       setProcesandoId(id);
-      await solicitudesCambioService.aprobar(id);
+      const res = await solicitudesCambioService.aprobar(id);
+      const actualizada = res?.data?.solicitud;
+      // Actualización local — sin refetch ni perder scroll
+      setSolicitudes(prev => prev.map(s => s.id === id ? (actualizada || { ...s, estado: 'aprobada' }) : s));
       toast.success('Solicitud aprobada y aplicada');
-      await cargar();
     } catch (e) {
       console.error(e);
       toast.error(e.response?.data?.message || 'Error al aprobar');
@@ -76,9 +78,10 @@ const SolicitudesCambioPage = () => {
     if (!motivo || !motivo.trim()) return;
     try {
       setProcesandoId(id);
-      await solicitudesCambioService.rechazar(id, motivo.trim());
+      const res = await solicitudesCambioService.rechazar(id, motivo.trim());
+      const actualizada = res?.data?.solicitud;
+      setSolicitudes(prev => prev.map(s => s.id === id ? (actualizada || { ...s, estado: 'rechazada', motivo_rechazo: motivo.trim() }) : s));
       toast.success('Solicitud rechazada y solicitante notificado');
-      await cargar();
     } catch (e) {
       console.error(e);
       toast.error(e.response?.data?.message || 'Error al rechazar');

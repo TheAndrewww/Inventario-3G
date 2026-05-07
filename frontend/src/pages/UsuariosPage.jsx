@@ -132,8 +132,9 @@ const UsuariosPage = () => {
 
     try {
       await usuariosService.eliminar(usuarioId);
-      toast.success('Usuario desactivado exitosamente');
-      cargarUsuarios();
+      // Actualización local — sin refetch ni perder scroll
+      setUsuarios(prev => prev.map(u => u.id === usuarioId ? { ...u, activo: false } : u));
+      toast.success('Usuario desactivado');
     } catch (error) {
       console.error('Error al eliminar usuario:', error);
       toast.error(error.response?.data?.message || 'Error al eliminar el usuario');
@@ -143,8 +144,8 @@ const UsuariosPage = () => {
   const handleReactivar = async (usuarioId) => {
     try {
       await usuariosService.reactivar(usuarioId);
+      setUsuarios(prev => prev.map(u => u.id === usuarioId ? { ...u, activo: true } : u));
       toast.success('Usuario reactivado');
-      cargarUsuarios();
     } catch (error) {
       console.error('Error al reactivar usuario:', error);
       toast.error(error.response?.data?.message || 'Error al reactivar el usuario');
@@ -167,8 +168,9 @@ const UsuariosPage = () => {
 
     try {
       await usuariosService.eliminarPermanente(usuario.id);
+      // Actualización local — quitar de la lista sin refetch
+      setUsuarios(prev => prev.filter(u => u.id !== usuario.id));
       toast.success('Usuario eliminado permanentemente');
-      cargarUsuarios();
     } catch (error) {
       console.error('Error al eliminar permanentemente:', error);
       toast.error(error.response?.data?.message || 'Error al eliminar el usuario');
