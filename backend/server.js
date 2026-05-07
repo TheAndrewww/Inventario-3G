@@ -1061,6 +1061,22 @@ const startServer = async () => {
             console.error('⚠️ Error en reparación de aislamiento:', repErr.message);
         }
 
+        // Deduplicación: consolida categorías y ubicaciones repetidas dentro del mismo almacén
+        try {
+            console.log('🧹 Verificando deduplicación (categorías/ubicaciones por almacén)...');
+            const fs = await import('fs');
+            const path = await import('path');
+            const { fileURLToPath } = await import('url');
+            const __filename = fileURLToPath(import.meta.url);
+            const __dirname = path.dirname(__filename);
+            const dedupPath = path.join(__dirname, 'migrations', '20260507_dedup_aislamiento.sql');
+            const dedupSQL = fs.readFileSync(dedupPath, 'utf8');
+            await sequelize.query(dedupSQL);
+            console.log('✅ Deduplicación aplicada/verificada');
+        } catch (dedErr) {
+            console.error('⚠️ Error en deduplicación:', dedErr.message);
+        }
+
         // Iniciar servidor
         app.listen(PORT, async () => {
             console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
