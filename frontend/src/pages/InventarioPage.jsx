@@ -1971,9 +1971,9 @@ const InventarioPage = () => {
                           )}
                         </td>
 
-                        {/* Sección Stock / Extras — editable inline */}
+                        {/* Sección Stock / Extras — solo editable por admin/encargado, no almacén */}
                         <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                          {puedeEditarArticulos ? (
+                          {puedeEditarArticulos && !esAlmacen ? (
                             <select
                               value={getSeccionArticulo(item)}
                               onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
@@ -2218,9 +2218,9 @@ const InventarioPage = () => {
                             )}
                           </td>
 
-                          {/* Sección Stock / Extras — editable inline */}
+                          {/* Sección Stock / Extras — solo editable por admin/encargado, no almacén */}
                           <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                            {puedeEditarArticulos ? (
+                            {puedeEditarArticulos && !esAlmacen ? (
                               <select
                                 value={getSeccionArticulo(item)}
                                 onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
@@ -2514,23 +2514,29 @@ const InventarioPage = () => {
                         <h3 className="font-semibold text-gray-900 text-sm mb-0.5 line-clamp-1">{item.nombre}</h3>
                         <p className="text-xs text-gray-500 mb-2 line-clamp-2">{item.descripcion}</p>
 
-                        {/* Badges: categoría + sección */}
+                        {/* Badges: categoría + sección (no editable para almacén) */}
                         <div className="mb-2 flex flex-wrap gap-1.5">
                           <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
                             {item.categoria?.nombre || 'Sin categoría'}
                           </span>
-                          <select
-                            value={getSeccionArticulo(item)}
-                            onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium border-0 cursor-pointer ${getSeccionArticulo(item) === 'extras'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-emerald-100 text-emerald-800'
-                              }`}
-                          >
-                            <option value="stock">📦 Stock</option>
-                            <option value="extras">✨ Extras</option>
-                          </select>
+                          {esAlmacen ? (
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                              {getSeccionArticulo(item) === 'extras' ? '✨ Extras' : '📦 Stock'}
+                            </span>
+                          ) : (
+                            <select
+                              value={getSeccionArticulo(item)}
+                              onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium border-0 cursor-pointer ${getSeccionArticulo(item) === 'extras'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                                }`}
+                            >
+                              <option value="stock">📦 Stock</option>
+                              <option value="extras">✨ Extras</option>
+                            </select>
+                          )}
                         </div>
 
                         {/* Ubicación y Stock en una línea */}
@@ -2705,20 +2711,26 @@ const InventarioPage = () => {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-gray-500 mb-2 line-clamp-2">{item.descripcion}</p>
 
-                          {/* Badges: categoría + sección */}
+                          {/* Badges: categoría + sección (no editable para almacén) */}
                           <div className="mb-2 flex flex-wrap gap-1.5">
                             <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
                               {item.categoria?.nombre || 'Sin categoría'}
                             </span>
-                            <button
-                              onClick={(e) => toggleSeccionArticulo(item.id, e)}
-                              className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${getSeccionArticulo(item) === 'extras'
-                                ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                }`}
-                            >
-                              {getSeccionArticulo(item) === 'extras' ? '✨ Extras' : '📦 Stock'}
-                            </button>
+                            {esAlmacen ? (
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                {getSeccionArticulo(item) === 'extras' ? '✨ Extras' : '📦 Stock'}
+                              </span>
+                            ) : (
+                              <button
+                                onClick={(e) => toggleSeccionArticulo(item.id, e)}
+                                className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${getSeccionArticulo(item) === 'extras'
+                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                  : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  }`}
+                              >
+                                {getSeccionArticulo(item) === 'extras' ? '✨ Extras' : '📦 Stock'}
+                              </button>
+                            )}
                           </div>
 
                           {/* Ubicación */}
