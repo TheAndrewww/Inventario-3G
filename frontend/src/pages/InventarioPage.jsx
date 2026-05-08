@@ -6,6 +6,7 @@ import movimientosService from '../services/movimientos.service';
 import solicitudesCambioService from '../services/solicitudesCambio.service';
 import categoriasService from '../services/categorias.service';
 import ubicacionesService from '../services/ubicaciones.service';
+import seccionesService from '../services/secciones.service';
 import almacenesService from '../services/almacenes.service';
 import herramientasRentaService from '../services/herramientasRenta.service';
 import conteosCiclicosService from '../services/conteosCiclicos.service';
@@ -197,6 +198,18 @@ const InventarioPage = () => {
   const [ubicacionEditMode, setUbicacionEditMode] = useState(false);
   const ubicacionDropdownRef = useRef(null);
 
+  // Estados para gestión de secciones (solo almacén "Herramientas")
+  const [secciones, setSecciones] = useState([]);
+  const [todasSecciones, setTodasSecciones] = useState([]);
+  const [seccionIdSeleccionada, setSeccionIdSeleccionada] = useState(null);
+  const [modalSeccionOpen, setModalSeccionOpen] = useState(false);
+  const [seccionEditando, setSeccionEditando] = useState(null);
+  const [nombreSeccion, setNombreSeccion] = useState('');
+  const [loadingSeccion, setLoadingSeccion] = useState(false);
+  const [seccionDropdownOpen, setSeccionDropdownOpen] = useState(false);
+  const [seccionEditMode, setSeccionEditMode] = useState(false);
+  const seccionDropdownRef = useRef(null);
+
   // Estados para gestión de almacenes
   const [modalAlmacenesOpen, setModalAlmacenesOpen] = useState(false);
   const [almacenEditando, setAlmacenEditando] = useState(null);
@@ -229,9 +242,10 @@ const InventarioPage = () => {
     fetchArticulosConteo();
     fetchTodasCategorias();
     fetchTodasUbicaciones();
+    fetchTodasSecciones();
   }, []);
 
-  // Cerrar dropdowns de categorías/ubicaciones al hacer click fuera
+  // Cerrar dropdowns de categorías/ubicaciones/secciones al hacer click fuera
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (categoriaDropdownRef.current && !categoriaDropdownRef.current.contains(e.target)) {
@@ -241,6 +255,10 @@ const InventarioPage = () => {
       if (ubicacionDropdownRef.current && !ubicacionDropdownRef.current.contains(e.target)) {
         setUbicacionDropdownOpen(false);
         setUbicacionEditMode(false);
+      }
+      if (seccionDropdownRef.current && !seccionDropdownRef.current.contains(e.target)) {
+        setSeccionDropdownOpen(false);
+        setSeccionEditMode(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -279,6 +297,20 @@ const InventarioPage = () => {
     } catch (e) { console.error('Error cargando todas las ubicaciones:', e); }
   };
 
+  const fetchTodasSecciones = async () => {
+    try {
+      const data = await seccionesService.getAll();
+      setTodasSecciones(Array.isArray(data) ? data : []);
+    } catch (e) { console.error('Error cargando secciones:', e); }
+  };
+
+  const fetchSecciones = async (almacenId = null) => {
+    try {
+      const data = await seccionesService.getAll(almacenId);
+      setSecciones(Array.isArray(data) ? data : []);
+    } catch (e) { console.error('Error cargando secciones del almacén:', e); }
+  };
+
   const handleQuickUpdate = async (item, field, value) => {
     const parsed = value === '' ? null : Number(value);
     if (item[field] === parsed) return;
@@ -311,6 +343,8 @@ const InventarioPage = () => {
         } else if (field === 'ubicacion_id') {
           const ub = todasUbicaciones.find(u => u.id === parsed) || null;
           updated.ubicacion = ub;
+        } else if (field === 'seccion_id') {
+          updated.seccion = todasSecciones.find(s => s.id === parsed) || null;
         }
         return updated;
       }));
@@ -343,20 +377,37 @@ const InventarioPage = () => {
     return todasCategorias.filter(c => c.almacen_id === almacenId);
   };
 
-  // Cuando cambia el almacén seleccionado, recargar categorías y ubicaciones filtradas
+  // Helper: hay un almacén real seleccionado donde aplican las secciones
+  const esAlmacenConSecciones = React.useMemo(() => {
+    return typeof almacenSeleccionado === 'number';
+  }, [almacenSeleccionado]);
+
+  // Secciones del almacén del artículo (para select inline)
+  const seccionesParaArticulo = (item) => {
+    const almacenId = item?.ubicacion?.almacen_id
+      ?? item?.ubicacion?.almacen_ref?.id
+      ?? (typeof almacenSeleccionado === 'number' ? almacenSeleccionado : null);
+    if (!almacenId) return [];
+    return todasSecciones.filter(s => s.almacen_id === almacenId);
+  };
+
+  // Cuando cambia el almacén seleccionado, recargar categorías, ubicaciones y secciones filtradas
   useEffect(() => {
     if (almacenSeleccionado === null) return; // Gate activo, no fetchear
     if (almacenSeleccionado === 'herramientas') {
-      // Modo herramientas: sin filtro de almacén
+      // Modo herramientas (renta): sin filtro de almacén
       fetchCategorias();
       fetchUbicaciones();
+      setSecciones([]);
     } else {
       fetchCategorias(almacenSeleccionado);
       fetchUbicaciones(almacenSeleccionado);
+      fetchSecciones(almacenSeleccionado);
     }
-    // Limpiar filtros de categoría y ubicación al cambiar almacén
+    // Limpiar filtros al cambiar almacén
     setCategoriaSeleccionada(null);
     setUbicacionSeleccionada(null);
+    setSeccionIdSeleccionada(null);
   }, [almacenSeleccionado]);
 
   const fetchArticulos = async (opts = {}) => {
@@ -518,8 +569,9 @@ const InventarioPage = () => {
           const matchesAlmacen = almacenSeleccionado === 'herramientas' ||
             (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
           const matchesSeccion = !seccionSeleccionada || getSeccionArticulo(item) === seccionSeleccionada;
+          const matchesSeccionId = !seccionIdSeleccionada || item.seccion_id === seccionIdSeleccionada;
 
-          return matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion;
+          return matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion && matchesSeccionId;
         })
         .sort((a, b) => {
           // Ordenar según la opción seleccionada
@@ -569,15 +621,18 @@ const InventarioPage = () => {
         const matchesAlmacen = almacenSeleccionado === 'herramientas' ||
           (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
 
-        // Filtrar por sección Stock / Extras
+        // Filtrar por sección Stock / Extras (legacy)
         const matchesSeccion = !seccionSeleccionada || getSeccionArticulo(item) === seccionSeleccionada;
+
+        // Filtrar por sección de BD (almacén "Herramientas")
+        const matchesSeccionId = !seccionIdSeleccionada || item.seccion_id === seccionIdSeleccionada;
 
         // Filtrar por tipo según el tab activo
         const estaEnTabCorrecto = tabActivo === 'consumibles'
           ? !item.es_herramienta  // Consumibles: artículos que NO son herramientas
           : item.es_herramienta;  // Herramientas: artículos que SÍ son herramientas
 
-        return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion && estaEnTabCorrecto;
+        return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion && matchesSeccionId && estaEnTabCorrecto;
       })
       .sort((a, b) => {
         // Ordenar según la opción seleccionada
@@ -1283,6 +1338,81 @@ const InventarioPage = () => {
     }
   };
 
+  // ============ GESTIÓN DE SECCIONES (solo almacén "Herramientas") ============
+  const handleAbrirModalSeccion = (seccion = null) => {
+    if (seccion) {
+      setSeccionEditando(seccion);
+      setNombreSeccion(seccion.nombre);
+    } else {
+      setSeccionEditando(null);
+      setNombreSeccion('');
+    }
+    setModalSeccionOpen(true);
+  };
+
+  const handleCerrarModalSeccion = () => {
+    setModalSeccionOpen(false);
+    setSeccionEditando(null);
+    setNombreSeccion('');
+  };
+
+  const handleGuardarSeccion = async () => {
+    if (!nombreSeccion.trim()) {
+      toast.error('El nombre de la sección es requerido');
+      return;
+    }
+    if (!seccionEditando && !esAlmacenConSecciones) {
+      toast.error('Selecciona un almacén antes de crear una sección');
+      return;
+    }
+
+    try {
+      setLoadingSeccion(true);
+      if (seccionEditando) {
+        await seccionesService.update(seccionEditando.id, { nombre: nombreSeccion.trim() });
+        toast.success('Sección actualizada');
+      } else {
+        await seccionesService.create({ nombre: nombreSeccion.trim(), almacen_id: almacenSeleccionado });
+        toast.success('Sección creada');
+      }
+      handleCerrarModalSeccion();
+      fetchSecciones(almacenSeleccionado);
+      fetchTodasSecciones();
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message || 'Error al guardar sección');
+    } finally {
+      setLoadingSeccion(false);
+    }
+  };
+
+  const handleEliminarSeccion = async (seccion) => {
+    try {
+      await seccionesService.delete(seccion.id, false);
+      toast.success('Sección eliminada');
+      fetchSecciones(almacenSeleccionado);
+      fetchTodasSecciones();
+      if (seccionIdSeleccionada === seccion.id) setSeccionIdSeleccionada(null);
+    } catch (error) {
+      if (error.requiresConfirmation) {
+        if (window.confirm(`⚠️ ${error.message}\n\n¿Continuar?`)) {
+          try {
+            await seccionesService.delete(seccion.id, true);
+            toast.success('Sección eliminada');
+            fetchSecciones(almacenSeleccionado);
+            fetchTodasSecciones();
+            fetchArticulos();
+            if (seccionIdSeleccionada === seccion.id) setSeccionIdSeleccionada(null);
+          } catch (e2) {
+            toast.error(e2.message || 'Error al eliminar sección');
+          }
+        }
+      } else {
+        toast.error(error.message || 'Error al eliminar sección');
+      }
+    }
+  };
+
   // Funciones para generación de etiquetas
   const handleAbrirModalEtiquetas = () => {
     setModalEtiquetasOpen(true);
@@ -1980,6 +2110,101 @@ const InventarioPage = () => {
               </button>
             )}
           </div>
+
+          {/* Filtro de sección (solo almacén "Herramientas") */}
+          {esAlmacenConSecciones && (
+            <div className="flex items-center gap-1">
+              <div className="relative" ref={seccionDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => { setSeccionDropdownOpen(o => !o); setSeccionEditMode(false); }}
+                  className="appearance-none pl-9 pr-8 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-700 text-left min-w-[180px] truncate"
+                >
+                  {seccionIdSeleccionada
+                    ? (secciones.find(s => s.id === seccionIdSeleccionada)?.nombre || 'Todas las secciones')
+                    : 'Todas las secciones'}
+                </button>
+                <Wrench size={16} className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none" />
+                <ChevronDown size={14} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                {seccionDropdownOpen && (
+                  <div className="absolute z-50 mt-1 left-0 min-w-full w-max max-w-[320px] max-h-80 overflow-y-auto bg-white border border-gray-300 rounded-lg shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => { setSeccionIdSeleccionada(null); setSeccionDropdownOpen(false); setSeccionEditMode(false); }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${!seccionIdSeleccionada ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-700'}`}
+                    >
+                      Todas las secciones
+                    </button>
+                    <div className="border-t border-gray-200" />
+                    {secciones.length === 0 ? (
+                      <div className="px-3 py-3 text-sm text-gray-500 text-center">No hay secciones</div>
+                    ) : (
+                      secciones.map((s) => (
+                        <div key={s.id} className={`flex items-center justify-between gap-2 hover:bg-gray-50 ${seccionIdSeleccionada === s.id ? 'bg-red-50' : ''}`}>
+                          <button
+                            type="button"
+                            onClick={() => { setSeccionIdSeleccionada(s.id); setSeccionDropdownOpen(false); setSeccionEditMode(false); }}
+                            className={`flex-1 text-left px-3 py-2 text-sm truncate ${seccionIdSeleccionada === s.id ? 'text-red-700 font-medium' : 'text-gray-700'}`}
+                          >
+                            {s.nombre}
+                          </button>
+                          {seccionEditMode && esAdministrador && (
+                            <div className="flex items-center gap-1 pr-2">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setSeccionDropdownOpen(false); setSeccionEditMode(false); handleAbrirModalSeccion(s); }}
+                                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                                title="Editar sección"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(`¿Eliminar la sección "${s.nombre}"?`)) {
+                                    setSeccionDropdownOpen(false);
+                                    setSeccionEditMode(false);
+                                    handleEliminarSeccion(s);
+                                  }
+                                }}
+                                className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                title="Eliminar sección"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                    {esAdministrador && secciones.length > 0 && (
+                      <>
+                        <div className="border-t border-gray-200" />
+                        <button
+                          type="button"
+                          onClick={() => setSeccionEditMode(m => !m)}
+                          className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium ${seccionEditMode ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                        >
+                          {seccionEditMode ? (<><X size={14} />Salir de edición</>) : (<><Edit2 size={14} />Editar / Eliminar</>)}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              {puedeCrearArticulos && (
+                <button
+                  onClick={() => handleAbrirModalSeccion()}
+                  className="px-2 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                  title="Nueva sección"
+                >
+                  <Plus size={16} />
+                </button>
+              )}
+            </div>
+          )}
+
           {puedeCrearArticulos && (
             <>
               <button
@@ -2179,25 +2404,42 @@ const InventarioPage = () => {
                           )}
                         </td>
 
-                        {/* Sección Stock / Extras — solo editable por admin/encargado, no almacén */}
+                        {/* Sección — en almacén "Herramientas" usa BD, en otros Stock/Extras local */}
                         <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                          {puedeEditarArticulos && !esAlmacen ? (
-                            <select
-                              value={getSeccionArticulo(item)}
-                              onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
-                              className={`w-full px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:outline-none ${getSeccionArticulo(item) === 'extras'
-                                ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-400'
-                                : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 focus:ring-emerald-400'
-                                }`}
-                              title="Cambiar entre Stock y Extras"
-                            >
-                              <option value="stock">📦 Stock</option>
-                              <option value="extras">✨ Extras</option>
-                            </select>
+                          {esAlmacenConSecciones ? (
+                            puedeEditarArticulos ? (
+                              <select
+                                value={item.seccion_id ?? ''}
+                                onChange={(e) => handleQuickUpdate(item, 'seccion_id', e.target.value)}
+                                disabled={actualizandoArt.has(item.id)}
+                                className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border-0 cursor-pointer hover:bg-purple-200 focus:ring-2 focus:ring-purple-400 focus:outline-none disabled:opacity-50"
+                              >
+                                <option value="">Sin sección</option>
+                                {seccionesParaArticulo(item).map(s => (
+                                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                {item.seccion?.nombre || 'Sin sección'}
+                              </span>
+                            )
                           ) : (
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                              {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
-                            </span>
+                            puedeEditarArticulos && !esAlmacen ? (
+                              <select
+                                value={getSeccionArticulo(item)}
+                                onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
+                                className={`w-full px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:outline-none ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-400' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 focus:ring-emerald-400'}`}
+                                title="Cambiar entre Stock y Extras"
+                              >
+                                <option value="stock">📦 Stock</option>
+                                <option value="extras">✨ Extras</option>
+                              </select>
+                            ) : (
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
+                              </span>
+                            )
                           )}
                         </td>
 
@@ -2426,25 +2668,42 @@ const InventarioPage = () => {
                             )}
                           </td>
 
-                          {/* Sección Stock / Extras — solo editable por admin/encargado, no almacén */}
+                          {/* Sección — Herramientas usa BD, otros Stock/Extras local */}
                           <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                            {puedeEditarArticulos && !esAlmacen ? (
-                              <select
-                                value={getSeccionArticulo(item)}
-                                onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
-                                className={`w-full px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:outline-none ${getSeccionArticulo(item) === 'extras'
-                                  ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-400'
-                                  : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 focus:ring-emerald-400'
-                                  }`}
-                                title="Cambiar entre Stock y Extras"
-                              >
-                                <option value="stock">📦 Stock</option>
-                                <option value="extras">✨ Extras</option>
-                              </select>
+                            {esAlmacenConSecciones ? (
+                              puedeEditarArticulos ? (
+                                <select
+                                  value={item.seccion_id ?? ''}
+                                  onChange={(e) => handleQuickUpdate(item, 'seccion_id', e.target.value)}
+                                  disabled={actualizandoArt.has(item.id)}
+                                  className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border-0 cursor-pointer hover:bg-purple-200 focus:ring-2 focus:ring-purple-400 focus:outline-none disabled:opacity-50"
+                                >
+                                  <option value="">Sin sección</option>
+                                  {seccionesParaArticulo(item).map(s => (
+                                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                  {item.seccion?.nombre || 'Sin sección'}
+                                </span>
+                              )
                             ) : (
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                                {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
-                              </span>
+                              puedeEditarArticulos && !esAlmacen ? (
+                                <select
+                                  value={getSeccionArticulo(item)}
+                                  onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
+                                  className={`w-full px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:outline-none ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-400' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 focus:ring-emerald-400'}`}
+                                  title="Cambiar entre Stock y Extras"
+                                >
+                                  <option value="stock">📦 Stock</option>
+                                  <option value="extras">✨ Extras</option>
+                                </select>
+                              ) : (
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                  {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
+                                </span>
+                              )
                             )}
                           </td>
 
@@ -3343,6 +3602,53 @@ const InventarioPage = () => {
                   Registrar Salida
                 </>
               )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de Sección */}
+      <Modal
+        isOpen={modalSeccionOpen}
+        onClose={handleCerrarModalSeccion}
+        title={seccionEditando ? 'Editar Sección' : 'Nueva Sección'}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nombre de la sección <span className="text-red-600">*</span>
+            </label>
+            <input
+              type="text"
+              value={nombreSeccion}
+              onChange={(e) => setNombreSeccion(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+              placeholder="Ej: Eléctrica, Mecánica, etc."
+              disabled={loadingSeccion}
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={handleCerrarModalSeccion}
+              disabled={loadingSeccion}
+              className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleGuardarSeccion}
+              disabled={loadingSeccion || !nombreSeccion.trim()}
+              className="flex-1 px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loadingSeccion ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Guardando...
+                </>
+              ) : (seccionEditando ? 'Actualizar' : 'Crear') + ' Sección'}
             </button>
           </div>
         </div>

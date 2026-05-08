@@ -4,6 +4,7 @@ import Almacen from './Almacen.js';
 import AlmacenCategoria from './AlmacenCategoria.js';
 import Categoria from './Categoria.js';
 import Ubicacion from './Ubicacion.js';
+import Seccion from './Seccion.js';
 import Proveedor from './Proveedor.js';
 import Articulo from './Articulo.js';
 import ArticuloProveedor from './ArticuloProveedor.js';
@@ -80,6 +81,26 @@ Articulo.belongsTo(Ubicacion, {
 });
 Ubicacion.hasMany(Articulo, {
     foreignKey: 'ubicacion_id',
+    as: 'articulos'
+});
+
+// Sección - Almacén (Muchos a Uno)
+Seccion.belongsTo(Almacen, {
+    foreignKey: 'almacen_id',
+    as: 'almacen_ref'
+});
+Almacen.hasMany(Seccion, {
+    foreignKey: 'almacen_id',
+    as: 'secciones'
+});
+
+// Artículo - Sección (Muchos a Uno, opcional)
+Articulo.belongsTo(Seccion, {
+    foreignKey: 'seccion_id',
+    as: 'seccion'
+});
+Seccion.hasMany(Articulo, {
+    foreignKey: 'seccion_id',
     as: 'articulos'
 });
 
@@ -670,6 +691,7 @@ export {
     AlmacenCategoria,
     Categoria,
     Ubicacion,
+    Seccion,
     Proveedor,
     Articulo,
     ArticuloProveedor,
@@ -705,6 +727,7 @@ export default {
     AlmacenCategoria,
     Categoria,
     Ubicacion,
+    Seccion,
     Proveedor,
     Articulo,
     ArticuloProveedor,
