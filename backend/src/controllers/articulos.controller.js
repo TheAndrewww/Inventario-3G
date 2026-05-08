@@ -115,12 +115,6 @@ export const getArticulos = async (req, res) => {
                         }]
                     },
                     {
-                        model: Seccion,
-                        as: 'seccion',
-                        attributes: ['id', 'nombre', 'almacen_id'],
-                        required: false
-                    },
-                    {
                         model: Proveedor,
                         as: 'proveedor',
                         attributes: ['id', 'nombre', 'contacto', 'telefono'],

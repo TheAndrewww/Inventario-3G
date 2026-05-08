@@ -44,6 +44,10 @@ ALTER TABLE articulos
     ADD COLUMN IF NOT EXISTS seccion_id INTEGER
     REFERENCES secciones(id) ON UPDATE CASCADE ON DELETE SET NULL;
 
+-- Índice para acelerar joins/filtros por seccion_id
+CREATE INDEX IF NOT EXISTS idx_articulos_seccion_id ON articulos(seccion_id);
+CREATE INDEX IF NOT EXISTS idx_secciones_almacen_id ON secciones(almacen_id);
+
 -- Pre-popular Stock y Extras como secciones por defecto en cada almacén.
 -- Idempotente: solo crea las que faltan.
 INSERT INTO secciones (nombre, almacen_id, activo, created_at, updated_at)
