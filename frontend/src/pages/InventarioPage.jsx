@@ -1385,7 +1385,7 @@ const InventarioPage = () => {
         const updateFn = (s) => s.id === seccionEditando.id ? { ...s, nombre: nombreSeccion.trim() } : s;
         setSecciones(prev => prev.map(updateFn));
         setTodasSecciones(prev => prev.map(updateFn));
-        toast.success('Sub-almacén actualizado');
+        toast.success('Sección actualizada');
       } else {
         const nueva = await seccionesService.create({ nombre: nombreSeccion.trim(), almacen_id: almacenDestino });
         // Actualización optimista local
@@ -1395,7 +1395,7 @@ const InventarioPage = () => {
           }
           setTodasSecciones(prev => [...prev, nueva].sort((a, b) => a.nombre.localeCompare(b.nombre)));
         }
-        toast.success('Sub-almacén creado');
+        toast.success('Sección creada');
       }
       handleCerrarModalSeccion();
       // Resincronizar con el backend en segundo plano
@@ -1407,7 +1407,7 @@ const InventarioPage = () => {
       fetchTodasSecciones();
     } catch (error) {
       console.error(error);
-      toast.error(error.message || 'Error al guardar sub-almacén');
+      toast.error(error.message || 'Error al guardar sección');
     } finally {
       setLoadingSeccion(false);
     }
@@ -1417,7 +1417,7 @@ const InventarioPage = () => {
     const removeFn = (prev) => prev.filter(s => s.id !== seccion.id);
     try {
       await seccionesService.delete(seccion.id, false);
-      toast.success('Sub-almacén eliminado');
+      toast.success('Sección eliminada');
       // Actualización optimista local
       setSecciones(removeFn);
       setTodasSecciones(removeFn);
@@ -1429,7 +1429,7 @@ const InventarioPage = () => {
         if (window.confirm(`⚠️ ${error.message}\n\n¿Continuar?`)) {
           try {
             await seccionesService.delete(seccion.id, true);
-            toast.success('Sub-almacén eliminado');
+            toast.success('Sección eliminada');
             setSecciones(removeFn);
             setTodasSecciones(removeFn);
             fetchSecciones(almacenSeleccionado);
@@ -1437,11 +1437,11 @@ const InventarioPage = () => {
             fetchArticulos();
             if (seccionSeleccionada === seccion.id) setSeccionSeleccionada(null);
           } catch (e2) {
-            toast.error(e2.message || 'Error al eliminar sub-almacén');
+            toast.error(e2.message || 'Error al eliminar sección');
           }
         }
       } else {
-        toast.error(error.message || 'Error al eliminar sub-almacén');
+        toast.error(error.message || 'Error al eliminar sección');
       }
     }
   };
@@ -1762,7 +1762,7 @@ const InventarioPage = () => {
     );
   }
 
-  // Sub-gate: si ya hay almacén pero no sección, mostrar selector de sub-almacenes (secciones de BD)
+  // Sub-gate: si ya hay almacén pero no sección, mostrar selector de secciones de BD
   if (seccionSeleccionada === null) {
     const nombreAlmacenActual = almacenSeleccionado === 'herramientas'
       ? 'Herramientas'
@@ -1785,18 +1785,18 @@ const InventarioPage = () => {
         <div className="max-w-3xl w-full">
           <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{nombreAlmacenActual}</h1>
-            <p className="text-gray-600">Selecciona el sub-almacén que deseas consultar</p>
+            <p className="text-gray-600">Selecciona la sección que deseas consultar</p>
           </div>
           {seccionesAlmacen.length === 0 ? (
             <div className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center text-gray-500">
-              No hay sub-almacenes definidos.
+              No hay secciones definidas.
               {esAdministrador && typeof almacenSeleccionado === 'number' && (
                 <div className="mt-4">
                   <button
                     onClick={() => handleAbrirModalSeccion()}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800"
                   >
-                    <Plus size={16} /> Crear primer sub-almacén
+                    <Plus size={16} /> Crear primera sección
                   </button>
                 </div>
               )}
@@ -1825,19 +1825,19 @@ const InventarioPage = () => {
                       <button
                         onClick={(e) => { e.stopPropagation(); handleAbrirModalSeccion(s); }}
                         className="p-1.5 text-blue-600 bg-white border border-gray-200 hover:bg-blue-50 rounded-lg shadow-sm"
-                        title="Editar sub-almacén"
+                        title="Editar sección"
                       >
                         <Edit2 size={14} />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (window.confirm(`¿Eliminar el sub-almacén "${s.nombre}"?`)) {
+                          if (window.confirm(`¿Eliminar la sección "${s.nombre}"?`)) {
                             handleEliminarSeccion(s);
                           }
                         }}
                         className="p-1.5 text-red-600 bg-white border border-gray-200 hover:bg-red-50 rounded-lg shadow-sm"
-                        title="Eliminar sub-almacén"
+                        title="Eliminar sección"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -1851,7 +1851,7 @@ const InventarioPage = () => {
                   className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-6 md:p-8 hover:border-red-600 hover:bg-red-50 transition-colors flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-red-700"
                 >
                   <Plus size={32} />
-                  <span className="font-semibold uppercase tracking-wide">Nuevo sub-almacén</span>
+                  <span className="font-semibold uppercase tracking-wide">Nueva sección</span>
                 </button>
               )}
             </div>
@@ -1870,12 +1870,12 @@ const InventarioPage = () => {
         <Modal
           isOpen={modalSeccionOpen}
           onClose={handleCerrarModalSeccion}
-          title={seccionEditando ? 'Editar Sub-almacén' : 'Nuevo Sub-almacén'}
+          title={seccionEditando ? 'Editar Sección' : 'Nueva Sección'}
         >
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre del sub-almacén <span className="text-red-600">*</span>
+                Nombre de la sección <span className="text-red-600">*</span>
               </label>
               <input
                 type="text"
@@ -1907,7 +1907,7 @@ const InventarioPage = () => {
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Guardando...
                   </>
-                ) : (seccionEditando ? 'Actualizar' : 'Crear') + ' Sub-almacén'}
+                ) : (seccionEditando ? 'Actualizar' : 'Crear') + ' Sección'}
               </button>
             </div>
           </div>
@@ -1963,13 +1963,13 @@ const InventarioPage = () => {
                 </span>
               </div>
             )}
-            {/* Indicador de sub-almacén activo */}
+            {/* Indicador de sección activa */}
             {seccionSeleccionada && (
               <div className="flex items-center gap-2 px-3 py-2.5 border rounded-lg bg-red-50 border-red-200">
                 <Package size={16} className="text-red-700" />
                 <span className="font-semibold uppercase tracking-wide text-xs md:text-sm text-red-700">
                   {typeof seccionSeleccionada === 'number'
-                    ? (todasSecciones.find(s => s.id === seccionSeleccionada)?.nombre || 'Sub-almacén')
+                    ? (todasSecciones.find(s => s.id === seccionSeleccionada)?.nombre || 'Sección')
                     : (seccionSeleccionada === 'extras' ? 'Extras' : 'Stock')}
                 </span>
               </div>
@@ -1977,10 +1977,10 @@ const InventarioPage = () => {
             <button
               onClick={() => setSeccionSeleccionada(null)}
               className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-2 text-sm"
-              title="Cambiar sub-almacén"
+              title="Cambiar sección"
             >
               <ArrowUpDown size={16} />
-              <span className="hidden md:inline">Sub-almacén</span>
+              <span className="hidden md:inline">Sección</span>
             </button>
             <button
               onClick={() => { setAlmacenSeleccionado(null); setSeccionSeleccionada(null); }}
