@@ -377,11 +377,10 @@ const InventarioPage = () => {
     return todasCategorias.filter(c => c.almacen_id === almacenId);
   };
 
-  // Helper: hay un almacén o modo seleccionado donde aplican las secciones
+  // Helper: hay un almacén seleccionado donde aplican las secciones
   const esAlmacenConSecciones = React.useMemo(() => {
-    return typeof almacenSeleccionado === 'number' || almacenSeleccionado === 'herramientas';
+    return typeof almacenSeleccionado === 'number';
   }, [almacenSeleccionado]);
-  const enModoHerramientas = almacenSeleccionado === 'herramientas';
 
   // Secciones del almacén del artículo (para select inline)
   const seccionesParaArticulo = (item) => {
@@ -395,16 +394,9 @@ const InventarioPage = () => {
   // Cuando cambia el almacén seleccionado, recargar categorías, ubicaciones y secciones filtradas
   useEffect(() => {
     if (almacenSeleccionado === null) return; // Gate activo, no fetchear
-    if (almacenSeleccionado === 'herramientas') {
-      // Modo herramientas (renta): sin filtro de almacén → todas las secciones
-      fetchCategorias();
-      fetchUbicaciones();
-      fetchSecciones();
-    } else {
-      fetchCategorias(almacenSeleccionado);
-      fetchUbicaciones(almacenSeleccionado);
-      fetchSecciones(almacenSeleccionado);
-    }
+    fetchCategorias(almacenSeleccionado);
+    fetchUbicaciones(almacenSeleccionado);
+    fetchSecciones(almacenSeleccionado);
     // Limpiar filtros al cambiar almacén
     setCategoriaSeleccionada(null);
     setUbicacionSeleccionada(null);
@@ -566,10 +558,8 @@ const InventarioPage = () => {
           const matchesActiveFilter = mostrarDesactivados ? !isActive : isActive;
           const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
           const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
-          const matchesAlmacen = almacenSeleccionado === 'herramientas' ||
-            (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
-          // matchesSeccion: si seccionSeleccionada es número → filtra por seccion_id de BD;
-          // si es 'stock'/'extras' → comportamiento legacy con extrasIds local
+          const matchesAlmacen = item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
+          // matchesSeccion: filtra por seccion_id si es número, o legacy stock/extras
           const matchesSeccion = !seccionSeleccionada
             || (typeof seccionSeleccionada === 'number'
               ? item.seccion_id === seccionSeleccionada
@@ -622,8 +612,7 @@ const InventarioPage = () => {
         const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
 
         // Filtrar por almacén
-        const matchesAlmacen = almacenSeleccionado === 'herramientas' ||
-          (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
+        const matchesAlmacen = item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
 
         // Filtrar por sección — número (BD) o 'stock'/'extras' (legacy)
         const matchesSeccion = !seccionSeleccionada
@@ -1761,21 +1750,16 @@ const InventarioPage = () => {
 
   // Sub-gate: si ya hay almacén pero no sección, mostrar selector de secciones de BD
   if (seccionSeleccionada === null) {
-    const nombreAlmacenActual = almacenSeleccionado === 'herramientas'
-      ? 'Herramientas'
-      : (almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén');
+    const nombreAlmacenActual = almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén';
     // Conteo de SKUs por sección (en este almacén)
     const articulosDelAlmacen = articulos.filter((item) => {
       const isActive = item.activo !== false;
       if (!isActive) return false;
-      if (almacenSeleccionado === 'herramientas') return item.es_herramienta;
       return item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
     });
     const conteoPorSeccion = (seccionId) =>
       articulosDelAlmacen.filter(i => i.seccion_id === seccionId).length;
-    const seccionesAlmacen = typeof almacenSeleccionado === 'number'
-      ? secciones
-      : todasSecciones; // modo herramientas: todas
+    const seccionesAlmacen = secciones;
 
     return (
       <div className="p-4 md:p-6 min-h-[70vh] flex flex-col items-center justify-center">
@@ -1870,25 +1854,6 @@ const InventarioPage = () => {
           title={seccionEditando ? 'Editar Sección' : 'Nueva Sección'}
         >
           <div className="space-y-4">
-            {/* Selector de almacén destino: solo visible al crear desde modo Herramientas */}
-            {!seccionEditando && almacenSeleccionado === 'herramientas' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Almacén destino <span className="text-red-600">*</span>
-                </label>
-                <select
-                  value={almacenSeccionForm ?? ''}
-                  onChange={(e) => setAlmacenSeccionForm(e.target.value ? Number(e.target.value) : null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                  disabled={loadingSeccion}
-                >
-                  <option value="">Selecciona un almacén…</option>
-                  {almacenesDisponibles.map(a => (
-                    <option key={a.id} value={a.id}>{a.nombre}</option>
-                  ))}
-                </select>
-              </div>
-            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Nombre de la sección <span className="text-red-600">*</span>
@@ -1964,21 +1929,20 @@ const InventarioPage = () => {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           {/* Almacén actual + botón para cambiar */}
           <div className="flex gap-2 flex-shrink-0 items-center">
-            {almacenSeleccionado === 'herramientas' ? (
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg">
-                <Wrench size={18} className="text-blue-700" />
-                <span className="font-semibold text-blue-700 uppercase tracking-wide text-sm md:text-base">
-                  Herramientas
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-lg">
-                <Package size={18} className="text-red-700" />
-                <span className="font-semibold text-red-700 uppercase tracking-wide text-sm md:text-base">
-                  {almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén'}
-                </span>
-              </div>
-            )}
+            {(() => {
+              const nombreAct = almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén';
+              const esHerr = nombreAct === 'Herramientas';
+              return (
+                <div className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg ${esHerr ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}`}>
+                  {esHerr
+                    ? <Wrench size={18} className="text-blue-700" />
+                    : <Package size={18} className="text-red-700" />}
+                  <span className={`font-semibold uppercase tracking-wide text-sm md:text-base ${esHerr ? 'text-blue-700' : 'text-red-700'}`}>
+                    {nombreAct}
+                  </span>
+                </div>
+              );
+            })()}
             {/* Indicador de sección activa */}
             {seccionSeleccionada && (
               <div className="flex items-center gap-2 px-3 py-2.5 border rounded-lg bg-red-50 border-red-200">
@@ -3584,24 +3548,6 @@ const InventarioPage = () => {
         title={seccionEditando ? 'Editar Sección' : 'Nueva Sección'}
       >
         <div className="space-y-4">
-          {!seccionEditando && almacenSeleccionado === 'herramientas' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Almacén destino <span className="text-red-600">*</span>
-              </label>
-              <select
-                value={almacenSeccionForm ?? ''}
-                onChange={(e) => setAlmacenSeccionForm(e.target.value ? Number(e.target.value) : null)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                disabled={loadingSeccion}
-              >
-                <option value="">Selecciona un almacén…</option>
-                {almacenesDisponibles.map(a => (
-                  <option key={a.id} value={a.id}>{a.nombre}</option>
-                ))}
-              </select>
-            </div>
-          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Nombre de la sección <span className="text-red-600">*</span>
