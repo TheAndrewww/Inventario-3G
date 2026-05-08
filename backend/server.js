@@ -1045,37 +1045,39 @@ const startServer = async () => {
             console.error('⚠️ Error aplicando aislamiento por almacén:', aisErr.message);
         }
 
-        // Reparación: duplicar categorías para cada almacén donde tienen SKUs
-        try {
-            console.log('🔧 Verificando reparación de aislamiento (categorías por SKU)...');
-            const fs = await import('fs');
-            const path = await import('path');
-            const { fileURLToPath } = await import('url');
-            const __filename = fileURLToPath(import.meta.url);
-            const __dirname = path.dirname(__filename);
-            const repairPath = path.join(__dirname, 'migrations', '20260507_reparar_aislamiento.sql');
-            const repairSQL = fs.readFileSync(repairPath, 'utf8');
-            await sequelize.query(repairSQL);
-            console.log('✅ Reparación de aislamiento aplicada/verificada');
-        } catch (repErr) {
-            console.error('⚠️ Error en reparación de aislamiento:', repErr.message);
-        }
+        // ⚠️ DESACTIVADO: la reparación reasignaba categorías de SKUs modificados manualmente.
+        // Si necesita reactivarse, evaluar primero si los SKUs ya están consistentes.
+        // try {
+        //     console.log('🔧 Verificando reparación de aislamiento (categorías por SKU)...');
+        //     const fs = await import('fs');
+        //     const path = await import('path');
+        //     const { fileURLToPath } = await import('url');
+        //     const __filename = fileURLToPath(import.meta.url);
+        //     const __dirname = path.dirname(__filename);
+        //     const repairPath = path.join(__dirname, 'migrations', '20260507_reparar_aislamiento.sql');
+        //     const repairSQL = fs.readFileSync(repairPath, 'utf8');
+        //     await sequelize.query(repairSQL);
+        //     console.log('✅ Reparación de aislamiento aplicada/verificada');
+        // } catch (repErr) {
+        //     console.error('⚠️ Error en reparación de aislamiento:', repErr.message);
+        // }
 
-        // Deduplicación: consolida categorías y ubicaciones repetidas dentro del mismo almacén
-        try {
-            console.log('🧹 Verificando deduplicación (categorías/ubicaciones por almacén)...');
-            const fs = await import('fs');
-            const path = await import('path');
-            const { fileURLToPath } = await import('url');
-            const __filename = fileURLToPath(import.meta.url);
-            const __dirname = path.dirname(__filename);
-            const dedupPath = path.join(__dirname, 'migrations', '20260507_dedup_aislamiento.sql');
-            const dedupSQL = fs.readFileSync(dedupPath, 'utf8');
-            await sequelize.query(dedupSQL);
-            console.log('✅ Deduplicación aplicada/verificada');
-        } catch (dedErr) {
-            console.error('⚠️ Error en deduplicación:', dedErr.message);
-        }
+        // ⚠️ DESACTIVADO: la deduplicación borraba categorías/ubicaciones aceptadas como duplicadas
+        // y reasignaba SKUs. Solo reactivar cuando se sepa que NO hay edits manuales pendientes.
+        // try {
+        //     console.log('🧹 Verificando deduplicación (categorías/ubicaciones por almacén)...');
+        //     const fs = await import('fs');
+        //     const path = await import('path');
+        //     const { fileURLToPath } = await import('url');
+        //     const __filename = fileURLToPath(import.meta.url);
+        //     const __dirname = path.dirname(__filename);
+        //     const dedupPath = path.join(__dirname, 'migrations', '20260507_dedup_aislamiento.sql');
+        //     const dedupSQL = fs.readFileSync(dedupPath, 'utf8');
+        //     await sequelize.query(dedupSQL);
+        //     console.log('✅ Deduplicación aplicada/verificada');
+        // } catch (dedErr) {
+        //     console.error('⚠️ Error en deduplicación:', dedErr.message);
+        // }
 
         // Iniciar servidor
         app.listen(PORT, async () => {
