@@ -52,8 +52,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
     stock_minimo: '',
     stock_maximo: '',
     unidad: 'piezas',
-    costo_unitario: '',
-    es_herramienta: false
+    costo_unitario: ''
   });
 
   // Estado para múltiples proveedores
@@ -101,8 +100,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
           stock_minimo: articulo.stock_minimo || '',
           stock_maximo: articulo.stock_maximo || '',
           unidad: articulo.unidad || 'piezas',
-          costo_unitario: articulo.costo_unitario || '',
-          es_herramienta: articulo.es_herramienta || false
+          costo_unitario: articulo.costo_unitario || ''
         });
 
         // Pre-seleccionar el almacén basado en la ubicación del artículo
@@ -152,8 +150,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
           stock_minimo: '',
           stock_maximo: '',
           unidad: 'piezas',
-          costo_unitario: '',
-          es_herramienta: false
+          costo_unitario: ''
         });
         setCurrentImageUrl(null);
         setSelectedImage(null);
@@ -623,8 +620,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         stock_minimo: esAlmacen ? 0 : parseFloat(formData.stock_minimo),
         stock_maximo: formData.stock_maximo ? parseFloat(formData.stock_maximo) : null,
         unidad: formData.unidad.toUpperCase(),
-        costo_unitario: parseFloat(formData.costo_unitario) || 0,
-        es_herramienta: formData.es_herramienta
+        costo_unitario: parseFloat(formData.costo_unitario) || 0
       };
 
       // Agregar proveedores si se seleccionaron
@@ -714,7 +710,6 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         stock_maximo: '',
         unidad: 'piezas',
         costo_unitario: '',
-        es_herramienta: false
       });
       setSelectedImage(null);
       setCurrentImageUrl(null);
@@ -769,7 +764,6 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         stock_maximo: '',
         unidad: 'piezas',
         costo_unitario: '',
-        es_herramienta: false
       });
       setSelectedImage(null);
       setCurrentImageUrl(null);
@@ -1517,24 +1511,6 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                   />
                 </div>
               )}
-            </div>
-
-            {/* Toggle Es Herramienta */}
-            <div className={`flex items-center gap-3 p-3 rounded-lg border ${formData.es_herramienta ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-200'}`}>
-              <input
-                type="checkbox"
-                id="es_herramienta"
-                name="es_herramienta"
-                checked={formData.es_herramienta}
-                onChange={(e) => setFormData({ ...formData, es_herramienta: e.target.checked })}
-                className="w-5 h-5 text-blue-700 bg-gray-100 border-gray-300 rounded focus:ring-blue-700 focus:ring-2"
-              />
-              <label htmlFor="es_herramienta" className="text-sm font-medium text-gray-700 cursor-pointer flex-1">
-                🔧 <strong>Es una herramienta</strong>
-                <span className="block text-xs text-gray-500 mt-0.5">
-                  Si marcas esto, el artículo aparecerá en la sección "HERRAMIENTAS" del gate principal en lugar de en su almacén.
-                </span>
-              </label>
             </div>
 
             {!isEdit && !formData.codigo_ean13 && (

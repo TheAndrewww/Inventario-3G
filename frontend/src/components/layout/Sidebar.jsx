@@ -16,7 +16,6 @@ const ALL_MENU_ITEMS = [
   { path: '/usuarios', icon: UserCog, label: 'Usuarios', roles: ['administrador'] },
   { path: '/solicitudes-cambio', icon: Inbox, label: 'Solicitudes', roles: ['administrador', 'almacen', 'encargado'] },
   { path: '/ordenes-compra', icon: FileText, label: 'Órdenes de Compra', roles: ['administrador', 'diseñador', 'ventas', 'compras'] },
-  { path: '/renta-herramientas', icon: Wrench, label: 'Renta Herramientas', roles: ['administrador', 'encargado', 'almacen'] },
   { path: '/calendario', icon: Calendar, label: 'Calendario', roles: ['administrador', 'diseñador', 'ventas', 'encargado', 'almacen'] },
   { path: '/mi-equipo', icon: User, label: 'Mi Equipo', roles: ['administrador', 'diseñador', 'ventas', 'encargado', 'operador'] },
   { path: '/produccion', icon: Factory, label: 'Dashboard Producción', roles: ['administrador', 'diseñador', 'encargado'] },
