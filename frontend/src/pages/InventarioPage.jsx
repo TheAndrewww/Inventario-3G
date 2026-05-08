@@ -42,8 +42,8 @@ const formatearCantidad = (cantidad, unidad) => {
   return valor.toFixed(0);
 };
 
-const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'stockTotal', 'stockDisp', 'unidad', 'acciones'];
-const DEFAULT_COL_WIDTHS = { articulo: 280, categoria: 130, ubicacion: 150, stockTotal: 110, stockDisp: 130, unidad: 90, acciones: 220 };
+const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'stockTotal', 'seccion', 'unidad', 'acciones'];
+const DEFAULT_COL_WIDTHS = { articulo: 280, categoria: 130, ubicacion: 150, stockTotal: 110, seccion: 140, unidad: 90, acciones: 220 };
 const STORAGE_KEY_COL_WIDTHS = 'inventario_col_widths_v2';
 const STORAGE_KEY_EXTRAS = 'inventario_extras_v1';
 
@@ -2285,7 +2285,7 @@ const InventarioPage = () => {
                   { key: 'categoria', label: 'Categoría', align: 'left' },
                   { key: 'ubicacion', label: 'Ubicación', align: 'left' },
                   { key: 'stockTotal', label: 'Stock Total', align: 'left' },
-                  { key: 'stockDisp', label: 'Stock Disponible', align: 'left' },
+                  { key: 'seccion', label: 'Sección', align: 'left' },
                   { key: 'unidad', label: 'Unidad', align: 'left' },
                   { key: 'acciones', label: 'Acciones', align: 'right' },
                 ].map(({ key, label, align }) => (
@@ -2423,9 +2423,25 @@ const InventarioPage = () => {
                           </span>
                         </td>
 
-                        {/* Stock Disponible (no aplica para consumibles) */}
-                        <td className="px-4 py-4 whitespace-nowrap text-center text-gray-400 text-sm">
-                          -
+                        {/* Sección — editable inline */}
+                        <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                          {puedeEditarArticulos ? (
+                            <select
+                              value={item.seccion_id ?? ''}
+                              onChange={(e) => handleQuickUpdate(item, 'seccion_id', e.target.value)}
+                              disabled={actualizandoArt.has(item.id)}
+                              className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border-0 cursor-pointer hover:bg-purple-200 focus:ring-2 focus:ring-purple-400 focus:outline-none disabled:opacity-50"
+                            >
+                              <option value="">Sin sección</option>
+                              {secciones.map(s => (
+                                <option key={s.id} value={s.id}>{s.nombre}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                              {item.seccion?.nombre || todasSecciones.find(s => s.id === item.seccion_id)?.nombre || 'Sin sección'}
+                            </span>
+                          )}
                         </td>
 
                         {/* Unidad */}
@@ -2648,14 +2664,25 @@ const InventarioPage = () => {
                             </span>
                           </td>
 
-                          {/* Stock Disponible */}
-                          <td className="px-4 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleVerDetalle(item)}>
-                            <span className={`font-medium ${(item.tipo_herramienta_migrado?.unidades_disponibles || 0) === 0
-                              ? 'text-red-600'
-                              : 'text-green-600'
-                              }`}>
-                              {item.tipo_herramienta_migrado?.unidades_disponibles || 0}
-                            </span>
+                          {/* Sección — editable inline */}
+                          <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            {puedeEditarArticulos ? (
+                              <select
+                                value={item.seccion_id ?? ''}
+                                onChange={(e) => handleQuickUpdate(item, 'seccion_id', e.target.value)}
+                                disabled={actualizandoArt.has(item.id)}
+                                className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border-0 cursor-pointer hover:bg-purple-200 focus:ring-2 focus:ring-purple-400 focus:outline-none disabled:opacity-50"
+                              >
+                                <option value="">Sin sección</option>
+                                {secciones.map(s => (
+                                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                {item.seccion?.nombre || todasSecciones.find(s => s.id === item.seccion_id)?.nombre || 'Sin sección'}
+                              </span>
+                            )}
                           </td>
 
                           {/* Unidad */}
