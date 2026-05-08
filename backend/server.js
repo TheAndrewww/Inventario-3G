@@ -102,6 +102,7 @@ import authRoutes from './src/routes/auth.routes.js';
 import articulosRoutes from './src/routes/articulos.routes.js';
 import movimientosRoutes from './src/routes/movimientos.routes.js';
 import categoriasRoutes from './src/routes/categorias.routes.js';
+import seccionesRoutes from './src/routes/secciones.routes.js';
 import ubicacionesRoutes from './src/routes/ubicaciones.routes.js';
 import pedidosRoutes from './src/routes/pedidos.routes.js';
 import proveedoresRoutes from './src/routes/proveedores.routes.js';
@@ -203,6 +204,7 @@ app.get('/api/test-email', async (req, res) => {
 });
 
 app.use('/api/categorias', categoriasRoutes);
+app.use('/api/secciones', seccionesRoutes);
 app.use('/api/ubicaciones', ubicacionesRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/proveedores', proveedoresRoutes);
@@ -1059,6 +1061,22 @@ const startServer = async () => {
             console.log('✅ Reparación de aislamiento aplicada/verificada');
         } catch (repErr) {
             console.error('⚠️ Error en reparación de aislamiento:', repErr.message);
+        }
+
+        // Tabla secciones (CRUD por almacén) + FK seccion_id en articulos
+        try {
+            console.log('🔍 Verificando tabla secciones...');
+            const fs = await import('fs');
+            const path = await import('path');
+            const { fileURLToPath } = await import('url');
+            const __filename = fileURLToPath(import.meta.url);
+            const __dirname = path.dirname(__filename);
+            const seccionesPath = path.join(__dirname, 'migrations', '20260507_secciones.sql');
+            const seccionesSQL = fs.readFileSync(seccionesPath, 'utf8');
+            await sequelize.query(seccionesSQL);
+            console.log('✅ Tabla secciones verificada');
+        } catch (secErr) {
+            console.error('⚠️ Error con tabla secciones:', secErr.message);
         }
 
         // Deduplicación: consolida categorías y ubicaciones repetidas dentro del mismo almacén

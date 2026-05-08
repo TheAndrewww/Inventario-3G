@@ -47,6 +47,15 @@ const Articulo = sequelize.define('Articulo', {
             key: 'id'
         }
     },
+    seccion_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'secciones',
+            key: 'id'
+        },
+        comment: 'Sección dentro del almacén (solo aplica al almacén Herramientas)'
+    },
     stock_actual: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
