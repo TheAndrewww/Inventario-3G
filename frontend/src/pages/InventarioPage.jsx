@@ -42,8 +42,8 @@ const formatearCantidad = (cantidad, unidad) => {
   return valor.toFixed(0);
 };
 
-const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'seccion', 'stockTotal', 'stockDisp', 'unidad', 'acciones'];
-const DEFAULT_COL_WIDTHS = { articulo: 280, categoria: 130, ubicacion: 150, seccion: 120, stockTotal: 110, stockDisp: 130, unidad: 90, acciones: 220 };
+const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'stockTotal', 'stockDisp', 'unidad', 'acciones'];
+const DEFAULT_COL_WIDTHS = { articulo: 280, categoria: 130, ubicacion: 150, stockTotal: 110, stockDisp: 130, unidad: 90, acciones: 220 };
 const STORAGE_KEY_COL_WIDTHS = 'inventario_col_widths_v2';
 const STORAGE_KEY_EXTRAS = 'inventario_extras_v1';
 
@@ -2240,7 +2240,6 @@ const InventarioPage = () => {
                   { key: 'articulo', label: 'Artículo', align: 'left' },
                   { key: 'categoria', label: 'Categoría', align: 'left' },
                   { key: 'ubicacion', label: 'Ubicación', align: 'left' },
-                  { key: 'seccion', label: 'Sección', align: 'left' },
                   { key: 'stockTotal', label: 'Stock Total', align: 'left' },
                   { key: 'stockDisp', label: 'Stock Disponible', align: 'left' },
                   { key: 'unidad', label: 'Unidad', align: 'left' },
@@ -2370,25 +2369,6 @@ const InventarioPage = () => {
                             </span>
                           ) : (
                             <span className="text-gray-500">{item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}</span>
-                          )}
-                        </td>
-
-                        {/* Sección Stock / Extras — legacy local */}
-                        <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                          {puedeEditarArticulos && !esAlmacen ? (
-                            <select
-                              value={getSeccionArticulo(item)}
-                              onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
-                              className={`w-full px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:outline-none ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-400' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 focus:ring-emerald-400'}`}
-                              title="Cambiar entre Stock y Extras"
-                            >
-                              <option value="stock">📦 Stock</option>
-                              <option value="extras">✨ Extras</option>
-                            </select>
-                          ) : (
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                              {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
-                            </span>
                           )}
                         </td>
 
@@ -2614,25 +2594,6 @@ const InventarioPage = () => {
                               </span>
                             ) : (
                               <span className="text-gray-500">{item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}</span>
-                            )}
-                          </td>
-
-                          {/* Sección Stock / Extras — legacy local */}
-                          <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                            {puedeEditarArticulos && !esAlmacen ? (
-                              <select
-                                value={getSeccionArticulo(item)}
-                                onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
-                                className={`w-full px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:outline-none ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-400' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 focus:ring-emerald-400'}`}
-                                title="Cambiar entre Stock y Extras"
-                              >
-                                <option value="stock">📦 Stock</option>
-                                <option value="extras">✨ Extras</option>
-                              </select>
-                            ) : (
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                                {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
-                              </span>
                             )}
                           </td>
 
