@@ -1064,39 +1064,14 @@ const startServer = async () => {
         //     console.error('⚠️ Error en reparación de aislamiento:', repErr.message);
         // }
 
-        // Crear almacén "Herramientas" entidad real y mover SKUs es_herramienta=true
-        try {
-            console.log('🔍 Verificando almacén "Herramientas"...');
-            const fs = await import('fs');
-            const path = await import('path');
-            const { fileURLToPath } = await import('url');
-            const __filename = fileURLToPath(import.meta.url);
-            const __dirname = path.dirname(__filename);
-            const herrPath = path.join(__dirname, 'migrations', '20260508_almacen_herramientas.sql');
-            const herrSQL = fs.readFileSync(herrPath, 'utf8');
-            await sequelize.query(herrSQL);
-            console.log('✅ Almacén Herramientas verificado/creado');
-        } catch (herrErr) {
-            console.error('⚠️ Error con almacén Herramientas:', herrErr.message);
-        }
-
-        // Conversión: cada UnidadHerramientaRenta se vuelve un SKU normal
-        // (Idempotente: solo crea SKUs para códigos que aún no existen)
-        try {
-            console.log('🔄 Convirtiendo unidades de herramienta de renta a SKUs...');
-            const fs = await import('fs');
-            const path = await import('path');
-            const { fileURLToPath } = await import('url');
-            const __filename = fileURLToPath(import.meta.url);
-            const __dirname = path.dirname(__filename);
-            const convPath = path.join(__dirname, 'migrations', '20260508_convertir_unidades_a_skus.sql');
-            const convSQL = fs.readFileSync(convPath, 'utf8');
-            await sequelize.query(convSQL);
-            console.log('✅ Conversión unidades→SKUs aplicada/verificada');
-        } catch (convErr) {
-            // Si las tablas ya fueron eliminadas en una FASE futura, esta migración fallará silenciosamente
-            console.log('ℹ️ Conversión unidades→SKUs omitida:', convErr.message?.substring(0, 100));
-        }
+        // ⚠️ DESACTIVADAS — movieron SKUs incorrectamente, no se ejecutan más en arranques.
+        // Las migraciones siguen disponibles en backend/migrations/ para uso manual si se requiere.
+        //
+        // 20260508_almacen_herramientas.sql  → creó almacén "Herramientas" y movió es_herramienta=true.
+        //   ⚠️ Posibles SKUs movidos por error: los que tenían es_herramienta=true sin serlo realmente.
+        //
+        // 20260508_convertir_unidades_a_skus.sql → convirtió cada unidad_herramienta_renta en SKU.
+        //   ⚠️ Pudo crear SKUs duplicados en almacén Herramientas.
 
         // Tabla secciones (CRUD por almacén) + FK seccion_id en articulos
         try {
