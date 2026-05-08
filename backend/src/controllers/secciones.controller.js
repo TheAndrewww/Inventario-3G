@@ -25,6 +25,7 @@ export const getSecciones = async (req, res) => {
 
         const secciones = await Seccion.findAll({
             where,
+            include: [{ model: Almacen, as: 'almacen_ref', attributes: ['id', 'nombre'], required: false }],
             order: [['nombre', 'ASC']]
         });
 

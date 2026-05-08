@@ -201,7 +201,6 @@ const InventarioPage = () => {
   // Estados para gestión de secciones (solo almacén "Herramientas")
   const [secciones, setSecciones] = useState([]);
   const [todasSecciones, setTodasSecciones] = useState([]);
-  const [seccionIdSeleccionada, setSeccionIdSeleccionada] = useState(null);
   const [modalSeccionOpen, setModalSeccionOpen] = useState(false);
   const [seccionEditando, setSeccionEditando] = useState(null);
   const [nombreSeccion, setNombreSeccion] = useState('');
@@ -209,6 +208,7 @@ const InventarioPage = () => {
   const [seccionDropdownOpen, setSeccionDropdownOpen] = useState(false);
   const [seccionEditMode, setSeccionEditMode] = useState(false);
   const seccionDropdownRef = useRef(null);
+  const [almacenSeccionForm, setAlmacenSeccionForm] = useState(null); // almacén destino al crear sección en modo herramientas
 
   // Estados para gestión de almacenes
   const [modalAlmacenesOpen, setModalAlmacenesOpen] = useState(false);
@@ -377,10 +377,11 @@ const InventarioPage = () => {
     return todasCategorias.filter(c => c.almacen_id === almacenId);
   };
 
-  // Helper: hay un almacén real seleccionado donde aplican las secciones
+  // Helper: hay un almacén o modo seleccionado donde aplican las secciones
   const esAlmacenConSecciones = React.useMemo(() => {
-    return typeof almacenSeleccionado === 'number';
+    return typeof almacenSeleccionado === 'number' || almacenSeleccionado === 'herramientas';
   }, [almacenSeleccionado]);
+  const enModoHerramientas = almacenSeleccionado === 'herramientas';
 
   // Secciones del almacén del artículo (para select inline)
   const seccionesParaArticulo = (item) => {
@@ -395,10 +396,10 @@ const InventarioPage = () => {
   useEffect(() => {
     if (almacenSeleccionado === null) return; // Gate activo, no fetchear
     if (almacenSeleccionado === 'herramientas') {
-      // Modo herramientas (renta): sin filtro de almacén
+      // Modo herramientas (renta): sin filtro de almacén → todas las secciones
       fetchCategorias();
       fetchUbicaciones();
-      setSecciones([]);
+      fetchSecciones();
     } else {
       fetchCategorias(almacenSeleccionado);
       fetchUbicaciones(almacenSeleccionado);
@@ -407,7 +408,6 @@ const InventarioPage = () => {
     // Limpiar filtros al cambiar almacén
     setCategoriaSeleccionada(null);
     setUbicacionSeleccionada(null);
-    setSeccionIdSeleccionada(null);
   }, [almacenSeleccionado]);
 
   const fetchArticulos = async (opts = {}) => {
@@ -568,10 +568,14 @@ const InventarioPage = () => {
           const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
           const matchesAlmacen = almacenSeleccionado === 'herramientas' ||
             (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
-          const matchesSeccion = !seccionSeleccionada || getSeccionArticulo(item) === seccionSeleccionada;
-          const matchesSeccionId = !seccionIdSeleccionada || item.seccion_id === seccionIdSeleccionada;
+          // matchesSeccion: si seccionSeleccionada es número → filtra por seccion_id de BD;
+          // si es 'stock'/'extras' → comportamiento legacy con extrasIds local
+          const matchesSeccion = !seccionSeleccionada
+            || (typeof seccionSeleccionada === 'number'
+              ? item.seccion_id === seccionSeleccionada
+              : getSeccionArticulo(item) === seccionSeleccionada);
 
-          return matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion && matchesSeccionId;
+          return matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion;
         })
         .sort((a, b) => {
           // Ordenar según la opción seleccionada
@@ -621,18 +625,18 @@ const InventarioPage = () => {
         const matchesAlmacen = almacenSeleccionado === 'herramientas' ||
           (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
 
-        // Filtrar por sección Stock / Extras (legacy)
-        const matchesSeccion = !seccionSeleccionada || getSeccionArticulo(item) === seccionSeleccionada;
-
-        // Filtrar por sección de BD (almacén "Herramientas")
-        const matchesSeccionId = !seccionIdSeleccionada || item.seccion_id === seccionIdSeleccionada;
+        // Filtrar por sección — número (BD) o 'stock'/'extras' (legacy)
+        const matchesSeccion = !seccionSeleccionada
+          || (typeof seccionSeleccionada === 'number'
+            ? item.seccion_id === seccionSeleccionada
+            : getSeccionArticulo(item) === seccionSeleccionada);
 
         // Filtrar por tipo según el tab activo
         const estaEnTabCorrecto = tabActivo === 'consumibles'
           ? !item.es_herramienta  // Consumibles: artículos que NO son herramientas
           : item.es_herramienta;  // Herramientas: artículos que SÍ son herramientas
 
-        return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion && matchesSeccionId && estaEnTabCorrecto;
+        return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion && estaEnTabCorrecto;
       })
       .sort((a, b) => {
         // Ordenar según la opción seleccionada
@@ -1343,9 +1347,13 @@ const InventarioPage = () => {
     if (seccion) {
       setSeccionEditando(seccion);
       setNombreSeccion(seccion.nombre);
+      setAlmacenSeccionForm(seccion.almacen_id);
     } else {
       setSeccionEditando(null);
       setNombreSeccion('');
+      // Pre-seleccionar almacén destino: si hay número en almacenSeleccionado, usarlo;
+      // si es modo 'herramientas', dejar al usuario elegir (null).
+      setAlmacenSeccionForm(typeof almacenSeleccionado === 'number' ? almacenSeleccionado : null);
     }
     setModalSeccionOpen(true);
   };
@@ -1354,6 +1362,7 @@ const InventarioPage = () => {
     setModalSeccionOpen(false);
     setSeccionEditando(null);
     setNombreSeccion('');
+    setAlmacenSeccionForm(null);
   };
 
   const handleGuardarSeccion = async () => {
@@ -1361,8 +1370,10 @@ const InventarioPage = () => {
       toast.error('El nombre de la sección es requerido');
       return;
     }
-    if (!seccionEditando && !esAlmacenConSecciones) {
-      toast.error('Selecciona un almacén antes de crear una sección');
+    // Almacén destino: si edita, conserva el de la sección; si crea, usa el del form
+    const almacenDestino = seccionEditando ? seccionEditando.almacen_id : almacenSeccionForm;
+    if (!seccionEditando && !almacenDestino) {
+      toast.error('Selecciona un almacén para la nueva sección');
       return;
     }
 
@@ -1372,11 +1383,16 @@ const InventarioPage = () => {
         await seccionesService.update(seccionEditando.id, { nombre: nombreSeccion.trim() });
         toast.success('Sección actualizada');
       } else {
-        await seccionesService.create({ nombre: nombreSeccion.trim(), almacen_id: almacenSeleccionado });
+        await seccionesService.create({ nombre: nombreSeccion.trim(), almacen_id: almacenDestino });
         toast.success('Sección creada');
       }
       handleCerrarModalSeccion();
-      fetchSecciones(almacenSeleccionado);
+      // Refrescar lista filtrada y global
+      if (typeof almacenSeleccionado === 'number') {
+        fetchSecciones(almacenSeleccionado);
+      } else {
+        fetchSecciones();
+      }
       fetchTodasSecciones();
     } catch (error) {
       console.error(error);
@@ -1392,7 +1408,7 @@ const InventarioPage = () => {
       toast.success('Sección eliminada');
       fetchSecciones(almacenSeleccionado);
       fetchTodasSecciones();
-      if (seccionIdSeleccionada === seccion.id) setSeccionIdSeleccionada(null);
+      if (seccionSeleccionada === seccion.id) setSeccionSeleccionada(null);
     } catch (error) {
       if (error.requiresConfirmation) {
         if (window.confirm(`⚠️ ${error.message}\n\n¿Continuar?`)) {
@@ -1402,7 +1418,7 @@ const InventarioPage = () => {
             fetchSecciones(almacenSeleccionado);
             fetchTodasSecciones();
             fetchArticulos();
-            if (seccionIdSeleccionada === seccion.id) setSeccionIdSeleccionada(null);
+            if (seccionSeleccionada === seccion.id) setSeccionSeleccionada(null);
           } catch (e2) {
             toast.error(e2.message || 'Error al eliminar sección');
           }
@@ -1729,53 +1745,100 @@ const InventarioPage = () => {
     );
   }
 
-  // Sub-gate: si ya hay almacén pero no sección, mostrar selector Stock / Extras
+  // Sub-gate: si ya hay almacén pero no sección, mostrar selector de sub-almacenes (secciones de BD)
   if (seccionSeleccionada === null) {
     const nombreAlmacenActual = almacenSeleccionado === 'herramientas'
       ? 'Herramientas'
       : (almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén');
+    // Conteo de SKUs por sección (en este almacén)
     const articulosDelAlmacen = articulos.filter((item) => {
       const isActive = item.activo !== false;
       if (!isActive) return false;
       if (almacenSeleccionado === 'herramientas') return item.es_herramienta;
       return item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
     });
-    const conteoStock = articulosDelAlmacen.filter(i => !extrasIds.has(i.id)).length;
-    const conteoExtras = articulosDelAlmacen.filter(i => extrasIds.has(i.id)).length;
+    const conteoPorSeccion = (seccionId) =>
+      articulosDelAlmacen.filter(i => i.seccion_id === seccionId).length;
+    const seccionesAlmacen = typeof almacenSeleccionado === 'number'
+      ? secciones
+      : todasSecciones; // modo herramientas: todas
 
     return (
       <div className="p-4 md:p-6 min-h-[70vh] flex flex-col items-center justify-center">
         <div className="max-w-3xl w-full">
           <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{nombreAlmacenActual}</h1>
-            <p className="text-gray-600">Selecciona la sección que deseas consultar</p>
+            <p className="text-gray-600">Selecciona el sub-almacén que deseas consultar</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-            <button
-              onClick={() => setSeccionSeleccionada('stock')}
-              className="group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-emerald-600 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
-            >
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-emerald-50 group-hover:bg-emerald-600 transition-colors flex items-center justify-center">
-                <Package size={36} className="text-emerald-600 group-hover:text-white transition-colors" />
-              </div>
-              <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">Stock</span>
-              <span className="text-sm text-gray-500">
-                {conteoStock} artículo{conteoStock === 1 ? '' : 's'}
-              </span>
-            </button>
-            <button
-              onClick={() => setSeccionSeleccionada('extras')}
-              className="group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-amber-600 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
-            >
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-amber-50 group-hover:bg-amber-600 transition-colors flex items-center justify-center">
-                <PackagePlus size={36} className="text-amber-600 group-hover:text-white transition-colors" />
-              </div>
-              <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">Extras</span>
-              <span className="text-sm text-gray-500">
-                {conteoExtras} artículo{conteoExtras === 1 ? '' : 's'}
-              </span>
-            </button>
-          </div>
+          {seccionesAlmacen.length === 0 ? (
+            <div className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center text-gray-500">
+              No hay sub-almacenes definidos.
+              {esAdministrador && typeof almacenSeleccionado === 'number' && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => handleAbrirModalSeccion()}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800"
+                  >
+                    <Plus size={16} /> Crear primer sub-almacén
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+              {seccionesAlmacen.map(s => (
+                <div
+                  key={s.id}
+                  className="relative group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-red-600 hover:shadow-xl transition-all duration-200"
+                >
+                  <button
+                    onClick={() => setSeccionSeleccionada(s.id)}
+                    className="w-full flex flex-col items-center gap-4"
+                  >
+                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-50 group-hover:bg-red-600 transition-colors flex items-center justify-center">
+                      <Package size={36} className="text-red-600 group-hover:text-white transition-colors" />
+                    </div>
+                    <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">{s.nombre}</span>
+                    <span className="text-sm text-gray-500">
+                      {conteoPorSeccion(s.id)} artículo{conteoPorSeccion(s.id) === 1 ? '' : 's'}
+                    </span>
+                  </button>
+                  {esAdministrador && (
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleAbrirModalSeccion(s); }}
+                        className="p-1.5 text-blue-600 bg-white border border-gray-200 hover:bg-blue-50 rounded-lg shadow-sm"
+                        title="Editar sub-almacén"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`¿Eliminar el sub-almacén "${s.nombre}"?`)) {
+                            handleEliminarSeccion(s);
+                          }
+                        }}
+                        className="p-1.5 text-red-600 bg-white border border-gray-200 hover:bg-red-50 rounded-lg shadow-sm"
+                        title="Eliminar sub-almacén"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {esAdministrador && typeof almacenSeleccionado === 'number' && (
+                <button
+                  onClick={() => handleAbrirModalSeccion()}
+                  className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-6 md:p-8 hover:border-red-600 hover:bg-red-50 transition-colors flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-red-700"
+                >
+                  <Plus size={32} />
+                  <span className="font-semibold uppercase tracking-wide">Nuevo sub-almacén</span>
+                </button>
+              )}
+            </div>
+          )}
           <div className="mt-6 text-center">
             <button
               onClick={() => { setAlmacenSeleccionado(null); setSeccionSeleccionada(null); }}
@@ -1836,24 +1899,24 @@ const InventarioPage = () => {
                 </span>
               </div>
             )}
-            {/* Indicador de sección Stock / Extras */}
+            {/* Indicador de sub-almacén activo */}
             {seccionSeleccionada && (
-              <div className={`flex items-center gap-2 px-3 py-2.5 border rounded-lg ${seccionSeleccionada === 'extras' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                {seccionSeleccionada === 'extras'
-                  ? <PackagePlus size={16} className="text-amber-700" />
-                  : <Package size={16} className="text-emerald-700" />}
-                <span className={`font-semibold uppercase tracking-wide text-xs md:text-sm ${seccionSeleccionada === 'extras' ? 'text-amber-700' : 'text-emerald-700'}`}>
-                  {seccionSeleccionada === 'extras' ? 'Extras' : 'Stock'}
+              <div className="flex items-center gap-2 px-3 py-2.5 border rounded-lg bg-red-50 border-red-200">
+                <Package size={16} className="text-red-700" />
+                <span className="font-semibold uppercase tracking-wide text-xs md:text-sm text-red-700">
+                  {typeof seccionSeleccionada === 'number'
+                    ? (todasSecciones.find(s => s.id === seccionSeleccionada)?.nombre || 'Sub-almacén')
+                    : (seccionSeleccionada === 'extras' ? 'Extras' : 'Stock')}
                 </span>
               </div>
             )}
             <button
               onClick={() => setSeccionSeleccionada(null)}
               className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-2 text-sm"
-              title="Cambiar sección (Stock / Extras)"
+              title="Cambiar sub-almacén"
             >
               <ArrowUpDown size={16} />
-              <span className="hidden md:inline">Sección</span>
+              <span className="hidden md:inline">Sub-almacén</span>
             </button>
             <button
               onClick={() => { setAlmacenSeleccionado(null); setSeccionSeleccionada(null); }}
@@ -2111,100 +2174,6 @@ const InventarioPage = () => {
             )}
           </div>
 
-          {/* Filtro de sección (solo almacén "Herramientas") */}
-          {esAlmacenConSecciones && (
-            <div className="flex items-center gap-1">
-              <div className="relative" ref={seccionDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => { setSeccionDropdownOpen(o => !o); setSeccionEditMode(false); }}
-                  className="appearance-none pl-9 pr-8 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-700 text-left min-w-[180px] truncate"
-                >
-                  {seccionIdSeleccionada
-                    ? (secciones.find(s => s.id === seccionIdSeleccionada)?.nombre || 'Todas las secciones')
-                    : 'Todas las secciones'}
-                </button>
-                <Wrench size={16} className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none" />
-                <ChevronDown size={14} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
-                {seccionDropdownOpen && (
-                  <div className="absolute z-50 mt-1 left-0 min-w-full w-max max-w-[320px] max-h-80 overflow-y-auto bg-white border border-gray-300 rounded-lg shadow-lg">
-                    <button
-                      type="button"
-                      onClick={() => { setSeccionIdSeleccionada(null); setSeccionDropdownOpen(false); setSeccionEditMode(false); }}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${!seccionIdSeleccionada ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-700'}`}
-                    >
-                      Todas las secciones
-                    </button>
-                    <div className="border-t border-gray-200" />
-                    {secciones.length === 0 ? (
-                      <div className="px-3 py-3 text-sm text-gray-500 text-center">No hay secciones</div>
-                    ) : (
-                      secciones.map((s) => (
-                        <div key={s.id} className={`flex items-center justify-between gap-2 hover:bg-gray-50 ${seccionIdSeleccionada === s.id ? 'bg-red-50' : ''}`}>
-                          <button
-                            type="button"
-                            onClick={() => { setSeccionIdSeleccionada(s.id); setSeccionDropdownOpen(false); setSeccionEditMode(false); }}
-                            className={`flex-1 text-left px-3 py-2 text-sm truncate ${seccionIdSeleccionada === s.id ? 'text-red-700 font-medium' : 'text-gray-700'}`}
-                          >
-                            {s.nombre}
-                          </button>
-                          {seccionEditMode && esAdministrador && (
-                            <div className="flex items-center gap-1 pr-2">
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setSeccionDropdownOpen(false); setSeccionEditMode(false); handleAbrirModalSeccion(s); }}
-                                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                                title="Editar sección"
-                              >
-                                <Edit2 size={14} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (window.confirm(`¿Eliminar la sección "${s.nombre}"?`)) {
-                                    setSeccionDropdownOpen(false);
-                                    setSeccionEditMode(false);
-                                    handleEliminarSeccion(s);
-                                  }
-                                }}
-                                className="p-1 text-red-600 hover:bg-red-100 rounded"
-                                title="Eliminar sección"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                    {esAdministrador && secciones.length > 0 && (
-                      <>
-                        <div className="border-t border-gray-200" />
-                        <button
-                          type="button"
-                          onClick={() => setSeccionEditMode(m => !m)}
-                          className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium ${seccionEditMode ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
-                        >
-                          {seccionEditMode ? (<><X size={14} />Salir de edición</>) : (<><Edit2 size={14} />Editar / Eliminar</>)}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-              {puedeCrearArticulos && (
-                <button
-                  onClick={() => handleAbrirModalSeccion()}
-                  className="px-2 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-                  title="Nueva sección"
-                >
-                  <Plus size={16} />
-                </button>
-              )}
-            </div>
-          )}
-
           {puedeCrearArticulos && (
             <>
               <button
@@ -2404,42 +2373,22 @@ const InventarioPage = () => {
                           )}
                         </td>
 
-                        {/* Sección — en almacén "Herramientas" usa BD, en otros Stock/Extras local */}
+                        {/* Sección Stock / Extras — legacy local */}
                         <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                          {esAlmacenConSecciones ? (
-                            puedeEditarArticulos ? (
-                              <select
-                                value={item.seccion_id ?? ''}
-                                onChange={(e) => handleQuickUpdate(item, 'seccion_id', e.target.value)}
-                                disabled={actualizandoArt.has(item.id)}
-                                className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border-0 cursor-pointer hover:bg-purple-200 focus:ring-2 focus:ring-purple-400 focus:outline-none disabled:opacity-50"
-                              >
-                                <option value="">Sin sección</option>
-                                {seccionesParaArticulo(item).map(s => (
-                                  <option key={s.id} value={s.id}>{s.nombre}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
-                                {item.seccion?.nombre || 'Sin sección'}
-                              </span>
-                            )
+                          {puedeEditarArticulos && !esAlmacen ? (
+                            <select
+                              value={getSeccionArticulo(item)}
+                              onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
+                              className={`w-full px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:outline-none ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-400' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 focus:ring-emerald-400'}`}
+                              title="Cambiar entre Stock y Extras"
+                            >
+                              <option value="stock">📦 Stock</option>
+                              <option value="extras">✨ Extras</option>
+                            </select>
                           ) : (
-                            puedeEditarArticulos && !esAlmacen ? (
-                              <select
-                                value={getSeccionArticulo(item)}
-                                onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
-                                className={`w-full px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:outline-none ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-400' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 focus:ring-emerald-400'}`}
-                                title="Cambiar entre Stock y Extras"
-                              >
-                                <option value="stock">📦 Stock</option>
-                                <option value="extras">✨ Extras</option>
-                              </select>
-                            ) : (
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                                {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
-                              </span>
-                            )
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                              {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
+                            </span>
                           )}
                         </td>
 
@@ -2668,42 +2617,22 @@ const InventarioPage = () => {
                             )}
                           </td>
 
-                          {/* Sección — Herramientas usa BD, otros Stock/Extras local */}
+                          {/* Sección Stock / Extras — legacy local */}
                           <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                            {esAlmacenConSecciones ? (
-                              puedeEditarArticulos ? (
-                                <select
-                                  value={item.seccion_id ?? ''}
-                                  onChange={(e) => handleQuickUpdate(item, 'seccion_id', e.target.value)}
-                                  disabled={actualizandoArt.has(item.id)}
-                                  className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border-0 cursor-pointer hover:bg-purple-200 focus:ring-2 focus:ring-purple-400 focus:outline-none disabled:opacity-50"
-                                >
-                                  <option value="">Sin sección</option>
-                                  {seccionesParaArticulo(item).map(s => (
-                                    <option key={s.id} value={s.id}>{s.nombre}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
-                                  {item.seccion?.nombre || 'Sin sección'}
-                                </span>
-                              )
+                            {puedeEditarArticulos && !esAlmacen ? (
+                              <select
+                                value={getSeccionArticulo(item)}
+                                onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
+                                className={`w-full px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:outline-none ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-400' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 focus:ring-emerald-400'}`}
+                                title="Cambiar entre Stock y Extras"
+                              >
+                                <option value="stock">📦 Stock</option>
+                                <option value="extras">✨ Extras</option>
+                              </select>
                             ) : (
-                              puedeEditarArticulos && !esAlmacen ? (
-                                <select
-                                  value={getSeccionArticulo(item)}
-                                  onChange={(e) => setSeccionArticulo(item.id, e.target.value)}
-                                  className={`w-full px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:outline-none ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-400' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 focus:ring-emerald-400'}`}
-                                  title="Cambiar entre Stock y Extras"
-                                >
-                                  <option value="stock">📦 Stock</option>
-                                  <option value="extras">✨ Extras</option>
-                                </select>
-                              ) : (
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                                  {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
-                                </span>
-                              )
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                {getSeccionArticulo(item) === 'extras' ? 'Extras' : 'Stock'}
+                              </span>
                             )}
                           </td>
 
