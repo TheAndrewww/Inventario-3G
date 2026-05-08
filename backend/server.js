@@ -103,6 +103,7 @@ import articulosRoutes from './src/routes/articulos.routes.js';
 import movimientosRoutes from './src/routes/movimientos.routes.js';
 import categoriasRoutes from './src/routes/categorias.routes.js';
 import seccionesRoutes from './src/routes/secciones.routes.js';
+import limpiezaHerramientasRoutes from './src/routes/limpiezaHerramientas.routes.js';
 import ubicacionesRoutes from './src/routes/ubicaciones.routes.js';
 import pedidosRoutes from './src/routes/pedidos.routes.js';
 import proveedoresRoutes from './src/routes/proveedores.routes.js';
@@ -205,6 +206,7 @@ app.get('/api/test-email', async (req, res) => {
 
 app.use('/api/categorias', categoriasRoutes);
 app.use('/api/secciones', seccionesRoutes);
+app.use('/api/admin', limpiezaHerramientasRoutes);
 app.use('/api/ubicaciones', ubicacionesRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/proveedores', proveedoresRoutes);
