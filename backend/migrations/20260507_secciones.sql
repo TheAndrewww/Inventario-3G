@@ -1,15 +1,35 @@
 -- Tabla secciones (CRUD por almacén) y FK seccion_id en articulos
 -- Idempotente: se puede ejecutar varias veces sin efectos secundarios.
 
+-- Sequelize tiene underscored: true globalmente, así que las columnas
+-- timestamps se nombran created_at y updated_at (snake_case).
 CREATE TABLE IF NOT EXISTS secciones (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     descripcion TEXT,
     almacen_id INTEGER NOT NULL REFERENCES almacenes(id) ON UPDATE CASCADE ON DELETE CASCADE,
     activo BOOLEAN DEFAULT TRUE,
-    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
+
+-- Si la tabla ya existía con columnas camelCase (de migración previa rota),
+-- renombrarlas a snake_case para alinear con Sequelize underscored: true.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'secciones' AND column_name = 'createdAt'
+    ) THEN
+        ALTER TABLE secciones RENAME COLUMN "createdAt" TO created_at;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'secciones' AND column_name = 'updatedAt'
+    ) THEN
+        ALTER TABLE secciones RENAME COLUMN "updatedAt" TO updated_at;
+    END IF;
+END $$;
 
 DO $$
 BEGIN
