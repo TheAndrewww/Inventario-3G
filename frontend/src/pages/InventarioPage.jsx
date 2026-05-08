@@ -1790,7 +1790,7 @@ const InventarioPage = () => {
           {seccionesAlmacen.length === 0 ? (
             <div className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center text-gray-500">
               No hay secciones definidas.
-              {esAdministrador && typeof almacenSeleccionado === 'number' && (
+              {esAdministrador && (
                 <div className="mt-4">
                   <button
                     onClick={() => handleAbrirModalSeccion()}
@@ -1845,7 +1845,7 @@ const InventarioPage = () => {
                   )}
                 </div>
               ))}
-              {esAdministrador && typeof almacenSeleccionado === 'number' && (
+              {esAdministrador && (
                 <button
                   onClick={() => handleAbrirModalSeccion()}
                   className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-6 md:p-8 hover:border-red-600 hover:bg-red-50 transition-colors flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-red-700"
@@ -1873,6 +1873,25 @@ const InventarioPage = () => {
           title={seccionEditando ? 'Editar Sección' : 'Nueva Sección'}
         >
           <div className="space-y-4">
+            {/* Selector de almacén destino: solo visible al crear desde modo Herramientas */}
+            {!seccionEditando && almacenSeleccionado === 'herramientas' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Almacén destino <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={almacenSeccionForm ?? ''}
+                  onChange={(e) => setAlmacenSeccionForm(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                  disabled={loadingSeccion}
+                >
+                  <option value="">Selecciona un almacén…</option>
+                  {almacenesDisponibles.map(a => (
+                    <option key={a.id} value={a.id}>{a.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Nombre de la sección <span className="text-red-600">*</span>
@@ -1899,7 +1918,7 @@ const InventarioPage = () => {
               <button
                 type="button"
                 onClick={handleGuardarSeccion}
-                disabled={loadingSeccion || !nombreSeccion.trim()}
+                disabled={loadingSeccion || !nombreSeccion.trim() || (!seccionEditando && !almacenSeccionForm)}
                 className="flex-1 px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loadingSeccion ? (
@@ -3568,6 +3587,24 @@ const InventarioPage = () => {
         title={seccionEditando ? 'Editar Sección' : 'Nueva Sección'}
       >
         <div className="space-y-4">
+          {!seccionEditando && almacenSeleccionado === 'herramientas' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Almacén destino <span className="text-red-600">*</span>
+              </label>
+              <select
+                value={almacenSeccionForm ?? ''}
+                onChange={(e) => setAlmacenSeccionForm(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                disabled={loadingSeccion}
+              >
+                <option value="">Selecciona un almacén…</option>
+                {almacenesDisponibles.map(a => (
+                  <option key={a.id} value={a.id}>{a.nombre}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Nombre de la sección <span className="text-red-600">*</span>
@@ -3577,7 +3614,7 @@ const InventarioPage = () => {
               value={nombreSeccion}
               onChange={(e) => setNombreSeccion(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              placeholder="Ej: Eléctrica, Mecánica, etc."
+              placeholder="Ej: Stock, Extras, Reservados…"
               disabled={loadingSeccion}
               autoFocus
             />
@@ -3594,7 +3631,7 @@ const InventarioPage = () => {
             <button
               type="button"
               onClick={handleGuardarSeccion}
-              disabled={loadingSeccion || !nombreSeccion.trim()}
+              disabled={loadingSeccion || !nombreSeccion.trim() || (!seccionEditando && !almacenSeccionForm)}
               className="flex-1 px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loadingSeccion ? (
