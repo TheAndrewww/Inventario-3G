@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { Articulo, Categoria, Ubicacion, Almacen, Proveedor, ArticuloProveedor, DetalleMovimiento, Movimiento, Usuario, SolicitudCompra, DetalleOrdenCompra, TipoHerramientaRenta, ChecklistItemArticulo, ConteoArticulo, AlmacenCategoria, Seccion } from '../models/index.js';
+import { Articulo, Categoria, Ubicacion, Almacen, Proveedor, ArticuloProveedor, DetalleMovimiento, Movimiento, Usuario, SolicitudCompra, DetalleOrdenCompra, TipoHerramientaRenta, ChecklistItemArticulo, ConteoArticulo, AlmacenCategoria } from '../models/index.js';
 
 /**
  * Elimina una categoría si se quedó sin SKUs activos y sin otras dependencias
@@ -113,12 +113,6 @@ export const getArticulos = async (req, res) => {
                             attributes: ['id', 'nombre'],
                             required: false
                         }]
-                    },
-                    {
-                        model: Seccion,
-                        as: 'seccion',
-                        attributes: ['id', 'nombre', 'almacen_id'],
-                        required: false
                     },
                     {
                         model: Proveedor,
@@ -791,7 +785,6 @@ export const updateArticulo = async (req, res) => {
             descripcion,
             categoria_id,
             ubicacion_id,
-            seccion_id,
             proveedor_id,
             proveedores_ids, // Nuevo: array de IDs de proveedores
             stock_actual,
@@ -878,7 +871,6 @@ export const updateArticulo = async (req, res) => {
             ...(descripcion !== undefined && { descripcion }),
             ...(categoria_id && { categoria_id }),
             ...(ubicacion_id && { ubicacion_id }),
-            ...(seccion_id !== undefined && { seccion_id: seccion_id || null }),
             ...(proveedor_id !== undefined && { proveedor_id }),
             ...(stock_actual !== undefined && { stock_actual }),
             ...(stock_minimo !== undefined && { stock_minimo }),
