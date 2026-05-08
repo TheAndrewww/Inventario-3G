@@ -1080,6 +1080,24 @@ const startServer = async () => {
             console.error('⚠️ Error con almacén Herramientas:', herrErr.message);
         }
 
+        // Conversión: cada UnidadHerramientaRenta se vuelve un SKU normal
+        // (Idempotente: solo crea SKUs para códigos que aún no existen)
+        try {
+            console.log('🔄 Convirtiendo unidades de herramienta de renta a SKUs...');
+            const fs = await import('fs');
+            const path = await import('path');
+            const { fileURLToPath } = await import('url');
+            const __filename = fileURLToPath(import.meta.url);
+            const __dirname = path.dirname(__filename);
+            const convPath = path.join(__dirname, 'migrations', '20260508_convertir_unidades_a_skus.sql');
+            const convSQL = fs.readFileSync(convPath, 'utf8');
+            await sequelize.query(convSQL);
+            console.log('✅ Conversión unidades→SKUs aplicada/verificada');
+        } catch (convErr) {
+            // Si las tablas ya fueron eliminadas en una FASE futura, esta migración fallará silenciosamente
+            console.log('ℹ️ Conversión unidades→SKUs omitida:', convErr.message?.substring(0, 100));
+        }
+
         // Tabla secciones (CRUD por almacén) + FK seccion_id en articulos
         try {
             console.log('🔍 Verificando tabla secciones...');
