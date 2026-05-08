@@ -559,8 +559,9 @@ const InventarioPage = () => {
           const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
           const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
           const matchesAlmacen = item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
-          // matchesSeccion: filtra por seccion_id si es número, o legacy stock/extras
-          const matchesSeccion = !seccionSeleccionada
+          // matchesSeccion: filtra por seccion_id si es número; 'todos' = sin filtro;
+          // legacy 'stock'/'extras' usa extrasIds local
+          const matchesSeccion = !seccionSeleccionada || seccionSeleccionada === 'todos'
             || (typeof seccionSeleccionada === 'number'
               ? item.seccion_id === seccionSeleccionada
               : getSeccionArticulo(item) === seccionSeleccionada);
@@ -614,8 +615,8 @@ const InventarioPage = () => {
         // Filtrar por almacén
         const matchesAlmacen = item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
 
-        // Filtrar por sección — número (BD) o 'stock'/'extras' (legacy)
-        const matchesSeccion = !seccionSeleccionada
+        // Filtrar por sección — número (BD), 'todos' (sin filtro), o legacy stock/extras
+        const matchesSeccion = !seccionSeleccionada || seccionSeleccionada === 'todos'
           || (typeof seccionSeleccionada === 'number'
             ? item.seccion_id === seccionSeleccionada
             : getSeccionArticulo(item) === seccionSeleccionada);
@@ -1837,7 +1838,13 @@ const InventarioPage = () => {
               )}
             </div>
           )}
-          <div className="mt-6 text-center">
+          <div className="mt-6 flex justify-center gap-3 flex-wrap">
+            <button
+              onClick={() => setSeccionSeleccionada('todos')}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors font-medium"
+            >
+              <Package size={16} /> Ver todos los artículos del almacén
+            </button>
             <button
               onClick={() => { setAlmacenSeleccionado(null); setSeccionSeleccionada(null); }}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
