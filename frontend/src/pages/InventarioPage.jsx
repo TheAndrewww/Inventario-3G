@@ -1710,37 +1710,34 @@ const InventarioPage = () => {
             <p className="text-gray-600">Elige un almacén o ve directamente a herramientas</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            {almacenesDisponibles.map((almacen) => (
-              <button
-                key={almacen.id}
-                onClick={() => { setAlmacenSeleccionado(almacen.id); setTabActivo('consumibles'); setSeccionSeleccionada(null); }}
-                className="group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-red-700 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
-              >
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-50 group-hover:bg-red-700 transition-colors flex items-center justify-center">
-                  <Package size={36} className="text-red-700 group-hover:text-white transition-colors" />
-                </div>
-                <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">
-                  {almacen.nombre}
-                </span>
-                {typeof almacen.articulos_count === 'number' && (
-                  <span className="text-sm text-gray-500">
-                    {almacen.articulos_count} artículo{almacen.articulos_count === 1 ? '' : 's'}
+            {almacenesDisponibles.map((almacen) => {
+              const esHerramientas = almacen.nombre === 'Herramientas';
+              return (
+                <button
+                  key={almacen.id}
+                  onClick={() => {
+                    setAlmacenSeleccionado(almacen.id);
+                    setTabActivo(esHerramientas ? 'herramientas' : 'consumibles');
+                    setSeccionSeleccionada(null);
+                  }}
+                  className={`group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 ${esHerramientas ? 'hover:border-blue-700' : 'hover:border-red-700'} hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4`}
+                >
+                  <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full ${esHerramientas ? 'bg-blue-50 group-hover:bg-blue-700' : 'bg-red-50 group-hover:bg-red-700'} transition-colors flex items-center justify-center`}>
+                    {esHerramientas
+                      ? <Wrench size={36} className="text-blue-700 group-hover:text-white transition-colors" />
+                      : <Package size={36} className="text-red-700 group-hover:text-white transition-colors" />}
+                  </div>
+                  <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">
+                    {almacen.nombre}
                   </span>
-                )}
-              </button>
-            ))}
-            <button
-              onClick={() => { setAlmacenSeleccionado('herramientas'); setTabActivo('herramientas'); setSeccionSeleccionada(null); }}
-              className="group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-blue-700 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
-            >
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-50 group-hover:bg-blue-700 transition-colors flex items-center justify-center">
-                <Wrench size={36} className="text-blue-700 group-hover:text-white transition-colors" />
-              </div>
-              <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">
-                Herramientas
-              </span>
-              <span className="text-sm text-gray-500">Todos los almacenes</span>
-            </button>
+                  {typeof almacen.articulos_count === 'number' && (
+                    <span className="text-sm text-gray-500">
+                      {almacen.articulos_count} artículo{almacen.articulos_count === 1 ? '' : 's'}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
           {almacenesDisponibles.length === 0 && (
             <div className="text-center text-gray-500 py-8">

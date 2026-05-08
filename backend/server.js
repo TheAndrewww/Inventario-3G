@@ -1064,6 +1064,22 @@ const startServer = async () => {
         //     console.error('⚠️ Error en reparación de aislamiento:', repErr.message);
         // }
 
+        // Crear almacén "Herramientas" entidad real y mover SKUs es_herramienta=true
+        try {
+            console.log('🔍 Verificando almacén "Herramientas"...');
+            const fs = await import('fs');
+            const path = await import('path');
+            const { fileURLToPath } = await import('url');
+            const __filename = fileURLToPath(import.meta.url);
+            const __dirname = path.dirname(__filename);
+            const herrPath = path.join(__dirname, 'migrations', '20260508_almacen_herramientas.sql');
+            const herrSQL = fs.readFileSync(herrPath, 'utf8');
+            await sequelize.query(herrSQL);
+            console.log('✅ Almacén Herramientas verificado/creado');
+        } catch (herrErr) {
+            console.error('⚠️ Error con almacén Herramientas:', herrErr.message);
+        }
+
         // Tabla secciones (CRUD por almacén) + FK seccion_id en articulos
         try {
             console.log('🔍 Verificando tabla secciones...');
