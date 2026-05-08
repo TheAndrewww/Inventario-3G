@@ -621,12 +621,7 @@ const InventarioPage = () => {
             ? item.seccion_id === seccionSeleccionada
             : getSeccionArticulo(item) === seccionSeleccionada);
 
-        // Filtrar por tipo según el tab activo
-        const estaEnTabCorrecto = tabActivo === 'consumibles'
-          ? !item.es_herramienta  // Consumibles: artículos que NO son herramientas
-          : item.es_herramienta;  // Herramientas: artículos que SÍ son herramientas
-
-        return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion && estaEnTabCorrecto;
+        return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion;
       })
       .sort((a, b) => {
         // Ordenar según la opción seleccionada
