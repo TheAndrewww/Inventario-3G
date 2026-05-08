@@ -612,14 +612,21 @@ export const createArticulo = async (req, res) => {
             });
         }
 
-        // Si se proporciona código, validarlo
+        // Si se proporciona código, validarlo (incluye desactivados — evita duplicados)
         if (codigo_ean13) {
-            // Verificar que el código no exista
             const articuloExistente = await Articulo.findOne({ where: { codigo_ean13 } });
             if (articuloExistente) {
                 return res.status(400).json({
                     success: false,
-                    message: `Ya existe un artículo con ese código ${tipoFinal}`
+                    message: articuloExistente.activo
+                        ? `Ya existe un artículo con ese código ${tipoFinal}: "${articuloExistente.nombre}"`
+                        : `Ya existe un artículo DESACTIVADO con ese código ${tipoFinal}: "${articuloExistente.nombre}". Reactívalo en lugar de crear uno nuevo.`,
+                    duplicado: true,
+                    articuloExistente: {
+                        id: articuloExistente.id,
+                        nombre: articuloExistente.nombre,
+                        activo: articuloExistente.activo
+                    }
                 });
             }
         }

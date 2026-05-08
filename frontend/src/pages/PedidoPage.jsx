@@ -294,12 +294,12 @@ const PedidoPage = () => {
       setBuscando(true);
       const articulos = await articulosService.getAll();
 
-      // Filtrar artículos localmente por nombre o código
+      // Filtrar artículos localmente por nombre o código — incluye DESACTIVADOS
+      // (para que se vean al buscar y se puedan reactivar/usar en lugar de duplicar)
       const resultados = articulos.filter(art => {
         const nombreMatch = art.nombre?.toLowerCase().includes(termino.toLowerCase());
         const codigoMatch = art.codigo_ean13?.includes(termino);
-        const activoMatch = art.activo !== false;
-        return (nombreMatch || codigoMatch) && activoMatch;
+        return nombreMatch || codigoMatch;
       });
 
       setResultadosBusqueda(resultados);
@@ -355,19 +355,14 @@ const PedidoPage = () => {
       }
 
       // Estrategia 2: Si no se encontró, buscar en todos los artículos por código
+      // (incluye desactivados para evitar duplicados / permitir reactivación)
       if (!articuloEncontrado) {
         const todosLosArticulos = await articulosService.getAll();
 
-        // Buscar por código_ean13 exacto (cualquier longitud)
-        articuloEncontrado = todosLosArticulos.find(art =>
-          art.codigo_ean13 === codigo && art.activo !== false
-        );
+        articuloEncontrado = todosLosArticulos.find(art => art.codigo_ean13 === codigo);
 
-        // Si aún no se encuentra, buscar por código que contenga el escaneado
         if (!articuloEncontrado) {
-          articuloEncontrado = todosLosArticulos.find(art =>
-            art.codigo_ean13?.includes(codigo) && art.activo !== false
-          );
+          articuloEncontrado = todosLosArticulos.find(art => art.codigo_ean13?.includes(codigo));
         }
       }
 
@@ -500,11 +495,12 @@ const PedidoPage = () => {
                         const imagenUrl = articulo.imagen_url
                           ? getImageUrl(articulo.imagen_url)
                           : null;
+                        const desactivado = articulo.activo === false;
 
                         return (
                           <div
                             key={articulo.id}
-                            className="p-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                            className={`p-3 hover:bg-gray-50 cursor-pointer transition-colors ${desactivado ? 'bg-gray-100 opacity-75' : ''}`}
                             onClick={() => handleAgregarArticulo(articulo)}
                           >
                             <div className="flex items-center gap-3">
@@ -512,7 +508,7 @@ const PedidoPage = () => {
                                 <img
                                   src={imagenUrl}
                                   alt={articulo.nombre}
-                                  className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
+                                  className={`w-12 h-12 object-cover rounded-lg flex-shrink-0 ${desactivado ? 'grayscale' : ''}`}
                                 />
                               ) : (
                                 <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
@@ -520,8 +516,9 @@ const PedidoPage = () => {
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-gray-900 text-sm truncate">
+                                <h4 className={`font-medium text-sm truncate ${desactivado ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                                   {articulo.nombre}
+                                  {desactivado && <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-gray-300 text-gray-700 no-underline">DESACTIVADO</span>}
                                 </h4>
                                 <p className="text-xs text-gray-500 truncate">
                                   {articulo.codigo_ean13} • Stock: {articulo.stock_actual}

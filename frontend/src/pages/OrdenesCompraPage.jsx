@@ -274,13 +274,13 @@ const OrdenesCompraPage = () => {
       setBuscandoArticulos(true);
       const articulos = await articulosService.getAll();
 
-      // Filtrar artículos localmente por nombre, código o categoría
+      // Filtrar artículos localmente por nombre, código o categoría — incluye DESACTIVADOS
+      // (para evitar crear duplicados de SKUs apagados; se marcan visualmente en la UI)
       const resultados = articulos.filter(art => {
         const nombreMatch = art.nombre?.toLowerCase().includes(termino.toLowerCase());
         const codigoMatch = art.codigo_ean13?.includes(termino);
         const categoriaMatch = art.categoria?.nombre?.toLowerCase().includes(termino.toLowerCase());
-        const activoMatch = art.activo !== false;
-        return (nombreMatch || codigoMatch || categoriaMatch) && activoMatch;
+        return nombreMatch || codigoMatch || categoriaMatch;
       });
 
       setArticulosBuscados(resultados);
@@ -1161,11 +1161,12 @@ const OrdenesCompraPage = () => {
                         const stockPorcentaje = (parseFloat(articulo.stock_actual) / parseFloat(articulo.stock_minimo || 1)) * 100;
                         const stockBajo = stockPorcentaje < 100;
                         const stockCritico = stockPorcentaje < 50;
+                        const desactivado = articulo.activo === false;
 
                         return (
                           <div
                             key={articulo.id}
-                            className={`p-2 hover:bg-gray-50 cursor-pointer transition-colors ${stockCritico ? 'bg-red-50' : stockBajo ? 'bg-orange-50' : ''
+                            className={`p-2 hover:bg-gray-50 cursor-pointer transition-colors ${desactivado ? 'bg-gray-100 opacity-75' : stockCritico ? 'bg-red-50' : stockBajo ? 'bg-orange-50' : ''
                               }`}
                             onClick={() => {
                               handleAbrirModalCrearSolicitudArticulo(articulo);
@@ -1178,7 +1179,7 @@ const OrdenesCompraPage = () => {
                                 <img
                                   src={articulo.imagen_url}
                                   alt={articulo.nombre}
-                                  className="w-10 h-10 object-cover rounded-lg flex-shrink-0"
+                                  className={`w-10 h-10 object-cover rounded-lg flex-shrink-0 ${desactivado ? 'grayscale' : ''}`}
                                   onError={(e) => { e.target.style.display = 'none'; }}
                                 />
                               ) : (
@@ -1187,8 +1188,9 @@ const OrdenesCompraPage = () => {
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-gray-900 text-sm truncate">
+                                <h4 className={`font-medium text-sm truncate ${desactivado ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                                   {articulo.nombre}
+                                  {desactivado && <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-gray-300 text-gray-700 no-underline">DESACTIVADO</span>}
                                 </h4>
                                 <p className="text-xs text-gray-500 truncate">
                                   {articulo.codigo_ean13 && `${articulo.codigo_ean13} • `}
