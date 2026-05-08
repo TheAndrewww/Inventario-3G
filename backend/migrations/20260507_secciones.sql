@@ -46,14 +46,14 @@ ALTER TABLE articulos
 
 -- Pre-popular Stock y Extras como secciones por defecto en cada almacén.
 -- Idempotente: solo crea las que faltan.
-INSERT INTO secciones (nombre, almacen_id, activo, "createdAt", "updatedAt")
+INSERT INTO secciones (nombre, almacen_id, activo, created_at, updated_at)
 SELECT 'Stock', a.id, true, NOW(), NOW()
 FROM almacenes a
 WHERE NOT EXISTS (
     SELECT 1 FROM secciones s WHERE s.almacen_id = a.id AND s.nombre = 'Stock'
 );
 
-INSERT INTO secciones (nombre, almacen_id, activo, "createdAt", "updatedAt")
+INSERT INTO secciones (nombre, almacen_id, activo, created_at, updated_at)
 SELECT 'Extras', a.id, true, NOW(), NOW()
 FROM almacenes a
 WHERE NOT EXISTS (
