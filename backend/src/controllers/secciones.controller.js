@@ -31,12 +31,20 @@ export const getSecciones = async (req, res) => {
                 order: [['nombre', 'ASC']]
             });
         } catch (includeErr) {
-            // Fallback: si el include falla (asociación no cargada o tabla recién creada), responder sin él
-            console.log('⚠️ getSecciones fallback sin include:', includeErr.message?.substring(0, 100));
-            secciones = await Seccion.findAll({
-                where,
-                order: [['nombre', 'ASC']]
-            });
+            console.log('⚠️ getSecciones fallback sin include:', includeErr.message?.substring(0, 200));
+            try {
+                secciones = await Seccion.findAll({
+                    where,
+                    order: [['nombre', 'ASC']]
+                });
+            } catch (basicErr) {
+                console.error('❌ getSecciones fallback básico también falló:', basicErr.message);
+                // Si la tabla no existe, devolver array vacío en lugar de 500
+                if (basicErr.message?.includes('does not exist') || basicErr.original?.code === '42P01') {
+                    return res.status(200).json({ success: true, data: { secciones: [] }, warning: 'Tabla secciones no existe todavía' });
+                }
+                throw basicErr;
+            }
         }
 
         res.status(200).json({
@@ -48,7 +56,10 @@ export const getSecciones = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al obtener secciones',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            // Exponer mensaje real para diagnóstico (temporal — quitar después de resolver)
+            error: error.message,
+            errorCode: error.original?.code,
+            errorTable: error.original?.table
         });
     }
 };
