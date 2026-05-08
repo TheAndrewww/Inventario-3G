@@ -23,11 +23,21 @@ export const getSecciones = async (req, res) => {
         const where = {};
         if (almacen_id) where.almacen_id = almacen_id;
 
-        const secciones = await Seccion.findAll({
-            where,
-            include: [{ model: Almacen, as: 'almacen_ref', attributes: ['id', 'nombre'], required: false }],
-            order: [['nombre', 'ASC']]
-        });
+        let secciones;
+        try {
+            secciones = await Seccion.findAll({
+                where,
+                include: [{ model: Almacen, as: 'almacen_ref', attributes: ['id', 'nombre'], required: false }],
+                order: [['nombre', 'ASC']]
+            });
+        } catch (includeErr) {
+            // Fallback: si el include falla (asociación no cargada o tabla recién creada), responder sin él
+            console.log('⚠️ getSecciones fallback sin include:', includeErr.message?.substring(0, 100));
+            secciones = await Seccion.findAll({
+                where,
+                order: [['nombre', 'ASC']]
+            });
+        }
 
         res.status(200).json({
             success: true,
