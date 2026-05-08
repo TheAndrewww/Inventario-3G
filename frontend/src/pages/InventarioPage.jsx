@@ -1848,6 +1848,53 @@ const InventarioPage = () => {
             </button>
           </div>
         </div>
+
+        {/* Modal de Sección — disponible también en el sub-gate */}
+        <Modal
+          isOpen={modalSeccionOpen}
+          onClose={handleCerrarModalSeccion}
+          title={seccionEditando ? 'Editar Sub-almacén' : 'Nuevo Sub-almacén'}
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nombre del sub-almacén <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={nombreSeccion}
+                onChange={(e) => setNombreSeccion(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
+                placeholder="Ej: Stock, Extras, Reservados…"
+                disabled={loadingSeccion}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3 pt-4 border-t">
+              <button
+                type="button"
+                onClick={handleCerrarModalSeccion}
+                disabled={loadingSeccion}
+                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleGuardarSeccion}
+                disabled={loadingSeccion || !nombreSeccion.trim()}
+                className="flex-1 px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loadingSeccion ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Guardando...
+                  </>
+                ) : (seccionEditando ? 'Actualizar' : 'Crear') + ' Sub-almacén'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     );
   }
