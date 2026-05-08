@@ -1380,14 +1380,25 @@ const InventarioPage = () => {
     try {
       setLoadingSeccion(true);
       if (seccionEditando) {
-        await seccionesService.update(seccionEditando.id, { nombre: nombreSeccion.trim() });
-        toast.success('Sección actualizada');
+        const actualizada = await seccionesService.update(seccionEditando.id, { nombre: nombreSeccion.trim() });
+        // Actualización optimista local
+        const updateFn = (s) => s.id === seccionEditando.id ? { ...s, nombre: nombreSeccion.trim() } : s;
+        setSecciones(prev => prev.map(updateFn));
+        setTodasSecciones(prev => prev.map(updateFn));
+        toast.success('Sub-almacén actualizado');
       } else {
-        await seccionesService.create({ nombre: nombreSeccion.trim(), almacen_id: almacenDestino });
-        toast.success('Sección creada');
+        const nueva = await seccionesService.create({ nombre: nombreSeccion.trim(), almacen_id: almacenDestino });
+        // Actualización optimista local
+        if (nueva && nueva.id) {
+          if (typeof almacenSeleccionado === 'number' && almacenSeleccionado === almacenDestino) {
+            setSecciones(prev => [...prev, nueva].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+          }
+          setTodasSecciones(prev => [...prev, nueva].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+        }
+        toast.success('Sub-almacén creado');
       }
       handleCerrarModalSeccion();
-      // Refrescar lista filtrada y global
+      // Resincronizar con el backend en segundo plano
       if (typeof almacenSeleccionado === 'number') {
         fetchSecciones(almacenSeleccionado);
       } else {
@@ -1396,16 +1407,20 @@ const InventarioPage = () => {
       fetchTodasSecciones();
     } catch (error) {
       console.error(error);
-      toast.error(error.message || 'Error al guardar sección');
+      toast.error(error.message || 'Error al guardar sub-almacén');
     } finally {
       setLoadingSeccion(false);
     }
   };
 
   const handleEliminarSeccion = async (seccion) => {
+    const removeFn = (prev) => prev.filter(s => s.id !== seccion.id);
     try {
       await seccionesService.delete(seccion.id, false);
-      toast.success('Sección eliminada');
+      toast.success('Sub-almacén eliminado');
+      // Actualización optimista local
+      setSecciones(removeFn);
+      setTodasSecciones(removeFn);
       fetchSecciones(almacenSeleccionado);
       fetchTodasSecciones();
       if (seccionSeleccionada === seccion.id) setSeccionSeleccionada(null);
@@ -1414,17 +1429,19 @@ const InventarioPage = () => {
         if (window.confirm(`⚠️ ${error.message}\n\n¿Continuar?`)) {
           try {
             await seccionesService.delete(seccion.id, true);
-            toast.success('Sección eliminada');
+            toast.success('Sub-almacén eliminado');
+            setSecciones(removeFn);
+            setTodasSecciones(removeFn);
             fetchSecciones(almacenSeleccionado);
             fetchTodasSecciones();
             fetchArticulos();
             if (seccionSeleccionada === seccion.id) setSeccionSeleccionada(null);
           } catch (e2) {
-            toast.error(e2.message || 'Error al eliminar sección');
+            toast.error(e2.message || 'Error al eliminar sub-almacén');
           }
         }
       } else {
-        toast.error(error.message || 'Error al eliminar sección');
+        toast.error(error.message || 'Error al eliminar sub-almacén');
       }
     }
   };
