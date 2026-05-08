@@ -48,28 +48,6 @@ ALTER TABLE articulos
 CREATE INDEX IF NOT EXISTS idx_articulos_seccion_id ON articulos(seccion_id);
 CREATE INDEX IF NOT EXISTS idx_secciones_almacen_id ON secciones(almacen_id);
 
--- Pre-popular Stock y Extras como secciones por defecto en cada almacén.
--- Idempotente: solo crea las que faltan.
-INSERT INTO secciones (nombre, almacen_id, activo, created_at, updated_at)
-SELECT 'Stock', a.id, true, NOW(), NOW()
-FROM almacenes a
-WHERE NOT EXISTS (
-    SELECT 1 FROM secciones s WHERE s.almacen_id = a.id AND s.nombre = 'Stock'
-);
-
-INSERT INTO secciones (nombre, almacen_id, activo, created_at, updated_at)
-SELECT 'Extras', a.id, true, NOW(), NOW()
-FROM almacenes a
-WHERE NOT EXISTS (
-    SELECT 1 FROM secciones s WHERE s.almacen_id = a.id AND s.nombre = 'Extras'
-);
-
--- Asignar SKUs sin seccion_id a la sección "Stock" de su almacén.
--- Sólo afecta a artículos con seccion_id NULL — preserva asignaciones existentes.
-UPDATE articulos a
-SET seccion_id = s.id
-FROM ubicaciones u, secciones s
-WHERE a.ubicacion_id = u.id
-    AND s.almacen_id = u.almacen_id
-    AND s.nombre = 'Stock'
-    AND a.seccion_id IS NULL;
+-- NO se pre-poblan secciones por defecto. Cada almacén empieza sin secciones
+-- y el administrador las crea desde la UI. Las secciones son INDEPENDIENTES
+-- por almacén — no se comparten ni duplican entre almacenes.
