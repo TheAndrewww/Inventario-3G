@@ -26,6 +26,7 @@ const ALL_MENU_ITEMS = [
   { path: '/conteo-ciclico', icon: ClipboardCheck, label: 'Conteo Cíclico', roles: ['administrador', 'almacen', 'encargado'] },
   { path: '/descontar-almacen', icon: PackageOpen, label: 'Descuento Almacén', roles: ['administrador', 'encargado'] },
   { path: '/rollos-membrana', icon: Layers, label: 'Rollos Membrana', roles: ['administrador', 'encargado'] },
+  { path: '/renta-herramientas', icon: Wrench, label: 'Renta Herramientas', roles: ['administrador', 'encargado', 'almacen'] },
   { path: '/reportes', icon: BarChart3, label: 'Reportes', roles: ['administrador', 'encargado'] },
 ];
 
