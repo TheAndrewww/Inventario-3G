@@ -43,8 +43,8 @@ const formatearCantidad = (cantidad, unidad) => {
 };
 
 const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'stockTotal', 'seccion', 'unidad', 'acciones'];
-const DEFAULT_COL_WIDTHS = { articulo: 280, categoria: 130, ubicacion: 150, stockTotal: 110, seccion: 140, unidad: 90, acciones: 220 };
-const STORAGE_KEY_COL_WIDTHS = 'inventario_col_widths_v2';
+const DEFAULT_COL_WIDTHS = { articulo: 300, categoria: 140, ubicacion: 140, stockTotal: 100, seccion: 130, unidad: 80, acciones: 240 };
+const STORAGE_KEY_COL_WIDTHS = 'inventario_col_widths_v3';
 const STORAGE_KEY_EXTRAS = 'inventario_extras_v1';
 
 const InventarioPage = () => {
@@ -2350,22 +2350,24 @@ const InventarioPage = () => {
                           }`}
                       >
                         {/* Artículo con imagen */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
+                        <td className="px-4 py-3 overflow-hidden">
+                          <div className="flex items-center gap-3 min-w-0">
                             {imagenUrl ? (
                               <img
                                 src={imagenUrl}
                                 alt={item.nombre}
-                                className="w-10 h-10 object-cover rounded-lg"
+                                className="w-9 h-9 object-cover rounded-lg flex-shrink-0"
                               />
                             ) : (
-                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
+                              <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
                                 📦
                               </div>
                             )}
-                            <div>
-                              <div className="font-medium text-gray-900">{item.nombre}</div>
-                              <div className="text-sm text-gray-500">{item.descripcion}</div>
+                            <div className="min-w-0 overflow-hidden">
+                              <div className="font-medium text-gray-900 truncate">{item.nombre}</div>
+                              {item.descripcion && (
+                                <div className="text-xs text-gray-400 truncate">{item.descripcion}</div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -2573,39 +2575,41 @@ const InventarioPage = () => {
                             }`}
                         >
                           {/* Artículo con imagen y botón expandir */}
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
+                          <td className="px-4 py-3 overflow-hidden">
+                            <div className="flex items-center gap-2 min-w-0">
                               <button
                                 onClick={(e) => handleToggleHerramienta(item.id, e)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                                className="text-gray-400 hover:text-gray-600 transition-colors p-1 flex-shrink-0"
                                 disabled={cargandoUnidades}
                               >
                                 {cargandoUnidades ? (
                                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
                                 ) : estaExpandida ? (
-                                  <ChevronUp size={20} />
+                                  <ChevronUp size={18} />
                                 ) : (
-                                  <ChevronDown size={20} />
+                                  <ChevronDown size={18} />
                                 )}
                               </button>
                               <div
-                                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                                className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0 overflow-hidden"
                                 onClick={() => handleVerDetalle(item)}
                               >
                                 {imagenUrl ? (
                                   <img
                                     src={imagenUrl}
                                     alt={item.nombre}
-                                    className="w-10 h-10 object-cover rounded-lg"
+                                    className="w-9 h-9 object-cover rounded-lg flex-shrink-0"
                                   />
                                 ) : (
-                                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
+                                  <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
                                     🔧
                                   </div>
                                 )}
-                                <div>
-                                  <div className="font-medium text-gray-900">{item.nombre}</div>
-                                  <div className="text-sm text-gray-500">{item.descripcion}</div>
+                                <div className="min-w-0 overflow-hidden">
+                                  <div className="font-medium text-gray-900 truncate">{item.nombre}</div>
+                                  {item.descripcion && (
+                                    <div className="text-xs text-gray-400 truncate">{item.descripcion}</div>
+                                  )}
                                 </div>
                               </div>
                             </div>
