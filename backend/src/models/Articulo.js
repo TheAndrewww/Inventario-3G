@@ -151,8 +151,99 @@ const Articulo = sequelize.define('Articulo', {
         }
     ],
     hooks: {
-        // Hook afterUpdate de sincronización de unidades_herramienta_renta eliminado
-        // (sistema de renta de herramientas deprecado).
+        afterUpdate: async (articulo, options) => {
+            if (!articulo.es_herramienta || !articulo.changed('stock_actual')) {
+                return;
+            }
+
+            try {
+                const { TipoHerramientaRenta, UnidadHerramientaRenta } = await import('./index.js');
+                const { Op } = await import('sequelize');
+
+                const tipoHerramienta = await TipoHerramientaRenta.findOne({
+                    where: { articulo_origen_id: articulo.id, activo: true }
+                });
+
+                if (!tipoHerramienta) {
+                    console.log(`⚠️ Hook: No hay tipo de herramienta para artículo ${articulo.id}`);
+                    return;
+                }
+
+                const unidadesActivas = await UnidadHerramientaRenta.count({
+                    where: { tipo_herramienta_id: tipoHerramienta.id, activo: true }
+                });
+
+                const nuevoStock = parseInt(articulo.stock_actual);
+                const diferencia = nuevoStock - unidadesActivas;
+
+                console.log(`🔄 Hook afterUpdate: Stock=${nuevoStock}, Activas=${unidadesActivas}, Diferencia=${diferencia}`);
+
+                if (diferencia > 0) {
+                    const prefijo = tipoHerramienta.prefijo_codigo;
+
+                    const ultimaUnidad = await UnidadHerramientaRenta.findOne({
+                        where: { codigo_unico: { [Op.like]: `${prefijo}-%` } },
+                        order: [['codigo_unico', 'DESC']]
+                    });
+
+                    let numeroInicial = 1;
+                    if (ultimaUnidad) {
+                        const match = ultimaUnidad.codigo_unico.match(/-(\d+)$/);
+                        if (match) numeroInicial = parseInt(match[1]) + 1;
+                    }
+
+                    for (let i = 0; i < diferencia; i++) {
+                        const numeroActual = numeroInicial + i;
+                        const codigoUnico = `${prefijo}-${numeroActual.toString().padStart(3, '0')}`;
+
+                        await UnidadHerramientaRenta.create({
+                            tipo_herramienta_id: tipoHerramienta.id,
+                            codigo_unico: codigoUnico,
+                            estado: 'buen_estado',
+                            activo: true
+                        }, { transaction: options.transaction });
+
+                        console.log(`   ✅ Hook: Creada unidad ${codigoUnico}`);
+                    }
+
+                    await tipoHerramienta.update({
+                        total_unidades: nuevoStock,
+                        unidades_disponibles: tipoHerramienta.unidades_disponibles + diferencia
+                    }, { transaction: options.transaction });
+
+                } else if (diferencia < 0) {
+                    const unidadesSobran = Math.abs(diferencia);
+
+                    const unidadesParaDesactivar = await UnidadHerramientaRenta.findAll({
+                        where: {
+                            tipo_herramienta_id: tipoHerramienta.id,
+                            activo: true,
+                            estado: { [Op.ne]: 'asignada' }
+                        },
+                        order: [['id', 'DESC']],
+                        limit: unidadesSobran
+                    });
+
+                    for (const unidad of unidadesParaDesactivar) {
+                        await unidad.update({
+                            activo: false,
+                            observaciones: `Desactivada automáticamente al reducir stock de ${unidadesActivas} a ${nuevoStock}`
+                        }, { transaction: options.transaction });
+
+                        console.log(`   ❌ Hook: Desactivada unidad ${unidad.codigo_unico}`);
+                    }
+
+                    const unidadesDisponiblesRestantes = Math.max(0, tipoHerramienta.unidades_disponibles - unidadesParaDesactivar.length);
+                    await tipoHerramienta.update({
+                        total_unidades: nuevoStock,
+                        unidades_disponibles: unidadesDisponiblesRestantes
+                    }, { transaction: options.transaction });
+                }
+
+            } catch (error) {
+                console.error('⚠️ Error en hook afterUpdate de Articulo:', error.message);
+            }
+        }
     }
 });
 

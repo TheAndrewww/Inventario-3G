@@ -52,7 +52,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
     stock_minimo: '',
     stock_maximo: '',
     unidad: 'piezas',
-    costo_unitario: ''
+    costo_unitario: '',
+    es_herramienta: false
   });
 
   // Estado para múltiples proveedores
@@ -100,7 +101,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
           stock_minimo: articulo.stock_minimo || '',
           stock_maximo: articulo.stock_maximo || '',
           unidad: articulo.unidad || 'piezas',
-          costo_unitario: articulo.costo_unitario || ''
+          costo_unitario: articulo.costo_unitario || '',
+          es_herramienta: articulo.es_herramienta || false
         });
 
         // Pre-seleccionar el almacén basado en la ubicación del artículo
@@ -150,7 +152,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
           stock_minimo: '',
           stock_maximo: '',
           unidad: 'piezas',
-          costo_unitario: ''
+          costo_unitario: '',
+          es_herramienta: false
         });
         setCurrentImageUrl(null);
         setSelectedImage(null);
@@ -620,7 +623,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         stock_minimo: esAlmacen ? 0 : parseFloat(formData.stock_minimo),
         stock_maximo: formData.stock_maximo ? parseFloat(formData.stock_maximo) : null,
         unidad: formData.unidad.toUpperCase(),
-        costo_unitario: parseFloat(formData.costo_unitario) || 0
+        costo_unitario: parseFloat(formData.costo_unitario) || 0,
+        es_herramienta: formData.es_herramienta || false
       };
 
       // Agregar proveedores si se seleccionaron
@@ -710,6 +714,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         stock_maximo: '',
         unidad: 'piezas',
         costo_unitario: '',
+        es_herramienta: false
       });
       setSelectedImage(null);
       setCurrentImageUrl(null);
@@ -764,6 +769,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         stock_maximo: '',
         unidad: 'piezas',
         costo_unitario: '',
+        es_herramienta: false
       });
       setSelectedImage(null);
       setCurrentImageUrl(null);
@@ -1512,6 +1518,23 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                 </div>
               )}
             </div>
+
+            {/* Checkbox es_herramienta — solo administrador */}
+            {user?.rol === 'administrador' && (
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="es_herramienta"
+                  name="es_herramienta"
+                  checked={formData.es_herramienta || false}
+                  onChange={(e) => setFormData(prev => ({ ...prev, es_herramienta: e.target.checked }))}
+                  className="w-4 h-4 text-blue-600 rounded"
+                />
+                <label htmlFor="es_herramienta" className="text-sm font-medium text-blue-800 cursor-pointer">
+                  🔧 Es una herramienta (crea unidades individuales rastreables)
+                </label>
+              </div>
+            )}
 
             {!isEdit && !formData.codigo_ean13 && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
