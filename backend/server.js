@@ -421,6 +421,17 @@ const startServer = async () => {
                 console.log('⚠️ No se pudo verificar/agregar es_premium:', e.message);
             }
 
+            // Verificar columnas herreria_armado_completado / herreria_pintado_completado
+            try {
+                await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS herreria_armado_completado BOOLEAN DEFAULT FALSE NOT NULL");
+                await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS herreria_pintado_completado BOOLEAN DEFAULT FALSE NOT NULL");
+                // Backfill: si herreria ya estaba completada en proyectos viejos, marcar ambos subpasos como true
+                await sequelize.query("UPDATE produccion_proyectos SET herreria_armado_completado = TRUE, herreria_pintado_completado = TRUE WHERE herreria_completado = TRUE AND (herreria_armado_completado = FALSE OR herreria_pintado_completado = FALSE)");
+                console.log('✅ Columnas herreria_armado/pintado verificadas');
+            } catch (e) {
+                console.log('⚠️ No se pudo verificar/agregar herreria_armado/pintado:', e.message);
+            }
+
             // Auto-crear tablas de checklist si no existen
             try {
                 await sequelize.query(`
@@ -678,6 +689,16 @@ const startServer = async () => {
                     console.log('🔄 Agregando columna es_premium...');
                     await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN es_premium BOOLEAN DEFAULT FALSE NOT NULL");
                     console.log('✅ Columna es_premium agregada');
+                }
+
+                // Verificar columnas herreria_armado_completado / herreria_pintado_completado
+                try {
+                    await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS herreria_armado_completado BOOLEAN DEFAULT FALSE NOT NULL");
+                    await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS herreria_pintado_completado BOOLEAN DEFAULT FALSE NOT NULL");
+                    await sequelize.query("UPDATE produccion_proyectos SET herreria_armado_completado = TRUE, herreria_pintado_completado = TRUE WHERE herreria_completado = TRUE AND (herreria_armado_completado = FALSE OR herreria_pintado_completado = FALSE)");
+                    console.log('✅ Columnas herreria_armado/pintado verificadas');
+                } catch (e) {
+                    console.log('⚠️ No se pudo verificar/agregar herreria_armado/pintado:', e.message);
                 }
             }
 

@@ -263,12 +263,12 @@ export const regresarEtapa = async (req, res) => {
 export const completarSubEtapa = async (req, res) => {
     try {
         const { id } = req.params;
-        const { subEtapa } = req.body; // 'manufactura' o 'herreria'
+        const { subEtapa } = req.body; // 'manufactura' | 'herreria' | 'herreria_armado' | 'herreria_pintado'
 
-        if (!subEtapa || !['manufactura', 'herreria'].includes(subEtapa)) {
+        if (!subEtapa || !['manufactura', 'herreria', 'herreria_armado', 'herreria_pintado'].includes(subEtapa)) {
             return res.status(400).json({
                 success: false,
-                message: 'Sub-etapa inválida. Use "manufactura" o "herreria"'
+                message: 'Sub-etapa inválida. Use "manufactura", "herreria", "herreria_armado" o "herreria_pintado"'
             });
         }
 
@@ -292,7 +292,13 @@ export const completarSubEtapa = async (req, res) => {
 
         const resultado = await proyecto.completarSubEtapaProduccion(subEtapa, usuarioId);
 
-        const nombreSubEtapa = subEtapa === 'manufactura' ? 'Manufactura' : 'Herrería';
+        const nombresSubEtapa = {
+            manufactura: 'Manufactura',
+            herreria: 'Herrería',
+            herreria_armado: 'Herrería - Armado',
+            herreria_pintado: 'Herrería - Pintado'
+        };
+        const nombreSubEtapa = nombresSubEtapa[subEtapa] || subEtapa;
 
         console.log(`✅ ${nombreSubEtapa} completada para "${proyecto.nombre}"`);
 
@@ -528,6 +534,12 @@ export const toggleEtapa = async (req, res) => {
             if (config.bool) proyecto[config.bool] = false;
         }
 
+        // Mantener consistencia entre herreria y sus sub-sub-etapas armado/pintado
+        if (etapa === 'herreria') {
+            proyecto.herreria_armado_completado = !!completado;
+            proyecto.herreria_pintado_completado = !!completado;
+        }
+
         // Al marcar/desmarcar "Preparado" (instalacion), propagar a las sub-etapas
         // paralelas para que los dashboards de manufactura/herrería queden consistentes.
         if (etapa === 'instalacion') {
@@ -542,6 +554,8 @@ export const toggleEtapa = async (req, res) => {
                     proyecto.herreria_completado_en = ahora;
                     proyecto.herreria_completado_por = usuarioId;
                 }
+                proyecto.herreria_armado_completado = true;
+                proyecto.herreria_pintado_completado = true;
             } else {
                 proyecto.manufactura_completado = false;
                 proyecto.manufactura_completado_en = null;
@@ -549,6 +563,8 @@ export const toggleEtapa = async (req, res) => {
                 proyecto.herreria_completado = false;
                 proyecto.herreria_completado_en = null;
                 proyecto.herreria_completado_por = null;
+                proyecto.herreria_armado_completado = false;
+                proyecto.herreria_pintado_completado = false;
             }
         }
 

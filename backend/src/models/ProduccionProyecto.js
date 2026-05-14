@@ -204,6 +204,21 @@ const ProduccionProyecto = sequelize.define('ProduccionProyecto', {
         comment: 'Usuario que marcó Herrería como completado'
     },
 
+    // Sub-sub-etapas de Herrería: Armado y Pintado.
+    // herreria_completado pasa a true automáticamente cuando ambos están en true.
+    herreria_armado_completado: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Si Herrería - Armado completó'
+    },
+    herreria_pintado_completado: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Si Herrería - Pintado completó'
+    },
+
     // ===== Integración con Google Drive =====
     drive_folder_id: {
         type: DataTypes.STRING(100),
@@ -454,8 +469,24 @@ ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEt
         this.herreria_completado = true;
         this.herreria_completado_en = ahora;
         this.herreria_completado_por = usuarioId;
+        // Asegurar consistencia con sub-sub-etapas
+        this.herreria_armado_completado = true;
+        this.herreria_pintado_completado = true;
+    } else if (subEtapa === 'herreria_armado' || subEtapa === 'herreria_pintado') {
+        const campo = subEtapa === 'herreria_armado' ? 'herreria_armado_completado' : 'herreria_pintado_completado';
+        if (this[campo]) {
+            const nombre = subEtapa === 'herreria_armado' ? 'Armado' : 'Pintado';
+            throw new Error(`Herrería - ${nombre} ya está completado`);
+        }
+        this[campo] = true;
+        // Auto-marcar herrería completa cuando ambos sub-sub-pasos están listos
+        if (this.herreria_armado_completado && this.herreria_pintado_completado && !this.herreria_completado) {
+            this.herreria_completado = true;
+            this.herreria_completado_en = ahora;
+            this.herreria_completado_por = usuarioId;
+        }
     } else {
-        throw new Error('Sub-etapa inválida. Use "manufactura" o "herreria"');
+        throw new Error('Sub-etapa inválida. Use "manufactura", "herreria", "herreria_armado" o "herreria_pintado"');
     }
 
     await this.save();
