@@ -24,12 +24,12 @@ import { flattenProyectos, sortProyectosPorUrgencia } from '../utils/produccion'
 import toast, { Toaster } from 'react-hot-toast';
 
 // ─── Configuración de etapas ───
-// Herrería se subdivide en dos sub-pasos: Armado y Pintado. Cuando ambos están
+// Herrería se subdivide en dos sub-pasos: Soldadura y Pintura. Cuando ambos están
 // completos, la herrería queda como completada en el dashboard.
 const ETAPAS_FLOW = [
     { key: 'manufactura', label: 'Mfra', icon: Scissors, color: '#F59E0B', bgClass: 'bg-amber-50', textClass: 'text-amber-700', borderClass: 'border-amber-200', isSubEtapa: true },
-    { key: 'herreria_armado', label: 'Armado', icon: Hammer, color: '#EF4444', bgClass: 'bg-red-50', textClass: 'text-red-700', borderClass: 'border-red-200', isSubEtapa: true, parent: 'herreria' },
-    { key: 'herreria_pintado', label: 'Pintado', icon: Paintbrush, color: '#B91C1C', bgClass: 'bg-red-50', textClass: 'text-red-700', borderClass: 'border-red-200', isSubEtapa: true, parent: 'herreria' },
+    { key: 'herreria_armado', label: 'Soldadura', icon: Hammer, color: '#EF4444', bgClass: 'bg-red-50', textClass: 'text-red-700', borderClass: 'border-red-200', isSubEtapa: true, parent: 'herreria' },
+    { key: 'herreria_pintado', label: 'Pintura', icon: Paintbrush, color: '#B91C1C', bgClass: 'bg-red-50', textClass: 'text-red-700', borderClass: 'border-red-200', isSubEtapa: true, parent: 'herreria' },
 ];
 
 // Orden de etapas para determinar si están completadas

@@ -295,8 +295,8 @@ export const completarSubEtapa = async (req, res) => {
         const nombresSubEtapa = {
             manufactura: 'Manufactura',
             herreria: 'Herrería',
-            herreria_armado: 'Herrería - Armado',
-            herreria_pintado: 'Herrería - Pintado'
+            herreria_armado: 'Herrería - Soldadura',
+            herreria_pintado: 'Herrería - Pintura'
         };
         const nombreSubEtapa = nombresSubEtapa[subEtapa] || subEtapa;
 

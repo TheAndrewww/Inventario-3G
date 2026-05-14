@@ -475,7 +475,7 @@ ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEt
     } else if (subEtapa === 'herreria_armado' || subEtapa === 'herreria_pintado') {
         const campo = subEtapa === 'herreria_armado' ? 'herreria_armado_completado' : 'herreria_pintado_completado';
         if (this[campo]) {
-            const nombre = subEtapa === 'herreria_armado' ? 'Armado' : 'Pintado';
+            const nombre = subEtapa === 'herreria_armado' ? 'Soldadura' : 'Pintura';
             throw new Error(`Herrería - ${nombre} ya está completado`);
         }
         this[campo] = true;
