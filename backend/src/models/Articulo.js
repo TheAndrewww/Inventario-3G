@@ -151,6 +151,20 @@ const Articulo = sequelize.define('Articulo', {
         }
     ],
     hooks: {
+        // Regla: si stock_minimo es 0, el artículo queda desactivado automáticamente.
+        // Aplica a todo create/update vía Sequelize (independiente del almacén).
+        beforeCreate: (articulo) => {
+            const stockMin = parseFloat(articulo.stock_minimo);
+            if (!isNaN(stockMin) && stockMin === 0) {
+                articulo.activo = false;
+            }
+        },
+        beforeUpdate: (articulo) => {
+            const stockMin = parseFloat(articulo.stock_minimo);
+            if (!isNaN(stockMin) && stockMin === 0) {
+                articulo.activo = false;
+            }
+        },
         afterUpdate: async (articulo, options) => {
             if (!articulo.es_herramienta || !articulo.changed('stock_actual')) {
                 return;

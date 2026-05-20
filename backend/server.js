@@ -432,6 +432,22 @@ const startServer = async () => {
                 console.log('⚠️ No se pudo verificar/agregar herreria_armado/pintado:', e.message);
             }
 
+            // Regla de negocio: artículos con stock_minimo = 0 quedan desactivados.
+            // El hook beforeCreate/beforeUpdate del modelo cubre los futuros;
+            // este UPDATE alinea los existentes al arrancar (idempotente).
+            try {
+                const [, meta] = await sequelize.query(
+                    "UPDATE articulos SET activo = false WHERE stock_minimo = 0 AND activo = true"
+                );
+                if (meta?.rowCount > 0) {
+                    console.log(`✅ Regla stock_minimo=0: ${meta.rowCount} artículos desactivados`);
+                } else {
+                    console.log('✅ Regla stock_minimo=0: nada que desactivar');
+                }
+            } catch (e) {
+                console.log('⚠️ No se pudo aplicar regla stock_minimo=0:', e.message);
+            }
+
             // Auto-crear tablas de checklist si no existen
             try {
                 await sequelize.query(`
