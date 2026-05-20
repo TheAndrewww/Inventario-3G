@@ -368,15 +368,6 @@ const InventarioPage = () => {
     return grupos;
   }, [todasUbicaciones]);
 
-  // Categorías filtradas para el almacén del artículo (evita duplicados/inexistentes en el select inline)
-  const categoriasParaArticulo = (item) => {
-    const almacenId = item?.ubicacion?.almacen_id
-      ?? item?.ubicacion?.almacen_ref?.id
-      ?? (typeof almacenSeleccionado === 'number' ? almacenSeleccionado : null);
-    if (!almacenId) return todasCategorias;
-    return todasCategorias.filter(c => c.almacen_id === almacenId);
-  };
-
   // Helper: hay un almacén seleccionado donde aplican las secciones
   const esAlmacenConSecciones = React.useMemo(() => {
     return typeof almacenSeleccionado === 'number';
@@ -2016,7 +2007,7 @@ const InventarioPage = () => {
                 className="appearance-none pl-9 pr-8 py-2 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-700 text-left min-w-[180px] truncate"
               >
                 {categoriaSeleccionada
-                  ? (categorias.find(c => c.id === categoriaSeleccionada)?.nombre || 'Todas las categorías')
+                  ? (todasCategorias.find(c => c.id === categoriaSeleccionada)?.nombre || 'Todas las categorías')
                   : 'Todas las categorías'}
               </button>
               <Package size={16} className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-500 pointer-events-none" />
@@ -2031,10 +2022,10 @@ const InventarioPage = () => {
                     Todas las categorías
                   </button>
                   <div className="border-t border-gray-200" />
-                  {categorias.length === 0 ? (
+                  {todasCategorias.length === 0 ? (
                     <div className="px-3 py-3 text-sm text-gray-500 text-center">No hay categorías</div>
                   ) : (
-                    categorias.map((cat) => (
+                    todasCategorias.map((cat) => (
                       <div
                         key={cat.id}
                         className={`flex items-center justify-between gap-2 hover:bg-gray-50 ${categoriaSeleccionada === cat.id ? 'bg-red-50' : ''}`}
@@ -2076,7 +2067,7 @@ const InventarioPage = () => {
                       </div>
                     ))
                   )}
-                  {esAdministrador && categorias.length > 0 && (
+                  {esAdministrador && todasCategorias.length > 0 && (
                     <>
                       <div className="border-t border-gray-200" />
                       <button
@@ -2382,7 +2373,7 @@ const InventarioPage = () => {
                               className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border-0 cursor-pointer hover:bg-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none disabled:opacity-50"
                             >
                               <option value="">Sin categoría</option>
-                              {categoriasParaArticulo(item).map(c => (
+                              {todasCategorias.map(c => (
                                 <option key={c.id} value={c.id}>{c.nombre}</option>
                               ))}
                             </select>
@@ -2625,7 +2616,7 @@ const InventarioPage = () => {
                                 className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border-0 cursor-pointer hover:bg-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none disabled:opacity-50"
                               >
                                 <option value="">Sin categoría</option>
-                                {categoriasParaArticulo(item).map(c => (
+                                {todasCategorias.map(c => (
                                   <option key={c.id} value={c.id}>{c.nombre}</option>
                                 ))}
                               </select>
