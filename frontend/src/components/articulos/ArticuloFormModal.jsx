@@ -305,12 +305,17 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       toast.error('Ingresa el código de la ubicación');
       return;
     }
+    if (!almacenSeleccionadoForm) {
+      toast.error('Selecciona un almacén antes de crear la ubicación');
+      return;
+    }
 
     try {
       setCreandoUbicacion(true);
       const response = await ubicacionesService.create({
         codigo: nuevaUbicacionData.codigo.trim().toUpperCase(),
-        descripcion: nuevaUbicacionData.descripcion.trim().toUpperCase() || 'Sin descripción'
+        descripcion: nuevaUbicacionData.descripcion.trim().toUpperCase() || 'Sin descripción',
+        almacen_id: parseInt(almacenSeleccionadoForm, 10)
       });
 
       const nuevaUbicacion = response;
