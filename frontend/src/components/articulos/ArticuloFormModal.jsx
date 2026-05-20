@@ -351,12 +351,17 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       toast.error('Ingresa el nombre de la categoría');
       return;
     }
+    if (!almacenSeleccionadoForm) {
+      toast.error('Selecciona un almacén antes de crear la categoría');
+      return;
+    }
 
     try {
       setCreandoCategoria(true);
       const response = await categoriasService.create({
         nombre: nuevaCategoriaData.nombre.trim().toUpperCase(),
-        descripcion: nuevaCategoriaData.descripcion.trim().toUpperCase() || 'Sin descripción'
+        descripcion: nuevaCategoriaData.descripcion.trim().toUpperCase() || 'Sin descripción',
+        almacen_id: parseInt(almacenSeleccionadoForm, 10)
       });
 
       const nuevaCategoria = response;
