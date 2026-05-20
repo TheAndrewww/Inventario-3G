@@ -6,9 +6,7 @@ import { sequelize } from '../config/database.js';
 // Si una sección/almacén no existe en BD o no tiene artículos elegibles, esa cuota se SALTA
 // (no se compensa con otra). El total del día puede ser menor a la suma teórica.
 const CUOTAS_CONTEO = [
-    { etiqueta: 'Principal / Stock', almacenNombre: 'Principal', seccionNombre: 'Stock', cantidad: 10 },
-    { etiqueta: 'Principal / Extras', almacenNombre: 'Principal', seccionNombre: 'Extras', cantidad: 1 },
-    { etiqueta: 'Herramientas', almacenNombre: 'Herramientas', seccionNombre: null, cantidad: 1 }
+    { etiqueta: 'Principal / Stock', almacenNombre: 'Principal', seccionNombre: 'Stock', cantidad: 10 }
 ];
 const ARTICULOS_POR_DIA = CUOTAS_CONTEO.reduce((s, c) => s + c.cantidad, 0);
 
