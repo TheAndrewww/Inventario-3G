@@ -1,8 +1,16 @@
-import { ConteoCiclico, ConteoArticulo, Articulo, Categoria, Ubicacion, Movimiento, DetalleMovimiento } from '../models/index.js';
+import { ConteoCiclico, ConteoArticulo, Articulo, Categoria, Ubicacion, Movimiento, DetalleMovimiento, Almacen, Seccion } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
-const ARTICULOS_POR_DIA = 20;
+// Cuotas del conteo diario por (almacén, sección).
+// Si una sección/almacén no existe en BD o no tiene artículos elegibles, esa cuota se SALTA
+// (no se compensa con otra). El total del día puede ser menor a la suma teórica.
+const CUOTAS_CONTEO = [
+    { etiqueta: 'Principal / Stock', almacenNombre: 'Principal', seccionNombre: 'Stock', cantidad: 10 },
+    { etiqueta: 'Principal / Extras', almacenNombre: 'Principal', seccionNombre: 'Extras', cantidad: 1 },
+    { etiqueta: 'Herramientas', almacenNombre: 'Herramientas', seccionNombre: null, cantidad: 1 }
+];
+const ARTICULOS_POR_DIA = CUOTAS_CONTEO.reduce((s, c) => s + c.cantidad, 0);
 
 // ============ HELPERS ============
 
@@ -12,56 +20,92 @@ const getFechaHoy = () => {
     return now.toISOString().split('T')[0];
 };
 
-// Seleccionar artículos para un nuevo conteo, excluyendo los ya contados hoy
+// Resolver los IDs de artículos elegibles para una cuota (por almacén y opcionalmente sección).
+// Devuelve [] si no se encuentra el almacén/sección o no hay artículos.
+const obtenerIdsElegiblesParaCuota = async (cuota) => {
+    const almacen = await Almacen.findOne({
+        where: { nombre: { [Op.iLike]: cuota.almacenNombre } }
+    });
+    if (!almacen) {
+        console.warn(`⚠️ Conteo cíclico: almacén "${cuota.almacenNombre}" no existe en BD — cuota ${cuota.etiqueta} se salta`);
+        return [];
+    }
+
+    const ubicaciones = await Ubicacion.findAll({
+        where: { almacen_id: almacen.id },
+        attributes: ['id']
+    });
+    const ubicacionIds = ubicaciones.map(u => u.id);
+    if (ubicacionIds.length === 0) return [];
+
+    const where = { activo: true, ubicacion_id: { [Op.in]: ubicacionIds } };
+
+    if (cuota.seccionNombre) {
+        const seccion = await Seccion.findOne({
+            where: { nombre: { [Op.iLike]: cuota.seccionNombre }, almacen_id: almacen.id }
+        });
+        if (!seccion) {
+            console.warn(`⚠️ Conteo cíclico: sección "${cuota.seccionNombre}" no existe en almacén ${cuota.almacenNombre} — cuota ${cuota.etiqueta} se salta`);
+            return [];
+        }
+        where.seccion_id = seccion.id;
+    }
+
+    const arts = await Articulo.findAll({ where, attributes: ['id'], order: [['id', 'ASC']] });
+    return arts.map(a => a.id);
+};
+
+// Seleccionar artículos para un nuevo conteo, aplicando cuotas por (almacén, sección).
+// idsExcluir: artículos ya contados hoy en sesiones previas del mismo día.
 const seleccionarArticulosParaConteo = async (idsExcluir = []) => {
-    // Obtener todos los artículos ya contados ALGUNA VEZ
+    // Mapa: articulo_id → último conteo (toda la historia)
     const todosConteos = await ConteoArticulo.findAll({
         attributes: ['articulo_id', [sequelize.fn('MAX', sequelize.col('contado_at')), 'ultimo_conteo']],
         group: ['articulo_id']
     });
-
     const contadoMap = {};
     todosConteos.forEach(c => {
         contadoMap[c.articulo_id] = c.get('ultimo_conteo');
     });
 
-    // Obtener todos los artículos activos
-    const todosArticulos = await Articulo.findAll({
-        where: { activo: true },
-        attributes: ['id'],
-        order: [['id', 'ASC']]
-    });
+    const excluirSet = new Set(idsExcluir);
+    const seleccionadosTotal = [];
 
-    // Separar en: nunca contados vs ya contados (excluyendo los de hoy)
-    const nuncaContados = [];
-    const yaContados = [];
+    // Tomar por cuota: nunca contados primero, luego los de último conteo más antiguo
+    for (const cuota of CUOTAS_CONTEO) {
+        const idsElegibles = await obtenerIdsElegiblesParaCuota(cuota);
 
-    todosArticulos.forEach(art => {
-        if (idsExcluir.includes(art.id)) return; // ya contado HOY, skip
-        if (!contadoMap[art.id]) {
-            nuncaContados.push(art.id);
-        } else {
-            yaContados.push({ id: art.id, ultimoConteo: contadoMap[art.id] });
+        const nuncaContados = [];
+        const yaContados = [];
+        idsElegibles.forEach(id => {
+            if (excluirSet.has(id)) return;
+            if (!contadoMap[id]) nuncaContados.push(id);
+            else yaContados.push({ id, ultimoConteo: contadoMap[id] });
+        });
+        yaContados.sort((a, b) => new Date(a.ultimoConteo) - new Date(b.ultimoConteo));
+
+        const seleccionadosCuota = [];
+        for (const id of nuncaContados) {
+            if (seleccionadosCuota.length >= cuota.cantidad) break;
+            seleccionadosCuota.push(id);
         }
-    });
+        for (const item of yaContados) {
+            if (seleccionadosCuota.length >= cuota.cantidad) break;
+            seleccionadosCuota.push(item.id);
+        }
 
-    // Ordenar los ya contados por fecha de último conteo (más antiguos primero)
-    yaContados.sort((a, b) => new Date(a.ultimoConteo) - new Date(b.ultimoConteo));
+        if (seleccionadosCuota.length < cuota.cantidad) {
+            console.warn(`⚠️ Conteo cíclico: cuota "${cuota.etiqueta}" pidió ${cuota.cantidad} pero solo hay ${seleccionadosCuota.length} disponibles — se salta el resto sin compensar`);
+        }
 
-    // Seleccionar artículos: primero los nunca contados, luego los más antiguos
-    const seleccionados = [];
-
-    for (const id of nuncaContados) {
-        if (seleccionados.length >= ARTICULOS_POR_DIA) break;
-        seleccionados.push(id);
+        // Evitar duplicados entre cuotas (por si compartieran artículos)
+        seleccionadosCuota.forEach(id => {
+            if (!seleccionadosTotal.includes(id)) seleccionadosTotal.push(id);
+        });
+        seleccionadosCuota.forEach(id => excluirSet.add(id));
     }
 
-    for (const item of yaContados) {
-        if (seleccionados.length >= ARTICULOS_POR_DIA) break;
-        seleccionados.push(item.id);
-    }
-
-    return seleccionados;
+    return seleccionadosTotal;
 };
 
 // Obtener IDs de todos los artículos contados hoy (en todos los conteos del día)
@@ -176,67 +220,16 @@ export const getArticulosPendientes = async (req, res) => {
             });
         }
 
-        // Obtener IDs de artículos ya contados en ESTA sesión
+        // IDs ya contados en ESTA sesión (no reasignar)
         const articulosContados = await ConteoArticulo.findAll({
             where: { conteo_ciclico_id: id },
             attributes: ['articulo_id']
         });
         const idsContados = articulosContados.map(ca => ca.articulo_id);
 
-        // Obtener todos los artículos ya contados ALGUNA VEZ (para saber cuáles asignar)
-        const todosConteos = await ConteoArticulo.findAll({
-            attributes: ['articulo_id', [sequelize.fn('MAX', sequelize.col('contado_at')), 'ultimo_conteo']],
-            group: ['articulo_id']
-        });
-        const contadoMap = {};
-        todosConteos.forEach(c => {
-            contadoMap[c.articulo_id] = c.get('ultimo_conteo');
-        });
-
-        // Obtener todos los artículos activos
-        const whereArticulo = { activo: true };
-
-        if (search && search.trim()) {
-            whereArticulo[Op.or] = [
-                { nombre: { [Op.iLike]: `%${search}%` } },
-                { codigo_ean13: { [Op.iLike]: `%${search}%` } },
-                { sku: { [Op.iLike]: `%${search}%` } }
-            ];
-        }
-
-        const todosArticulos = await Articulo.findAll({
-            where: whereArticulo,
-            attributes: ['id'],
-            order: [['id', 'ASC']]
-        });
-
-        // Separar y priorizar
-        const nuncaContados = [];
-        const yaContadosList = [];
-
-        todosArticulos.forEach(art => {
-            if (idsContados.includes(art.id)) return; // ya contado HOY, skip
-            if (!contadoMap[art.id]) {
-                nuncaContados.push(art.id);
-            } else {
-                yaContadosList.push({ id: art.id, ultimoConteo: contadoMap[art.id] });
-            }
-        });
-
-        yaContadosList.sort((a, b) => new Date(a.ultimoConteo) - new Date(b.ultimoConteo));
-
-        // Seleccionar los que faltan por contar hoy
-        const faltantes = conteo.total_asignados - idsContados.length;
-        const seleccionados = [];
-
-        for (const id of nuncaContados) {
-            if (seleccionados.length >= faltantes) break;
-            seleccionados.push(id);
-        }
-        for (const item of yaContadosList) {
-            if (seleccionados.length >= faltantes) break;
-            seleccionados.push(item.id);
-        }
+        // Selección por cuotas (mismo criterio que al crear la sesión).
+        // Excluimos los ya contados en esta sesión para que vayan apareciendo solo los faltantes.
+        const seleccionados = await seleccionarArticulosParaConteo(idsContados);
 
         // Obtener datos completos de los seleccionados
         let articulos = [];
