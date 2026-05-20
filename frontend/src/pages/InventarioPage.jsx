@@ -2113,7 +2113,7 @@ const InventarioPage = () => {
               >
                 {ubicacionSeleccionada
                   ? (() => {
-                      const ub = ubicaciones.find(u => u.id === ubicacionSeleccionada);
+                      const ub = todasUbicaciones.find(u => u.id === ubicacionSeleccionada);
                       return ub ? (ub.codigo || ub.nombre) : 'Todas las ubicaciones';
                     })()
                   : 'Todas las ubicaciones'}
@@ -2130,10 +2130,10 @@ const InventarioPage = () => {
                     Todas las ubicaciones
                   </button>
                   <div className="border-t border-gray-200" />
-                  {ubicaciones.length === 0 ? (
+                  {todasUbicaciones.length === 0 ? (
                     <div className="px-3 py-3 text-sm text-gray-500 text-center">No hay ubicaciones</div>
                   ) : (
-                    ubicaciones.map((ub) => (
+                    todasUbicaciones.map((ub) => (
                       <div
                         key={ub.id}
                         className={`flex items-center justify-between gap-2 hover:bg-gray-50 ${ubicacionSeleccionada === ub.id ? 'bg-red-50' : ''}`}
@@ -2175,7 +2175,7 @@ const InventarioPage = () => {
                       </div>
                     ))
                   )}
-                  {esAdministrador && ubicaciones.length > 0 && (
+                  {esAdministrador && todasUbicaciones.length > 0 && (
                     <>
                       <div className="border-t border-gray-200" />
                       <button
@@ -3852,7 +3852,7 @@ const InventarioPage = () => {
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
             >
               <option value="todos">Todas las ubicaciones</option>
-              {ubicaciones.filter(u => u.activo !== false).map(ubicacion => (
+              {todasUbicaciones.filter(u => u.activo !== false).map(ubicacion => (
                 <option key={ubicacion.id} value={ubicacion.id}>
                   {ubicacion.codigo} - {ubicacion.almacen}
                 </option>
