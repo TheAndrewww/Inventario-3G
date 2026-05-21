@@ -8,15 +8,31 @@ import { Op } from 'sequelize';
 
 /**
  * GET /api/mi-equipo
- * Obtiene el dashboard personal del usuario autenticado
- * - Herramientas asignadas
- * - Camionetas a cargo (si es encargado)
- * - Alertas de stock mínimo
+ * Obtiene el dashboard personal del usuario autenticado.
+ * El administrador puede pasar ?usuario_id=N para ver el equipo de otro usuario.
  */
 export const obtenerMiEquipo = async (req, res) => {
     try {
-        const usuarioId = req.usuario.id;
-        const usuarioRol = req.usuario.rol;
+        const requesterId = req.usuario.id;
+        const requesterRol = req.usuario.rol;
+
+        // Admin puede inspeccionar el equipo de otro usuario vía ?usuario_id
+        let usuarioId = requesterId;
+        let usuarioNombre = req.usuario.nombre;
+        let usuarioRol = requesterRol;
+        const usuarioIdQuery = req.query.usuario_id ? parseInt(req.query.usuario_id, 10) : null;
+        if (usuarioIdQuery && usuarioIdQuery !== requesterId) {
+            if (requesterRol !== 'administrador') {
+                return res.status(403).json({ success: false, message: 'Solo el administrador puede ver el equipo de otros usuarios' });
+            }
+            const objetivo = await Usuario.findByPk(usuarioIdQuery, { attributes: ['id', 'nombre', 'rol', 'activo'] });
+            if (!objetivo || objetivo.activo === false) {
+                return res.status(404).json({ success: false, message: 'Usuario objetivo no encontrado' });
+            }
+            usuarioId = objetivo.id;
+            usuarioNombre = objetivo.nombre;
+            usuarioRol = objetivo.rol;
+        }
 
         // 1. Obtener herramientas asignadas al usuario
         let herramientasAsignadas = [];
@@ -101,7 +117,7 @@ export const obtenerMiEquipo = async (req, res) => {
             data: {
                 usuario: {
                     id: usuarioId,
-                    nombre: req.usuario.nombre,
+                    nombre: usuarioNombre,
                     rol: usuarioRol
                 },
                 stats,
@@ -117,6 +133,52 @@ export const obtenerMiEquipo = async (req, res) => {
             message: 'Error al obtener información personal',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
+    }
+};
+
+/**
+ * GET /api/mi-equipo/usuarios-con-equipo
+ * Lista de usuarios con herramientas o camionetas asignadas. Solo admin.
+ * Útil para que el admin pueda seleccionar de quién ver el equipo.
+ */
+export const listarUsuariosConEquipo = async (req, res) => {
+    try {
+        if (req.usuario.rol !== 'administrador') {
+            return res.status(403).json({ success: false, message: 'Solo administrador' });
+        }
+
+        // Usuarios con herramientas asignadas
+        const conHerramientas = await UnidadHerramientaRenta.findAll({
+            where: { activo: true, usuario_asignado_id: { [Op.ne]: null } },
+            attributes: ['usuario_asignado_id'],
+            group: ['usuario_asignado_id']
+        }).catch(() => []);
+
+        // Usuarios encargados de camionetas
+        const conCamionetas = await Camioneta.findAll({
+            where: { activo: true, encargado_id: { [Op.ne]: null } },
+            attributes: ['encargado_id'],
+            group: ['encargado_id']
+        }).catch(() => []);
+
+        const idsSet = new Set();
+        conHerramientas.forEach(u => u.usuario_asignado_id && idsSet.add(u.usuario_asignado_id));
+        conCamionetas.forEach(c => c.encargado_id && idsSet.add(c.encargado_id));
+
+        if (idsSet.size === 0) {
+            return res.json({ success: true, data: { usuarios: [] } });
+        }
+
+        const usuarios = await Usuario.findAll({
+            where: { id: { [Op.in]: [...idsSet] }, activo: true },
+            attributes: ['id', 'nombre', 'email', 'rol'],
+            order: [['nombre', 'ASC']]
+        });
+
+        res.json({ success: true, data: { usuarios } });
+    } catch (error) {
+        console.error('Error al listar usuarios con equipo:', error);
+        res.status(500).json({ success: false, message: 'Error al listar usuarios' });
     }
 };
 

@@ -19,22 +19,34 @@ import toast from 'react-hot-toast';
 
 const MiEquipoPage = () => {
     const { user } = useAuth();
+    const esAdmin = user?.rol === 'administrador';
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [usuariosDisponibles, setUsuariosDisponibles] = useState([]);
+    const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(''); // '' = mi propio equipo
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        fetchData(usuarioSeleccionado || null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [usuarioSeleccionado]);
 
-    const fetchData = async () => {
+    useEffect(() => {
+        if (esAdmin) {
+            miEquipoService.listarUsuariosConEquipo()
+                .then(setUsuariosDisponibles)
+                .catch(() => setUsuariosDisponibles([]));
+        }
+    }, [esAdmin]);
+
+    const fetchData = async (usuarioId = null) => {
         try {
             setLoading(true);
-            const response = await miEquipoService.obtenerMiEquipo();
+            const response = await miEquipoService.obtenerMiEquipo(usuarioId);
             setData(response);
         } catch (error) {
             console.error('Error al cargar datos:', error);
-            toast.error('Error al cargar tus datos');
+            toast.error('Error al cargar los datos');
         } finally {
             setLoading(false);
         }
@@ -42,7 +54,7 @@ const MiEquipoPage = () => {
 
     const handleRefresh = async () => {
         setRefreshing(true);
-        await fetchData();
+        await fetchData(usuarioSeleccionado || null);
         setRefreshing(false);
         toast.success('Datos actualizados');
     };
@@ -65,30 +77,53 @@ const MiEquipoPage = () => {
         return <Loader fullScreen />;
     }
 
-    const { stats, herramientas, camionetas } = data || { stats: {}, herramientas: [], camionetas: [] };
+    const { stats, herramientas, camionetas, usuario: usuarioVisto } = data || { stats: {}, herramientas: [], camionetas: [], usuario: null };
+    const viendoOtro = esAdmin && usuarioSeleccionado && usuarioVisto && usuarioVisto.id !== user?.id;
 
     return (
         <div className="p-6 max-w-6xl mx-auto">
             {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
                         <User className="text-red-700" size={32} />
-                        Mi Equipo
+                        {viendoOtro ? `Equipo de ${usuarioVisto.nombre}` : 'Mi Equipo'}
                     </h1>
                     <p className="text-gray-600 mt-1">
-                        Bienvenido, <span className="font-medium">{user?.nombre}</span>
+                        {viendoOtro ? (
+                            <>Viendo como administrador · rol del usuario: <span className="font-medium capitalize">{usuarioVisto.rol}</span></>
+                        ) : (
+                            <>Bienvenido, <span className="font-medium">{user?.nombre}</span></>
+                        )}
                     </p>
                 </div>
-                <Button
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    variant="secondary"
-                    className="flex items-center gap-2"
-                >
-                    <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
-                    Actualizar
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap">
+                    {esAdmin && (
+                        <select
+                            value={usuarioSeleccionado}
+                            onChange={(e) => setUsuarioSeleccionado(e.target.value)}
+                            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-700"
+                            title="Ver el equipo de otro usuario"
+                        >
+                            <option value="">Mi propio equipo</option>
+                            {usuariosDisponibles.length > 0 && <option disabled>──────────</option>}
+                            {usuariosDisponibles.map(u => (
+                                <option key={u.id} value={u.id}>
+                                    {u.nombre} ({u.rol})
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                    <Button
+                        onClick={handleRefresh}
+                        disabled={refreshing}
+                        variant="secondary"
+                        className="flex items-center gap-2"
+                    >
+                        <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+                        Actualizar
+                    </Button>
+                </div>
             </div>
 
             {/* Estadísticas */}
@@ -96,7 +131,7 @@ const MiEquipoPage = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-500">Mis Herramientas</p>
+                            <p className="text-sm text-gray-500">{viendoOtro ? 'Herramientas' : 'Mis Herramientas'}</p>
                             <p className="text-3xl font-bold text-gray-900">{stats.totalHerramientas || 0}</p>
                         </div>
                         <div className="p-3 bg-blue-100 rounded-xl">
@@ -113,7 +148,7 @@ const MiEquipoPage = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-500">Mis Camionetas</p>
+                            <p className="text-sm text-gray-500">{viendoOtro ? 'Camionetas' : 'Mis Camionetas'}</p>
                             <p className="text-3xl font-bold text-gray-900">{stats.totalCamionetas || 0}</p>
                         </div>
                         <div className="p-3 bg-purple-100 rounded-xl">
@@ -152,14 +187,14 @@ const MiEquipoPage = () => {
                 <div className="px-6 py-4 border-b border-gray-200">
                     <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                         <Wrench size={20} className="text-blue-600" />
-                        Mis Herramientas Asignadas
+                        {viendoOtro ? 'Herramientas Asignadas' : 'Mis Herramientas Asignadas'}
                     </h2>
                 </div>
                 <div className="p-4">
                     {herramientas.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
                             <Package size={48} className="mx-auto mb-3 opacity-50" />
-                            <p>No tienes herramientas asignadas</p>
+                            <p>{viendoOtro ? `${usuarioVisto?.nombre} no tiene herramientas asignadas` : 'No tienes herramientas asignadas'}</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -212,7 +247,7 @@ const MiEquipoPage = () => {
                     <div className="px-6 py-4 border-b border-gray-200">
                         <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                             <Truck size={20} className="text-purple-600" />
-                            Mis Camionetas a Cargo
+                            {viendoOtro ? 'Camionetas a Cargo' : 'Mis Camionetas a Cargo'}
                         </h2>
                     </div>
                     <div className="p-4">
