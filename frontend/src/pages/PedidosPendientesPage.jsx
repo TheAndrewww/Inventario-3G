@@ -157,147 +157,163 @@ const PedidosPendientesPage = () => {
         <p className="text-gray-500 mt-1">Gestiona y prepara los tickets de materiales</p>
       </div>
 
-      {pedidos.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <ClipboardList size={64} className="mx-auto mb-4 text-gray-300" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay tickets pendientes</h3>
-          <p className="text-gray-500">Todos los tickets han sido completados</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
-          {pedidos.map((pedido) => (
-            <div
-              key={pedido.id}
-              className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => handleVerDetalle(pedido)}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-bold text-gray-900">
-                      {pedido.ubicacionDestino ? (
-                        <>
-                          {pedido.ubicacionDestino.almacen.includes('Camioneta') ? '🚛' : '📦'} {pedido.ubicacionDestino.almacen}
-                        </>
-                      ) : (
-                        pedido.proyecto || 'Sin especificar'
-                      )}
-                    </h3>
-                    <span className="px-3 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
-                      Pendiente
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Columna izquierda: Pendientes */}
+        <section>
+          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <ClipboardList size={22} className="text-orange-600" />
+            Pendientes
+            <span className="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+              {pedidos.length}
+            </span>
+          </h2>
+
+          {pedidos.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm p-10 text-center">
+              <ClipboardList size={48} className="mx-auto mb-3 text-gray-300" />
+              <h3 className="text-base font-medium text-gray-900 mb-1">No hay tickets pendientes</h3>
+              <p className="text-sm text-gray-500">Todos los tickets han sido completados</p>
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-[calc(100vh-220px)] overflow-y-auto pr-2">
+              {pedidos.map((pedido) => (
+                <div
+                  key={pedido.id}
+                  className="bg-white rounded-xl shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => handleVerDetalle(pedido)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <h3 className="text-base font-bold text-gray-900 truncate">
+                          {pedido.ubicacionDestino ? (
+                            <>
+                              {pedido.ubicacionDestino.almacen.includes('Camioneta') ? '🚛' : '📦'} {pedido.ubicacionDestino.almacen}
+                            </>
+                          ) : (
+                            pedido.proyecto || 'Sin especificar'
+                          )}
+                        </h3>
+                        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                          Pendiente
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <ClipboardList size={14} />
+                          <span className="font-mono">{pedido.ticket_id}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <User size={14} />
+                          <span>{pedido.usuario?.nombre || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar size={14} />
+                          <span>{new Date(pedido.fecha_hora).toLocaleDateString('es-MX')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-1.5 text-xs">
+                      <span className="text-gray-600">Progreso de preparación</span>
+                      <span className="font-semibold text-gray-900">
+                        {pedido.progreso_dispersion || 0}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all ${getProgresoColor(pedido.progreso_dispersion || 0)}`}
+                        style={{ width: `${pedido.progreso_dispersion || 0}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-xs text-gray-600">
+                      {pedido.detalles?.length || 0} artículos
+                    </span>
+                    <button className="text-red-700 hover:text-red-900 text-sm font-medium">
+                      Ver Checklist →
+                    </button>
+                  </div>
+
+                  {pedido.observaciones && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <p className="text-xs text-gray-500 font-medium mb-1">Observaciones:</p>
+                      <p className="text-xs text-gray-600 whitespace-pre-line line-clamp-2">{pedido.observaciones}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Columna derecha: Completados */}
+        <section>
+          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <CheckCircle size={22} className="text-green-600" />
+            Completados
+            <span className="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+              {pedidosCompletados.length}
+            </span>
+          </h2>
+
+          {pedidosCompletados.length === 0 ? (
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-10 text-center">
+              <CheckCircle size={48} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-sm text-gray-500 font-medium">No hay tickets completados recientes</p>
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-[calc(100vh-220px)] overflow-y-auto pr-2">
+              {pedidosCompletados.map((pedido) => (
+                <div
+                  key={pedido.id}
+                  className="bg-white border border-gray-200 rounded-xl p-4 hover:border-green-300 transition-colors cursor-pointer"
+                  onClick={() => handleVerDetalle(pedido)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 flex-shrink-0">
+                        <CheckCircle size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-gray-900 truncate" title={pedido.ubicacionDestino?.almacen || pedido.proyecto}>
+                          {pedido.ubicacionDestino?.almacen || pedido.proyecto || 'Sin especificar'}
+                        </h4>
+                        <p className="text-xs font-mono text-gray-500">{pedido.ticket_id}</p>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded-full flex-shrink-0">
+                      Completado
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <ClipboardList size={16} />
-                      <span className="font-mono">{pedido.ticket_id}</span>
+
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-600">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <User size={13} className="text-gray-400 flex-shrink-0" />
+                      <span className="truncate">Solicitó: {pedido.usuario?.nombre || 'N/A'}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <User size={16} />
-                      <span>{pedido.usuario?.nombre || 'N/A'}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <CheckSquare size={13} className="text-gray-400 flex-shrink-0" />
+                      <span className="truncate">Preparó: {pedido.detalles?.[0]?.dispersadoPor?.nombre || 'N/A'}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar size={16} />
-                      <span>{new Date(pedido.fecha_hora).toLocaleDateString('es-MX')}</span>
+                    <div className="flex items-center gap-1.5">
+                      <Calendar size={13} className="text-gray-400 flex-shrink-0" />
+                      <span>{new Date(pedido.updated_at || pedido.fecha_hora).toLocaleDateString('es-MX')}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Package size={13} className="text-gray-400 flex-shrink-0" />
+                      <span className="font-semibold">{pedido.detalles?.length || 0} artículos</span>
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="mb-3">
-                <div className="flex items-center justify-between mb-2 text-sm">
-                  <span className="text-gray-600">Progreso de preparación</span>
-                  <span className="font-semibold text-gray-900">
-                    {pedido.progreso_dispersion || 0}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div
-                    className={`h-2.5 rounded-full transition-all ${getProgresoColor(pedido.progreso_dispersion || 0)}`}
-                    style={{ width: `${pedido.progreso_dispersion || 0}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">
-                  {pedido.detalles?.length || 0} artículos totales
-                </span>
-                <button className="text-red-700 hover:text-red-900 font-medium">
-                  Ver Checklist →
-                </button>
-              </div>
-
-              {pedido.observaciones && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs text-gray-500 font-medium mb-1">Observaciones:</p>
-                  <p className="text-sm text-gray-600 whitespace-pre-line">{pedido.observaciones}</p>
-                </div>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Sección de Tickets Completados */}
-      <div className="mt-8 border-t border-gray-200 pt-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <CheckCircle size={24} className="text-green-600" />
-           Últimos Tickets Completados
-        </h2>
-
-        {pedidosCompletados.length === 0 ? (
-          <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
-            <CheckCircle size={48} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">No hay tickets completados recientes</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pedidosCompletados.map((pedido) => (
-              <div 
-                key={pedido.id} 
-                className="bg-white border border-gray-200 rounded-xl p-4 hover:border-green-300 transition-colors cursor-pointer"
-                onClick={() => handleVerDetalle(pedido)}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700">
-                      <CheckCircle size={16} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-gray-900 truncate max-w-[150px]" title={pedido.ubicacionDestino?.almacen || pedido.proyecto}>
-                        {pedido.ubicacionDestino?.almacen || pedido.proyecto || 'Sin especificar'}
-                      </h4>
-                      <p className="text-xs font-mono text-gray-500">{pedido.ticket_id}</p>
-                    </div>
-                  </div>
-                  <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                    Completado
-                  </span>
-                </div>
-                
-                <div className="space-y-1.5 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <User size={14} className="text-gray-400" />
-                    <span>Solicitó: {pedido.usuario?.nombre || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckSquare size={14} className="text-gray-400" />
-                    <span>Preparó: {pedido.detalles?.[0]?.dispersadoPor?.nombre || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar size={14} className="text-gray-400" />
-                    <span>{new Date(pedido.updated_at || pedido.fecha_hora).toLocaleDateString('es-MX')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Package size={14} className="text-gray-400" />
-                    <span className="font-semibold">{pedido.detalles?.length || 0} artículos</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+          )}
+        </section>
       </div>
 
       <Modal
