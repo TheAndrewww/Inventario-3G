@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check, Inbox } from 'lucide-react';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check, Inbox, Eye, EyeOff } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -30,6 +30,7 @@ const ALL_MENU_ITEMS = [
 ];
 
 const storageKey = (userId) => `sidebar-order:${userId ?? 'anon'}`;
+const storageKeyHidden = (userId) => `sidebar-hidden:${userId ?? 'anon'}`;
 
 // Dado el array por defecto y un orden guardado (paths), devuelve items en
 // orden preferido. Items nuevos (que no están en el saved) van al final.
@@ -60,10 +61,11 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
 
   const [menuItems, setMenuItems] = useState(itemsFiltrados);
   const [editMode, setEditMode] = useState(false);
+  const [hiddenPaths, setHiddenPaths] = useState(new Set());
   const dragIndexRef = useRef(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
-  // Cargar orden guardado al montar / cuando cambia el usuario
+  // Cargar orden y ocultos guardados al montar / cuando cambia el usuario
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey(user?.id));
@@ -71,6 +73,13 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       setMenuItems(aplicarOrdenGuardado(itemsFiltrados, saved));
     } catch {
       setMenuItems(itemsFiltrados);
+    }
+    try {
+      const rawH = localStorage.getItem(storageKeyHidden(user?.id));
+      const savedH = rawH ? JSON.parse(rawH) : [];
+      setHiddenPaths(new Set(Array.isArray(savedH) ? savedH : []));
+    } catch {
+      setHiddenPaths(new Set());
     }
   }, [itemsFiltrados, user?.id]);
 
@@ -80,10 +89,37 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
     } catch { /* storage lleno o bloqueado — ignorar */ }
   };
 
+  const persistirOcultos = (paths) => {
+    try {
+      localStorage.setItem(storageKeyHidden(user?.id), JSON.stringify([...paths]));
+    } catch { /* ignorar */ }
+  };
+
+  const toggleOculto = (path) => {
+    setHiddenPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      persistirOcultos(next);
+      return next;
+    });
+  };
+
+  const mostrarTodos = () => {
+    try { localStorage.removeItem(storageKeyHidden(user?.id)); } catch {}
+    setHiddenPaths(new Set());
+  };
+
   const resetOrden = () => {
     try { localStorage.removeItem(storageKey(user?.id)); } catch {}
     setMenuItems(itemsFiltrados);
   };
+
+  // Items que se renderizan en la nav: en modo edición se ven todos (con los
+  // ocultos en gris); fuera de edición se filtran los ocultos.
+  const itemsParaRender = editMode
+    ? menuItems
+    : menuItems.filter(i => !hiddenPaths.has(i.path));
 
   const handleDragStart = (e, index) => {
     dragIndexRef.current = index;
@@ -154,51 +190,77 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
         )}
       </div>
 
-      {/* Barra de reordenar — solo visible con sidebar abierto */}
+      {/* Barra de personalización (reordenar + ocultar) — solo con sidebar abierto */}
       {isOpen && (
-        <div className="px-4 pt-3 pb-1 flex items-center justify-between gap-2">
+        <div className="px-4 pt-3 pb-1 flex items-center justify-between gap-2 flex-wrap">
           <button
             onClick={() => setEditMode(m => !m)}
             className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded transition-colors ${editMode
               ? 'bg-red-50 text-red-700 hover:bg-red-100'
               : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
               }`}
-            title={editMode ? 'Terminar de reordenar' : 'Reordenar menú'}
+            title={editMode ? 'Terminar de personalizar' : 'Personalizar menú (reordenar y ocultar)'}
           >
             {editMode ? <Check size={14} /> : <GripVertical size={14} />}
-            {editMode ? 'Listo' : 'Reordenar'}
+            {editMode ? 'Listo' : 'Personalizar'}
           </button>
           {editMode && (
-            <button
-              onClick={resetOrden}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
-              title="Restaurar orden original"
-            >
-              <RotateCcw size={14} />
-              Restaurar
-            </button>
+            <div className="flex items-center gap-1">
+              {hiddenPaths.size > 0 && (
+                <button
+                  onClick={mostrarTodos}
+                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
+                  title="Mostrar todos los paneles"
+                >
+                  <Eye size={14} />
+                  Mostrar todos
+                </button>
+              )}
+              <button
+                onClick={resetOrden}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
+                title="Restaurar orden original"
+              >
+                <RotateCcw size={14} />
+                Orden
+              </button>
+            </div>
           )}
         </div>
       )}
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {menuItems.map((item, index) => {
+        {itemsParaRender.map((item, index) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
           const isDragOver = editMode && dragOverIndex === index;
+          const isHidden = hiddenPaths.has(item.path);
 
           const commonClasses = `w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
             ? 'bg-red-50 text-red-700'
             : 'text-gray-700 hover:bg-gray-100'
             } ${editMode ? 'cursor-grab active:cursor-grabbing border border-dashed border-gray-300' : ''
-            } ${isDragOver ? 'ring-2 ring-red-300' : ''}`;
+            } ${isDragOver ? 'ring-2 ring-red-300' : ''
+            } ${isHidden ? 'opacity-50' : ''}`;
 
           const content = (
             <>
               {editMode && isOpen && <GripVertical size={16} className="text-gray-400 shrink-0" />}
               <Icon size={20} />
-              {isOpen && <span className="font-medium">{item.label}</span>}
+              {isOpen && <span className={`font-medium flex-1 ${isHidden ? 'line-through' : ''}`}>{item.label}</span>}
+              {editMode && isOpen && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleOculto(item.path); }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className={`p-1 rounded ${isHidden ? 'text-gray-400 hover:bg-gray-200' : 'text-gray-500 hover:bg-gray-200'}`}
+                  title={isHidden ? 'Mostrar este panel' : 'Ocultar este panel'}
+                  draggable={false}
+                >
+                  {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              )}
             </>
           );
 
