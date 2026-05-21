@@ -3,6 +3,23 @@ import { Movimiento, DetalleMovimiento, Articulo, SolicitudCompra } from '../mod
 
 const ESTADOS_ACTIVOS = ['pendiente', 'pendiente_aprobacion', 'aprobado', 'listo_para_entrega'];
 
+const normalizar = (s) => (s || '').trim().toLowerCase();
+
+// True si el nombre del ticket coincide (exacto, prefijo o variante con / - o espacio)
+// con el nombre del proyecto.
+function ticketPerteneceAProyecto(ticketProyecto, proyectoNombre) {
+    const t = normalizar(ticketProyecto);
+    const p = normalizar(proyectoNombre);
+    if (!t || !p) return false;
+    return (
+        t === p ||
+        t.startsWith(`${p} /`) ||
+        t.startsWith(`${p}/`) ||
+        t.startsWith(`${p} -`) ||
+        t.startsWith(`${p} `)
+    );
+}
+
 /**
  * Anula los pedidos abiertos asociados a un proyecto.
  * Revierte el stock de cada artículo y cancela las solicitudes de compra
@@ -18,11 +35,14 @@ const ESTADOS_ACTIVOS = ['pendiente', 'pendiente_aprobacion', 'aprobado', 'listo
 export async function anularPedidosDeProyecto({ proyectoNombre, motivo = 'Proyecto cerrado', transaction = null, usuarioId = null }) {
     if (!proyectoNombre) return { anulados: 0, ticketIds: [] };
 
-    const pedidos = await Movimiento.findAll({
+    // Traer candidatos con match flexible: cualquier movimiento cuya `proyecto`
+    // empiece (case-insensitive) con el nombre del proyecto. Después filtramos
+    // en JS con la heurística completa para evitar falsos positivos.
+    const candidatos = await Movimiento.findAll({
         where: {
             tipo: 'pedido',
-            proyecto: proyectoNombre,
-            estado: { [Op.in]: ESTADOS_ACTIVOS }
+            estado: { [Op.in]: ESTADOS_ACTIVOS },
+            proyecto: { [Op.iLike]: `${proyectoNombre.trim()}%` }
         },
         include: [
             { model: DetalleMovimiento, as: 'detalles', include: [{ model: Articulo, as: 'articulo' }] },
@@ -30,6 +50,8 @@ export async function anularPedidosDeProyecto({ proyectoNombre, motivo = 'Proyec
         ],
         transaction
     });
+
+    const pedidos = candidatos.filter(p => ticketPerteneceAProyecto(p.proyecto, proyectoNombre));
 
     const ticketIds = [];
     for (const pedido of pedidos) {

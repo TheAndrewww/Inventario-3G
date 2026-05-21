@@ -5,14 +5,40 @@ import { crearNotificacion, notificarPorRol } from './notificaciones.controller.
 import { buscarCarpetaProyecto, uploadTicket } from '../services/googleDrive.service.js';
 import admin from 'firebase-admin';
 
-// Devuelve los nombres de proyectos cuya etapa_actual está en 'completado'.
-// Usado para filtrar tickets cuyo proyecto ya cerró: se ocultan en pendientes y completados.
-async function getNombresProyectosCerrados() {
+// Devuelve un Set con los nombres (normalizados a trim+lowercase) de proyectos
+// cuya etapa_actual = 'completado'. Usado para filtrar tickets cuyo proyecto cerró.
+async function getNombresProyectosCerradosSet() {
   const proyectos = await ProduccionProyecto.findAll({
-    where: { etapa_actual: 'completado', activo: true },
+    where: { etapa_actual: 'completado' },
     attributes: ['nombre']
   });
-  return proyectos.map(p => p.nombre).filter(Boolean);
+  return new Set(
+    proyectos
+      .map(p => (p.nombre || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+// Heurística para detectar si el `proyecto` de un Movimiento pertenece a un
+// ProduccionProyecto cerrado. Compara normalizado y, si no hay match exacto,
+// intenta match por prefijo (p.ej. "THELMA PADILLA / MTO" coincide con "THELMA PADILLA").
+function pedidoEsDeProyectoCerrado(pedidoProyecto, cerradosSet) {
+  if (!pedidoProyecto) return false;
+  const nombre = pedidoProyecto.trim().toLowerCase();
+  if (cerradosSet.has(nombre)) return true;
+  // Match por prefijo: el nombre del ticket empieza con el nombre del proyecto + separador
+  for (const cerrado of cerradosSet) {
+    if (
+      nombre === cerrado ||
+      nombre.startsWith(`${cerrado} /`) ||
+      nombre.startsWith(`${cerrado}/`) ||
+      nombre.startsWith(`${cerrado} -`) ||
+      nombre.startsWith(`${cerrado} `)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -663,20 +689,6 @@ export const listarPedidos = async (req, res) => {
       if (fecha_fin) where.fecha_hora[Op.lte] = new Date(fecha_fin);
     }
 
-    // Ocultar tickets cuyo proyecto ya cerró (etapa_actual='completado')
-    const proyectosCerrados = await getNombresProyectosCerrados();
-    if (proyectosCerrados.length > 0) {
-      where[Op.and] = [
-        ...(where[Op.and] || []),
-        {
-          [Op.or]: [
-            { proyecto: { [Op.is]: null } },
-            { proyecto: { [Op.notIn]: proyectosCerrados } }
-          ]
-        }
-      ];
-    }
-
     const { count, rows: pedidos } = await Movimiento.findAndCountAll({
       where,
       include: [
@@ -707,8 +719,12 @@ export const listarPedidos = async (req, res) => {
       offset
     });
 
+    // Filtrar tickets cuyo proyecto está cerrado (etapa_actual='completado')
+    const cerradosSet = await getNombresProyectosCerradosSet();
+    const pedidosVisibles = pedidos.filter(p => !pedidoEsDeProyectoCerrado(p.proyecto, cerradosSet));
+
     // Calcular progreso de dispersión para cada pedido
-    const pedidosConProgreso = pedidos.map(pedido => {
+    const pedidosConProgreso = pedidosVisibles.map(pedido => {
       const pedidoJSON = pedido.toJSON();
       const totalArticulos = pedidoJSON.detalles.length;
       const articulosDispersados = pedidoJSON.detalles.filter(d => d.dispersado).length;
@@ -725,7 +741,7 @@ export const listarPedidos = async (req, res) => {
       data: {
         pedidos: pedidosConProgreso,
         paginacion: {
-          total: count,
+          total: pedidosConProgreso.length,
           pagina_actual: parseInt(page),
           total_paginas: Math.ceil(count / parseInt(limit)),
           por_pagina: parseInt(limit)
@@ -928,24 +944,11 @@ export const marcarArticuloDispersado = async (req, res) => {
  */
 export const listarPedidosPendientes = async (req, res) => {
   try {
-    const proyectosCerrados = await getNombresProyectosCerrados();
-    const where = {
-      tipo: 'pedido',
-      estado: { [Op.in]: ['pendiente', 'aprobado'] }
-    };
-    if (proyectosCerrados.length > 0) {
-      where[Op.and] = [
-        {
-          [Op.or]: [
-            { proyecto: { [Op.is]: null } },
-            { proyecto: { [Op.notIn]: proyectosCerrados } }
-          ]
-        }
-      ];
-    }
-
     const pedidos = await Movimiento.findAll({
-      where,
+      where: {
+        tipo: 'pedido',
+        estado: { [Op.in]: ['pendiente', 'aprobado'] }
+      },
       include: [
         {
           model: Usuario,
@@ -977,8 +980,12 @@ export const listarPedidosPendientes = async (req, res) => {
       order: [['fecha_hora', 'ASC']] // Más antiguos primero
     });
 
+    // Filtrar tickets cuyo proyecto está cerrado (etapa_actual='completado')
+    const cerradosSet = await getNombresProyectosCerradosSet();
+    const pedidosVisibles = pedidos.filter(p => !pedidoEsDeProyectoCerrado(p.proyecto, cerradosSet));
+
     // Calcular progreso para cada pedido
-    const pedidosConProgreso = pedidos.map(pedido => {
+    const pedidosConProgreso = pedidosVisibles.map(pedido => {
       const pedidoJSON = pedido.toJSON();
       const totalArticulos = pedidoJSON.detalles.length;
       const articulosDispersados = pedidoJSON.detalles.filter(d => d.dispersado).length;
