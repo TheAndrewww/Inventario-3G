@@ -214,7 +214,7 @@ const PedidoPage = () => {
 
       const data = {
         articulos: articulosPedido,
-        observaciones: observaciones.trim() || `Pedido creado por ${user?.nombre || 'Usuario'}`,
+        observaciones: observaciones.trim() || null,
       };
 
       // Agregar proyecto o equipo según el rol

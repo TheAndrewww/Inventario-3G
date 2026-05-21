@@ -5,11 +5,14 @@ import { Loader, Modal } from '../components/common';
 import toast from 'react-hot-toast';
 
 // Devuelve solo las observaciones originales del ticket (recorta anotaciones
-// auto-añadidas: [ANULADO], [CANCELADO], [RECHAZADO]...).
+// auto-añadidas: [ANULADO], [CANCELADO], [RECHAZADO]... y el placeholder
+// legacy "Pedido creado por ...").
 const obsOriginales = (texto) => {
   if (!texto) return '';
   const idx = texto.search(/\n\s*\[/);
-  return (idx >= 0 ? texto.substring(0, idx) : texto).trim();
+  const limpio = (idx >= 0 ? texto.substring(0, idx) : texto).trim();
+  if (/^Pedido creado por\b/i.test(limpio)) return '';
+  return limpio;
 };
 
 const PedidosPendientesPage = () => {
@@ -269,10 +272,10 @@ const PedidosPendientesPage = () => {
                     </button>
                   </div>
 
-                  {pedido.observaciones && (
+                  {obsOriginales(pedido.observaciones) && (
                     <div className="mt-3 pt-3 border-t border-gray-200">
                       <p className="text-xs text-gray-500 font-medium mb-1">Observaciones:</p>
-                      <p className="text-xs text-gray-600 whitespace-pre-line line-clamp-2">{pedido.observaciones}</p>
+                      <p className="text-xs text-gray-600 whitespace-pre-line line-clamp-2">{obsOriginales(pedido.observaciones)}</p>
                     </div>
                   )}
                 </div>
@@ -324,7 +327,7 @@ const PedidosPendientesPage = () => {
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-600">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <User size={13} className="text-gray-400 flex-shrink-0" />
-                      <span className="truncate">Encargado: {pedido.usuario?.nombre || 'N/A'}</span>
+                      <span className="truncate">Encargado: {pedido.supervisor?.nombre || pedido.usuario?.nombre || 'N/A'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 min-w-0">
                       <CheckSquare size={13} className="text-gray-400 flex-shrink-0" />
@@ -374,7 +377,7 @@ const PedidosPendientesPage = () => {
                 </div>
                 <div>
                   <span className="font-medium text-gray-500">Encargado:</span>
-                  <p className="text-gray-900">{pedidoSeleccionado.usuario?.nombre || '-'}</p>
+                  <p className="text-gray-900">{pedidoSeleccionado.supervisor?.nombre || pedidoSeleccionado.usuario?.nombre || '-'}</p>
                 </div>
                 <div>
                   <span className="font-medium text-gray-500">Fecha:</span>
