@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, AlertTriangle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit, Clock } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import articulosService from '../services/articulos.service';
@@ -3630,14 +3630,44 @@ const UltimoMovimientoInfo = ({ articuloId }) => {
 };
 
 const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitud, titulo, articulosConSolicitudIds = [] }) => {
+  // Filtros por Almacén y Sección (default Principal / Stock).
+  const [filtroAlmacen, setFiltroAlmacen] = useState('Principal');
+  const [filtroSeccion, setFiltroSeccion] = useState('Stock');
+
+  const getAlmacen = (art) => art?.ubicacion?.almacen_ref?.nombre || art?.ubicacion?.almacen || 'Sin almacén';
+  const getSeccion = (art) => art?.seccion?.nombre || 'Sin sección';
+
+  const almacenesUnicos = useMemo(() => {
+    const set = new Set(articulos.map(getAlmacen));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [articulos]);
+
+  const seccionesUnicas = useMemo(() => {
+    const base = filtroAlmacen === 'todos'
+      ? articulos
+      : articulos.filter(a => getAlmacen(a) === filtroAlmacen);
+    const set = new Set(base.map(getSeccion));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [articulos, filtroAlmacen]);
+
+  const articulosFiltrados = useMemo(() => {
+    return articulos.filter(art => {
+      if (filtroAlmacen !== 'todos' && getAlmacen(art) !== filtroAlmacen) return false;
+      if (filtroSeccion !== 'todos' && getSeccion(art) !== filtroSeccion) return false;
+      return true;
+    });
+  }, [articulos, filtroAlmacen, filtroSeccion]);
+
   if (!isOpen) return null;
 
   const generarPDFBajoStock = async () => {
     toast.loading('Generando PDF...', { id: 'pdf-loading' });
 
     try {
+      // Usar la lista filtrada para que el PDF refleje lo visible
+      const articulosParaPDF = articulosFiltrados;
       // Fetch último movimiento para todos los artículos en paralelo
-      const movimientosPromises = articulos.map(art =>
+      const movimientosPromises = articulosParaPDF.map(art =>
         articulosService.getUltimoMovimiento(art.id)
           .then(data => ({ id: art.id, mov: data.ultimoMovimiento }))
           .catch(() => ({ id: art.id, mov: null }))
@@ -3665,7 +3695,7 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
         img.src = url;
       });
 
-      const imagePromises = articulos.map(art =>
+      const imagePromises = articulosParaPDF.map(art =>
         loadImage(art.imagen_url).then(data => ({ id: art.id, img: data }))
       );
       const images = await Promise.all(imagePromises);
@@ -3684,7 +3714,7 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100);
       doc.text(`Generado: ${fecha}`, 14, 27);
-      doc.text(`Total de artículos: ${articulos.length}`, 14, 32);
+      doc.text(`Total de artículos: ${articulosParaPDF.length}`, 14, 32);
       doc.setTextColor(0);
 
       // Table config
@@ -3713,7 +3743,7 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
       let yPos = startY + 8;
 
       // Sort: critical first
-      const sorted = [...articulos].sort((a, b) => {
+      const sorted = [...articulosParaPDF].sort((a, b) => {
         const pctA = parseFloat(a.stock_actual) / parseFloat(a.stock_minimo || 1);
         const pctB = parseFloat(b.stock_actual) / parseFloat(b.stock_minimo || 1);
         return pctA - pctB;
@@ -3818,11 +3848,18 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
             <div>
               <h3 className="text-xl font-bold text-gray-900">{titulo}</h3>
               <p className="text-sm text-gray-600 mt-1">
-                {articulos.length} artículo{articulos.length !== 1 ? 's' : ''} encontrado{articulos.length !== 1 ? 's' : ''}
+                {articulosFiltrados.length} de {articulos.length} artículo{articulos.length !== 1 ? 's' : ''}
+                {(filtroAlmacen !== 'todos' || filtroSeccion !== 'todos') && (
+                  <span className="ml-1 text-gray-500">
+                    · {filtroAlmacen === 'todos' ? 'Todos los almacenes' : filtroAlmacen}
+                    {' / '}
+                    {filtroSeccion === 'todos' ? 'Todas las secciones' : filtroSeccion}
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {articulos.length > 0 && (
+              {articulosFiltrados.length > 0 && (
                 <button
                   onClick={generarPDFBajoStock}
                   className="flex items-center gap-2 px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors text-sm font-medium"
@@ -3840,17 +3877,60 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
               </button>
             </div>
           </div>
+
+          {/* Filtros Almacén / Sección */}
+          <div className="mt-3 flex flex-wrap gap-3 items-end">
+            <div className="flex flex-col">
+              <label className="text-xs font-medium text-gray-700 mb-1">Almacén</label>
+              <select
+                value={filtroAlmacen}
+                onChange={(e) => setFiltroAlmacen(e.target.value)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="todos">Todos los almacenes</option>
+                {almacenesUnicos.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs font-medium text-gray-700 mb-1">Sección</label>
+              <select
+                value={filtroSeccion}
+                onChange={(e) => setFiltroSeccion(e.target.value)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="todos">Todas las secciones</option>
+                {seccionesUnicas.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+            {(filtroAlmacen !== 'Principal' || filtroSeccion !== 'Stock') && (
+              <button
+                onClick={() => { setFiltroAlmacen('Principal'); setFiltroSeccion('Stock'); }}
+                className="px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white border border-gray-300 rounded-lg transition-colors"
+                title="Volver a Principal / Stock"
+              >
+                ↺ Default
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {articulos.length === 0 ? (
+          {articulosFiltrados.length === 0 ? (
             <div className="text-center py-12">
               <Package size={64} className="mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">No se encontraron artículos</p>
+              <p className="text-gray-500">
+                {articulos.length === 0
+                  ? 'No se encontraron artículos'
+                  : `No hay artículos en ${filtroAlmacen === 'todos' ? 'la selección' : filtroAlmacen} ${filtroSeccion === 'todos' ? '' : '/ ' + filtroSeccion}`}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {articulos.map((articulo) => {
+              {articulosFiltrados.map((articulo) => {
                 const stockPorcentaje = (parseFloat(articulo.stock_actual) / parseFloat(articulo.stock_minimo || 1)) * 100;
                 const stockBajo = stockPorcentaje < 100;
                 const stockCritico = stockPorcentaje < 50;
