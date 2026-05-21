@@ -227,6 +227,8 @@ const InventarioPage = () => {
   const puedeEditarArticulos = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
   const puedeAgregarAlPedido = ['administrador', 'diseñador'].includes(user?.rol);
   const puedeGestionarInventario = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
+  // Taxonomía (categorías, ubicaciones, secciones, almacenes): almacén NO puede crear/editar/eliminar
+  const puedeGestionarTaxonomia = ['administrador', 'encargado'].includes(user?.rol);
   const puedeRegistrarSalida = ['administrador', 'almacen'].includes(user?.rol); // Almacén puede registrar salidas
   const esAdministrador = user?.rol === 'administrador';
   const esAlmacen = user?.rol === 'almacen';
@@ -2092,7 +2094,7 @@ const InventarioPage = () => {
                 </div>
               )}
             </div>
-            {puedeCrearArticulos && (
+            {puedeGestionarTaxonomia && (
               <button
                 onClick={() => handleAbrirModalCategoria()}
                 className="px-2 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
@@ -2200,7 +2202,7 @@ const InventarioPage = () => {
                 </div>
               )}
             </div>
-            {puedeCrearArticulos && (
+            {puedeGestionarTaxonomia && (
               <button
                 onClick={() => handleAbrirModalUbicacion()}
                 className="px-2 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"

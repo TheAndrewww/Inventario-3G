@@ -1061,9 +1061,11 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                         {cat.nombre}
                       </option>
                     ))}
-                    <option value="nueva_categoria" className="text-red-700 font-medium">
-                      + Crear nueva categoría
-                    </option>
+                    {!esAlmacen && (
+                      <option value="nueva_categoria" className="text-red-700 font-medium">
+                        + Crear nueva categoría
+                      </option>
+                    )}
                   </select>
                 ) : (
                   <div className="space-y-2">
@@ -1206,7 +1208,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                             {ub.codigo}{ub.descripcion ? ` - ${ub.descripcion}` : ''}
                           </option>
                         ))}
-                      {almacenSeleccionadoForm && (
+                      {almacenSeleccionadoForm && !esAlmacen && (
                         <option value="nueva_ubicacion" className="text-red-700 font-medium">
                           + Crear nueva ubicación
                         </option>
