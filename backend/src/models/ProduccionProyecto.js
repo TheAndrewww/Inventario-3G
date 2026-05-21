@@ -514,12 +514,16 @@ ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEt
     // Verificar si ambas sub-etapas están completas para auto-avanzar
     const puedeAvanzar = this.manufactura_completado && this.herreria_completado;
 
-    // Auto-avanzar a instalacion (Preparado) cuando ambas sub-etapas están completas
+    // Auto-avanzar directamente a 'completado' cuando ambas sub-etapas están completas.
+    // Se rellena también instalacion_* para mantener consistencia con los checkboxes.
     let autoAvanzado = false;
-    if (puedeAvanzar && this.etapa_actual === 'produccion') {
-        this.etapa_actual = 'instalacion';
-        this.instalacion_completado_en = ahora;
-        this.instalacion_completado_por = usuarioId;
+    if (puedeAvanzar && this.etapa_actual !== 'completado') {
+        if (!this.instalacion_completado_en) {
+            this.instalacion_completado_en = ahora;
+            this.instalacion_completado_por = usuarioId;
+        }
+        this.etapa_actual = 'completado';
+        if (!this.fecha_completado) this.fecha_completado = ahora;
         await this.save();
         autoAvanzado = true;
     }

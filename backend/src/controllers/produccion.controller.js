@@ -575,12 +575,12 @@ export const toggleEtapa = async (req, res) => {
         const manDone = proyecto.manufactura_completado || !!proyecto.manufactura_completado_en;
         const herDone = proyecto.herreria_completado || !!proyecto.herreria_completado_en;
 
-        // Si marca "Preparado" → el proyecto está EN la etapa Preparado (instalacion)
-        if (proyecto.instalacion_completado_en) {
-            nuevaEtapa = 'instalacion';
+        // Si ambas sub-etapas de producción están completas → Completado (auto)
+        if (manDone && herDone) {
+            nuevaEtapa = 'completado';
         }
-        // Si ambas sub-etapas de producción están completas → Preparado
-        else if (manDone && herDone) {
+        // Si marca "Preparado" sin tener ambas sub-etapas → Preparado (instalacion)
+        else if (proyecto.instalacion_completado_en) {
             nuevaEtapa = 'instalacion';
         }
         // Si alguna sub-etapa está marcada → Producción
@@ -594,9 +594,14 @@ export const toggleEtapa = async (req, res) => {
 
         proyecto.etapa_actual = nuevaEtapa;
 
-        // Si completado, actualizar fecha_completado
+        // Si completado, actualizar fecha_completado y sellar instalación para
+        // que los checkboxes queden consistentes con la etapa final.
         if (nuevaEtapa === 'completado') {
             if (!proyecto.fecha_completado) proyecto.fecha_completado = ahora;
+            if (!proyecto.instalacion_completado_en) {
+                proyecto.instalacion_completado_en = ahora;
+                proyecto.instalacion_completado_por = usuarioId;
+            }
         } else {
             proyecto.fecha_completado = null;
         }
