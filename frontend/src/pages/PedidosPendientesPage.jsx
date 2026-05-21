@@ -139,6 +139,28 @@ const PedidosPendientesPage = () => {
     setEditandoCantidad(null);
   };
 
+  const handleCompletarTicket = async () => {
+    if (!pedidoSeleccionado) return;
+    if (pedidoSeleccionado.progreso_dispersion !== 100) {
+      toast.error('Faltan artículos por palomear');
+      return;
+    }
+    if (!confirm('¿Marcar este ticket como COMPLETADO? Pasará a la columna de Completados.')) return;
+    try {
+      setProcesando(true);
+      await pedidosService.entregarDirecto(pedidoSeleccionado.id);
+      toast.success('Ticket completado');
+      setShowModal(false);
+      setPedidoSeleccionado(null);
+      await cargarDatos();
+    } catch (error) {
+      console.error('Error al completar ticket:', error);
+      toast.error(error.response?.data?.message || 'Error al completar el ticket');
+    } finally {
+      setProcesando(false);
+    }
+  };
+
   const getProgresoColor = (porcentaje) => {
     if (porcentaje === 0) return 'bg-red-500';
     if (porcentaje < 50) return 'bg-orange-500';
@@ -524,6 +546,23 @@ const PedidosPendientesPage = () => {
               <div className="bg-gray-50 rounded-lg p-4">
                 <h5 className="font-medium text-gray-700 mb-2">Observaciones:</h5>
                 <p className="text-gray-900">{pedidoSeleccionado.observaciones}</p>
+              </div>
+            )}
+
+            {/* Botón Completar Ticket — visible solo al 100% */}
+            {pedidoSeleccionado.progreso_dispersion === 100 && (
+              <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-4 bg-white border-t border-gray-200">
+                <button
+                  onClick={handleCompletarTicket}
+                  disabled={procesando}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition-colors disabled:opacity-50"
+                >
+                  <CheckCircle size={20} />
+                  {procesando ? 'Completando...' : 'Completar Ticket'}
+                </button>
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  El ticket pasará a la columna de Completados.
+                </p>
               </div>
             )}
 

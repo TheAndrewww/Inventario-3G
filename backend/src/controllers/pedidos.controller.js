@@ -889,22 +889,9 @@ export const marcarArticuloDispersado = async (req, res) => {
 
     await detalle.save({ transaction });
 
-    // Verificar si todos los artículos han sido dispersados
-    const todosLosDetalles = await DetalleMovimiento.findAll({
-      where: { movimiento_id: pedido_id }
-    });
-
-    const todosDispersados = todosLosDetalles.every(d => d.dispersado);
-
-    // Si todos están dispersados, actualizar estado del pedido
-    if (todosDispersados && (pedido.estado === 'pendiente' || pedido.estado === 'aprobado')) {
-      pedido.estado = 'completado';
-      await pedido.save({ transaction });
-    } else if (!todosDispersados && pedido.estado === 'completado') {
-      // Restaurar al estado anterior (pendiente o aprobado)
-      pedido.estado = pedido.tipo_pedido === 'equipo' ? 'aprobado' : 'pendiente';
-      await pedido.save({ transaction });
-    }
+    // No auto-cambiar el estado del pedido al palomear. El usuario debe pulsar
+    // explícitamente "Completar Ticket" en la UI (PUT /:id/entregar-directo).
+    // Así el ticket no salta a "Completados" sin confirmación.
 
     await transaction.commit();
 

@@ -260,13 +260,13 @@ router.put(
 
 /**
  * @route   PUT /api/pedidos/:pedido_id/entregar-directo
- * @desc    Marcar pedido como entregado directamente (sin supervisor)
- * @access  Solo Administrador
+ * @desc    Completar ticket (marca todos los detalles como dispersados y pasa a 'entregado')
+ * @access  Almacén, Encargado, Administrador
  */
 router.put(
   '/:pedido_id/entregar-directo',
   verificarToken,
-  verificarRol('administrador'),
+  accesoInventario,
   marcarPedidoEntregadoDirecto
 );
 
