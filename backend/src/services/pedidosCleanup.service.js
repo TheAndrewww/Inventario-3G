@@ -3,21 +3,28 @@ import { Movimiento, DetalleMovimiento, Articulo, SolicitudCompra } from '../mod
 
 const ESTADOS_ACTIVOS = ['pendiente', 'pendiente_aprobacion', 'aprobado', 'listo_para_entrega'];
 
-const normalizar = (s) => (s || '').trim().toLowerCase();
+const SEPARADORES = [' / ', ' /', '/ ', '/', ' - ', ' -', '- ', '-'];
 
-// True si el nombre del ticket coincide (exacto, prefijo o variante con / - o espacio)
-// con el nombre del proyecto.
-function ticketPerteneceAProyecto(ticketProyecto, proyectoNombre) {
-    const t = normalizar(ticketProyecto);
-    const p = normalizar(proyectoNombre);
-    if (!t || !p) return false;
-    return (
-        t === p ||
-        t.startsWith(`${p} /`) ||
-        t.startsWith(`${p}/`) ||
-        t.startsWith(`${p} -`) ||
-        t.startsWith(`${p} `)
-    );
+function normalizar(s) {
+    return (s || '')
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+}
+
+// Match bidireccional: t≈p si son iguales normalizados o uno empieza con
+// el otro seguido de un separador conocido.
+export function mismosProyectos(a, b) {
+    const an = normalizar(a);
+    const bn = normalizar(b);
+    if (!an || !bn) return false;
+    if (an === bn) return true;
+    for (const sep of SEPARADORES) {
+        if (an.startsWith(bn + sep) || bn.startsWith(an + sep)) return true;
+    }
+    return false;
 }
 
 /**
@@ -35,14 +42,13 @@ function ticketPerteneceAProyecto(ticketProyecto, proyectoNombre) {
 export async function anularPedidosDeProyecto({ proyectoNombre, motivo = 'Proyecto cerrado', transaction = null, usuarioId = null }) {
     if (!proyectoNombre) return { anulados: 0, ticketIds: [] };
 
-    // Traer candidatos con match flexible: cualquier movimiento cuya `proyecto`
-    // empiece (case-insensitive) con el nombre del proyecto. Después filtramos
-    // en JS con la heurística completa para evitar falsos positivos.
+    // Match flexible: traer TODOS los pedidos activos y filtrar en JS, ya que
+    // el match SQL (iLike + prefijo) no cubre el caso inverso (proyecto del
+    // ticket más corto que el ProduccionProyecto.nombre).
     const candidatos = await Movimiento.findAll({
         where: {
             tipo: 'pedido',
-            estado: { [Op.in]: ESTADOS_ACTIVOS },
-            proyecto: { [Op.iLike]: `${proyectoNombre.trim()}%` }
+            estado: { [Op.in]: ESTADOS_ACTIVOS }
         },
         include: [
             { model: DetalleMovimiento, as: 'detalles', include: [{ model: Articulo, as: 'articulo' }] },
@@ -51,7 +57,7 @@ export async function anularPedidosDeProyecto({ proyectoNombre, motivo = 'Proyec
         transaction
     });
 
-    const pedidos = candidatos.filter(p => ticketPerteneceAProyecto(p.proyecto, proyectoNombre));
+    const pedidos = candidatos.filter(p => mismosProyectos(p.proyecto, proyectoNombre));
 
     const ticketIds = [];
     for (const pedido of pedidos) {

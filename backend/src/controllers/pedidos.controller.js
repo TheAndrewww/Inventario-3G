@@ -5,40 +5,44 @@ import { crearNotificacion, notificarPorRol } from './notificaciones.controller.
 import { buscarCarpetaProyecto, uploadTicket } from '../services/googleDrive.service.js';
 import admin from 'firebase-admin';
 
-// Devuelve un Set con los nombres (normalizados a trim+lowercase) de proyectos
-// cuya etapa_actual = 'completado'. Usado para filtrar tickets cuyo proyecto cerró.
-async function getNombresProyectosCerradosSet() {
+// Normalización: minúsculas, sin acentos, espacios colapsados.
+function normalizarNombreProyecto(s) {
+  return (s || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+const SEPARADORES_PROYECTO = [' / ', ' /', '/ ', '/', ' - ', ' -', '- ', '-'];
+
+// True si dos nombres de proyecto representan el mismo (match bidireccional con sufijos).
+// p.ej.: "THELMA PADILLA / MTO" ≈ "THELMA PADILLA", y al revés también.
+function mismosProyectos(a, b) {
+  const an = normalizarNombreProyecto(a);
+  const bn = normalizarNombreProyecto(b);
+  if (!an || !bn) return false;
+  if (an === bn) return true;
+  for (const sep of SEPARADORES_PROYECTO) {
+    if (an.startsWith(bn + sep) || bn.startsWith(an + sep)) return true;
+  }
+  return false;
+}
+
+// Devuelve un array con los nombres (originales) de ProduccionProyecto cuya
+// etapa_actual = 'completado'. El consumidor compara con `mismosProyectos`.
+async function getNombresProyectosCerrados() {
   const proyectos = await ProduccionProyecto.findAll({
     where: { etapa_actual: 'completado' },
     attributes: ['nombre']
   });
-  return new Set(
-    proyectos
-      .map(p => (p.nombre || '').trim().toLowerCase())
-      .filter(Boolean)
-  );
+  return proyectos.map(p => p.nombre).filter(Boolean);
 }
 
-// Heurística para detectar si el `proyecto` de un Movimiento pertenece a un
-// ProduccionProyecto cerrado. Compara normalizado y, si no hay match exacto,
-// intenta match por prefijo (p.ej. "THELMA PADILLA / MTO" coincide con "THELMA PADILLA").
-function pedidoEsDeProyectoCerrado(pedidoProyecto, cerradosSet) {
+function pedidoEsDeProyectoCerrado(pedidoProyecto, nombresCerrados) {
   if (!pedidoProyecto) return false;
-  const nombre = pedidoProyecto.trim().toLowerCase();
-  if (cerradosSet.has(nombre)) return true;
-  // Match por prefijo: el nombre del ticket empieza con el nombre del proyecto + separador
-  for (const cerrado of cerradosSet) {
-    if (
-      nombre === cerrado ||
-      nombre.startsWith(`${cerrado} /`) ||
-      nombre.startsWith(`${cerrado}/`) ||
-      nombre.startsWith(`${cerrado} -`) ||
-      nombre.startsWith(`${cerrado} `)
-    ) {
-      return true;
-    }
-  }
-  return false;
+  return nombresCerrados.some(n => mismosProyectos(pedidoProyecto, n));
 }
 
 /**
@@ -720,8 +724,8 @@ export const listarPedidos = async (req, res) => {
     });
 
     // Filtrar tickets cuyo proyecto está cerrado (etapa_actual='completado')
-    const cerradosSet = await getNombresProyectosCerradosSet();
-    const pedidosVisibles = pedidos.filter(p => !pedidoEsDeProyectoCerrado(p.proyecto, cerradosSet));
+    const nombresCerrados = await getNombresProyectosCerrados();
+    const pedidosVisibles = pedidos.filter(p => !pedidoEsDeProyectoCerrado(p.proyecto, nombresCerrados));
 
     // Calcular progreso de dispersión para cada pedido
     const pedidosConProgreso = pedidosVisibles.map(pedido => {
@@ -981,8 +985,8 @@ export const listarPedidosPendientes = async (req, res) => {
     });
 
     // Filtrar tickets cuyo proyecto está cerrado (etapa_actual='completado')
-    const cerradosSet = await getNombresProyectosCerradosSet();
-    const pedidosVisibles = pedidos.filter(p => !pedidoEsDeProyectoCerrado(p.proyecto, cerradosSet));
+    const nombresCerrados = await getNombresProyectosCerrados();
+    const pedidosVisibles = pedidos.filter(p => !pedidoEsDeProyectoCerrado(p.proyecto, nombresCerrados));
 
     // Calcular progreso para cada pedido
     const pedidosConProgreso = pedidosVisibles.map(pedido => {
