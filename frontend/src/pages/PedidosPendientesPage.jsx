@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardList, CheckSquare, Square, Package, User, Calendar, AlertCircle, Edit2, Plus, Minus, Trash2, Save, X, Truck, Send, XCircle, CheckCircle } from 'lucide-react';
+import { ClipboardList, CheckSquare, Square, Package, User, Calendar, AlertCircle, Edit2, Plus, Minus, Trash2, Save, X, CheckCircle } from 'lucide-react';
 import pedidosService from '../services/pedidos.service';
 import { Loader, Modal } from '../components/common';
 import toast from 'react-hot-toast';
-import { useAuth } from '../context/AuthContext';
 
 const PedidosPendientesPage = () => {
   const [pedidos, setPedidos] = useState([]);
@@ -13,14 +12,6 @@ const PedidosPendientesPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [editandoCantidad, setEditandoCantidad] = useState(null);
-  const [supervisores, setSupervisores] = useState([]);
-  const [supervisorSeleccionado, setSupervisorSeleccionado] = useState('');
-  const [showModalMarcarListo, setShowModalMarcarListo] = useState(false);
-  const [showModalAnular, setShowModalAnular] = useState(false);
-  const [motivoAnulacion, setMotivoAnulacion] = useState('');
-  const [pedidoAAnular, setPedidoAAnular] = useState(null);
-  const { user } = useAuth();
-  const esAdmin = user?.rol === 'administrador';
 
   useEffect(() => {
     cargarDatos();
@@ -42,8 +33,8 @@ const PedidosPendientesPage = () => {
       const response = await pedidosService.listarPendientes();
       setPedidos(response.data?.pedidos || []);
     } catch (error) {
-      console.error('Error al cargar pedidos pendientes:', error);
-      toast.error('Error al cargar pedidos pendientes');
+      console.error('Error al cargar tickets pendientes:', error);
+      toast.error('Error al cargar tickets pendientes');
     } finally {
       setLoading(false);
     }
@@ -54,33 +45,9 @@ const PedidosPendientesPage = () => {
       const response = await pedidosService.listarCompletados();
       setPedidosCompletados(response.data?.pedidos || []);
     } catch (error) {
-      console.error('Error al cargar pedidos completados:', error);
-      toast.error('Error al cargar pedidos completados');
+      console.error('Error al cargar tickets completados:', error);
+      toast.error('Error al cargar tickets completados');
     }
-  };
-
-  const cargarSupervisores = async () => {
-    try {
-      const response = await pedidosService.listarSupervisores();
-      setSupervisores(response.data?.supervisores || []);
-    } catch (error) {
-      console.error('Error al cargar supervisores:', error);
-      toast.error('Error al cargar supervisores');
-    }
-  };
-
-  const handleAbrirModalMarcarListo = async () => {
-    // Ya no abrimos el modal, directamente entregamos el pedido
-    if (pedidoSeleccionado.progreso_dispersion !== 100) {
-      toast.error('Debes completar todos los artículos antes de marcar como listo');
-      return;
-    }
-    
-    if (!confirm('¿Marcar este pedido como COMPLETADO?\n\nEsto actualizará el inventario y no requerirá revisión del supervisor.')) {
-      return;
-    }
-
-    await handleEntregarDirecto();
   };
 
   const handleVerDetalle = async (pedido) => {
@@ -90,8 +57,8 @@ const PedidosPendientesPage = () => {
       setPedidoSeleccionado(response.data?.pedido);
       setShowModal(true);
     } catch (error) {
-      console.error('Error al cargar detalle del pedido:', error);
-      toast.error('Error al cargar detalle del pedido');
+      console.error('Error al cargar detalle del ticket:', error);
+      toast.error('Error al cargar detalle del ticket');
     } finally {
       setLoading(false);
     }
@@ -146,14 +113,14 @@ const PedidosPendientesPage = () => {
   };
 
   const handleEliminarArticulo = async (pedidoId, detalleId) => {
-    if (!confirm('¿Estás seguro de eliminar este artículo del pedido?')) {
+    if (!confirm('¿Estás seguro de eliminar este artículo del ticket?')) {
       return;
     }
 
     try {
       setProcesando(true);
       await pedidosService.eliminarArticulo(pedidoId, detalleId);
-      toast.success('Art�culo eliminado del pedido');
+      toast.success('Artículo eliminado del ticket');
 
       const response = await pedidosService.obtenerPorId(pedidoId);
       setPedidoSeleccionado(response.data?.pedido);
@@ -161,35 +128,6 @@ const PedidosPendientesPage = () => {
     } catch (error) {
       console.error('Error al eliminar artículo:', error);
       toast.error(error.response?.data?.message || 'Error al eliminar artículo');
-    } finally {
-      setProcesando(false);
-    }
-  };
-
-  const handleAbrirModalAnular = (pedido, e) => {
-    e.stopPropagation();
-    setPedidoAAnular(pedido);
-    setMotivoAnulacion('');
-    setShowModalAnular(true);
-  };
-
-  const handleAnularPedido = async () => {
-    if (!motivoAnulacion || motivoAnulacion.trim().length < 10) {
-      toast.error('El motivo de anulación debe tener al menos 10 caracteres');
-      return;
-    }
-
-    try {
-      setProcesando(true);
-      const response = await pedidosService.anular(pedidoAAnular.id, motivoAnulacion);
-      toast.success(response.message || 'Pedido anulado exitosamente. Stock y solicitudes revertidas.');
-      setShowModalAnular(false);
-      setPedidoAAnular(null);
-      setMotivoAnulacion('');
-      await cargarPedidosPendientes();
-    } catch (error) {
-      console.error('Error al anular pedido:', error);
-      toast.error(error.response?.data?.message || 'Error al anular pedido');
     } finally {
       setProcesando(false);
     }
@@ -208,25 +146,6 @@ const PedidosPendientesPage = () => {
     return 'bg-green-500';
   };
 
-  const handleEntregarDirecto = async () => {
-    if (!confirm('¿Marcar este pedido como ENTREGADO directamente?\n\nEsto saltará el flujo de supervisor y marcará todos los artículos como preparados automáticamente.')) {
-      return;
-    }
-
-    try {
-      setProcesando(true);
-      await pedidosService.entregarDirecto(pedidoSeleccionado.id);
-      toast.success('Pedido marcado como completado exitosamente');
-      setShowModal(false);
-      await cargarDatos();
-    } catch (error) {
-      console.error('Error al entregar pedido:', error);
-      toast.error(error.response?.data?.message || 'Error al entregar pedido');
-    } finally {
-      setProcesando(false);
-    }
-  };
-
   if (loading && pedidos.length === 0) {
     return <Loader fullScreen />;
   }
@@ -234,15 +153,15 @@ const PedidosPendientesPage = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Pedidos Pendientes</h1>
-        <p className="text-gray-500 mt-1">Gestiona y prepara los pedidos de materiales</p>
+        <h1 className="text-2xl font-bold text-gray-900">Tickets Pendientes</h1>
+        <p className="text-gray-500 mt-1">Gestiona y prepara los tickets de materiales</p>
       </div>
 
       {pedidos.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
           <ClipboardList size={64} className="mx-auto mb-4 text-gray-300" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay pedidos pendientes</h3>
-          <p className="text-gray-500">Todos los pedidos han sido completados</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay tickets pendientes</h3>
+          <p className="text-gray-500">Todos los tickets han sido completados</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
@@ -304,31 +223,10 @@ const PedidosPendientesPage = () => {
                 <span className="text-gray-600">
                   {pedido.detalles?.length || 0} artículos totales
                 </span>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={(e) => handleAbrirModalAnular(pedido, e)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-red-600 hover:text-white hover:bg-red-600 border border-red-600 rounded-lg font-medium transition-colors"
-                  >
-                    <XCircle size={16} />
-                    Anular
-                  </button>
-                  <button className="text-red-700 hover:text-red-900 font-medium">
-                    Ver Checklist →
-                  </button>
-                </div>
+                <button className="text-red-700 hover:text-red-900 font-medium">
+                  Ver Checklist →
+                </button>
               </div>
-
-              {pedido.motivo_rechazo && (
-                <div className="mt-3 pt-3 border-t border-red-100 bg-red-50 rounded-lg p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle size={16} className="text-red-600 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-xs font-semibold text-red-800 mb-1">Pedido devuelto - Motivo:</p>
-                      <p className="text-sm text-red-700">{pedido.motivo_rechazo}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {pedido.observaciones && (
                 <div className="mt-3 pt-3 border-t border-gray-200">
@@ -341,17 +239,17 @@ const PedidosPendientesPage = () => {
         </div>
       )}
 
-      {/* Sección de Pedidos Completados */}
+      {/* Sección de Tickets Completados */}
       <div className="mt-8 border-t border-gray-200 pt-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
           <CheckCircle size={24} className="text-green-600" />
-           Últimos Pedidos Completados
+           Últimos Tickets Completados
         </h2>
 
         {pedidosCompletados.length === 0 ? (
           <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
             <CheckCircle size={48} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">No hay pedidos completados recientes</p>
+            <p className="text-gray-500 font-medium">No hay tickets completados recientes</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -440,24 +338,6 @@ const PedidosPendientesPage = () => {
                 </div>
               </div>
             </div>
-
-            {pedidoSeleccionado.motivo_rechazo && (
-              <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="text-red-600 flex-shrink-0 mt-1" size={24} />
-                  <div className="flex-1">
-                    <h4 className="font-bold text-red-900 mb-2">⚠️ Pedido Devuelto por el Supervisor</h4>
-                    <div className="bg-white rounded-lg p-3 border border-red-200">
-                      <p className="text-sm font-semibold text-red-800 mb-1">Motivo del rechazo:</p>
-                      <p className="text-sm text-red-700">{pedidoSeleccionado.motivo_rechazo}</p>
-                    </div>
-                    <p className="text-xs text-red-600 mt-2 italic">
-                      Por favor, revisa y corrige el pedido según las indicaciones antes de reenviarlo.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-3 mb-2">
@@ -631,94 +511,9 @@ const PedidosPendientesPage = () => {
               </div>
             )}
 
-            {pedidoSeleccionado.progreso_dispersion === 100 && (
-              <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
-                <button
-                  onClick={handleAbrirModalMarcarListo}
-                  disabled={procesando}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:opacity-50"
-                >
-                  <CheckCircle size={20} />
-                  Marcar como Completado
-                </button>
-                <p className="text-sm text-gray-600 text-center">
-                  El pedido se dará por terminado sin revisión del supervisor
-                </p>
-              </div>
-            )}
           </div>
         )}
       </Modal>
-
-      {/* Modal para seleccionar supervisor quitado */}
-
-      {/* Modal para anular pedido */}
-      {showModalAnular && pedidoAAnular && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <XCircle size={24} className="text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Anular Pedido</h3>
-                <p className="text-sm text-gray-600">
-                  {pedidoAAnular.ticket_id}
-                </p>
-              </div>
-            </div>
-
-            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800 font-medium">
-                ⚠️ Esta acción anulará completamente el pedido y:
-              </p>
-              <ul className="mt-2 text-sm text-yellow-700 list-disc list-inside space-y-1">
-                <li>Revertirá el stock de todos los artículos</li>
-                <li>Cancelará las solicitudes de compra asociadas</li>
-                <li>Esta acción NO puede deshacerse</li>
-              </ul>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Motivo de anulación *
-              </label>
-              <textarea
-                value={motivoAnulacion}
-                onChange={(e) => setMotivoAnulacion(e.target.value)}
-                placeholder="Escribe el motivo de la anulación (mínimo 10 caracteres)..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
-                rows={4}
-                autoFocus
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                {motivoAnulacion.length}/10 caracteres mínimos
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowModalAnular(false);
-                  setPedidoAAnular(null);
-                  setMotivoAnulacion('');
-                }}
-                disabled={procesando}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleAnularPedido}
-                disabled={motivoAnulacion.trim().length < 10 || procesando}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {procesando ? 'Anulando...' : 'Anular Pedido'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

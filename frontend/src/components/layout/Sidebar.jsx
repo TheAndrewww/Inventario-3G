@@ -10,7 +10,7 @@ const ALL_MENU_ITEMS = [
   { path: '/recepcion-mercancia', icon: PackageCheck, label: 'Recepción Mercancía', roles: ['administrador', 'almacen'] },
   { path: '/procesamiento-masivo', icon: Wand2, label: 'Procesamiento IA', roles: ['administrador', 'encargado'] },
   { path: '/pedido', icon: ShoppingCart, label: 'Orden de Salida', roles: ['administrador', 'diseñador'] },
-  { path: '/pedidos-pendientes', icon: ClipboardList, label: 'Pedidos Pendientes', roles: ['administrador', 'almacen'] },
+  { path: '/pedidos-pendientes', icon: ClipboardList, label: 'Tickets Pendientes', roles: ['administrador', 'almacen'] },
   { path: '/monitor-pedidos', icon: BarChart3, label: 'Monitor Pedidos', roles: ['administrador', 'encargado'] },
   { path: '/camionetas', icon: Briefcase, label: 'Equipos', roles: ['administrador', 'encargado'] },
   { path: '/usuarios', icon: UserCog, label: 'Usuarios', roles: ['administrador'] },
