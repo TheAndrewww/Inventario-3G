@@ -30,7 +30,7 @@ const AREAS = [
 
 const ControlCampanaPage = () => {
     const { user } = useAuth();
-    const esSoloLectura = user?.rol === 'compras';
+    const esSoloLectura = ['compras', 'encargado'].includes(user?.rol);
 
     const [data, setData] = useState({});
     const [totals, setTotals] = useState({ byQuarter: {}, byArea: {} });
