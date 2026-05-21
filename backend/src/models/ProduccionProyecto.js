@@ -297,6 +297,26 @@ const ProduccionProyecto = sequelize.define('ProduccionProyecto', {
     ]
 });
 
+// Hook: al cerrarse un proyecto (etapa_actual → 'completado'), anular sus
+// pedidos abiertos para revertir stock reservado y cancelar solicitudes de compra.
+ProduccionProyecto.addHook('afterUpdate', async (proyecto, options) => {
+    const previa = proyecto.previous('etapa_actual');
+    if (previa === 'completado' || proyecto.etapa_actual !== 'completado') return;
+    try {
+        const { anularPedidosDeProyecto } = await import('../services/pedidosCleanup.service.js');
+        const resultado = await anularPedidosDeProyecto({
+            proyectoNombre: proyecto.nombre,
+            motivo: `Proyecto "${proyecto.nombre}" marcado como completado`,
+            transaction: options?.transaction || null
+        });
+        if (resultado.anulados > 0) {
+            console.log(`🧹 Auto-anulados ${resultado.anulados} pedido(s) del proyecto "${proyecto.nombre}": ${resultado.ticketIds.join(', ')}`);
+        }
+    } catch (err) {
+        console.error('[ProduccionProyecto afterUpdate] Error al limpiar pedidos:', err);
+    }
+});
+
 // ===== Métodos de instancia =====
 
 /**

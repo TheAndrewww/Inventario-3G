@@ -5,6 +5,16 @@ import { crearNotificacion, notificarPorRol } from './notificaciones.controller.
 import { buscarCarpetaProyecto, uploadTicket } from '../services/googleDrive.service.js';
 import admin from 'firebase-admin';
 
+// Devuelve los nombres de proyectos cuya etapa_actual está en 'completado'.
+// Usado para filtrar tickets cuyo proyecto ya cerró: se ocultan en pendientes y completados.
+async function getNombresProyectosCerrados() {
+  const proyectos = await ProduccionProyecto.findAll({
+    where: { etapa_actual: 'completado', activo: true },
+    attributes: ['nombre']
+  });
+  return proyectos.map(p => p.nombre).filter(Boolean);
+}
+
 /**
  * Función auxiliar para detectar el proveedor de un artículo
  * Prioridad:
@@ -653,6 +663,20 @@ export const listarPedidos = async (req, res) => {
       if (fecha_fin) where.fecha_hora[Op.lte] = new Date(fecha_fin);
     }
 
+    // Ocultar tickets cuyo proyecto ya cerró (etapa_actual='completado')
+    const proyectosCerrados = await getNombresProyectosCerrados();
+    if (proyectosCerrados.length > 0) {
+      where[Op.and] = [
+        ...(where[Op.and] || []),
+        {
+          [Op.or]: [
+            { proyecto: { [Op.is]: null } },
+            { proyecto: { [Op.notIn]: proyectosCerrados } }
+          ]
+        }
+      ];
+    }
+
     const { count, rows: pedidos } = await Movimiento.findAndCountAll({
       where,
       include: [
@@ -904,13 +928,24 @@ export const marcarArticuloDispersado = async (req, res) => {
  */
 export const listarPedidosPendientes = async (req, res) => {
   try {
-    const pedidos = await Movimiento.findAll({
-      where: {
-        tipo: 'pedido',
-        estado: {
-          [Op.in]: ['pendiente', 'aprobado']
+    const proyectosCerrados = await getNombresProyectosCerrados();
+    const where = {
+      tipo: 'pedido',
+      estado: { [Op.in]: ['pendiente', 'aprobado'] }
+    };
+    if (proyectosCerrados.length > 0) {
+      where[Op.and] = [
+        {
+          [Op.or]: [
+            { proyecto: { [Op.is]: null } },
+            { proyecto: { [Op.notIn]: proyectosCerrados } }
+          ]
         }
-      },
+      ];
+    }
+
+    const pedidos = await Movimiento.findAll({
+      where,
       include: [
         {
           model: Usuario,
