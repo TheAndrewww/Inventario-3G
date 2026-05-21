@@ -15,6 +15,7 @@ import ProyectoTimeline from '../components/produccion/ProyectoTimeline';
 import EstadisticasHeader from '../components/produccion/EstadisticasHeader';
 import { useProduccionData } from '../hooks/useProduccionData';
 import { useProduccionFilters } from '../hooks/useProduccionFilters';
+import { useAuth } from '../context/AuthContext';
 
 // ============ Modal para nuevo proyecto ============
 const ModalNuevoProyecto = ({ isOpen, onClose, onCrear }) => {
@@ -159,6 +160,8 @@ const FiltrosProyectos = ({ filtro, setFiltro, opciones }) => (
 // ============ Página principal ============
 const DashboardProduccionPage = () => {
     const [modalOpen, setModalOpen] = useState(false);
+    const { user } = useAuth();
+    const esAlmacen = user?.rol === 'almacen';
 
     // Hooks personalizados
     const {
@@ -177,7 +180,12 @@ const DashboardProduccionPage = () => {
         toggleEtapa
     } = useProduccionData({ autoSync: true, refreshInterval: 5 * 60 * 1000 });
 
-    const { filtro, setFiltro, busqueda, setBusqueda, proyectosFiltrados, opciones } = useProduccionFilters(proyectos);
+    // Almacén: vista de solo lectura limitada a proyectos en etapa de Producción
+    const proyectosVisibles = esAlmacen
+        ? proyectos.filter(p => p.etapa_actual === 'produccion')
+        : proyectos;
+
+    const { filtro, setFiltro, busqueda, setBusqueda, proyectosFiltrados, opciones } = useProduccionFilters(proyectosVisibles);
 
     if (loading && proyectos.length === 0) {
         return (
@@ -208,6 +216,7 @@ const DashboardProduccionPage = () => {
                             </span>
                         )}
 
+                        {!esAlmacen && (<>
                         <a
                             href="/produccion-tv"
                             target="_blank"
@@ -287,6 +296,7 @@ const DashboardProduccionPage = () => {
                             <Plus size={16} />
                             Nuevo Proyecto
                         </button>
+                        </>)}
                     </div>
                 </div>
             </div>
@@ -317,7 +327,9 @@ const DashboardProduccionPage = () => {
             </div>
 
             {/* Filtros */}
-            <FiltrosProyectos filtro={filtro} setFiltro={setFiltro} opciones={opciones} />
+            {!esAlmacen && (
+                <FiltrosProyectos filtro={filtro} setFiltro={setFiltro} opciones={opciones} />
+            )}
 
             {/* Lista de Proyectos */}
             <div className="space-y-6">
@@ -334,11 +346,11 @@ const DashboardProduccionPage = () => {
                         <ProyectoTimeline
                             key={proyecto.id}
                             proyecto={proyecto}
-                            onCompletar={completarEtapa}
-                            onRegresar={regresarEtapa}
-                            onCompletarSubEtapa={completarSubEtapa}
-                            onTogglePausa={togglePausa}
-                            onToggleEtapa={toggleEtapa}
+                            onCompletar={esAlmacen ? undefined : completarEtapa}
+                            onRegresar={esAlmacen ? undefined : regresarEtapa}
+                            onCompletarSubEtapa={esAlmacen ? undefined : completarSubEtapa}
+                            onTogglePausa={esAlmacen ? undefined : togglePausa}
+                            onToggleEtapa={esAlmacen ? undefined : toggleEtapa}
                         />
                     ))
                 )}
