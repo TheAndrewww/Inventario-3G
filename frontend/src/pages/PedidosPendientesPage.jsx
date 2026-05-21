@@ -4,6 +4,14 @@ import pedidosService from '../services/pedidos.service';
 import { Loader, Modal } from '../components/common';
 import toast from 'react-hot-toast';
 
+// Devuelve solo las observaciones originales del ticket (recorta anotaciones
+// auto-añadidas: [ANULADO], [CANCELADO], [RECHAZADO]...).
+const obsOriginales = (texto) => {
+  if (!texto) return '';
+  const idx = texto.search(/\n\s*\[/);
+  return (idx >= 0 ? texto.substring(0, idx) : texto).trim();
+};
+
 const PedidosPendientesPage = () => {
   const [pedidos, setPedidos] = useState([]);
   const [pedidosCompletados, setPedidosCompletados] = useState([]);
@@ -316,7 +324,7 @@ const PedidosPendientesPage = () => {
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-600">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <User size={13} className="text-gray-400 flex-shrink-0" />
-                      <span className="truncate">Solicitó: {pedido.usuario?.nombre || 'N/A'}</span>
+                      <span className="truncate">Encargado: {pedido.usuario?.nombre || 'N/A'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 min-w-0">
                       <CheckSquare size={13} className="text-gray-400 flex-shrink-0" />
@@ -365,8 +373,8 @@ const PedidosPendientesPage = () => {
                   </p>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-500">Solicitante:</span>
-                  <p className="text-gray-900">{pedidoSeleccionado.usuario?.nombre}</p>
+                  <span className="font-medium text-gray-500">Encargado:</span>
+                  <p className="text-gray-900">{pedidoSeleccionado.usuario?.nombre || '-'}</p>
                 </div>
                 <div>
                   <span className="font-medium text-gray-500">Fecha:</span>
@@ -542,12 +550,14 @@ const PedidosPendientesPage = () => {
               </div>
             </div>
 
-            {pedidoSeleccionado.observaciones && (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h5 className="font-medium text-gray-700 mb-2">Observaciones:</h5>
-                <p className="text-gray-900">{pedidoSeleccionado.observaciones}</p>
-              </div>
-            )}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h5 className="font-medium text-gray-700 mb-2">Observaciones:</h5>
+              {obsOriginales(pedidoSeleccionado.observaciones) ? (
+                <p className="text-gray-900 whitespace-pre-line">{obsOriginales(pedidoSeleccionado.observaciones)}</p>
+              ) : (
+                <p className="text-gray-400 italic text-sm">Sin observaciones.</p>
+              )}
+            </div>
 
             {/* Botón Completar Ticket — visible solo al 100% */}
             {pedidoSeleccionado.progreso_dispersion === 100 && (
