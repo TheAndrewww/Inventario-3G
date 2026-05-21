@@ -2365,9 +2365,9 @@ const InventarioPage = () => {
                           </div>
                         </td>
 
-                        {/* Categoría — editable inline */}
+                        {/* Categoría — editable inline (no para almacén) */}
                         <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                          {puedeEditarArticulos ? (
+                          {puedeGestionarTaxonomia ? (
                             <select
                               value={item.categoria_id ?? ''}
                               onChange={(e) => handleQuickUpdate(item, 'categoria_id', e.target.value)}
@@ -2386,9 +2386,9 @@ const InventarioPage = () => {
                           )}
                         </td>
 
-                        {/* Ubicación — editable inline (incluye cambio de almacén) */}
+                        {/* Ubicación — editable inline (no para almacén) */}
                         <td className="px-2 py-2 overflow-hidden text-sm" onClick={(e) => e.stopPropagation()}>
-                          {puedeEditarArticulos ? (
+                          {puedeGestionarTaxonomia ? (
                             <select
                               value={item.ubicacion_id ?? ''}
                               onChange={(e) => handleQuickUpdate(item, 'ubicacion_id', e.target.value)}
@@ -2420,9 +2420,9 @@ const InventarioPage = () => {
                           </span>
                         </td>
 
-                        {/* Sección — editable inline */}
+                        {/* Sección — editable inline (no para almacén) */}
                         <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                          {puedeEditarArticulos ? (
+                          {puedeGestionarTaxonomia ? (
                             <select
                               value={item.seccion_id ?? ''}
                               onChange={(e) => handleQuickUpdate(item, 'seccion_id', e.target.value)}
@@ -2608,9 +2608,9 @@ const InventarioPage = () => {
                             </div>
                           </td>
 
-                          {/* Categoría — editable inline */}
+                          {/* Categoría — editable inline (no para almacén) */}
                           <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                            {puedeEditarArticulos ? (
+                            {puedeGestionarTaxonomia ? (
                               <select
                                 value={item.categoria_id ?? ''}
                                 onChange={(e) => handleQuickUpdate(item, 'categoria_id', e.target.value)}
@@ -2629,9 +2629,9 @@ const InventarioPage = () => {
                             )}
                           </td>
 
-                          {/* Ubicación — editable inline */}
+                          {/* Ubicación — editable inline (no para almacén) */}
                           <td className="px-2 py-2 overflow-hidden text-sm" onClick={(e) => e.stopPropagation()}>
-                            {puedeEditarArticulos ? (
+                            {puedeGestionarTaxonomia ? (
                               <select
                                 value={item.ubicacion_id ?? ''}
                                 onChange={(e) => handleQuickUpdate(item, 'ubicacion_id', e.target.value)}
@@ -2663,9 +2663,9 @@ const InventarioPage = () => {
                             </span>
                           </td>
 
-                          {/* Sección — editable inline */}
+                          {/* Sección — editable inline (no para almacén) */}
                           <td className="px-2 py-2 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                            {puedeEditarArticulos ? (
+                            {puedeGestionarTaxonomia ? (
                               <select
                                 value={item.seccion_id ?? ''}
                                 onChange={(e) => handleQuickUpdate(item, 'seccion_id', e.target.value)}
