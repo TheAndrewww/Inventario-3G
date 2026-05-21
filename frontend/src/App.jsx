@@ -23,7 +23,6 @@ import CalendarioPage from './pages/CalendarioPage';
 import CalendarioPublicoPage from './pages/CalendarioPublicoPage';
 import AnunciosPublicosPage from './pages/AnunciosPublicosPage';
 import ProcesamientoMasivoPage from './pages/ProcesamientoMasivoPage';
-import MonitorPedidosPage from './pages/MonitorPedidosPage';
 import MiEquipoPage from './pages/MiEquipoPage';
 import DashboardProduccionPage from './pages/DashboardProduccionPage';
 import TerminalAreaPage from './pages/TerminalAreaPage';
@@ -120,7 +119,6 @@ function App() {
                       <Route path="proveedores" element={<ProveedoresPage />} />
                       <Route path="calendario" element={<CalendarioPage />} />
                       <Route path="procesamiento-masivo" element={<ProcesamientoMasivoPage />} />
-                      <Route path="monitor-pedidos" element={<MonitorPedidosPage />} />
                       <Route path="mi-equipo" element={<MiEquipoPage />} />
                       <Route path="produccion" element={<DashboardProduccionPage />} />
                       <Route path="control-campana" element={<ControlCampanaPage />} />
