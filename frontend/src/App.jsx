@@ -36,6 +36,7 @@ import DescontarAlmacenPage from './pages/DescontarAlmacenPage';
 import RollosMembranasPage from './pages/RollosMembranasPage';
 import AvanceProduccionPage from './pages/AvanceProduccionPage';
 import RentaHerramientasPage from './pages/RentaHerramientasPage';
+import ReportesPage from './pages/ReportesPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAuth } from './context/AuthContext';
 
@@ -127,6 +128,7 @@ function App() {
                       <Route path="rollos-membrana" element={<RollosMembranasPage />} />
                       <Route path="avance-produccion" element={<AvanceProduccionPage />} />
                       <Route path="renta-herramientas" element={<RentaHerramientasPage />} />
+                      <Route path="reportes" element={<ReportesPage />} />
                       <Route path="perfil" element={<PerfilPage />} />
 
                       {/* Ruta 404 para rutas privadas no encontradas */}

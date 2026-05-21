@@ -125,6 +125,7 @@ import almacenesRoutes from './src/routes/almacenes.routes.js';
 import rollosMembrana from './src/routes/rollosMembrana.routes.js';
 import checklistRoutes from './src/routes/checklist.routes.js';
 import solicitudesCambioRoutes from './src/routes/solicitudesCambio.routes.js';
+import reportesRoutes from './src/routes/reportes.routes.js';
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -226,6 +227,7 @@ app.use('/api/almacenes', almacenesRoutes);
 app.use('/api/rollos-membrana', rollosMembrana);
 app.use('/api/checklist', checklistRoutes);
 app.use('/api/solicitudes-cambio', solicitudesCambioRoutes);
+app.use('/api/reportes', reportesRoutes);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
 
