@@ -276,11 +276,29 @@ const sincronizarMes = async (mes) => {
             }
 
             // Si el proyecto estaba completado en la DB pero ya NO está marcado en el Excel,
-            // revertir a 'diseno' para que vuelva a aparecer en el dashboard
+            // revertir a 'diseno' para que vuelva a aparecer en el dashboard.
+            // EXCEPCIÓN: si el proyecto fue auto-completado dentro de la app (ambas
+            // sub-etapas manufactura+herrería marcadas), no revertir — el Excel no
+            // refleja ese flujo y reabriríamos un proyecto ya terminado en cada sync.
             if (!proyecto.estaEntregado && existente.etapa_actual === 'completado') {
-                cambios.etapa_actual = 'diseno';
-                cambios.fecha_completado = null;
-                console.log(`⚠️ Proyecto "${proyecto.nombre}" desmarcado como completado en Excel, revirtiendo a diseño`);
+                const completadoEnApp = existente.manufactura_completado && existente.herreria_completado;
+                if (!completadoEnApp) {
+                    cambios.etapa_actual = 'diseno';
+                    cambios.fecha_completado = null;
+                    console.log(`⚠️ Proyecto "${proyecto.nombre}" desmarcado como completado en Excel, revirtiendo a diseño`);
+                }
+            }
+
+            // Recuperación: arreglar proyectos que quedaron en estado inconsistente por
+            // el bug anterior (auto-completados en la app pero revertidos por el sync).
+            // Si ambas sub-etapas están marcadas pero la etapa no es 'completado',
+            // re-promoverlos a completado.
+            const ambasSubEtapasDone = existente.manufactura_completado && existente.herreria_completado;
+            const etapaFinalCambios = cambios.etapa_actual ?? existente.etapa_actual;
+            if (ambasSubEtapasDone && etapaFinalCambios !== 'completado') {
+                cambios.etapa_actual = 'completado';
+                if (!existente.fecha_completado) cambios.fecha_completado = new Date();
+                console.log(`🔧 Proyecto "${proyecto.nombre}" tenía manufactura+herrería completas pero etapa=${etapaFinalCambios}; re-promoviendo a completado`);
             }
 
             if (proyecto.tipoProyecto && existente.tipo_proyecto !== proyecto.tipoProyecto.toUpperCase()) {
