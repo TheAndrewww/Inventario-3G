@@ -42,7 +42,9 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'activos') => {
                 case 'activos':
                     return p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente' && p.etapa_actual !== 'instalacion';
                 case 'preparados':
-                    return p.etapa_actual === 'instalacion';
+                    // Incluye 'instalacion' (Preparado) y 'completado' (auto-completado
+                    // al marcar manufactura+herrería). Ambos se etiquetan "Completado" en UI.
+                    return p.etapa_actual === 'instalacion' || p.etapa_actual === 'completado';
                 case 'urgentes':
                     return p.prioridad === 1 || (p.diasRestantes !== null && p.diasRestantes <= 3);
                 case 'produccion_diseno': {

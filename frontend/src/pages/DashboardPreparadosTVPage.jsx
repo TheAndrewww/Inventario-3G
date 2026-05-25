@@ -74,25 +74,28 @@ const DashboardPreparadosTVPage = () => {
         return (tipo === 'MTO' || tipo === 'GTIA') && !p.es_extensivo;
     };
 
-    // Proyectos PREPARADOS: etapa 'instalacion' O proyectos MTO/GTIA simplificados activos
+    // Proyectos COMPLETADOS: etapa 'instalacion' (Preparado) o 'completado' (auto-completado
+    // al marcar manufactura+herrería), O proyectos MTO/GTIA simplificados activos.
     const proyectosPreparados = useMemo(() =>
         sortProyectosPorUrgencia(
             proyectos.filter(p =>
                 !p.pausado && (
                     p.etapa_actual === 'instalacion' ||
-                    (usaTimelineSimplificado(p) && p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
+                    p.etapa_actual === 'completado' ||
+                    (usaTimelineSimplificado(p) && p.etapa_actual !== 'pendiente')
                 )
             )
         ),
         [proyectos]
     );
 
-    // Proyectos congelados (pausados) que estén en preparado o sean MTO/GTIA
+    // Proyectos congelados (pausados) que estén en preparado/completado o sean MTO/GTIA
     const proyectosCongelados = useMemo(() =>
         proyectos.filter(p =>
             p.pausado && (
                 p.etapa_actual === 'instalacion' ||
-                (usaTimelineSimplificado(p) && p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
+                p.etapa_actual === 'completado' ||
+                (usaTimelineSimplificado(p) && p.etapa_actual !== 'pendiente')
             )
         ),
         [proyectos]
