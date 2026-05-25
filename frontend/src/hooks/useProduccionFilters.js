@@ -47,17 +47,22 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'activos') => {
                     return p.prioridad === 1 || (p.diasRestantes !== null && p.diasRestantes <= 3);
                 case 'produccion_diseno': {
                     // Proyectos que entran a producción: A/B/C, o MTO/GTIA con EXTENSIVO.
-                    // Se excluyen completados y cancelados.
-                    if (p.etapa_actual === 'completado') return false;
+                    // Se excluyen completados (incluye 'instalacion' que en UI se etiqueta
+                    // como "Completado" y vive en la pantalla 📦 Preparados) y cancelados.
+                    if (p.etapa_actual === 'completado' || p.etapa_actual === 'instalacion') return false;
                     if (p.tipo_proyecto?.toUpperCase().startsWith('CANCELADO')) return false;
                     const tipo = p.tipo_proyecto?.toUpperCase();
                     const esMTOoGTIA = tipo === 'MTO' || tipo === 'GTIA';
                     return !esMTOoGTIA || p.es_extensivo;
                 }
                 case 'manufactura':
-                    return p.tiene_manufactura && p.etapa_actual !== 'completado';
+                    return p.tiene_manufactura
+                        && p.etapa_actual !== 'completado'
+                        && p.etapa_actual !== 'instalacion';
                 case 'herreria':
-                    return p.tiene_herreria && p.etapa_actual !== 'completado';
+                    return p.tiene_herreria
+                        && p.etapa_actual !== 'completado'
+                        && p.etapa_actual !== 'instalacion';
                 default:
                     return true;
             }
