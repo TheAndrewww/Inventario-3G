@@ -131,14 +131,16 @@ export const generateTicketPDF = async (pedido) => {
     // Información del pedido (centrada)
     doc.setFontSize(8);
 
-    // Supervisor
+    // Encargado (el seleccionado en el dropdown al crear el ticket).
+    // NO usar al creador como fallback: rellena con el nombre del diseñador y
+    // confunde con el encargado real. Si no hay encargado asignado, mostrarlo así.
     doc.setFont(undefined, 'bold');
-    doc.text('SUPERVISOR', anchoTicket / 2, yPos, { align: 'center' });
+    doc.text('ENCARGADO', anchoTicket / 2, yPos, { align: 'center' });
     yPos += 4;
     doc.setFont(undefined, 'normal');
-    const supervisor = pedido.aprobadoPor?.nombre || pedido.usuario?.nombre || 'N/A';
-    const supervisorLines = doc.splitTextToSize(supervisor, anchoUtil);
-    supervisorLines.forEach(line => {
+    const encargado = pedido.supervisor?.nombre || pedido.aprobadoPor?.nombre || 'Sin encargado';
+    const encargadoLines = doc.splitTextToSize(encargado, anchoUtil);
+    encargadoLines.forEach(line => {
       doc.text(line, anchoTicket / 2, yPos, { align: 'center' });
       yPos += 3.5;
     });
