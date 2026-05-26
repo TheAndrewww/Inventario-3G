@@ -74,30 +74,29 @@ const DashboardPreparadosTVPage = () => {
         return (tipo === 'MTO' || tipo === 'GTIA') && !p.es_extensivo;
     };
 
-    // Proyectos COMPLETADOS: etapa 'instalacion' (Preparado) o 'completado' (auto-completado
-    // al marcar manufactura+herrería), O proyectos MTO/GTIA simplificados activos.
+    // Proyectos COMPLETADOS: producción terminada y NO cerrados desde el índice (Excel).
+    //  - etapa 'instalacion' (Preparado, marcado en app)
+    //  - etapa 'completado' auto-completado al marcar manufactura+herrería
+    //  - MTO/GTIA simplificados activos (su único estado intermedio es Preparado)
+    // En todos los casos excluimos los que tienen cerrado_en_indice=true porque ya
+    // fueron cerrados desde el Excel.
+    const cumpleEstadoCompletado = (p) =>
+        !p.cerrado_en_indice && (
+            p.etapa_actual === 'instalacion' ||
+            p.etapa_actual === 'completado' ||
+            (usaTimelineSimplificado(p) && p.etapa_actual !== 'pendiente' && p.etapa_actual !== 'completado')
+        );
+
     const proyectosPreparados = useMemo(() =>
         sortProyectosPorUrgencia(
-            proyectos.filter(p =>
-                !p.pausado && (
-                    p.etapa_actual === 'instalacion' ||
-                    p.etapa_actual === 'completado' ||
-                    (usaTimelineSimplificado(p) && p.etapa_actual !== 'pendiente')
-                )
-            )
+            proyectos.filter(p => !p.pausado && cumpleEstadoCompletado(p))
         ),
         [proyectos]
     );
 
-    // Proyectos congelados (pausados) que estén en preparado/completado o sean MTO/GTIA
+    // Proyectos congelados (pausados) que estén en estado de Completado
     const proyectosCongelados = useMemo(() =>
-        proyectos.filter(p =>
-            p.pausado && (
-                p.etapa_actual === 'instalacion' ||
-                p.etapa_actual === 'completado' ||
-                (usaTimelineSimplificado(p) && p.etapa_actual !== 'pendiente')
-            )
-        ),
+        proyectos.filter(p => p.pausado && cumpleEstadoCompletado(p)),
         [proyectos]
     );
 

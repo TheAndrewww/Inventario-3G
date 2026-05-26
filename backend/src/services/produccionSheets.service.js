@@ -275,6 +275,13 @@ const sincronizarMes = async (mes) => {
                 cambios.fecha_completado = new Date();
             }
 
+            // Trackear si la casilla del índice (Excel) está marcada. La pantalla
+            // de Completados oculta los que tengan cerrado_en_indice=true para no
+            // mostrar proyectos ya cerrados desde el índice.
+            if (existente.cerrado_en_indice !== proyecto.estaEntregado) {
+                cambios.cerrado_en_indice = !!proyecto.estaEntregado;
+            }
+
             // Si el proyecto estaba completado en la DB pero ya NO está marcado en el Excel,
             // revertir a 'diseno' para que vuelva a aparecer en el dashboard.
             // EXCEPCIÓN: si el proyecto fue auto-completado dentro de la app (ambas
@@ -328,6 +335,7 @@ const sincronizarMes = async (mes) => {
                 tipo_proyecto: proyecto.tipoProyecto ? proyecto.tipoProyecto.toUpperCase() : null,
                 es_extensivo: proyecto.esExtensivo,
                 es_premium: proyecto.esPremium,
+                cerrado_en_indice: !!proyecto.estaEntregado,
                 prioridad: 3,
                 activo: true
             });

@@ -284,6 +284,16 @@ const ProduccionProyecto = sequelize.define('ProduccionProyecto', {
         defaultValue: true,
         allowNull: false,
         comment: 'Si el proyecto está activo (soft delete)'
+    },
+
+    // Marca cuando el sync detecta que la casilla "entregado" del índice (Excel)
+    // está prendida. Se usa para esconder de la pantalla de Completados los
+    // proyectos cerrados desde el índice, sin perderlos del histórico de la DB.
+    cerrado_en_indice: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+        comment: 'Casilla de entregado marcada en el índice (Google Sheets)'
     }
 }, {
     tableName: 'produccion_proyectos',
@@ -739,6 +749,10 @@ ProduccionProyecto.obtenerResumenDashboard = async function () {
     const proyectos = await this.findAll({
         where: {
             activo: true,
+            // Excluir proyectos cerrados desde el índice (casilla del Excel marcada).
+            // Se mantienen en la DB como histórico pero no aparecen en ningún dashboard
+            // ni en la pantalla de Completados — el cierre desde el índice los archiva.
+            cerrado_en_indice: false,
             // Excluir proyectos cancelados
             [Op.or]: [
                 { tipo_proyecto: null },
