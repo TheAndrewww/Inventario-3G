@@ -42,12 +42,7 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'activos') => {
                 case 'activos':
                     return p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente' && p.etapa_actual !== 'instalacion';
                 case 'preparados':
-                    // Incluye 'instalacion' (Preparado) y 'completado' (auto-completado
-                    // al marcar manufactura+herrería). Excluye los cerrados desde el
-                    // índice (Excel) — esos ya fueron archivados desde el spreadsheet.
-                    return !p.cerrado_en_indice && (
-                        p.etapa_actual === 'instalacion' || p.etapa_actual === 'completado'
-                    );
+                    return p.etapa_actual === 'instalacion';
                 case 'urgentes':
                     return p.prioridad === 1 || (p.diasRestantes !== null && p.diasRestantes <= 3);
                 case 'produccion_diseno': {

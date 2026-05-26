@@ -575,12 +575,11 @@ export const toggleEtapa = async (req, res) => {
         const manDone = proyecto.manufactura_completado || !!proyecto.manufactura_completado_en;
         const herDone = proyecto.herreria_completado || !!proyecto.herreria_completado_en;
 
-        // Si ambas sub-etapas de producción están completas → Completado (auto)
-        if (manDone && herDone) {
-            nuevaEtapa = 'completado';
-        }
-        // Si marca "Preparado" sin tener ambas sub-etapas → Preparado (instalacion)
-        else if (proyecto.instalacion_completado_en) {
+        // Si ambas sub-etapas de producción están completas O marca "Preparado"
+        // → 'instalacion' (= "Completado" en UI, pantalla de Completados).
+        // NO usamos 'completado' aquí: ese estado está reservado para los
+        // proyectos cerrados desde el índice (casilla E del Excel).
+        if ((manDone && herDone) || proyecto.instalacion_completado_en) {
             nuevaEtapa = 'instalacion';
         }
         // Si alguna sub-etapa está marcada → Producción
@@ -594,15 +593,14 @@ export const toggleEtapa = async (req, res) => {
 
         proyecto.etapa_actual = nuevaEtapa;
 
-        // Si completado, actualizar fecha_completado y sellar instalación para
-        // que los checkboxes queden consistentes con la etapa final.
-        if (nuevaEtapa === 'completado') {
-            if (!proyecto.fecha_completado) proyecto.fecha_completado = ahora;
-            if (!proyecto.instalacion_completado_en) {
-                proyecto.instalacion_completado_en = ahora;
-                proyecto.instalacion_completado_por = usuarioId;
-            }
-        } else {
+        // Al pasar a 'instalacion' por auto-avance (ambas sub-etapas), asegurar
+        // que instalacion_completado_en quede sellado.
+        if (nuevaEtapa === 'instalacion' && !proyecto.instalacion_completado_en) {
+            proyecto.instalacion_completado_en = ahora;
+            proyecto.instalacion_completado_por = usuarioId;
+        }
+        // fecha_completado sólo aplica para etapa='completado' (cierre desde Excel)
+        if (nuevaEtapa !== 'completado') {
             proyecto.fecha_completado = null;
         }
 

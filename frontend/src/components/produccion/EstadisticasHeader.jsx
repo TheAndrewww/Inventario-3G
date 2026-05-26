@@ -4,15 +4,11 @@ import { s, px } from '../../utils/produccion';
 
 const EstadisticasHeader = ({ estadisticas }) => {
 
-    // "Completado" agrupa Preparados (instalacion) + auto-completados (completado)
-    // porque ambas etapas se etiquetan "Completado" en UI y viven en la misma pantalla.
-    const totalCompletado = (estadisticas.instalacion || 0) + (estadisticas.completado || 0);
-
     const items = [
         { label: 'En Diseño', value: estadisticas.diseno || 0, color: ETAPAS_CONFIG.diseno.color, icon: ETAPAS_CONFIG.diseno.icon },
         { label: 'En Compras', value: estadisticas.compras || 0, color: ETAPAS_CONFIG.compras.color, icon: ETAPAS_CONFIG.compras.icon },
         { label: 'En Producción', value: estadisticas.produccion || 0, color: ETAPAS_CONFIG.produccion.color, icon: ETAPAS_CONFIG.produccion.icon },
-        { label: 'Completado', value: totalCompletado, color: ETAPAS_CONFIG.instalacion.color, icon: ETAPAS_CONFIG.instalacion.icon },
+        { label: 'Completado', value: estadisticas.instalacion || 0, color: ETAPAS_CONFIG.instalacion.color, icon: ETAPAS_CONFIG.instalacion.icon },
     ];
 
     return (

@@ -74,29 +74,29 @@ const DashboardPreparadosTVPage = () => {
         return (tipo === 'MTO' || tipo === 'GTIA') && !p.es_extensivo;
     };
 
-    // Proyectos COMPLETADOS: producción terminada y NO cerrados desde el índice (Excel).
-    //  - etapa 'instalacion' (Preparado, marcado en app)
-    //  - etapa 'completado' auto-completado al marcar manufactura+herrería
-    //  - MTO/GTIA simplificados activos (su único estado intermedio es Preparado)
-    // En todos los casos excluimos los que tienen cerrado_en_indice=true porque ya
-    // fueron cerrados desde el Excel.
-    const cumpleEstadoCompletado = (p) =>
-        !p.cerrado_en_indice && (
-            p.etapa_actual === 'instalacion' ||
-            p.etapa_actual === 'completado' ||
-            (usaTimelineSimplificado(p) && p.etapa_actual !== 'pendiente' && p.etapa_actual !== 'completado')
-        );
-
+    // Proyectos PREPARADOS / COMPLETADOS: etapa 'instalacion' o MTO/GTIA simplificados activos.
+    // No incluye 'completado' porque ese estado es para los cerrados desde la casilla
+    // E del Excel y el backend ya los excluye del dataset.
     const proyectosPreparados = useMemo(() =>
         sortProyectosPorUrgencia(
-            proyectos.filter(p => !p.pausado && cumpleEstadoCompletado(p))
+            proyectos.filter(p =>
+                !p.pausado && (
+                    p.etapa_actual === 'instalacion' ||
+                    (usaTimelineSimplificado(p) && p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
+                )
+            )
         ),
         [proyectos]
     );
 
-    // Proyectos congelados (pausados) que estén en estado de Completado
+    // Proyectos congelados (pausados) que estén en preparado o sean MTO/GTIA
     const proyectosCongelados = useMemo(() =>
-        proyectos.filter(p => p.pausado && cumpleEstadoCompletado(p)),
+        proyectos.filter(p =>
+            p.pausado && (
+                p.etapa_actual === 'instalacion' ||
+                (usaTimelineSimplificado(p) && p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente')
+            )
+        ),
         [proyectos]
     );
 

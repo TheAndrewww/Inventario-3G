@@ -434,14 +434,6 @@ const startServer = async () => {
                 console.log('⚠️ No se pudo verificar/agregar herreria_armado/pintado:', e.message);
             }
 
-            // Verificar columna cerrado_en_indice (refleja la casilla "entregado" del Excel)
-            try {
-                await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS cerrado_en_indice BOOLEAN DEFAULT FALSE NOT NULL");
-                console.log('✅ Columna cerrado_en_indice verificada');
-            } catch (e) {
-                console.log('⚠️ No se pudo verificar/agregar cerrado_en_indice:', e.message);
-            }
-
             // Regla de negocio: artículos con stock_minimo = 0 quedan desactivados.
             // El hook beforeCreate/beforeUpdate del modelo cubre los futuros;
             // este UPDATE alinea los existentes al arrancar (idempotente).
@@ -725,14 +717,6 @@ const startServer = async () => {
                     console.log('✅ Columnas herreria_armado/pintado verificadas');
                 } catch (e) {
                     console.log('⚠️ No se pudo verificar/agregar herreria_armado/pintado:', e.message);
-                }
-
-                // Verificar columna cerrado_en_indice (refleja la casilla "entregado" del Excel)
-                try {
-                    await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS cerrado_en_indice BOOLEAN DEFAULT FALSE NOT NULL");
-                    console.log('✅ Columna cerrado_en_indice verificada');
-                } catch (e) {
-                    console.log('⚠️ No se pudo verificar/agregar cerrado_en_indice:', e.message);
                 }
             }
 

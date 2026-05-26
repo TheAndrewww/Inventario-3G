@@ -275,37 +275,24 @@ const sincronizarMes = async (mes) => {
                 cambios.fecha_completado = new Date();
             }
 
-            // Trackear si la casilla del índice (Excel) está marcada. La pantalla
-            // de Completados oculta los que tengan cerrado_en_indice=true para no
-            // mostrar proyectos ya cerrados desde el índice.
-            if (existente.cerrado_en_indice !== proyecto.estaEntregado) {
-                cambios.cerrado_en_indice = !!proyecto.estaEntregado;
-            }
-
             // Si el proyecto estaba completado en la DB pero ya NO está marcado en el Excel,
             // revertir a 'diseno' para que vuelva a aparecer en el dashboard.
-            // EXCEPCIÓN: si el proyecto fue auto-completado dentro de la app (ambas
-            // sub-etapas manufactura+herrería marcadas), no revertir — el Excel no
-            // refleja ese flujo y reabriríamos un proyecto ya terminado en cada sync.
             if (!proyecto.estaEntregado && existente.etapa_actual === 'completado') {
-                const completadoEnApp = existente.manufactura_completado && existente.herreria_completado;
-                if (!completadoEnApp) {
-                    cambios.etapa_actual = 'diseno';
-                    cambios.fecha_completado = null;
-                    console.log(`⚠️ Proyecto "${proyecto.nombre}" desmarcado como completado en Excel, revirtiendo a diseño`);
-                }
+                cambios.etapa_actual = 'diseno';
+                cambios.fecha_completado = null;
+                console.log(`⚠️ Proyecto "${proyecto.nombre}" desmarcado como completado en Excel, revirtiendo a diseño`);
             }
 
-            // Recuperación: arreglar proyectos que quedaron en estado inconsistente por
-            // el bug anterior (auto-completados en la app pero revertidos por el sync).
-            // Si ambas sub-etapas están marcadas pero la etapa no es 'completado',
-            // re-promoverlos a completado.
+            // Recuperación: arreglar proyectos que quedaron en estado inconsistente.
+            // Si ambas sub-etapas están marcadas pero la etapa no es 'instalacion' ni
+            // 'completado' (= ya cerrado desde el Excel), promover a 'instalacion'
+            // (pantalla de Completados).
             const ambasSubEtapasDone = existente.manufactura_completado && existente.herreria_completado;
             const etapaFinalCambios = cambios.etapa_actual ?? existente.etapa_actual;
-            if (ambasSubEtapasDone && etapaFinalCambios !== 'completado') {
-                cambios.etapa_actual = 'completado';
-                if (!existente.fecha_completado) cambios.fecha_completado = new Date();
-                console.log(`🔧 Proyecto "${proyecto.nombre}" tenía manufactura+herrería completas pero etapa=${etapaFinalCambios}; re-promoviendo a completado`);
+            if (ambasSubEtapasDone && etapaFinalCambios !== 'instalacion' && etapaFinalCambios !== 'completado') {
+                cambios.etapa_actual = 'instalacion';
+                if (!existente.instalacion_completado_en) cambios.instalacion_completado_en = new Date();
+                console.log(`🔧 Proyecto "${proyecto.nombre}" tenía manufactura+herrería completas pero etapa=${etapaFinalCambios}; promoviendo a instalacion`);
             }
 
             if (proyecto.tipoProyecto && existente.tipo_proyecto !== proyecto.tipoProyecto.toUpperCase()) {
@@ -335,7 +322,6 @@ const sincronizarMes = async (mes) => {
                 tipo_proyecto: proyecto.tipoProyecto ? proyecto.tipoProyecto.toUpperCase() : null,
                 es_extensivo: proyecto.esExtensivo,
                 es_premium: proyecto.esPremium,
-                cerrado_en_indice: !!proyecto.estaEntregado,
                 prioridad: 3,
                 activo: true
             });

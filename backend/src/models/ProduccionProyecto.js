@@ -284,16 +284,6 @@ const ProduccionProyecto = sequelize.define('ProduccionProyecto', {
         defaultValue: true,
         allowNull: false,
         comment: 'Si el proyecto está activo (soft delete)'
-    },
-
-    // Marca cuando el sync detecta que la casilla "entregado" del índice (Excel)
-    // está prendida. Se usa para esconder de la pantalla de Completados los
-    // proyectos cerrados desde el índice, sin perderlos del histórico de la DB.
-    cerrado_en_indice: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
-        allowNull: false,
-        comment: 'Casilla de entregado marcada en el índice (Google Sheets)'
     }
 }, {
     tableName: 'produccion_proyectos',
@@ -524,16 +514,15 @@ ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEt
     // Verificar si ambas sub-etapas están completas para auto-avanzar
     const puedeAvanzar = this.manufactura_completado && this.herreria_completado;
 
-    // Auto-avanzar directamente a 'completado' cuando ambas sub-etapas están completas.
-    // Se rellena también instalacion_* para mantener consistencia con los checkboxes.
+    // Auto-avanzar a 'instalacion' (= "Completado" en UI, vive en la pantalla
+    // de Completados) cuando ambas sub-etapas están completas. NO usamos
+    // etapa='completado' porque ese estado está reservado para los proyectos
+    // cerrados desde el índice (casilla E del Excel) y queda oculto del dashboard.
     let autoAvanzado = false;
-    if (puedeAvanzar && this.etapa_actual !== 'completado') {
-        if (!this.instalacion_completado_en) {
-            this.instalacion_completado_en = ahora;
-            this.instalacion_completado_por = usuarioId;
-        }
-        this.etapa_actual = 'completado';
-        if (!this.fecha_completado) this.fecha_completado = ahora;
+    if (puedeAvanzar && this.etapa_actual !== 'instalacion' && this.etapa_actual !== 'completado') {
+        this.etapa_actual = 'instalacion';
+        this.instalacion_completado_en = ahora;
+        this.instalacion_completado_por = usuarioId;
         await this.save();
         autoAvanzado = true;
     }
@@ -749,10 +738,10 @@ ProduccionProyecto.obtenerResumenDashboard = async function () {
     const proyectos = await this.findAll({
         where: {
             activo: true,
-            // Excluir proyectos cerrados desde el índice (casilla del Excel marcada).
-            // Se mantienen en la DB como histórico pero no aparecen en ningún dashboard
-            // ni en la pantalla de Completados — el cierre desde el índice los archiva.
-            cerrado_en_indice: false,
+            // Ocultar proyectos cerrados desde el índice (casilla E del Excel marcada
+            // → sync los pone en etapa='completado'). Se mantienen en la DB como
+            // histórico pero no aparecen en ningún dashboard.
+            etapa_actual: { [Op.ne]: 'completado' },
             // Excluir proyectos cancelados
             [Op.or]: [
                 { tipo_proyecto: null },
