@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ClipboardList, CheckSquare, Square, Package, User, Calendar, AlertCircle, Edit2, Plus, Minus, Trash2, Save, X, CheckCircle } from 'lucide-react';
 import pedidosService from '../services/pedidos.service';
 import { Loader, Modal } from '../components/common';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 // Devuelve solo las observaciones originales del ticket (recorta anotaciones
@@ -16,6 +17,8 @@ const obsOriginales = (texto) => {
 };
 
 const PedidosPendientesPage = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.rol === 'administrador';
   const [pedidos, setPedidos] = useState([]);
   const [pedidosCompletados, setPedidosCompletados] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -172,6 +175,27 @@ const PedidosPendientesPage = () => {
     }
   };
 
+  const handleEliminarTicket = async (pedido) => {
+    if (!isAdmin) return;
+    if (!confirm(`¿Eliminar permanentemente el ticket ${pedido.ticket_id}? Se revertirá el stock y esta acción no se puede deshacer.`)) {
+      return;
+    }
+    try {
+      setProcesando(true);
+      await pedidosService.eliminar(pedido.id);
+      toast.success(`Ticket ${pedido.ticket_id} eliminado`);
+      if (pedidoSeleccionado?.id === pedido.id) {
+        handleCloseModal();
+      }
+      await cargarPedidosPendientes();
+    } catch (error) {
+      console.error('Error al eliminar ticket:', error);
+      toast.error(error.response?.data?.message || 'Error al eliminar el ticket');
+    } finally {
+      setProcesando(false);
+    }
+  };
+
   const getProgresoColor = (porcentaje) => {
     if (porcentaje === 0) return 'bg-red-500';
     if (porcentaje < 50) return 'bg-orange-500';
@@ -246,6 +270,20 @@ const PedidosPendientesPage = () => {
                         </div>
                       </div>
                     </div>
+
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEliminarTicket(pedido);
+                        }}
+                        disabled={procesando}
+                        className="flex-shrink-0 ml-2 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        title="Eliminar ticket (solo administrador)"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
                   </div>
 
                   <div className="mb-3">
@@ -577,6 +615,18 @@ const PedidosPendientesPage = () => {
                   El ticket pasará a la columna de Completados.
                 </p>
               </div>
+            )}
+
+            {/* Botón Eliminar Ticket — solo administrador y tickets pendientes */}
+            {isAdmin && pedidoSeleccionado.estado === 'pendiente' && (
+              <button
+                onClick={() => handleEliminarTicket(pedidoSeleccionado)}
+                disabled={procesando}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 border-2 border-red-200 text-red-700 hover:bg-red-50 font-semibold rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Trash2 size={20} />
+                {procesando ? 'Eliminando...' : 'Eliminar Ticket'}
+              </button>
             )}
 
           </div>

@@ -98,6 +98,14 @@ const pedidosService = {
   },
 
   /**
+   * Eliminar permanentemente un ticket pendiente (solo administrador)
+   */
+  eliminar: async (pedidoId) => {
+    const response = await api.delete(`/pedidos/${pedidoId}`);
+    return response.data;
+  },
+
+  /**
    * Listar pedidos pendientes de aprobación (para encargados)
    */
   listarPendientesAprobacion: async () => {

@@ -7,6 +7,7 @@ import {
   listarPedidosPendientes,
   cancelarPedido,
   anularPedido,
+  eliminarPedido,
   actualizarCantidadArticulo,
   agregarArticuloAPedido,
   eliminarArticuloDePedido,
@@ -25,7 +26,8 @@ import {
   verificarToken,
   verificarRol,
   accesoDiseño,
-  accesoInventario
+  accesoInventario,
+  esAdministrador
 } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
@@ -136,6 +138,18 @@ router.put(
   verificarToken,
   verificarRol('encargado', 'administrador'),
   anularPedido
+);
+
+/**
+ * @route   DELETE /api/pedidos/:id
+ * @desc    Eliminar permanentemente un ticket pendiente (revierte stock)
+ * @access  Solo Administrador
+ */
+router.delete(
+  '/:id',
+  verificarToken,
+  esAdministrador,
+  eliminarPedido
 );
 
 /**

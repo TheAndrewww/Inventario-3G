@@ -1606,6 +1606,141 @@ export const eliminarArticuloDePedido = async (req, res) => {
 };
 
 /**
+ * Eliminar permanentemente un ticket (pedido) pendiente.
+ * SOLO administradores. Revierte el stock descontado, libera/cancela las
+ * solicitudes de compra asociadas y borra físicamente el pedido y sus detalles.
+ */
+export const eliminarPedido = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+    const usuario = req.usuario;
+
+    // Doble verificación de permisos (la ruta ya exige rol administrador)
+    if (usuario.rol !== 'administrador') {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        message: 'Solo los administradores pueden eliminar tickets pendientes'
+      });
+    }
+
+    // Obtener el pedido con detalles (y artículo) y solicitudes de compra
+    const pedido = await Movimiento.findOne({
+      where: { id, tipo: 'pedido' },
+      include: [
+        {
+          model: DetalleMovimiento,
+          as: 'detalles',
+          include: [{ model: Articulo, as: 'articulo' }]
+        },
+        {
+          model: SolicitudCompra,
+          as: 'solicitudes_compra',
+          include: [{ model: OrdenCompra, as: 'ordenCompra' }]
+        }
+      ],
+      transaction
+    });
+
+    if (!pedido) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Ticket no encontrado'
+      });
+    }
+
+    // Solo se pueden eliminar tickets pendientes
+    if (pedido.estado !== 'pendiente') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Solo se pueden eliminar tickets pendientes. Este ticket está en estado "${pedido.estado}".`
+      });
+    }
+
+    // No eliminar si hay solicitudes de compra ya completadas (material recibido)
+    const solicitudesCompletadas = pedido.solicitudes_compra?.filter(s => s.estado === 'completada') || [];
+    if (solicitudesCompletadas.length > 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `No se puede eliminar porque ${solicitudesCompletadas.length} solicitud(es) de compra ya fueron completadas (material recibido).`
+      });
+    }
+
+    console.log(`\n🗑️  [Eliminación] Admin ${usuario.nombre} eliminando ticket ${pedido.ticket_id}`);
+
+    // PASO 1: Revertir el stock de todos los artículos del pedido
+    const articulosRevertidos = [];
+    for (const detalle of pedido.detalles) {
+      const articulo = detalle.articulo;
+      if (!articulo) continue;
+      const cantidadARevertir = parseFloat(detalle.cantidad);
+      const stockAntes = parseFloat(articulo.stock_actual);
+      const stockDespues = stockAntes + cantidadARevertir;
+
+      await articulo.update({ stock_actual: stockDespues }, { transaction });
+      articulosRevertidos.push({ articulo_id: articulo.id, nombre: articulo.nombre, cantidad_revertida: cantidadARevertir });
+      console.log(`   ✅ ${articulo.nombre}: ${stockAntes} + ${cantidadARevertir} = ${stockDespues}`);
+    }
+
+    // PASO 2: Cancelar y liberar las solicitudes de compra asociadas.
+    // Se desvincula pedido_origen_id para evitar violar la FK al borrar el pedido.
+    let solicitudesCanceladas = 0;
+    for (const solicitud of (pedido.solicitudes_compra || [])) {
+      const nuevoEstado = ['pendiente', 'en_orden'].includes(solicitud.estado) ? 'cancelada' : solicitud.estado;
+      await solicitud.update({
+        estado: nuevoEstado,
+        pedido_origen_id: null,
+        observaciones: `${solicitud.observaciones || ''}\n[Liberada automáticamente] El ticket ${pedido.ticket_id} fue eliminado por ${usuario.nombre}.`.trim()
+      }, { transaction });
+      if (nuevoEstado === 'cancelada') solicitudesCanceladas++;
+    }
+
+    // PASO 3: Borrar físicamente detalles y el pedido
+    await DetalleMovimiento.destroy({ where: { movimiento_id: pedido.id }, transaction });
+    const ticketEliminado = pedido.ticket_id;
+    const creadorId = pedido.usuario_id;
+    await pedido.destroy({ transaction });
+
+    await transaction.commit();
+
+    // Notificar al creador del ticket
+    try {
+      await crearNotificacion({
+        usuario_id: creadorId,
+        tipo: 'pedido_anulado',
+        titulo: 'Ticket eliminado',
+        mensaje: `Tu ticket ${ticketEliminado} fue eliminado por ${usuario.nombre}. El stock ha sido revertido.`,
+        url: '/pedidos-pendientes'
+      });
+    } catch (notifError) {
+      console.error('Error al enviar notificación de eliminación:', notifError);
+    }
+
+    console.log(`✅ [Eliminación] Ticket ${ticketEliminado} eliminado permanentemente\n`);
+
+    res.status(200).json({
+      success: true,
+      message: `Ticket ${ticketEliminado} eliminado. Stock revertido: ${articulosRevertidos.length} artículo(s). Solicitudes canceladas: ${solicitudesCanceladas}.`,
+      data: { ticket_id: ticketEliminado, stock_revertido: articulosRevertidos, solicitudes_canceladas: solicitudesCanceladas }
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al eliminar ticket:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar el ticket',
+      error: error.message
+    });
+  }
+};
+
+/**
  * Aprobar un pedido de equipo (solo supervisores)
  * El supervisor debe ser el asignado al equipo
  */
