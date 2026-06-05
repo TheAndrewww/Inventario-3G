@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer, Wrench } from 'lucide-react';
+import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer, Wrench, Save } from 'lucide-react';
 import api from '../services/api';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
@@ -69,6 +69,9 @@ const InventarioPage = () => {
   const [todasCategorias, setTodasCategorias] = useState([]); // Todas las categorías (para edición rápida)
   const [todasUbicaciones, setTodasUbicaciones] = useState([]); // Todas las ubicaciones con su almacén (para edición rápida)
   const [actualizandoArt, setActualizandoArt] = useState(new Set()); // IDs siendo actualizados
+  const [modoAjusteStock, setModoAjusteStock] = useState(false); // Modo edición rápida de stocks (solo admin)
+  const [stocksEditados, setStocksEditados] = useState({}); // id → nuevo valor (pendiente de guardar)
+  const [guardandoStocks, setGuardandoStocks] = useState(false);
   const [tabActivo, setTabActivo] = useState('consumibles'); // Nuevo: 'consumibles' o 'herramientas'
   const [mostrarDesactivados, setMostrarDesactivados] = useState(false);
 
@@ -356,6 +359,101 @@ const InventarioPage = () => {
       toast.error(err.message || 'Error al actualizar');
     } finally {
       setActualizandoArt(prev => { const n = new Set(prev); n.delete(item.id); return n; });
+    }
+  };
+
+  // ============ AJUSTE RÁPIDO DE STOCKS (solo admin, guardado en lote) ============
+  // Los cambios se acumulan localmente y se guardan todos juntos al presionar "Guardar"
+
+  const handleStockEditChange = (item, value) => {
+    setStocksEditados(prev => {
+      const next = { ...prev };
+      // Si el valor vuelve a ser el original, descartar el cambio pendiente
+      if (value !== '' && parseFloat(value) === parseFloat(item.stock_actual)) {
+        delete next[item.id];
+      } else {
+        next[item.id] = value;
+      }
+      return next;
+    });
+  };
+
+  // Cambios válidos pendientes de guardar (con delta ≠ 0)
+  const cambiosStockPendientes = React.useMemo(() => {
+    return Object.entries(stocksEditados)
+      .map(([id, valor]) => {
+        const art = articulos.find(a => a.id === Number(id));
+        if (!art || valor === '') return null;
+        const nuevo = parseFloat(valor);
+        if (isNaN(nuevo) || nuevo < 0) return null;
+        const delta = nuevo - parseFloat(art.stock_actual);
+        if (delta === 0) return null;
+        return { articulo: art, nuevo, delta };
+      })
+      .filter(Boolean);
+  }, [stocksEditados, articulos]);
+
+  const handleCancelarAjusteStock = () => {
+    if (cambiosStockPendientes.length > 0 &&
+      !window.confirm(`Hay ${cambiosStockPendientes.length} cambio(s) sin guardar. ¿Descartar?`)) {
+      return;
+    }
+    setModoAjusteStock(false);
+    setStocksEditados({});
+  };
+
+  const handleGuardarAjustesStock = async () => {
+    if (cambiosStockPendientes.length === 0) {
+      setModoAjusteStock(false);
+      setStocksEditados({});
+      return;
+    }
+
+    setGuardandoStocks(true);
+    try {
+      const entradas = cambiosStockPendientes.filter(c => c.delta > 0);
+      const salidas = cambiosStockPendientes.filter(c => c.delta < 0);
+
+      // Registrar como movimientos de ajuste para mantener el historial
+      if (entradas.length > 0) {
+        await movimientosService.create({
+          tipo: 'ajuste_entrada',
+          articulos: entradas.map(c => ({
+            articulo_id: c.articulo.id,
+            cantidad: c.delta,
+            observaciones: `Ajuste rápido: ${formatearCantidad(c.articulo.stock_actual, c.articulo.unidad)} → ${formatearCantidad(c.nuevo, c.articulo.unidad)}`
+          })),
+          observaciones: 'Ajuste rápido de stocks desde inventario'
+        });
+      }
+      if (salidas.length > 0) {
+        await movimientosService.create({
+          tipo: 'ajuste_salida',
+          articulos: salidas.map(c => ({
+            articulo_id: c.articulo.id,
+            cantidad: Math.abs(c.delta),
+            observaciones: `Ajuste rápido: ${formatearCantidad(c.articulo.stock_actual, c.articulo.unidad)} → ${formatearCantidad(c.nuevo, c.articulo.unidad)}`
+          })),
+          observaciones: 'Ajuste rápido de stocks desde inventario'
+        });
+      }
+
+      // Actualizar localmente sin refetch completo
+      const nuevosPorId = Object.fromEntries(cambiosStockPendientes.map(c => [c.articulo.id, c.nuevo]));
+      setArticulos(prev => prev.map(a =>
+        nuevosPorId[a.id] !== undefined ? { ...a, stock_actual: nuevosPorId[a.id] } : a
+      ));
+
+      toast.success(`${cambiosStockPendientes.length} stock(s) ajustado(s) correctamente`);
+      setModoAjusteStock(false);
+      setStocksEditados({});
+    } catch (error) {
+      console.error('Error al guardar ajustes de stock:', error);
+      toast.error(error.response?.data?.message || 'Error al guardar los ajustes de stock');
+      // Re-sincronizar por si algún movimiento sí alcanzó a aplicarse
+      fetchArticulos({ silent: true });
+    } finally {
+      setGuardandoStocks(false);
     }
   };
 
@@ -2245,9 +2343,61 @@ const InventarioPage = () => {
               )}
             </>
           )}
+
+          {/* Ajuste rápido de stocks (solo admin) — los cambios se guardan en lote, no uno por uno */}
+          {esAdministrador && (
+            <button
+              onClick={() => modoAjusteStock ? handleCancelarAjusteStock() : setModoAjusteStock(true)}
+              disabled={guardandoStocks}
+              className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base rounded-lg transition-colors disabled:opacity-50 ${modoAjusteStock
+                ? 'bg-amber-500 text-white hover:bg-amber-600 ring-2 ring-amber-300'
+                : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                }`}
+              title={modoAjusteStock ? 'Salir del modo de ajuste de stocks' : 'Editar stocks directamente en la tabla y guardar todo en un solo paso'}
+            >
+              <Edit2 size={18} />
+              <span className="hidden sm:inline">{modoAjusteStock ? 'Salir de Ajuste' : 'Ajustar Stocks'}</span>
+            </button>
+          )}
         </div>
 
       </div>
+
+      {/* Barra flotante de ajuste de stocks: los cambios solo se aplican al presionar Guardar */}
+      {modoAjusteStock && esAdministrador && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-white border-2 border-amber-400 rounded-xl shadow-2xl">
+          <span className="text-sm font-medium text-gray-700">
+            {cambiosStockPendientes.length === 0
+              ? 'Edita los stocks en la tabla'
+              : `${cambiosStockPendientes.length} cambio${cambiosStockPendientes.length === 1 ? '' : 's'} pendiente${cambiosStockPendientes.length === 1 ? '' : 's'}`}
+          </span>
+          <button
+            onClick={handleGuardarAjustesStock}
+            disabled={guardandoStocks || cambiosStockPendientes.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {guardandoStocks ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save size={16} />
+                Guardar
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleCancelarAjusteStock}
+            disabled={guardandoStocks}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 disabled:opacity-50"
+          >
+            <X size={16} />
+            Cancelar
+          </button>
+        </div>
+      )}
 
       {/* Sección Unificada: Artículos (Consumibles + Herramientas) */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -2413,11 +2563,23 @@ const InventarioPage = () => {
                           )}
                         </td>
 
-                        {/* Stock Total (para consumibles es stock actual) */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                            {formatearCantidad(item.stock_actual, item.unidad)}
-                          </span>
+                        {/* Stock Total (para consumibles es stock actual) — editable en modo ajuste (solo admin) */}
+                        <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => modoAjusteStock && e.stopPropagation()}>
+                          {modoAjusteStock && esAdministrador ? (
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={stocksEditados[item.id] ?? String(parseFloat(item.stock_actual))}
+                              onChange={(e) => handleStockEditChange(item, e.target.value)}
+                              disabled={guardandoStocks}
+                              className={`w-24 px-2 py-1 text-sm border rounded-lg focus:ring-2 focus:ring-amber-400 focus:outline-none disabled:opacity-50 ${stocksEditados[item.id] !== undefined ? 'border-amber-400 bg-amber-50 font-bold text-amber-900' : 'border-gray-300'}`}
+                            />
+                          ) : (
+                            <span className={`font-medium ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                              {formatearCantidad(item.stock_actual, item.unidad)}
+                            </span>
+                          )}
                         </td>
 
                         {/* Sección — editable inline (no para almacén) */}
@@ -2978,11 +3140,23 @@ const InventarioPage = () => {
                               <span className="text-gray-700 font-medium">{item.ubicacion?.codigo || 'N/A'}</span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1" onClick={(e) => modoAjusteStock && e.stopPropagation()}>
                             <span className="text-gray-500">📦</span>
-                            <span className={`font-bold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
-                              {formatearCantidad(item.stock_actual, item.unidad)}
-                            </span>
+                            {modoAjusteStock && esAdministrador ? (
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={stocksEditados[item.id] ?? String(parseFloat(item.stock_actual))}
+                                onChange={(e) => handleStockEditChange(item, e.target.value)}
+                                disabled={guardandoStocks}
+                                className={`w-20 px-2 py-1 text-xs border rounded-lg focus:ring-2 focus:ring-amber-400 focus:outline-none disabled:opacity-50 ${stocksEditados[item.id] !== undefined ? 'border-amber-400 bg-amber-50 font-bold text-amber-900' : 'border-gray-300'}`}
+                              />
+                            ) : (
+                              <span className={`font-bold ${parseFloat(item.stock_actual) <= parseFloat(item.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                                {formatearCantidad(item.stock_actual, item.unidad)}
+                              </span>
+                            )}
                             <span className="text-gray-400 text-[10px] uppercase">{item.unidad}</span>
                           </div>
                         </div>
