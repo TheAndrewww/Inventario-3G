@@ -42,33 +42,8 @@ const formatearCantidad = (cantidad, unidad) => {
   return valor.toFixed(0);
 };
 
-/**
- * Formatea la fecha de última actualización de forma compacta:
- * - Hoy → "Hoy 14:32", Ayer → "Ayer 09:10", anterior → "12 may 26"
- */
-const formatearFechaActualizacion = (fecha) => {
-  if (!fecha) return '—';
-  const f = new Date(fecha);
-  if (isNaN(f.getTime())) return '—';
-  const hoy = new Date();
-  const esMismoDia = (a, b) => a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
-  const hora = f.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-  if (esMismoDia(f, hoy)) return `Hoy ${hora}`;
-  const ayer = new Date(hoy);
-  ayer.setDate(hoy.getDate() - 1);
-  if (esMismoDia(f, ayer)) return `Ayer ${hora}`;
-  return f.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' });
-};
-
-const esActualizadoHoy = (fecha) => {
-  if (!fecha) return false;
-  const f = new Date(fecha);
-  const hoy = new Date();
-  return f.getDate() === hoy.getDate() && f.getMonth() === hoy.getMonth() && f.getFullYear() === hoy.getFullYear();
-};
-
-const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'stockTotal', 'seccion', 'unidad', 'actualizado', 'acciones'];
-const DEFAULT_COL_WIDTHS = { articulo: 300, categoria: 140, ubicacion: 140, stockTotal: 100, seccion: 130, unidad: 80, actualizado: 120, acciones: 240 };
+const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'stockTotal', 'seccion', 'unidad', 'acciones'];
+const DEFAULT_COL_WIDTHS = { articulo: 300, categoria: 140, ubicacion: 140, stockTotal: 100, seccion: 130, unidad: 80, acciones: 240 };
 const STORAGE_KEY_COL_WIDTHS = 'inventario_col_widths_v3';
 const STORAGE_KEY_EXTRAS = 'inventario_extras_v1';
 
@@ -2479,7 +2454,6 @@ const InventarioPage = () => {
                   { key: 'stockTotal', label: 'Stock Total', align: 'left' },
                   { key: 'seccion', label: 'Sección', align: 'left' },
                   { key: 'unidad', label: 'Unidad', align: 'left' },
-                  { key: 'actualizado', label: 'Últ. Actualización', align: 'left' },
                   { key: 'acciones', label: 'Acciones', align: 'right' },
                 ].map(({ key, label, align }) => (
                   <th key={key} className={`relative px-4 py-3 text-${align} text-xs font-medium text-gray-500 uppercase tracking-wider select-none overflow-hidden`}>
@@ -2498,7 +2472,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => !item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-blue-50 sticky top-[49px] z-20 border-b border-blue-200 shadow-sm">
-                    <td colSpan="8" className="px-6 py-3">
+                    <td colSpan="7" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-blue-900">
                         📦 Consumibles
                         <span className="text-xs font-normal text-blue-700">
@@ -2661,19 +2635,6 @@ const InventarioPage = () => {
                           {item.unidad}
                         </td>
 
-                        {/* Última actualización */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          {esRecienActualizado ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                              ✓ {formatearFechaActualizacion(item.updatedAt)}
-                            </span>
-                          ) : (
-                            <span className={`text-xs ${esActualizadoHoy(item.updatedAt) ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                              {formatearFechaActualizacion(item.updatedAt)}
-                            </span>
-                          )}
-                        </td>
-
                         {/* Acciones */}
                         <td className="px-4 py-4 whitespace-nowrap text-right">
                           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
@@ -2750,7 +2711,7 @@ const InventarioPage = () => {
               {filteredArticulos.filter(item => item.es_herramienta).length > 0 && (
                 <>
                   <tr className="bg-orange-50 sticky top-[49px] z-20 border-b border-orange-200 shadow-sm">
-                    <td colSpan="8" className="px-6 py-3">
+                    <td colSpan="7" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-orange-900">
                         🔧 Herramientas
                         <span className="text-xs font-normal text-orange-700">
@@ -2915,19 +2876,6 @@ const InventarioPage = () => {
                           {/* Unidad */}
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase cursor-pointer" onClick={() => handleVerDetalle(item)}>
                             unidades
-                          </td>
-
-                          {/* Última actualización */}
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            {recienActualizados.has(item.id) ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                                ✓ {formatearFechaActualizacion(item.updatedAt)}
-                              </span>
-                            ) : (
-                              <span className={`text-xs ${esActualizadoHoy(item.updatedAt) ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                                {formatearFechaActualizacion(item.updatedAt)}
-                              </span>
-                            )}
                           </td>
 
                           {/* Acciones */}
@@ -3242,16 +3190,6 @@ const InventarioPage = () => {
                               </span>
                             )}
                             <span className="text-gray-400 text-[10px] uppercase">{item.unidad}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-gray-500">🕒</span>
-                            {esRecienActualizado ? (
-                              <span className="font-semibold text-green-700">✓ {formatearFechaActualizacion(item.updatedAt)}</span>
-                            ) : (
-                              <span className={esActualizadoHoy(item.updatedAt) ? 'text-green-700 font-medium' : 'text-gray-500'}>
-                                {formatearFechaActualizacion(item.updatedAt)}
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
