@@ -42,8 +42,33 @@ const formatearCantidad = (cantidad, unidad) => {
   return valor.toFixed(0);
 };
 
-const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'stockTotal', 'seccion', 'unidad', 'acciones'];
-const DEFAULT_COL_WIDTHS = { articulo: 300, categoria: 140, ubicacion: 140, stockTotal: 100, seccion: 130, unidad: 80, acciones: 240 };
+/**
+ * Formatea la fecha de última actualización de forma compacta:
+ * - Hoy → "Hoy 14:32", Ayer → "Ayer 09:10", anterior → "12 may 26"
+ */
+const formatearFechaActualizacion = (fecha) => {
+  if (!fecha) return '—';
+  const f = new Date(fecha);
+  if (isNaN(f.getTime())) return '—';
+  const hoy = new Date();
+  const esMismoDia = (a, b) => a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+  const hora = f.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  if (esMismoDia(f, hoy)) return `Hoy ${hora}`;
+  const ayer = new Date(hoy);
+  ayer.setDate(hoy.getDate() - 1);
+  if (esMismoDia(f, ayer)) return `Ayer ${hora}`;
+  return f.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' });
+};
+
+const esActualizadoHoy = (fecha) => {
+  if (!fecha) return false;
+  const f = new Date(fecha);
+  const hoy = new Date();
+  return f.getDate() === hoy.getDate() && f.getMonth() === hoy.getMonth() && f.getFullYear() === hoy.getFullYear();
+};
+
+const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'stockTotal', 'seccion', 'unidad', 'actualizado', 'acciones'];
+const DEFAULT_COL_WIDTHS = { articulo: 300, categoria: 140, ubicacion: 140, stockTotal: 100, seccion: 130, unidad: 80, actualizado: 120, acciones: 240 };
 const STORAGE_KEY_COL_WIDTHS = 'inventario_col_widths_v3';
 const STORAGE_KEY_EXTRAS = 'inventario_extras_v1';
 
@@ -72,6 +97,23 @@ const InventarioPage = () => {
   const [modoAjusteStock, setModoAjusteStock] = useState(false); // Modo edición rápida de stocks (solo admin)
   const [stocksEditados, setStocksEditados] = useState({}); // id → nuevo valor (pendiente de guardar)
   const [guardandoStocks, setGuardandoStocks] = useState(false);
+  const [recienActualizados, setRecienActualizados] = useState(new Set()); // IDs recién modificados (resaltado temporal)
+
+  // Marca artículos como recién actualizados (resaltado verde) y limpia la marca tras unos segundos
+  const marcarRecienActualizados = useCallback((ids) => {
+    setRecienActualizados(prev => {
+      const next = new Set(prev);
+      ids.forEach(id => next.add(id));
+      return next;
+    });
+    setTimeout(() => {
+      setRecienActualizados(prev => {
+        const next = new Set(prev);
+        ids.forEach(id => next.delete(id));
+        return next;
+      });
+    }, 10000);
+  }, []);
   const [tabActivo, setTabActivo] = useState('consumibles'); // Nuevo: 'consumibles' o 'herramientas'
   const [mostrarDesactivados, setMostrarDesactivados] = useState(false);
 
@@ -342,7 +384,7 @@ const InventarioPage = () => {
       // Actualizar localmente sin refetch completo
       setArticulos(prev => prev.map(a => {
         if (a.id !== item.id) return a;
-        const updated = { ...a, [field]: parsed };
+        const updated = { ...a, [field]: parsed, updatedAt: new Date().toISOString() };
         if (field === 'categoria_id') {
           updated.categoria = todasCategorias.find(c => c.id === parsed) || null;
         } else if (field === 'ubicacion_id') {
@@ -353,6 +395,7 @@ const InventarioPage = () => {
         }
         return updated;
       }));
+      marcarRecienActualizados([item.id]);
       toast.success('Artículo actualizado');
     } catch (err) {
       console.error(err);
@@ -440,9 +483,11 @@ const InventarioPage = () => {
 
       // Actualizar localmente sin refetch completo
       const nuevosPorId = Object.fromEntries(cambiosStockPendientes.map(c => [c.articulo.id, c.nuevo]));
+      const ahoraISO = new Date().toISOString();
       setArticulos(prev => prev.map(a =>
-        nuevosPorId[a.id] !== undefined ? { ...a, stock_actual: nuevosPorId[a.id] } : a
+        nuevosPorId[a.id] !== undefined ? { ...a, stock_actual: nuevosPorId[a.id], updatedAt: ahoraISO } : a
       ));
+      marcarRecienActualizados(Object.keys(nuevosPorId).map(Number));
 
       toast.success(`${cambiosStockPendientes.length} stock(s) ajustado(s) correctamente`);
       setModoAjusteStock(false);
@@ -1134,6 +1179,7 @@ const InventarioPage = () => {
           ],
           observaciones: `Entrada de inventario: ${articuloParaEntrada.nombre}`
         });
+        marcarRecienActualizados([articuloParaEntrada.id]);
         toast.success('Entrada registrada exitosamente');
       }
 
@@ -1193,6 +1239,7 @@ const InventarioPage = () => {
           ],
           observaciones: `Salida de inventario: ${articuloParaSalida.nombre}`
         });
+        marcarRecienActualizados([articuloParaSalida.id]);
         toast.success('Salida registrada exitosamente');
       }
 
@@ -2432,6 +2479,7 @@ const InventarioPage = () => {
                   { key: 'stockTotal', label: 'Stock Total', align: 'left' },
                   { key: 'seccion', label: 'Sección', align: 'left' },
                   { key: 'unidad', label: 'Unidad', align: 'left' },
+                  { key: 'actualizado', label: 'Últ. Actualización', align: 'left' },
                   { key: 'acciones', label: 'Acciones', align: 'right' },
                 ].map(({ key, label, align }) => (
                   <th key={key} className={`relative px-4 py-3 text-${align} text-xs font-medium text-gray-500 uppercase tracking-wider select-none overflow-hidden`}>
@@ -2477,11 +2525,16 @@ const InventarioPage = () => {
                     // Stock 0 con mínimo > 0 → necesita resurtido urgente
                     const esSinStockCritico = parseFloat(item.stock_actual) === 0 && parseFloat(item.stock_minimo) > 0;
 
+                    // Recién modificado → resaltado verde temporal
+                    const esRecienActualizado = recienActualizados.has(item.id);
+
                     return (
                       <tr
                         key={item.id}
                         onClick={() => handleVerDetalle(item)}
-                        className={`transition-colors cursor-pointer ${esPendienteRevision
+                        className={`transition-colors cursor-pointer ${esRecienActualizado
+                          ? 'bg-green-50 hover:bg-green-100 border-l-4 border-green-500'
+                          : esPendienteRevision
                           ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
                           : esSinStockCritico
                             ? 'bg-red-100 hover:bg-red-200 border-l-4 border-red-600'
@@ -2606,6 +2659,19 @@ const InventarioPage = () => {
                         {/* Unidad */}
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 uppercase">
                           {item.unidad}
+                        </td>
+
+                        {/* Última actualización */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          {esRecienActualizado ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                              ✓ {formatearFechaActualizacion(item.updatedAt)}
+                            </span>
+                          ) : (
+                            <span className={`text-xs ${esActualizadoHoy(item.updatedAt) ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                              {formatearFechaActualizacion(item.updatedAt)}
+                            </span>
+                          )}
                         </td>
 
                         {/* Acciones */}
@@ -2851,6 +2917,19 @@ const InventarioPage = () => {
                             unidades
                           </td>
 
+                          {/* Última actualización */}
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            {recienActualizados.has(item.id) ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                ✓ {formatearFechaActualizacion(item.updatedAt)}
+                              </span>
+                            ) : (
+                              <span className={`text-xs ${esActualizadoHoy(item.updatedAt) ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                                {formatearFechaActualizacion(item.updatedAt)}
+                              </span>
+                            )}
+                          </td>
+
                           {/* Acciones */}
                           <td className="px-4 py-4 whitespace-nowrap text-right">
                             <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
@@ -3069,11 +3148,16 @@ const InventarioPage = () => {
                 // Stock 0 con mínimo > 0 → necesita resurtido urgente
                 const esSinStockCritico = parseFloat(item.stock_actual) === 0 && parseFloat(item.stock_minimo) > 0;
 
+                // Recién modificado → resaltado verde temporal
+                const esRecienActualizado = recienActualizados.has(item.id);
+
                 return (
                   <div
                     key={`consumible-${item.id}`}
                     onClick={() => handleVerDetalle(item)}
-                    className={`p-3 transition-colors cursor-pointer ${esPendienteRevision
+                    className={`p-3 transition-colors cursor-pointer ${esRecienActualizado
+                      ? 'bg-green-50 hover:bg-green-100 border-l-4 border-green-500'
+                      : esPendienteRevision
                       ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
                       : esSinStockCritico
                         ? 'bg-red-100 hover:bg-red-200 border-l-4 border-red-600'
@@ -3158,6 +3242,16 @@ const InventarioPage = () => {
                               </span>
                             )}
                             <span className="text-gray-400 text-[10px] uppercase">{item.unidad}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-500">🕒</span>
+                            {esRecienActualizado ? (
+                              <span className="font-semibold text-green-700">✓ {formatearFechaActualizacion(item.updatedAt)}</span>
+                            ) : (
+                              <span className={esActualizadoHoy(item.updatedAt) ? 'text-green-700 font-medium' : 'text-gray-500'}>
+                                {formatearFechaActualizacion(item.updatedAt)}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
