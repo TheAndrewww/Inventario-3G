@@ -160,6 +160,12 @@ const Articulo = sequelize.define('Articulo', {
             }
         },
         beforeUpdate: (articulo) => {
+            // Si el usuario está reactivando explícitamente el artículo,
+            // respetar esa decisión aunque stock_minimo sea 0.
+            // (De lo contrario los artículos con stock_minimo = 0 nunca se podrían reactivar.)
+            if (articulo.changed('activo') && articulo.activo === true) {
+                return;
+            }
             const stockMin = parseFloat(articulo.stock_minimo);
             if (!isNaN(stockMin) && stockMin === 0) {
                 articulo.activo = false;
