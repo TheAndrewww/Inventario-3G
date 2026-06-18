@@ -1116,6 +1116,30 @@ const startServer = async () => {
             console.error('⚠️ Error con tabla configuracion:', configErr.message);
         }
 
+        // Tarea de UNA SOLA VEZ: dejar en cero las solicitudes pendientes (aprobar o eliminar).
+        // Protegida con la marca 'pendientes_procesadas_v1' para no repetirse en cada arranque.
+        try {
+            const [marca] = await sequelize.query(
+                "SELECT valor FROM configuracion WHERE clave = 'pendientes_procesadas_v1'"
+            );
+            const yaProcesado = marca[0]?.valor === 'true';
+            if (!yaProcesado) {
+                console.log('🧹 Ejecutando limpieza única de solicitudes pendientes...');
+                const { procesarPendientesUnaVez } = await import('./src/utils/procesarPendientes.js');
+                await procesarPendientesUnaVez();
+                await sequelize.query(`
+                    INSERT INTO configuracion (clave, valor, descripcion, created_at, updated_at)
+                    VALUES ('pendientes_procesadas_v1', 'true',
+                            'Marca: ya se procesaron (aprobar/eliminar) las solicitudes pendientes una vez',
+                            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (clave) DO UPDATE SET valor = 'true', updated_at = CURRENT_TIMESTAMP;
+                `);
+                console.log('✅ Marca pendientes_procesadas_v1 establecida (no se repetirá)');
+            }
+        } catch (procErr) {
+            console.error('⚠️ Error procesando pendientes (no crítico):', procErr.message);
+        }
+
         // ⚠️ DESACTIVADO: la reparación reasignaba categorías de SKUs modificados manualmente.
         // Si necesita reactivarse, evaluar primero si los SKUs ya están consistentes.
         // try {
