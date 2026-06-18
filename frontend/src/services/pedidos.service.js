@@ -71,6 +71,15 @@ const pedidosService = {
   },
 
   /**
+   * Eliminar (borrado real) un ticket pendiente, revirtiendo stock.
+   * Solo administrador.
+   */
+  eliminar: async (id) => {
+    const response = await api.delete(`/pedidos/${id}`);
+    return response.data;
+  },
+
+  /**
    * Actualizar cantidad de un artículo en el pedido
    */
   actualizarCantidad: async (pedidoId, detalleId, cantidad) => {

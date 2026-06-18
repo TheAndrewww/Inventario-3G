@@ -7,6 +7,7 @@ import {
   listarPedidosPendientes,
   cancelarPedido,
   anularPedido,
+  eliminarPedido,
   actualizarCantidadArticulo,
   agregarArticuloAPedido,
   eliminarArticuloDePedido,
@@ -136,6 +137,18 @@ router.put(
   verificarToken,
   verificarRol('encargado', 'administrador'),
   anularPedido
+);
+
+/**
+ * @route   DELETE /api/pedidos/:id
+ * @desc    Eliminar (borrado real) un ticket pendiente, revirtiendo stock
+ * @access  Administrador
+ */
+router.delete(
+  '/:id',
+  verificarToken,
+  verificarRol('administrador'),
+  eliminarPedido
 );
 
 /**

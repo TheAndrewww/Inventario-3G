@@ -1231,6 +1231,102 @@ export const anularPedido = async (req, res) => {
 };
 
 /**
+ * Eliminar (borrado real) un ticket pendiente — solo administrador.
+ * Revierte el stock, suelta/cancela las solicitudes de compra asociadas y
+ * borra el pedido junto con sus detalles. Solo aplica a tickets en estado
+ * 'pendiente' o 'aprobado' (no a entregados ni con compras ya recibidas).
+ */
+export const eliminarPedido = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { id } = req.params;
+    const usuario = req.usuario;
+
+    if (usuario.rol !== 'administrador') {
+      await transaction.rollback();
+      return res.status(403).json({ success: false, message: 'Solo el administrador puede eliminar tickets' });
+    }
+
+    const pedido = await Movimiento.findOne({
+      where: { id, tipo: 'pedido' },
+      include: [
+        { model: DetalleMovimiento, as: 'detalles', include: [{ model: Articulo, as: 'articulo' }] },
+        { model: SolicitudCompra, as: 'solicitudes_compra' }
+      ],
+      transaction
+    });
+
+    if (!pedido) {
+      await transaction.rollback();
+      return res.status(404).json({ success: false, message: 'Ticket no encontrado' });
+    }
+
+    // Solo tickets pendientes (incluye 'aprobado', que sigue en la lista de pendientes)
+    if (!['pendiente', 'aprobado'].includes(pedido.estado)) {
+      await transaction.rollback();
+      return res.status(400).json({ success: false, message: `Solo se pueden eliminar tickets pendientes (este está "${pedido.estado}")` });
+    }
+
+    // No eliminar si hay compras ya recibidas asociadas (material ya entró)
+    const comprasCompletadas = pedido.solicitudes_compra?.filter(s => s.estado === 'completada') || [];
+    if (comprasCompletadas.length > 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `No se puede eliminar: ${comprasCompletadas.length} solicitud(es) de compra ya fueron recibidas. Usa "Anular" o contacta al administrador.`
+      });
+    }
+
+    // PASO 1: revertir stock de cada artículo del pedido
+    for (const detalle of pedido.detalles) {
+      const articulo = detalle.articulo;
+      if (!articulo) continue;
+      const nuevoStock = parseFloat(articulo.stock_actual) + parseFloat(detalle.cantidad);
+      await articulo.update({ stock_actual: nuevoStock }, { transaction });
+    }
+
+    // PASO 2: soltar y cancelar solicitudes de compra asociadas (FK pedido_origen_id es nullable)
+    await SolicitudCompra.update(
+      { estado: 'cancelada', pedido_origen_id: null },
+      { where: { pedido_origen_id: pedido.id }, transaction }
+    );
+
+    // PASO 3: borrar detalles y el pedido
+    await DetalleMovimiento.destroy({ where: { movimiento_id: pedido.id }, transaction });
+    const ticketId = pedido.ticket_id;
+    const creadorId = pedido.usuario_id;
+    await pedido.destroy({ transaction });
+
+    await transaction.commit();
+
+    // Notificar al creador (best-effort, fuera de la transacción)
+    try {
+      await crearNotificacion({
+        usuario_id: creadorId,
+        tipo: 'pedido_anulado',
+        titulo: 'Ticket eliminado',
+        mensaje: `Tu ticket ${ticketId} fue eliminado por ${usuario.nombre}. El stock fue revertido.`,
+        url: '/pedidos',
+        datos_adicionales: { ticket_id: ticketId, eliminado_por: usuario.nombre }
+      });
+    } catch (notifError) {
+      console.error('Error al notificar eliminación de ticket:', notifError.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Ticket ${ticketId} eliminado. Stock revertido: ${pedido.detalles.length} artículo(s).`,
+      data: { id: Number(id), ticket_id: ticketId }
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al eliminar pedido:', error);
+    res.status(500).json({ success: false, message: 'Error al eliminar el ticket', error: error.message });
+  }
+};
+
+/**
  * Cancelar un pedido (SIN revertir stock)
  * Solo diseñador que creó el pedido, supervisor o admin
  * DEPRECADO: Usar anularPedido para reversión completa

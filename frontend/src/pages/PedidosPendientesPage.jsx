@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ClipboardList, CheckSquare, Square, Package, User, Calendar, AlertCircle, Edit2, Plus, Minus, Trash2, Save, X, CheckCircle } from 'lucide-react';
 import pedidosService from '../services/pedidos.service';
 import { Loader, Modal } from '../components/common';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 // Devuelve solo las observaciones originales del ticket (recorta anotaciones
@@ -16,6 +17,9 @@ const obsOriginales = (texto) => {
 };
 
 const PedidosPendientesPage = () => {
+  const { user } = useAuth();
+  const esAdmin = user?.rol === 'administrador';
+
   const [pedidos, setPedidos] = useState([]);
   const [pedidosCompletados, setPedidosCompletados] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +27,23 @@ const PedidosPendientesPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [editandoCantidad, setEditandoCantidad] = useState(null);
+  const [eliminandoId, setEliminandoId] = useState(null);
+
+  const handleEliminarTicket = async (pedido, e) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm(`¿Eliminar el ticket ${pedido.ticket_id}? Se revertirá el stock de sus artículos y no se puede deshacer.`)) return;
+    try {
+      setEliminandoId(pedido.id);
+      const res = await pedidosService.eliminar(pedido.id);
+      setPedidos((prev) => prev.filter((p) => p.id !== pedido.id));
+      toast.success(res?.message || 'Ticket eliminado');
+    } catch (error) {
+      console.error('Error al eliminar ticket:', error);
+      toast.error(error.response?.data?.message || 'Error al eliminar el ticket');
+    } finally {
+      setEliminandoId(null);
+    }
+  };
 
   useEffect(() => {
     cargarDatos();
@@ -267,9 +288,22 @@ const PedidosPendientesPage = () => {
                     <span className="text-xs text-gray-600">
                       {pedido.detalles?.length || 0} artículos
                     </span>
-                    <button className="text-red-700 hover:text-red-900 text-sm font-medium">
-                      Ver Checklist →
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {esAdmin && (
+                        <button
+                          onClick={(e) => handleEliminarTicket(pedido, e)}
+                          disabled={eliminandoId === pedido.id}
+                          className="inline-flex items-center gap-1 text-gray-500 hover:text-red-700 text-sm font-medium disabled:opacity-50"
+                          title="Eliminar ticket (revierte stock)"
+                        >
+                          <Trash2 size={15} />
+                          {eliminandoId === pedido.id ? 'Eliminando…' : 'Eliminar'}
+                        </button>
+                      )}
+                      <button className="text-red-700 hover:text-red-900 text-sm font-medium">
+                        Ver Checklist →
+                      </button>
+                    </div>
                   </div>
 
                   {obsOriginales(pedido.observaciones) && (
