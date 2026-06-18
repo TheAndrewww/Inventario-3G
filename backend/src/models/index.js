@@ -31,6 +31,7 @@ import ChecklistItem from './ChecklistItem.js';
 import ChecklistItemArticulo from './ChecklistItemArticulo.js';
 import ChecklistEquipo from './ChecklistEquipo.js';
 import SolicitudCambio from './SolicitudCambio.js';
+import Configuracion from './Configuracion.js';
 
 // Definir relaciones
 
@@ -717,7 +718,8 @@ export {
     ChecklistItem,
     ChecklistItemArticulo,
     ChecklistEquipo,
-    SolicitudCambio
+    SolicitudCambio,
+    Configuracion
 };
 
 export default {
@@ -753,5 +755,6 @@ export default {
     ChecklistItem,
     ChecklistItemArticulo,
     ChecklistEquipo,
-    SolicitudCambio
+    SolicitudCambio,
+    Configuracion
 };

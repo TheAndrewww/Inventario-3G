@@ -125,6 +125,7 @@ import almacenesRoutes from './src/routes/almacenes.routes.js';
 import rollosMembrana from './src/routes/rollosMembrana.routes.js';
 import checklistRoutes from './src/routes/checklist.routes.js';
 import solicitudesCambioRoutes from './src/routes/solicitudesCambio.routes.js';
+import configuracionRoutes from './src/routes/configuracion.routes.js';
 import reportesRoutes from './src/routes/reportes.routes.js';
 
 // Ruta de prueba
@@ -227,6 +228,7 @@ app.use('/api/almacenes', almacenesRoutes);
 app.use('/api/rollos-membrana', rollosMembrana);
 app.use('/api/checklist', checklistRoutes);
 app.use('/api/solicitudes-cambio', solicitudesCambioRoutes);
+app.use('/api/configuracion', configuracionRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
@@ -1086,6 +1088,32 @@ const startServer = async () => {
             console.log('✅ Aislamiento por almacén aplicado/verificado');
         } catch (aisErr) {
             console.error('⚠️ Error aplicando aislamiento por almacén:', aisErr.message);
+        }
+
+        // Tabla de configuración global (interruptores del sistema) — aplica en dev y prod
+        try {
+            console.log('🔍 Verificando tabla configuracion...');
+            await sequelize.query(`
+                CREATE TABLE IF NOT EXISTS configuracion (
+                    id SERIAL PRIMARY KEY,
+                    clave VARCHAR(100) NOT NULL UNIQUE,
+                    valor TEXT,
+                    descripcion TEXT,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            `);
+            // Sembrar el interruptor de ajuste directo de almacén (apagado por defecto)
+            await sequelize.query(`
+                INSERT INTO configuracion (clave, valor, descripcion, created_at, updated_at)
+                VALUES ('almacen_ajuste_directo', 'false',
+                        'Permite que el rol almacen aplique entradas/salidas de stock sin aprobación del administrador',
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (clave) DO NOTHING;
+            `);
+            console.log('✅ Tabla configuracion lista');
+        } catch (configErr) {
+            console.error('⚠️ Error con tabla configuracion:', configErr.message);
         }
 
         // ⚠️ DESACTIVADO: la reparación reasignaba categorías de SKUs modificados manualmente.

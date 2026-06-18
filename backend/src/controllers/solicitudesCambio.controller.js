@@ -1,4 +1,5 @@
 import { sequelize, SolicitudCambio, Articulo, Usuario, Movimiento, DetalleMovimiento, Ubicacion, Notificacion } from '../models/index.js';
+import { esAjusteDirectoActivo } from './configuracion.controller.js';
 
 const TIPOS_VALIDOS = ['cambio_ubicacion', 'entrada_stock', 'salida_stock', 'crear_articulo', 'desactivar_articulo'];
 
@@ -16,7 +17,99 @@ const incluirRelaciones = [
 ];
 
 /**
- * Crear solicitud de cambio
+ * Aplica el cambio real de una solicitud (modifica stock/ubicación/artículo).
+ * NO cambia el estado de la solicitud — eso lo hace el llamador.
+ * Debe ejecutarse SIEMPRE dentro de una transacción.
+ */
+const aplicarCambioSolicitud = async (solicitud, aprobador_id, transaction) => {
+  switch (solicitud.tipo) {
+    case 'cambio_ubicacion': {
+      const articulo = await Articulo.findByPk(solicitud.articulo_id, { transaction });
+      if (!articulo) throw new Error('Artículo no encontrado');
+      const nuevaUbicacion = solicitud.payload.ubicacion_id || null;
+      if (nuevaUbicacion) {
+        const ubicacion = await Ubicacion.findByPk(nuevaUbicacion, { transaction });
+        if (!ubicacion) throw new Error('Ubicación destino no existe');
+      }
+      await articulo.update({ ubicacion_id: nuevaUbicacion }, { transaction });
+      return { articulo_id: articulo.id, ubicacion_id: nuevaUbicacion };
+    }
+
+    case 'entrada_stock':
+    case 'salida_stock': {
+      const articulo = await Articulo.findByPk(solicitud.articulo_id, { transaction });
+      if (!articulo) throw new Error('Artículo no encontrado');
+      const cantidad = parseFloat(solicitud.payload.cantidad);
+      if (!cantidad || cantidad <= 0) throw new Error('Cantidad inválida en la solicitud');
+
+      const tipoMov = solicitud.tipo === 'entrada_stock' ? 'ajuste_entrada' : 'ajuste_salida';
+      let nuevoStock = parseFloat(articulo.stock_actual);
+      if (tipoMov === 'ajuste_entrada') nuevoStock += cantidad;
+      else {
+        if (nuevoStock < cantidad) throw new Error(`Stock insuficiente. Disponible: ${articulo.stock_actual}`);
+        nuevoStock -= cantidad;
+      }
+
+      const movimiento = await Movimiento.create({
+        ticket_id: generarTicketID(),
+        tipo: tipoMov,
+        fecha_hora: new Date(),
+        usuario_id: solicitud.solicitante_id,
+        supervisor_id: aprobador_id,
+        observaciones: solicitud.payload.observaciones || `Aplicado desde solicitud #${solicitud.id}`,
+        estado: 'completado'
+      }, { transaction });
+
+      await DetalleMovimiento.create({
+        movimiento_id: movimiento.id,
+        articulo_id: articulo.id,
+        cantidad,
+        costo_unitario: articulo.costo_unitario,
+        observaciones: solicitud.payload.observaciones || null
+      }, { transaction });
+
+      await articulo.update({ stock_actual: nuevoStock }, { transaction });
+      return { movimiento_id: movimiento.id, nuevoStock };
+    }
+
+    case 'crear_articulo': {
+      const { nombre, descripcion, categoria_id, ubicacion_id, unidad, stock_actual, stock_minimo, costo_unitario, codigo_ean13, es_herramienta } = solicitud.payload;
+      if (!nombre) throw new Error('El nombre es obligatorio');
+      const nuevo = await Articulo.create({
+        nombre,
+        descripcion: descripcion || null,
+        categoria_id: categoria_id || null,
+        ubicacion_id: ubicacion_id || null,
+        unidad: unidad || 'piezas',
+        stock_actual: stock_actual || 0,
+        stock_minimo: stock_minimo || 0,
+        costo_unitario: costo_unitario || 0,
+        codigo_ean13: codigo_ean13 || null,
+        es_herramienta: es_herramienta || false,
+        activo: true,
+        pendiente_revision: false
+      }, { transaction });
+      await solicitud.update({ articulo_id: nuevo.id }, { transaction });
+      return { articulo_id: nuevo.id };
+    }
+
+    case 'desactivar_articulo': {
+      const articulo = await Articulo.findByPk(solicitud.articulo_id, { transaction });
+      if (!articulo) throw new Error('Artículo no encontrado');
+      await articulo.update({ activo: false }, { transaction });
+      return { articulo_id: articulo.id, activo: false };
+    }
+
+    default:
+      throw new Error(`Tipo no soportado: ${solicitud.tipo}`);
+  }
+};
+
+/**
+ * Crear solicitud de cambio.
+ * Si el interruptor "ajuste directo de almacén" está activo y el solicitante
+ * es del rol almacen pidiendo entrada/salida de stock, se aplica de inmediato
+ * (queda registrada como aprobada, sin pasar por el administrador).
  */
 export const crearSolicitud = async (req, res) => {
   try {
@@ -55,6 +148,46 @@ export const crearSolicitud = async (req, res) => {
       }
     }
 
+    // ¿Se aplica directo? Solo almacen, solo entrada/salida, solo con el interruptor activo.
+    const esAjusteStock = tipo === 'entrada_stock' || tipo === 'salida_stock';
+    const aplicarDirecto = esAjusteStock
+      && req.usuario.rol === 'almacen'
+      && !!articulo_id
+      && await esAjusteDirectoActivo();
+
+    if (aplicarDirecto) {
+      const transaction = await sequelize.transaction();
+      try {
+        const solicitud = await SolicitudCambio.create({
+          tipo,
+          articulo_id,
+          solicitante_id,
+          estado: 'aprobada',
+          payload,
+          snapshot,
+          observaciones: observaciones || null,
+          aprobador_id: solicitante_id, // auto-aplicada por el propio solicitante
+          fecha_resolucion: new Date()
+        }, { transaction });
+
+        const resultado = await aplicarCambioSolicitud(solicitud, solicitante_id, transaction);
+        await transaction.commit();
+
+        const completa = await SolicitudCambio.findByPk(solicitud.id, { include: incluirRelaciones });
+        return res.status(201).json({
+          success: true,
+          aplicada: true,
+          message: tipo === 'entrada_stock' ? 'Entrada aplicada al inventario' : 'Salida aplicada al inventario',
+          data: { solicitud: completa, resultado }
+        });
+      } catch (errAplicar) {
+        await transaction.rollback();
+        console.error('Error al aplicar ajuste directo:', errAplicar);
+        return res.status(400).json({ success: false, message: errAplicar.message || 'No se pudo aplicar el ajuste' });
+      }
+    }
+
+    // Flujo normal: queda pendiente de aprobación del administrador.
     const solicitud = await SolicitudCambio.create({
       tipo,
       articulo_id: articulo_id || null,
@@ -85,7 +218,7 @@ export const crearSolicitud = async (req, res) => {
     }
 
     const completa = await SolicitudCambio.findByPk(solicitud.id, { include: incluirRelaciones });
-    res.status(201).json({ success: true, message: 'Solicitud enviada para aprobación', data: { solicitud: completa } });
+    res.status(201).json({ success: true, aplicada: false, message: 'Solicitud enviada para aprobación', data: { solicitud: completa } });
   } catch (error) {
     console.error('Error al crear solicitud:', error);
     res.status(500).json({ success: false, message: 'Error al crear solicitud' });
@@ -161,93 +294,7 @@ export const aprobarSolicitud = async (req, res) => {
       return res.status(400).json({ success: false, message: `Esta solicitud ya está ${solicitud.estado}` });
     }
 
-    let resultado = null;
-
-    switch (solicitud.tipo) {
-      case 'cambio_ubicacion': {
-        const articulo = await Articulo.findByPk(solicitud.articulo_id, { transaction });
-        if (!articulo) throw new Error('Artículo no encontrado');
-        const nuevaUbicacion = solicitud.payload.ubicacion_id || null;
-        if (nuevaUbicacion) {
-          const ubicacion = await Ubicacion.findByPk(nuevaUbicacion, { transaction });
-          if (!ubicacion) throw new Error('Ubicación destino no existe');
-        }
-        await articulo.update({ ubicacion_id: nuevaUbicacion }, { transaction });
-        resultado = { articulo_id: articulo.id, ubicacion_id: nuevaUbicacion };
-        break;
-      }
-
-      case 'entrada_stock':
-      case 'salida_stock': {
-        const articulo = await Articulo.findByPk(solicitud.articulo_id, { transaction });
-        if (!articulo) throw new Error('Artículo no encontrado');
-        const cantidad = parseFloat(solicitud.payload.cantidad);
-        if (!cantidad || cantidad <= 0) throw new Error('Cantidad inválida en la solicitud');
-
-        const tipoMov = solicitud.tipo === 'entrada_stock' ? 'ajuste_entrada' : 'ajuste_salida';
-        let nuevoStock = parseFloat(articulo.stock_actual);
-        if (tipoMov === 'ajuste_entrada') nuevoStock += cantidad;
-        else {
-          if (nuevoStock < cantidad) throw new Error(`Stock insuficiente. Disponible: ${articulo.stock_actual}`);
-          nuevoStock -= cantidad;
-        }
-
-        const movimiento = await Movimiento.create({
-          ticket_id: generarTicketID(),
-          tipo: tipoMov,
-          fecha_hora: new Date(),
-          usuario_id: solicitud.solicitante_id,
-          supervisor_id: aprobador_id,
-          observaciones: solicitud.payload.observaciones || `Aprobado desde solicitud #${solicitud.id}`,
-          estado: 'completado'
-        }, { transaction });
-
-        await DetalleMovimiento.create({
-          movimiento_id: movimiento.id,
-          articulo_id: articulo.id,
-          cantidad,
-          costo_unitario: articulo.costo_unitario,
-          observaciones: solicitud.payload.observaciones || null
-        }, { transaction });
-
-        await articulo.update({ stock_actual: nuevoStock }, { transaction });
-        resultado = { movimiento_id: movimiento.id, nuevoStock };
-        break;
-      }
-
-      case 'crear_articulo': {
-        const { nombre, descripcion, categoria_id, ubicacion_id, unidad, stock_actual, stock_minimo, costo_unitario, codigo_ean13, es_herramienta } = solicitud.payload;
-        if (!nombre) throw new Error('El nombre es obligatorio');
-        const nuevo = await Articulo.create({
-          nombre,
-          descripcion: descripcion || null,
-          categoria_id: categoria_id || null,
-          ubicacion_id: ubicacion_id || null,
-          unidad: unidad || 'piezas',
-          stock_actual: stock_actual || 0,
-          stock_minimo: stock_minimo || 0,
-          costo_unitario: costo_unitario || 0,
-          codigo_ean13: codigo_ean13 || null,
-          es_herramienta: es_herramienta || false,
-          activo: true,
-          pendiente_revision: false
-        }, { transaction });
-        resultado = { articulo_id: nuevo.id };
-        await solicitud.update({ articulo_id: nuevo.id }, { transaction });
-        break;
-      }
-
-      case 'desactivar_articulo': {
-        const articulo = await Articulo.findByPk(solicitud.articulo_id, { transaction });
-        if (!articulo) throw new Error('Artículo no encontrado');
-        await articulo.update({ activo: false }, { transaction });
-        resultado = { articulo_id: articulo.id, activo: false };
-        break;
-      }
-
-      default:
-        throw new Error(`Tipo no soportado: ${solicitud.tipo}`);
-    }
+    const resultado = await aplicarCambioSolicitud(solicitud, aprobador_id, transaction);
 
     await solicitud.update({
       estado: 'aprobada',

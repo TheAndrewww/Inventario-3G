@@ -1131,9 +1131,9 @@ const InventarioPage = () => {
     try {
       setLoadingEntrada(true);
 
-      // Almacén: solicita aprobación. Admin/encargado: aplica directo.
+      // Almacén: solicita aprobación, salvo que el admin haya activado el ajuste directo.
       if (esAlmacen) {
-        await solicitudesCambioService.crear({
+        const resp = await solicitudesCambioService.crear({
           tipo: 'entrada_stock',
           articulo_id: articuloParaEntrada.id,
           payload: {
@@ -1141,7 +1141,12 @@ const InventarioPage = () => {
             observaciones: observacionesEntrada || null
           }
         });
-        toast.success('Solicitud de entrada enviada al administrador');
+        if (resp?.aplicada) {
+          marcarRecienActualizados([articuloParaEntrada.id]);
+          toast.success(resp.message || 'Entrada aplicada al inventario');
+        } else {
+          toast.success('Solicitud de entrada enviada al administrador');
+        }
       } else {
         await movimientosService.create({
           tipo: 'ajuste_entrada',
@@ -1191,9 +1196,9 @@ const InventarioPage = () => {
     try {
       setLoadingSalida(true);
 
-      // Almacén: solicita aprobación. Admin/encargado: aplica directo.
+      // Almacén: solicita aprobación, salvo que el admin haya activado el ajuste directo.
       if (esAlmacen) {
-        await solicitudesCambioService.crear({
+        const resp = await solicitudesCambioService.crear({
           tipo: 'salida_stock',
           articulo_id: articuloParaSalida.id,
           payload: {
@@ -1201,7 +1206,12 @@ const InventarioPage = () => {
             observaciones: observacionesSalida || null
           }
         });
-        toast.success('Solicitud de salida enviada al administrador');
+        if (resp?.aplicada) {
+          marcarRecienActualizados([articuloParaSalida.id]);
+          toast.success(resp.message || 'Salida aplicada al inventario');
+        } else {
+          toast.success('Solicitud de salida enviada al administrador');
+        }
       } else {
         await movimientosService.create({
           tipo: 'ajuste_salida',

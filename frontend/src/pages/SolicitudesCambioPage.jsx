@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, Clock, AlertCircle, MapPin, PackagePlus, PackageMinus, Plus, Trash2, RefreshCw } from 'lucide-react';
 import solicitudesCambioService from '../services/solicitudesCambio.service';
 import ubicacionesService from '../services/ubicaciones.service';
+import configuracionService from '../services/configuracion.service';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -36,6 +37,8 @@ const SolicitudesCambioPage = () => {
   const [tabActivo, setTabActivo] = useState('pendiente');
   const [loading, setLoading] = useState(false);
   const [procesandoId, setProcesandoId] = useState(null);
+  const [ajusteDirecto, setAjusteDirecto] = useState(false);
+  const [cambiandoAjuste, setCambiandoAjuste] = useState(false);
 
   const cargar = async (opts = {}) => {
     const { silent = false } = opts;
@@ -56,6 +59,30 @@ const SolicitudesCambioPage = () => {
   };
 
   useEffect(() => { cargar(); }, []);
+
+  // Cargar estado del interruptor de ajuste directo (solo lo gestiona el admin)
+  useEffect(() => {
+    if (!esAdmin) return;
+    configuracionService.obtener()
+      .then(res => setAjusteDirecto(!!res?.data?.almacen_ajuste_directo))
+      .catch(() => {});
+  }, [esAdmin]);
+
+  const toggleAjusteDirecto = async () => {
+    const nuevo = !ajusteDirecto;
+    if (nuevo && !window.confirm('¿Activar ajuste directo? Almacén podrá registrar entradas y salidas de stock sin tu aprobación.')) return;
+    try {
+      setCambiandoAjuste(true);
+      const res = await configuracionService.setAjusteDirecto(nuevo);
+      setAjusteDirecto(!!res?.data?.almacen_ajuste_directo);
+      toast.success(res?.message || (nuevo ? 'Ajuste directo activado' : 'Ajuste directo desactivado'));
+    } catch (e) {
+      console.error(e);
+      toast.error(e.response?.data?.message || 'No se pudo cambiar la configuración');
+    } finally {
+      setCambiandoAjuste(false);
+    }
+  };
 
   // Auto-refresh: cada 20s y al volver a la pestaña.
   // Admin ve nuevas solicitudes y almacén ve resoluciones sin recargar.
@@ -156,6 +183,32 @@ const SolicitudesCambioPage = () => {
           Actualizar
         </button>
       </div>
+
+      {/* Interruptor: ajuste directo de almacén (solo admin) */}
+      {esAdmin && (
+        <div className={`mb-5 rounded-xl border p-4 flex items-start justify-between gap-4 ${ajusteDirecto ? 'bg-amber-50 border-amber-300' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-start gap-3">
+            <AlertCircle size={20} className={ajusteDirecto ? 'text-amber-600 mt-0.5' : 'text-gray-400 mt-0.5'} />
+            <div>
+              <p className="font-semibold text-gray-900">Ajuste directo de almacén</p>
+              <p className="text-sm text-gray-600 mt-0.5">
+                {ajusteDirecto
+                  ? 'ACTIVO: almacén registra entradas y salidas de stock sin tu aprobación. Quedan registradas aquí como aprobadas.'
+                  : 'Desactivado: almacén debe solicitar tu aprobación para cada entrada o salida de stock.'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={toggleAjusteDirecto}
+            disabled={cambiandoAjuste}
+            role="switch"
+            aria-checked={ajusteDirecto}
+            className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${ajusteDirecto ? 'bg-amber-500' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${ajusteDirecto ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="mb-4 flex gap-2 border-b border-gray-200">
