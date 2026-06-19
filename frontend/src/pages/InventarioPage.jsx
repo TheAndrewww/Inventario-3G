@@ -1072,6 +1072,23 @@ const InventarioPage = () => {
   };
 
   const handleReactivar = async (articulo) => {
+    // Almacén: no puede reactivar directo, envía solicitud (la resuelve admin o compras)
+    if (esAlmacen) {
+      if (!window.confirm(`Se enviará una solicitud para reactivar "${articulo.nombre}". ¿Continuar?`)) return;
+      try {
+        await solicitudesCambioService.crear({
+          tipo: 'reactivar_articulo',
+          articulo_id: articulo.id,
+          payload: {}
+        });
+        toast.success('Solicitud de reactivación enviada');
+      } catch (error) {
+        console.error(error);
+        toast.error(error.response?.data?.message || 'Error al enviar solicitud');
+      }
+      return;
+    }
+
     if (!window.confirm(`¿Deseas reactivar "${articulo.nombre}"?`)) {
       return;
     }

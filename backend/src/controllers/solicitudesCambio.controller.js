@@ -1,7 +1,7 @@
 import { sequelize, SolicitudCambio, Articulo, Usuario, Movimiento, DetalleMovimiento, Ubicacion, Notificacion } from '../models/index.js';
 import { esAjusteDirectoActivo } from './configuracion.controller.js';
 
-const TIPOS_VALIDOS = ['cambio_ubicacion', 'entrada_stock', 'salida_stock', 'crear_articulo', 'desactivar_articulo'];
+const TIPOS_VALIDOS = ['cambio_ubicacion', 'entrada_stock', 'salida_stock', 'crear_articulo', 'desactivar_articulo', 'reactivar_articulo'];
 
 const generarTicketID = () => {
   const ahora = new Date();
@@ -98,6 +98,13 @@ const aplicarCambioSolicitud = async (solicitud, aprobador_id, transaction) => {
       if (!articulo) throw new Error('Artículo no encontrado');
       await articulo.update({ activo: false }, { transaction });
       return { articulo_id: articulo.id, activo: false };
+    }
+
+    case 'reactivar_articulo': {
+      const articulo = await Articulo.findByPk(solicitud.articulo_id, { transaction });
+      if (!articulo) throw new Error('Artículo no encontrado');
+      await articulo.update({ activo: true }, { transaction });
+      return { articulo_id: articulo.id, activo: true };
     }
 
     default:
@@ -198,9 +205,13 @@ export const crearSolicitud = async (req, res) => {
       observaciones: observaciones || null
     });
 
-    // Notificar a todos los administradores activos
+    // Notificar a los administradores activos. Para reactivaciones, notificar
+    // también a compras (puede resolverlas).
     try {
-      const admins = await Usuario.findAll({ where: { rol: 'administrador', activo: true }, attributes: ['id'] });
+      const rolesNotificar = tipo === 'reactivar_articulo'
+        ? ['administrador', 'compras']
+        : ['administrador'];
+      const admins = await Usuario.findAll({ where: { rol: rolesNotificar, activo: true }, attributes: ['id'] });
       const titulo = 'Nueva solicitud de cambio';
       const mensaje = `${req.usuario.nombre} solicitó: ${descripcionTipo(tipo)}`;
       for (const admin of admins) {
@@ -234,7 +245,13 @@ export const listarSolicitudes = async (req, res) => {
     const where = {};
     if (estado) where.estado = estado;
 
-    if (req.usuario.rol !== 'administrador') {
+    if (req.usuario.rol === 'administrador') {
+      // Admin ve todas
+    } else if (req.usuario.rol === 'compras') {
+      // Compras solo ve (y resuelve) solicitudes de reactivación
+      where.tipo = 'reactivar_articulo';
+    } else {
+      // Almacén/encargado: solo las suyas
       where.solicitante_id = req.usuario.id;
     }
 
@@ -257,14 +274,19 @@ export const listarSolicitudes = async (req, res) => {
 export const contarPendientes = async (req, res) => {
   try {
     const where = { estado: 'pendiente' };
-    if (req.usuario.rol !== 'administrador') {
+    if (req.usuario.rol === 'administrador') {
+      // cuenta todas las pendientes
+    } else if (req.usuario.rol === 'compras') {
+      // solo reactivaciones pendientes (lo que compras puede resolver)
+      where.tipo = 'reactivar_articulo';
+    } else {
       where.solicitante_id = req.usuario.id;
     }
     const total = await SolicitudCambio.count({ where });
 
-    // Para almacen: contar también las rechazadas no vistas (las que necesitan corrección)
+    // Para almacen/encargado: contar también las rechazadas no vistas (las que necesitan corrección)
     let rechazadas = 0;
-    if (req.usuario.rol !== 'administrador') {
+    if (req.usuario.rol !== 'administrador' && req.usuario.rol !== 'compras') {
       rechazadas = await SolicitudCambio.count({ where: { solicitante_id: req.usuario.id, estado: 'rechazada' } });
     }
 
@@ -292,6 +314,11 @@ export const aprobarSolicitud = async (req, res) => {
     if (solicitud.estado !== 'pendiente') {
       await transaction.rollback();
       return res.status(400).json({ success: false, message: `Esta solicitud ya está ${solicitud.estado}` });
+    }
+    // Compras solo puede resolver solicitudes de reactivación
+    if (req.usuario.rol === 'compras' && solicitud.tipo !== 'reactivar_articulo') {
+      await transaction.rollback();
+      return res.status(403).json({ success: false, message: 'Solo puedes aprobar solicitudes de reactivación de artículo' });
     }
 
     const resultado = await aplicarCambioSolicitud(solicitud, aprobador_id, transaction);
@@ -343,6 +370,10 @@ export const rechazarSolicitud = async (req, res) => {
     if (solicitud.estado !== 'pendiente') {
       return res.status(400).json({ success: false, message: `Esta solicitud ya está ${solicitud.estado}` });
     }
+    // Compras solo puede resolver solicitudes de reactivación
+    if (req.usuario.rol === 'compras' && solicitud.tipo !== 'reactivar_articulo') {
+      return res.status(403).json({ success: false, message: 'Solo puedes rechazar solicitudes de reactivación de artículo' });
+    }
 
     await solicitud.update({
       estado: 'rechazada',
@@ -376,5 +407,6 @@ const descripcionTipo = (tipo) => ({
   entrada_stock: 'entrada de stock',
   salida_stock: 'salida de stock',
   crear_articulo: 'creación de artículo',
-  desactivar_articulo: 'desactivación de artículo'
+  desactivar_articulo: 'desactivación de artículo',
+  reactivar_articulo: 'reactivación de artículo'
 }[tipo] || tipo);

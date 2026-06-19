@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, XCircle, Clock, AlertCircle, MapPin, PackagePlus, PackageMinus, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, AlertCircle, MapPin, PackagePlus, PackageMinus, Plus, Trash2, RefreshCw, RotateCcw } from 'lucide-react';
 import solicitudesCambioService from '../services/solicitudesCambio.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import configuracionService from '../services/configuracion.service';
@@ -11,7 +11,8 @@ const TIPO_LABEL = {
   entrada_stock: 'Entrada de stock',
   salida_stock: 'Salida de stock',
   crear_articulo: 'Crear artículo',
-  desactivar_articulo: 'Desactivar artículo'
+  desactivar_articulo: 'Desactivar artículo',
+  reactivar_articulo: 'Reactivar artículo'
 };
 
 const TIPO_ICON = {
@@ -19,7 +20,8 @@ const TIPO_ICON = {
   entrada_stock: PackagePlus,
   salida_stock: PackageMinus,
   crear_articulo: Plus,
-  desactivar_articulo: Trash2
+  desactivar_articulo: Trash2,
+  reactivar_articulo: RotateCcw
 };
 
 const ESTADO_BADGE = {
@@ -31,6 +33,9 @@ const ESTADO_BADGE = {
 const SolicitudesCambioPage = () => {
   const { user } = useAuth();
   const esAdmin = user?.rol === 'administrador';
+  const esCompras = user?.rol === 'compras';
+  // Quién puede resolver una solicitud: admin todas; compras solo reactivaciones.
+  const puedeResolver = (s) => esAdmin || (esCompras && s.tipo === 'reactivar_articulo');
 
   const [solicitudes, setSolicitudes] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
@@ -153,6 +158,8 @@ const SolicitudesCambioPage = () => {
         return `Nombre: ${s.payload?.nombre || ''}`;
       case 'desactivar_articulo':
         return 'Desactivar artículo';
+      case 'reactivar_articulo':
+        return 'Reactivar artículo';
       default:
         return '';
     }
@@ -171,7 +178,9 @@ const SolicitudesCambioPage = () => {
           <p className="text-gray-600 mt-1">
             {esAdmin
               ? 'Aprueba o rechaza los cambios solicitados por almacén'
-              : 'Estado de tus solicitudes enviadas al administrador'}
+              : esCompras
+                ? 'Aprueba o rechaza las solicitudes de reactivación de artículos'
+                : 'Estado de tus solicitudes enviadas al administrador'}
           </p>
         </div>
         <button
@@ -295,8 +304,8 @@ const SolicitudesCambioPage = () => {
                     </div>
                   </div>
 
-                  {/* Acciones admin solo en pendientes */}
-                  {esAdmin && s.estado === 'pendiente' && (
+                  {/* Acciones de resolución solo en pendientes (admin todas; compras reactivaciones) */}
+                  {puedeResolver(s) && s.estado === 'pendiente' && (
                     <div className="flex gap-2 md:flex-col md:w-40">
                       <button
                         onClick={() => aprobar(s.id)}

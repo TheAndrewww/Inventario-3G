@@ -18,11 +18,11 @@ router.post(
   crearSolicitud
 );
 
-// Listar — admin ve todas, almacen solo las suyas
+// Listar — admin ve todas, compras las de reactivación, almacen solo las suyas
 router.get(
   '/',
   verificarToken,
-  verificarRol('almacen', 'encargado', 'administrador'),
+  verificarRol('almacen', 'encargado', 'administrador', 'compras'),
   listarSolicitudes
 );
 
@@ -30,23 +30,23 @@ router.get(
 router.get(
   '/contador',
   verificarToken,
-  verificarRol('almacen', 'encargado', 'administrador'),
+  verificarRol('almacen', 'encargado', 'administrador', 'compras'),
   contarPendientes
 );
 
-// Aprobar — solo admin
+// Aprobar — admin (todas) y compras (solo reactivaciones, validado en el controlador)
 router.patch(
   '/:id/aprobar',
   verificarToken,
-  verificarRol('administrador'),
+  verificarRol('administrador', 'compras'),
   aprobarSolicitud
 );
 
-// Rechazar — solo admin
+// Rechazar — admin (todas) y compras (solo reactivaciones, validado en el controlador)
 router.patch(
   '/:id/rechazar',
   verificarToken,
-  verificarRol('administrador'),
+  verificarRol('administrador', 'compras'),
   rechazarSolicitud
 );
 

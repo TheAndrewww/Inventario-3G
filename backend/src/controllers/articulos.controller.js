@@ -892,7 +892,9 @@ export const updateArticulo = async (req, res) => {
             ...(unidad && { unidad }),
             ...(costo_unitario !== undefined && { costo_unitario }),
             ...(imagen !== undefined && { imagen }),
-            ...(activo !== undefined && { activo }),
+            // Activar/desactivar directo solo lo puede hacer el administrador.
+            // Almacén (y compras) deben pasar por una solicitud de reactivación.
+            ...(activo !== undefined && req.usuario?.rol === 'administrador' && { activo }),
             ...(es_herramienta !== undefined && { es_herramienta }),
             // Si es admin o encargado, marcar como revisado
             ...(esAdminOEncargado && { pendiente_revision: false })
