@@ -180,12 +180,11 @@ const DashboardProduccionPage = () => {
         toggleEtapa
     } = useProduccionData({ autoSync: true, refreshInterval: 5 * 60 * 1000 });
 
-    // Almacén: vista de solo lectura de los proyectos que ya entraron al flujo
-    // de producción (diseño, compras y producción). Se excluyen los que aún están
-    // 'pendiente' y los ya 'instalacion'/'completado'.
-    const ETAPAS_VISIBLES_ALMACEN = ['diseno', 'compras', 'produccion'];
+    // Almacén: vista de solo lectura de todos los proyectos en curso, es decir
+    // todos los que NO estén en etapa 'completado' (pendiente, diseño, compras,
+    // producción e instalación).
     const proyectosVisibles = esAlmacen
-        ? proyectos.filter(p => ETAPAS_VISIBLES_ALMACEN.includes(p.etapa_actual))
+        ? proyectos.filter(p => p.etapa_actual !== 'completado')
         : proyectos;
 
     const { filtro, setFiltro, busqueda, setBusqueda, proyectosFiltrados, opciones } = useProduccionFilters(proyectosVisibles);
