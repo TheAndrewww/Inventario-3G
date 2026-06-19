@@ -154,6 +154,14 @@ const Articulo = sequelize.define('Articulo', {
         // Regla: si stock_minimo es 0, el artículo queda desactivado automáticamente.
         // Aplica a todo create/update vía Sequelize (independiente del almacén).
         beforeCreate: (articulo) => {
+            // Respetar la activación explícita al crear: si el artículo se crea
+            // como activo, no desactivarlo aunque stock_minimo sea 0. El rol
+            // almacén crea SKUs con stock_minimo = 0 por defecto y deben quedar
+            // activos; la regla de stock_minimo=0 → desactivado solo debe forzarse
+            // cuando un admin lo marca explícitamente como inactivo.
+            if (articulo.activo === true) {
+                return;
+            }
             const stockMin = parseFloat(articulo.stock_minimo);
             if (!isNaN(stockMin) && stockMin === 0) {
                 articulo.activo = false;
@@ -164,6 +172,16 @@ const Articulo = sequelize.define('Articulo', {
             // respetar esa decisión aunque stock_minimo sea 0.
             // (De lo contrario los artículos con stock_minimo = 0 nunca se podrían reactivar.)
             if (articulo.changed('activo') && articulo.activo === true) {
+                return;
+            }
+            // Solo aplicar la regla cuando stock_minimo se está modificando en
+            // ESTA actualización. Antes el hook se disparaba en cualquier save:
+            // un ajuste de stock (entrada/salida), un cambio de nombre, etc. sobre
+            // un artículo con stock_minimo = 0 lo volvía a desactivar — el ajuste
+            // sí se guardaba pero el SKU "desaparecía" del inventario activo, por
+            // lo que parecía que el ajuste no se había hecho. (rol almacén crea/edita
+            // SKUs con stock_minimo = 0 por defecto, así que les pegaba siempre.)
+            if (!articulo.changed('stock_minimo')) {
                 return;
             }
             const stockMin = parseFloat(articulo.stock_minimo);
