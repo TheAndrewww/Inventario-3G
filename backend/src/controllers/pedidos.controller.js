@@ -914,8 +914,7 @@ export const marcarArticuloDispersado = async (req, res) => {
       success: true,
       message: dispersado ? 'Artículo marcado como dispersado' : 'Artículo desmarcado',
       data: {
-        detalle: detalleActualizado,
-        pedido_completado: todosDispersados
+        detalle: detalleActualizado
       }
     });
 
