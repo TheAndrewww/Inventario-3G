@@ -180,11 +180,22 @@ const DashboardProduccionPage = () => {
         toggleEtapa
     } = useProduccionData({ autoSync: true, refreshInterval: 5 * 60 * 1000 });
 
-    // Almacén: vista de solo lectura de todos los proyectos en curso, es decir
-    // todos los que NO estén en etapa 'completado' (pendiente, diseño, compras,
-    // producción e instalación).
+    // Almacén: vista de solo lectura que replica la "pantalla de producción" (TV).
+    // Solo proyectos activos en producción (diseño, compras, producción),
+    // excluyendo completados, pendientes, preparados/instalación, pausados y los
+    // MTO/GTIA simplificados (que van directo a Preparados).
+    const usaTimelineSimplificado = (p) => {
+        const tipo = p.tipo_proyecto?.toUpperCase();
+        return (tipo === 'MTO' || tipo === 'GTIA') && !p.es_extensivo;
+    };
     const proyectosVisibles = esAlmacen
-        ? proyectos.filter(p => p.etapa_actual !== 'completado')
+        ? proyectos.filter(p =>
+            p.etapa_actual !== 'completado' &&
+            p.etapa_actual !== 'pendiente' &&
+            p.etapa_actual !== 'instalacion' &&
+            !p.pausado &&
+            !usaTimelineSimplificado(p)
+        )
         : proyectos;
 
     const { filtro, setFiltro, busqueda, setBusqueda, proyectosFiltrados, opciones } = useProduccionFilters(proyectosVisibles);
