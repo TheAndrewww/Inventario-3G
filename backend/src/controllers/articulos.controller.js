@@ -604,8 +604,21 @@ export const createArticulo = async (req, res) => {
             es_herramienta
         } = req.body;
 
+        // El rol almacén crea SKUs "borrador" que van a NUEVOS REGISTROS: solo
+        // aporta nombre (y foto). El admin completa categoría, ubicación, stocks y
+        // proveedor al revisarlos. Para los demás roles se siguen exigiendo todos
+        // los campos.
+        const esAlmacen = req.usuario?.rol === 'almacen';
+
         // Validar campos requeridos (codigo_ean13 ahora es OPCIONAL)
-        if (!nombre || !categoria_id || !ubicacion_id || stock_actual === undefined || stock_minimo === undefined) {
+        if (esAlmacen) {
+            if (!nombre) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Campo requerido: nombre'
+                });
+            }
+        } else if (!nombre || !categoria_id || !ubicacion_id || stock_actual === undefined || stock_minimo === undefined) {
             return res.status(400).json({
                 success: false,
                 message: 'Campos requeridos: nombre, categoria_id, ubicacion_id, stock_actual, stock_minimo'
@@ -643,8 +656,23 @@ export const createArticulo = async (req, res) => {
             }
         }
 
+        // Resolver categoría/ubicación finales.
+        // Almacén puede no enviarlas: se usa una categoría "Sin Categoría" de
+        // respaldo (se crea si no existe) y la ubicación queda sin asignar hasta
+        // que el admin lo revise en NUEVOS REGISTROS.
+        let categoriaIdFinal = categoria_id;
+        let ubicacionIdFinal = ubicacion_id || null;
+
+        if (esAlmacen && !categoriaIdFinal) {
+            const [categoriaRespaldo] = await Categoria.findOrCreate({
+                where: { nombre: 'Sin Categoría', almacen_id: null },
+                defaults: { nombre: 'Sin Categoría', almacen_id: null, descripcion: 'Categoría temporal para SKUs pendientes de revisión' }
+            });
+            categoriaIdFinal = categoriaRespaldo.id;
+        }
+
         // Verificar que la categoría existe
-        const categoria = await Categoria.findByPk(categoria_id);
+        const categoria = await Categoria.findByPk(categoriaIdFinal);
         if (!categoria) {
             return res.status(404).json({
                 success: false,
@@ -652,13 +680,15 @@ export const createArticulo = async (req, res) => {
             });
         }
 
-        // Verificar que la ubicación existe
-        const ubicacion = await Ubicacion.findByPk(ubicacion_id);
-        if (!ubicacion) {
-            return res.status(404).json({
-                success: false,
-                message: 'Ubicación no encontrada'
-            });
+        // Verificar que la ubicación existe (si se proporcionó)
+        if (ubicacionIdFinal) {
+            const ubicacion = await Ubicacion.findByPk(ubicacionIdFinal);
+            if (!ubicacion) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Ubicación no encontrada'
+                });
+            }
         }
 
         // Determinar el código EAN-13 a usar
@@ -669,21 +699,18 @@ export const createArticulo = async (req, res) => {
             codigoFinal = generarCodigoEAN13Temporal();
         }
 
-        // Determinar si el artículo debe marcarse como pendiente de revisión
-        // (cuando lo crea un usuario con rol almacén)
-        const esAlmacen = req.usuario?.rol === 'almacen';
-
-        // Crear artículo
+        // Crear artículo. Si lo crea almacén se marca como pendiente de revisión
+        // (queda en NUEVOS REGISTROS) y los campos no aportados toman valores base.
         const articulo = await Articulo.create({
             codigo_ean13: codigoFinal,
             codigo_tipo: tipoFinal,
             nombre,
             descripcion,
-            categoria_id,
-            ubicacion_id,
+            categoria_id: categoriaIdFinal,
+            ubicacion_id: ubicacionIdFinal,
             proveedor_id: proveedor_id || null,
-            stock_actual,
-            stock_minimo,
+            stock_actual: stock_actual !== undefined ? stock_actual : 0,
+            stock_minimo: stock_minimo !== undefined ? stock_minimo : 0,
             stock_maximo: stock_maximo || null,
             unidad: unidad || 'piezas',
             costo_unitario: costo_unitario || 0,

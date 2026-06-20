@@ -569,7 +569,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       return;
     }
 
-    if (!formData.stock_actual || parseFloat(formData.stock_actual) < 0) {
+    // El rol almacén no captura stock: el SKU va a NUEVOS REGISTROS y el admin
+    // asigna stock al revisarlo. Para los demás roles el stock actual es obligatorio.
+    if (!esAlmacen && (!formData.stock_actual || parseFloat(formData.stock_actual) < 0)) {
       toast.error('El stock actual debe ser mayor o igual a 0');
       return;
     }
@@ -582,7 +584,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
 
     // Validar que si la unidad es "piezas", los stocks sean números enteros
     if (formData.unidad === 'piezas') {
-      if (!Number.isInteger(parseFloat(formData.stock_actual))) {
+      if (!esAlmacen && !Number.isInteger(parseFloat(formData.stock_actual))) {
         toast.error('El stock actual debe ser un número entero para piezas');
         return;
       }
@@ -629,7 +631,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         descripcion: formData.descripcion.trim().toUpperCase(),
         categoria_id: parseInt(categoriaId),
         ubicacion_id: parseInt(ubicacionId),
-        stock_actual: parseFloat(formData.stock_actual),
+        stock_actual: esAlmacen ? 0 : parseFloat(formData.stock_actual),
         stock_minimo: esAlmacen ? 0 : parseFloat(formData.stock_minimo),
         stock_maximo: formData.stock_maximo ? parseFloat(formData.stock_maximo) : null,
         unidad: formData.unidad.toUpperCase(),
@@ -792,7 +794,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={isEdit ? (esEdicionLimitada ? 'Editar Nombre y Foto' : 'Editar Artículo') : (modoIngreso ? 'Ingreso de Inventario' : 'Nuevo Artículo')}
+      title={isEdit ? (esEdicionLimitada ? 'Editar Nombre y Foto' : 'Editar Artículo') : (modoIngreso ? 'Ingreso de Inventario' : (esAlmacen ? 'Nuevo SKU → Nuevos Registros' : 'Nuevo Artículo'))}
       closeOnBackdropClick={false}
     >
       <form onSubmit={modoIngreso ? handleIngresoInventario : handleSubmit} className="space-y-4">
@@ -967,8 +969,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
               />
             </div>
           </>
-        ) : esEdicionLimitada ? (
-          /* Modo Edición Limitada (Almacén): Solo Nombre y Foto */
+        ) : esAlmacen ? (
+          /* Almacén (crear o editar): Solo Nombre y Foto. El SKU va a NUEVOS REGISTROS. */
           <>
             {/* Nombre */}
             <div>
@@ -1002,7 +1004,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
 
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-700">
-                ⚠️ Solo puedes modificar el nombre y la foto del artículo.
+                {isEdit
+                  ? '⚠️ Solo puedes modificar el nombre y la foto del artículo.'
+                  : '⚠️ Solo capturas nombre y foto. El SKU se enviará a NUEVOS REGISTROS y el administrador completará proveedor, stock, almacén y mejorará la foto.'}
               </p>
             </div>
           </>

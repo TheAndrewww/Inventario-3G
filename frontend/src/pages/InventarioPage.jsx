@@ -253,6 +253,14 @@ const InventarioPage = () => {
   const esAdministrador = user?.rol === 'administrador';
   const esAlmacen = user?.rol === 'almacen';
 
+  // NUEVOS REGISTROS: SKUs creados por almacén pendientes de revisión del admin.
+  // 'nuevos' es un valor centinela de almacenSeleccionado (no es un almacén real).
+  const modoNuevosRegistros = almacenSeleccionado === 'nuevos';
+  const articulosPendientesRevision = React.useMemo(
+    () => articulos.filter(a => a.pendiente_revision === true && a.activo !== false),
+    [articulos]
+  );
+
   // Estado para artículos en conteo cíclico activo
   const [articulosEnConteo, setArticulosEnConteo] = useState(new Set());
 
@@ -505,6 +513,7 @@ const InventarioPage = () => {
   // Cuando cambia el almacén seleccionado, recargar categorías, ubicaciones y secciones filtradas
   useEffect(() => {
     if (almacenSeleccionado === null) return; // Gate activo, no fetchear
+    if (almacenSeleccionado === 'nuevos') return; // NUEVOS REGISTROS no es un almacén real
     fetchCategorias(almacenSeleccionado);
     fetchUbicaciones(almacenSeleccionado);
     fetchSecciones(almacenSeleccionado);
@@ -661,7 +670,7 @@ const InventarioPage = () => {
     // Normalizar: convertir apóstrofes a guión (el lector QR a veces lee ' en lugar de -)
     const codigo = searchTerm.trim().toUpperCase().replace(/['`´]/g, '-');
 
-    if (codigo && patronCodigoParcial.test(codigo) && herramientasEncontradasPorCodigo.length > 0) {
+    if (almacenSeleccionado !== 'nuevos' && codigo && patronCodigoParcial.test(codigo) && herramientasEncontradasPorCodigo.length > 0) {
       // Filtrar las herramientas encontradas por los demás filtros
       return herramientasEncontradasPorCodigo
         .filter((item) => {
@@ -677,7 +686,8 @@ const InventarioPage = () => {
               ? item.seccion_id === seccionSeleccionada
               : getSeccionArticulo(item) === seccionSeleccionada);
 
-          return matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion;
+          // Ocultar SKUs pendientes de revisión: viven solo en NUEVOS REGISTROS
+          return !item.pendiente_revision && matchesActiveFilter && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion;
         })
         .sort((a, b) => {
           // Ordenar según la opción seleccionada
@@ -720,6 +730,12 @@ const InventarioPage = () => {
           item.codigo_ean13?.includes(searchTerm) ||
           item.categoria?.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
 
+        // Modo NUEVOS REGISTROS: solo SKUs pendientes de revisión (creados por
+        // almacén), sin filtrar por almacén/sección porque aún no se les asigna.
+        if (almacenSeleccionado === 'nuevos') {
+          return item.pendiente_revision === true && isActive && matchesSearch;
+        }
+
         const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
         const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
 
@@ -732,7 +748,8 @@ const InventarioPage = () => {
             ? item.seccion_id === seccionSeleccionada
             : getSeccionArticulo(item) === seccionSeleccionada);
 
-        return matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion;
+        // Ocultar SKUs pendientes de revisión: viven solo en NUEVOS REGISTROS
+        return !item.pendiente_revision && matchesActiveFilter && matchesSearch && matchesCategoria && matchesUbicacion && matchesAlmacen && matchesSeccion;
       })
       .sort((a, b) => {
         // Ordenar según la opción seleccionada
@@ -1863,6 +1880,35 @@ const InventarioPage = () => {
                 </button>
               );
             })}
+            {/* NUEVOS REGISTROS: SKUs creados por almacén, pendientes de revisión del admin */}
+            {(esAdministrador || esAlmacen) && (
+              <button
+                key="nuevos-registros"
+                onClick={() => {
+                  setAlmacenSeleccionado('nuevos');
+                  setTabActivo('consumibles');
+                  setSeccionSeleccionada('todos');
+                  setCategoriaSeleccionada(null);
+                  setUbicacionSeleccionada(null);
+                }}
+                className="relative group bg-white border-2 border-amber-200 rounded-2xl p-6 md:p-8 hover:border-amber-500 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
+              >
+                {articulosPendientesRevision.length > 0 && (
+                  <span className="absolute top-3 right-3 min-w-[24px] h-6 px-1.5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full">
+                    {articulosPendientesRevision.length}
+                  </span>
+                )}
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-amber-50 group-hover:bg-amber-500 transition-colors flex items-center justify-center">
+                  <PackagePlus size={36} className="text-amber-600 group-hover:text-white transition-colors" />
+                </div>
+                <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide text-center">
+                  Nuevos Registros
+                </span>
+                <span className="text-sm text-gray-500">
+                  {articulosPendientesRevision.length} pendiente{articulosPendientesRevision.length === 1 ? '' : 's'}
+                </span>
+              </button>
+            )}
           </div>
           {almacenesDisponibles.length === 0 && (
             <div className="text-center text-gray-500 py-8">
@@ -1885,7 +1931,8 @@ const InventarioPage = () => {
   }
 
   // Sub-gate: si ya hay almacén pero no sección, mostrar selector de secciones de BD
-  if (seccionSeleccionada === null) {
+  // (NUEVOS REGISTROS no tiene secciones: se salta este gate)
+  if (seccionSeleccionada === null && !modoNuevosRegistros) {
     const nombreAlmacenActual = almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén';
     // Conteo de SKUs por sección (en este almacén)
     const articulosDelAlmacen = articulos.filter((item) => {
@@ -2071,7 +2118,14 @@ const InventarioPage = () => {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           {/* Almacén actual + botón para cambiar */}
           <div className="flex gap-2 flex-shrink-0 items-center">
-            {(() => {
+            {modoNuevosRegistros ? (
+              <div className="flex items-center gap-2 px-4 py-2.5 border rounded-lg bg-amber-50 border-amber-200">
+                <PackagePlus size={18} className="text-amber-600" />
+                <span className="font-semibold uppercase tracking-wide text-sm md:text-base text-amber-700">
+                  Nuevos Registros
+                </span>
+              </div>
+            ) : (() => {
               const nombreAct = almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén';
               const esHerr = nombreAct === 'Herramientas';
               return (
@@ -2086,7 +2140,7 @@ const InventarioPage = () => {
               );
             })()}
             {/* Indicador de sección activa */}
-            {seccionSeleccionada && (
+            {seccionSeleccionada && !modoNuevosRegistros && (
               <div className="flex items-center gap-2 px-3 py-2.5 border rounded-lg bg-red-50 border-red-200">
                 <Package size={16} className="text-red-700" />
                 <span className="font-semibold uppercase tracking-wide text-xs md:text-sm text-red-700">
@@ -2096,14 +2150,16 @@ const InventarioPage = () => {
                 </span>
               </div>
             )}
-            <button
-              onClick={() => setSeccionSeleccionada(null)}
-              className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-2 text-sm"
-              title="Cambiar sección"
-            >
-              <ArrowUpDown size={16} />
-              <span className="hidden md:inline">Sección</span>
-            </button>
+            {!modoNuevosRegistros && (
+              <button
+                onClick={() => setSeccionSeleccionada(null)}
+                className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                title="Cambiar sección"
+              >
+                <ArrowUpDown size={16} />
+                <span className="hidden md:inline">Sección</span>
+              </button>
+            )}
             <button
               onClick={() => { setAlmacenSeleccionado(null); setSeccionSeleccionada(null); }}
               className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-2 text-sm"
@@ -2381,15 +2437,13 @@ const InventarioPage = () => {
                 <Barcode size={18} />
                 <span className="hidden sm:inline">Generar Etiquetas</span>
               </button>
-              {user?.rol !== 'almacen' && (
-                <button
-                  onClick={handleNuevoArticulo}
-                  className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base bg-red-700 text-white rounded-lg hover:bg-red-800"
-                >
-                  <Plus size={18} />
-                  <span className="hidden sm:inline">Nuevo Artículo</span>
-                </button>
-              )}
+              <button
+                onClick={handleNuevoArticulo}
+                className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base bg-red-700 text-white rounded-lg hover:bg-red-800"
+              >
+                <Plus size={18} />
+                <span className="hidden sm:inline">{esAlmacen ? 'Nuevo SKU' : 'Nuevo Artículo'}</span>
+              </button>
             </>
           )}
 
