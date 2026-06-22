@@ -511,8 +511,14 @@ ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEt
 
     await this.save();
 
-    // Verificar si ambas sub-etapas están completas para auto-avanzar
-    const puedeAvanzar = this.manufactura_completado && this.herreria_completado;
+    // Verificar si las sub-etapas aplicables están completas para auto-avanzar.
+    // Un proyecto puede tener solo manufactura, solo herrería, o ambas: solo
+    // exigimos completar las áreas que realmente tiene (tiene_manufactura /
+    // tiene_herreria). Coincide con la lógica del frontend (isEtapaActiva).
+    const manufacturaOk = !this.tiene_manufactura || this.manufactura_completado;
+    const herreriaOk = !this.tiene_herreria || this.herreria_completado;
+    const tieneProduccion = this.tiene_manufactura || this.tiene_herreria;
+    const puedeAvanzar = tieneProduccion && manufacturaOk && herreriaOk;
 
     // Auto-avanzar a 'instalacion' (= "Completado" en UI, vive en la pantalla
     // de Completados) cuando ambas sub-etapas están completas. NO usamos
@@ -545,7 +551,10 @@ ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEt
  */
 ProduccionProyecto.prototype.puedeAvanzarDeProduccion = function () {
     if (this.etapa_actual !== 'produccion') return false;
-    return this.manufactura_completado && this.herreria_completado;
+    const manufacturaOk = !this.tiene_manufactura || this.manufactura_completado;
+    const herreriaOk = !this.tiene_herreria || this.herreria_completado;
+    const tieneProduccion = this.tiene_manufactura || this.tiene_herreria;
+    return tieneProduccion && manufacturaOk && herreriaOk;
 };
 
 /**
