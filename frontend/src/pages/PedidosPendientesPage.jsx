@@ -596,8 +596,8 @@ const PedidosPendientesPage = () => {
               )}
             </div>
 
-            {/* Botón Completar Ticket — visible solo al 100% */}
-            {pedidoSeleccionado.progreso_dispersion === 100 && (
+            {/* Botón Completar Ticket — visible solo al 100% y si el ticket aún no está entregado */}
+            {pedidoSeleccionado.progreso_dispersion === 100 && ['pendiente', 'aprobado'].includes(pedidoSeleccionado.estado) && (
               <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-4 bg-white border-t border-gray-200">
                 <button
                   onClick={handleCompletarTicket}
