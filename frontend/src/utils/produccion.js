@@ -341,42 +341,61 @@ export const matchNombre = (nombreA, nombreB) => {
 };
 
 /**
+ * Dadas fechas ISO (YYYY-MM-DD) ordenadas ascendentemente, las agrupa en bloques
+ * de días consecutivos y devuelve el PRIMER día del ÚLTIMO bloque contiguo.
+ *
+ * Motivo: una cita de instalación puede abarcar varios días seguidos (29, 30, 1)
+ * → debe usarse su primer día (29). Pero si un proyecto se movió y la celda vieja
+ * quedó con texto residual, las fechas tienen un hueco → se usa el bloque más
+ * reciente (la cita real).
+ */
+const inicioUltimoBloque = (fechasAsc) => {
+    if (!fechasAsc.length) return null;
+    const toUTC = (s) => { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+    const UN_DIA = 86400000;
+    let inicioBloque = fechasAsc[0];
+    for (let i = 1; i < fechasAsc.length; i++) {
+        const diff = (toUTC(fechasAsc[i]) - toUTC(fechasAsc[i - 1])) / UN_DIA;
+        if (diff > 1) inicioBloque = fechasAsc[i]; // hueco → arranca un bloque nuevo
+    }
+    return inicioBloque;
+};
+
+/**
  * Aplica fechas del calendario como fecha_limite a los proyectos de producción.
  * Para cada proyecto del calendario, busca un match de nombre (≥80%) en la lista de producción.
- * Si encuentra match, overridea fecha_limite con (día del calendario - 1).
+ * Si encuentra match, overridea fecha_limite con (fecha de instalación - 1 día hábil).
  *
  * @param {Array} proyectos - Proyectos de producción
- * @param {Array} calendarioProyectos - Proyectos del calendario [{nombre, dia, ...}]
- * @param {number} anio - Año actual
- * @param {number} mes - Mes actual (1-12)
+ * @param {Array} calendarioProyectos - Proyectos del calendario [{nombre, dia, fecha, ...}]
+ * @param {number} anio - Año actual (fallback si la cita no trae fecha resuelta)
+ * @param {number} mes - Mes actual 1-12 (fallback si la cita no trae fecha resuelta)
  * @returns {Array} Proyectos con fecha_limite actualizada donde corresponde
  */
 export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, mes) => {
     if (!calendarioProyectos?.length || !proyectos?.length) return proyectos;
 
-    // Crear mapa de nombre calendario → mayor día encontrado
-    // Usamos el MAYOR día porque si un proyecto se mueve de un día a otro,
-    // la celda anterior puede quedar con texto residual. El día más reciente
-    // es el que representa la cita actual.
+    // Mapa nombre calendario → conjunto de fechas ISO de sus citas.
+    // Usamos la fecha REAL resuelta por el backend (`cp.fecha`), que maneja las
+    // semanas cruzadas entre meses (ej. el 29 que vive en la pestaña de JULIO
+    // pero pertenece a JUNIO). Fallback a mes+dia si el backend no la envía.
     const fechasPorNombre = {};
     calendarioProyectos.forEach(cp => {
-        if (!cp.nombre || !cp.dia) return;
+        if (!cp.nombre) return;
         const key = normalizarNombre(cp.nombre);
         if (!key) return;
         // Ignorar entradas de cimentación
         if (key.includes('cimentacion')) return;
-        // Guardar el mayor día (última aparición / cita más reciente)
-        if (!fechasPorNombre[key] || cp.dia > fechasPorNombre[key]) {
-            fechasPorNombre[key] = cp.dia;
+        let fecha = cp.fecha;
+        if (!fecha && cp.dia) {
+            fecha = `${anio}-${String(mes).padStart(2, '0')}-${String(cp.dia).padStart(2, '0')}`;
         }
+        if (!fecha) return;
+        (fechasPorNombre[key] = fechasPorNombre[key] || new Set()).add(fecha);
     });
 
     const nombresCalendario = Object.keys(fechasPorNombre);
     if (nombresCalendario.length === 0) return proyectos;
-
-    // Debug: mostrar nombres del calendario y sus días
-    console.log('📅 Calendario → Producción matching:');
-    console.log('   Calendario:', Object.entries(fechasPorNombre).map(([k, v]) => `"${k}" → día ${v}`).join(', '));
 
     return proyectos.map(p => {
         const nombreProd = normalizarNombre(p.nombre);
@@ -385,9 +404,21 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
         // Buscar match en nombres del calendario
         for (const nombreCal of nombresCalendario) {
             if (matchNombre(nombreProd, nombreCal)) {
-                const diaCal = fechasPorNombre[nombreCal];
-                // Fecha del calendario = día programado para instalación
-                const fechaInstalacionStr = `${anio}-${String(mes).padStart(2, '0')}-${String(diaCal).padStart(2, '0')}`;
+                const fechas = [...fechasPorNombre[nombreCal]].sort(); // ISO → orden cronológico
+                const fechaInstalacionStr = inicioUltimoBloque(fechas);
+                if (!fechaInstalacionStr) return p;
+
+                // Regla de negocio:
+                // - Si la fecha del calendario es ANTERIOR (o igual) a la fecha de
+                //   entrega del índice (columna D de la hoja), MANDA el calendario.
+                // - Si la cita del calendario es POSTERIOR, se respeta la fecha del
+                //   índice (la hoja de producción).
+                // Las fechas están en formato ISO (YYYY-MM-DD), comparables como texto.
+                const fechaIndice = p.fecha_limite_original || p.fecha_limite;
+                if (fechaIndice && fechaInstalacionStr > fechaIndice) {
+                    console.log(`   ⏩ ÍNDICE MANDA: prod="${nombreProd}" cal=${fechaInstalacionStr} es posterior a entrega=${fechaIndice} → se respeta el índice`);
+                    return p;
+                }
 
                 // El proyecto debe estar COMPLETADO 1 día hábil antes de la instalación
                 const fechaCompletado = restarDiasHabiles(fechaInstalacionStr, 1);
@@ -396,14 +427,9 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
                 const d = String(fechaCompletado.getUTCDate()).padStart(2, '0');
                 const nuevaFechaLimite = `${y}-${m}-${d}`;
 
-                console.log(`   ✅ MATCH: prod="${nombreProd}" ↔ cal="${nombreCal}" → día ${diaCal} → instalación=${fechaInstalacionStr} → fecha_limite=${nuevaFechaLimite}`);
-                // El calendario manda. Siempre overridear la fecha_limite con la del calendario.
+                console.log(`   ✅ CALENDARIO MANDA: prod="${nombreProd}" ↔ cal="${nombreCal}" → instalación=${fechaInstalacionStr} (antes de entrega=${fechaIndice || 'N/A'}) → fecha_limite=${nuevaFechaLimite}`);
                 return { ...p, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
             }
-        }
-        // Solo loguear los que NO matchearon para diagnóstico
-        if (p.etapa_actual !== 'completado') {
-            console.log(`   ❌ SIN MATCH: prod="${nombreProd}" (${p.nombre})`);
         }
         return p;
     });

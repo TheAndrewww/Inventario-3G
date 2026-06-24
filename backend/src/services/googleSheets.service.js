@@ -150,6 +150,12 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
       console.warn(`⚠️ Mes no válido: ${mes}. Meses válidos: ${mesesValidos.join(', ')}`);
     }
 
+    // Índice del mes de la pestaña (0-11) y año base para resolver fechas reales.
+    // Necesario para manejar semanas cruzadas entre meses (ej. la 1ª semana de
+    // JULIO arrastra 28/29/30 de JUNIO antes de 1/2/3 de julio).
+    const tabMonthIndex = mesesValidos.indexOf(mes.toUpperCase());
+    const baseYear = new Date().getFullYear();
+
     // Definir el rango a leer (todo el calendario visible)
     // Aumentamos hasta fila 100 para capturar todos los meses (algunos tienen 5-6 semanas)
     const range = `${mes}!A6:Z100`;
@@ -234,6 +240,30 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
             diaIndex++;
           }
         }
+
+        // Resolver a qué mes pertenece cada día de la semana (semanas cruzadas).
+        // Convención del sheet: la 1ª semana de una pestaña puede arrastrar la
+        // cola del mes anterior (ej. JULIO empieza 28,29,30,1,2..). Detectamos el
+        // punto donde el número de día decrece = frontera entre dos meses.
+        const esPrimeraSemana = calendario.semanas.length === 0;
+        const numerosSemana = semanaActual.dias.map(d => d.numero);
+        let dropIdx = -1;
+        for (let k = 1; k < numerosSemana.length; k++) {
+          if (numerosSemana[k] != null && numerosSemana[k - 1] != null && numerosSemana[k] < numerosSemana[k - 1]) {
+            dropIdx = k;
+            break;
+          }
+        }
+        semanaActual.dias.forEach((d, idx) => {
+          let offset = 0;
+          if (dropIdx !== -1) {
+            // Antes de la frontera en la 1ª semana = mes anterior.
+            // Desde la frontera en otras semanas = mes siguiente (cola del mes).
+            if (esPrimeraSemana && idx < dropIdx) offset = -1;
+            else if (!esPrimeraSemana && idx >= dropIdx) offset = 1;
+          }
+          d.monthOffset = offset;
+        });
       }
       // Si no es fila de encabezados y tenemos una semana activa, buscar proyectos
       else if (semanaActual && rowIndex > filaEncabezadoDias) {
@@ -270,12 +300,27 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
             const nombre = partes[0];
             const cliente = partes.length > 1 ? partes[1] : null;
 
+            // Resolver la fecha real (YYYY-MM-DD) según el mes al que pertenece
+            // el día (considerando semanas cruzadas entre meses).
+            let fechaISO = null;
+            let mesResuelto = tabMonthIndex;
+            let anioResuelto = baseYear;
+            if (dia.numero != null && tabMonthIndex >= 0) {
+              mesResuelto = tabMonthIndex + (dia.monthOffset || 0);
+              if (mesResuelto < 0) { mesResuelto = 11; anioResuelto -= 1; }
+              else if (mesResuelto > 11) { mesResuelto = 0; anioResuelto += 1; }
+              fechaISO = `${anioResuelto}-${String(mesResuelto + 1).padStart(2, '0')}-${String(dia.numero).padStart(2, '0')}`;
+            }
+
             const proyecto = {
               nombre: nombre,
               cliente: cliente,
               hora: hora && hora.trim() !== '' ? hora : null,
               tipoProyecto: tipoProyecto,
               equipoHora: equipoHora,
+              fecha: fechaISO,
+              mesIndex: fechaISO ? mesResuelto : null,
+              anio: fechaISO ? anioResuelto : null,
               color: backgroundColorProyecto ? {
                 red: Math.round((backgroundColorProyecto.red || 0) * 255),
                 green: Math.round((backgroundColorProyecto.green || 0) * 255),
@@ -306,6 +351,7 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
     calendario.semanas.forEach(semana => {
       semana.dias.forEach(dia => {
         delete dia.columnas;
+        delete dia.monthOffset;
       });
     });
 

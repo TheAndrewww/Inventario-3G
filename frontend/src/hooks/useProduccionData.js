@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import produccionService from '../services/produccion.service';
-import { obtenerCalendarioActualPublico } from '../services/calendario.service';
+import { obtenerCalendarioActualPublico, obtenerCalendarioMesPublico } from '../services/calendario.service';
 import { flattenProyectos, aplicarFechasCalendario, calcularDiasHabiles, getHoyStr } from '../utils/produccion';
 import toast from 'react-hot-toast';
 
@@ -40,6 +40,22 @@ export const useProduccionData = ({
                 const anio = mexicoTime.getFullYear();
                 const mes = mexicoTime.getMonth() + 1;
 
+                // Citas del mes actual + la cola cruzada que el sheet coloca al
+                // inicio de la pestaña del mes siguiente (ej. 29/30 de junio viven
+                // en la pestaña JULIO). Sin esto, las citas de fin de mes no se
+                // encuentran y producción muestra la fecha cruda de la hoja.
+                let citas = [...calResponse.data.proyectos];
+                try {
+                    const MESES_NOMBRES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+                    const mesIdx0 = mexicoTime.getMonth();
+                    const nextResp = await obtenerCalendarioMesPublico(MESES_NOMBRES[(mesIdx0 + 1) % 12]);
+                    // Solo la cola que pertenece al mes actual (mesIndex resuelto por el backend)
+                    const extra = (nextResp?.data?.proyectos || []).filter(cp => cp.mesIndex === mesIdx0);
+                    if (extra.length) citas = citas.concat(extra);
+                } catch (e) {
+                    console.warn('⚠️ No se pudo cargar la cola del mes siguiente:', e.message);
+                }
+
                 // Guardar la fecha original (usar la que ya tenía si es re-aplicación)
                 let result = proys.map(p => ({
                     ...p,
@@ -49,7 +65,7 @@ export const useProduccionData = ({
                     _fechaCalendario: false
                 }));
 
-                result = aplicarFechasCalendario(result, calResponse.data.proyectos, anio, mes);
+                result = aplicarFechasCalendario(result, citas, anio, mes);
 
                 // Recalcular diasRestantes para proyectos con fecha del calendario
                 const hoy = getHoyStr();
