@@ -669,11 +669,13 @@ export const cancelarSolicitudesConOrdenesExistentes = async () => {
     let canceladas = 0;
 
     for (const solicitud of solicitudesPendientes) {
-      // Buscar si existe alguna orden de compra con este artículo (que no esté cancelada o rechazada)
+      // Buscar si existe alguna orden de compra ACTIVA (aún sin recibir) con este artículo.
+      // Solo las órdenes en proceso bloquean una nueva solicitud; las órdenes ya
+      // recibidas son compras del pasado y NO deben impedir reponer stock otra vez.
       const ordenExistente = await OrdenCompra.findOne({
         where: {
           estado: {
-            [Op.notIn]: ['cancelada', 'rechazada']
+            [Op.in]: ['pendiente_aprobacion', 'borrador', 'enviada', 'parcial']
           }
         },
         include: [
@@ -714,6 +716,36 @@ export const cancelarSolicitudesConOrdenesExistentes = async () => {
 };
 
 /**
+ * Función auxiliar: Cerrar solicitudes 'en_orden' cuya orden ya fue recibida.
+ * Auto-corrige datos históricos: antes estas solicitudes quedaban en 'en_orden'
+ * para siempre, lo que ocultaba su artículo del listado de bajo stock.
+ */
+export const completarSolicitudesDeOrdenesRecibidas = async () => {
+  try {
+    const solicitudesEnOrden = await SolicitudCompra.findAll({
+      where: { estado: 'en_orden' },
+      include: [{ model: OrdenCompra, as: 'ordenCompra', attributes: ['id', 'estado'], required: true }]
+    });
+
+    const idsACompletar = solicitudesEnOrden
+      .filter(sol => sol.ordenCompra && sol.ordenCompra.estado === 'recibida')
+      .map(sol => sol.id);
+
+    if (idsACompletar.length === 0) return 0;
+
+    await SolicitudCompra.update(
+      { estado: 'completada' },
+      { where: { id: idsACompletar } }
+    );
+    console.log(`✅ [completarSolicitudesDeOrdenesRecibidas] ${idsACompletar.length} solicitud(es) cerradas (orden ya recibida)`);
+    return idsACompletar.length;
+  } catch (error) {
+    console.error('❌ [completarSolicitudesDeOrdenesRecibidas] Error:', error.message);
+    return 0;
+  }
+};
+
+/**
  * Listar todas las solicitudes de compra
  * - Ejecuta limpieza automática de solicitudes obsoletas antes de listar
  */
@@ -724,6 +756,9 @@ export const listarSolicitudesCompra = async (req, res) => {
 
     // Ejecutar limpieza de solicitudes obsoletas antes de listar
     await cancelarSolicitudesObsoletas();
+
+    // Cerrar solicitudes cuyas órdenes ya fueron recibidas (en_orden -> completada)
+    await completarSolicitudesDeOrdenesRecibidas();
 
     // Ejecutar limpieza de solicitudes que ya tienen órdenes existentes
     await cancelarSolicitudesConOrdenesExistentes();
@@ -2533,6 +2568,16 @@ export const recibirMercancia = async (req, res) => {
       fecha_recepcion: fechaRecepcionFinal
     }, { transaction });
 
+    // Si la orden quedó totalmente recibida, cerrar el ciclo de sus solicitudes:
+    // pasan de 'en_orden' a 'completada' para que el artículo vuelva a poder
+    // solicitarse/aparecer en bajo stock si más adelante baja de nuevo.
+    if (nuevoEstado === 'recibida') {
+      await SolicitudCompra.update(
+        { estado: 'completada' },
+        { where: { orden_compra_id: orden.id, estado: 'en_orden' }, transaction }
+      );
+    }
+
     await transaction.commit();
 
     // Recargar orden con relaciones actualizadas
@@ -2829,6 +2874,13 @@ export const completarOrdenManualmente = async (req, res) => {
         ? `${orden.observaciones}\n\n[COMPLETADA MANUALMENTE] ${new Date().toLocaleString('es-MX')}: ${motivo}`
         : `[COMPLETADA MANUALMENTE] ${new Date().toLocaleString('es-MX')}: ${motivo}`
     });
+
+    // Cerrar el ciclo de las solicitudes de esta orden (en_orden -> completada)
+    // para que el artículo pueda volver a solicitarse si baja de stock otra vez.
+    await SolicitudCompra.update(
+      { estado: 'completada' },
+      { where: { orden_compra_id: orden.id, estado: 'en_orden' } }
+    );
 
     // Notificar
     try {
