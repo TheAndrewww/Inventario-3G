@@ -307,19 +307,31 @@ const OrdenesCompraPage = () => {
     try {
       setBuscandoArticulos(true);
 
-      // Obtener solicitudes pendientes y artículos en paralelo
+      // Obtener TODAS las solicitudes (pendientes y en orden) y artículos en paralelo
       const [responseSolicitudes, todosArticulos] = await Promise.all([
-        ordenesCompraService.listarSolicitudes({ estado: 'pendiente' }).catch(() => ({ data: { solicitudes: [] } })),
+        ordenesCompraService.listarSolicitudes({ limit: 99999 }).catch(() => ({ data: { solicitudes: [] } })),
         articulosService.buscar({ activo: true, limit: 99999 })
       ]);
 
-      const solicitudesActivas = responseSolicitudes.data?.solicitudes || [];
-      const idsConSolicitud = solicitudesActivas.map(sol => sol.articulo_id);
+      const solicitudes = responseSolicitudes.data?.solicitudes || [];
+
+      // Artículos con solicitud PENDIENTE (aún sin orden): se muestran marcados
+      const idsConSolicitud = solicitudes
+        .filter(sol => sol.estado === 'pendiente')
+        .map(sol => sol.articulo_id);
       setArticulosConSolicitudIds(idsConSolicitud);
 
-      // Filtrar artículos con stock bajo mínimo (sin importar si ya tienen solicitud)
+      // Artículos que YA están en una orden de compra (solicitud en_orden):
+      // se ocultan de la lista para NO duplicar la compra
+      const idsEnOrden = solicitudes
+        .filter(sol => sol.estado === 'en_orden')
+        .map(sol => sol.articulo_id);
+
+      // Filtrar artículos con stock bajo mínimo, excluyendo los que ya tienen
+      // una orden de compra activa (para no duplicar las compras)
       const articulosBajoStock = todosArticulos.filter(art =>
-        parseFloat(art.stock_actual) < parseFloat(art.stock_minimo)
+        parseFloat(art.stock_actual) < parseFloat(art.stock_minimo) &&
+        !idsEnOrden.includes(art.id)
       );
 
       setArticulosBuscados(articulosBajoStock);

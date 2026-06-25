@@ -3829,14 +3829,31 @@ export const obtenerArticulosPendientesPorProveedor = async (req, res) => {
       ]
     });
 
-    const articulosStockBajo = articulosBajoStock.map(articulo => ({
-      articulo_id: articulo.id,
-      articulo: articulo,
-      stock_actual: parseFloat(articulo.stock_actual),
-      stock_minimo: parseFloat(articulo.stock_minimo),
-      faltante: parseFloat(articulo.stock_minimo) - parseFloat(articulo.stock_actual),
-      cantidad_sugerida: parseFloat(articulo.stock_maximo || articulo.stock_minimo) - parseFloat(articulo.stock_actual)
-    }));
+    // Solicitudes ya incluidas en una orden de compra (en_orden) de este proveedor
+    const solicitudesEnOrden = await SolicitudCompra.findAll({
+      where: { proveedor_id: proveedor_id, estado: 'en_orden' },
+      attributes: ['articulo_id']
+    });
+
+    // IDs de artículos que YA están en una orden o en una solicitud pendiente/en orden
+    // de este proveedor: se excluyen del listado de bajo stock para NO duplicar
+    // la compra (ya están siendo gestionados).
+    const idsYaGestionados = new Set([
+      ...articulosOrdenes.map(item => item.articulo_id),
+      ...articulosSolicitudes.map(item => item.articulo_id),
+      ...solicitudesEnOrden.map(sol => sol.articulo_id)
+    ]);
+
+    const articulosStockBajo = articulosBajoStock
+      .filter(articulo => !idsYaGestionados.has(articulo.id))
+      .map(articulo => ({
+        articulo_id: articulo.id,
+        articulo: articulo,
+        stock_actual: parseFloat(articulo.stock_actual),
+        stock_minimo: parseFloat(articulo.stock_minimo),
+        faltante: parseFloat(articulo.stock_minimo) - parseFloat(articulo.stock_actual),
+        cantidad_sugerida: parseFloat(articulo.stock_maximo || articulo.stock_minimo) - parseFloat(articulo.stock_actual)
+      }));
 
     // ========================================
     // RESPUESTA CONSOLIDADA
