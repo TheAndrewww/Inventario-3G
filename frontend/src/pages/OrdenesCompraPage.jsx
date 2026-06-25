@@ -1519,7 +1519,11 @@ const OrdenesCompraPage = () => {
           const motivo = `Reposición de stock. Stock actual: ${articulo.stock_actual} ${articulo.unidad}, Stock mínimo: ${articulo.stock_minimo} ${articulo.unidad}`;
           await ordenesCompraService.crearSolicitudManual(articulo.id, cantidad, prioridad, motivo);
           setArticulosConSolicitudIds(prev => [...prev, articulo.id]);
-          await fetchData();
+          // Quitar el artículo de la lista para reflejar que ya se agregó,
+          // SIN cerrar la ventana: así se pueden agregar varios seguidos.
+          setArticulosBuscados(prev => prev.filter(a => a.id !== articulo.id));
+          // Refrescar solicitudes en segundo plano (no cierra el modal de bajo stock)
+          fetchData();
         }}
         titulo={mostrandoBajoStock ? '⚠️ Artículos Bajo Stock Mínimo' : '🔍 Resultados de Búsqueda'}
       />
