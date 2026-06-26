@@ -258,6 +258,12 @@ const sincronizarMes = async (mes) => {
         if (existente) {
             const cambios = {};
 
+            // Si estaba desactivado (se había quitado del sheet) y ahora reapareció,
+            // reactivarlo para que vuelva al dashboard.
+            if (existente.activo === false) {
+                cambios.activo = true;
+            }
+
             if (existente.nombre !== proyecto.nombre) {
                 cambios.nombre = proyecto.nombre;
             }
@@ -330,7 +336,26 @@ const sincronizarMes = async (mes) => {
         }
     }
 
-    return { creados, actualizados, total: resultado.data.length };
+    // Desactivar proyectos de ESTE mes que ya NO están en el sheet (fila borrada o
+    // vaciada = proyecto cancelado/quitado). Quedan en la DB como histórico pero
+    // salen de todos los dashboards. Es seguro: el early-return de arriba evita
+    // ejecutar esto cuando la lectura del mes vino vacía (no desactiva en masa).
+    const rowIdsEnSheet = resultado.data.map(p => p.spreadsheetRowId);
+    const huerfanos = await ProduccionProyecto.findAll({
+        where: {
+            activo: true,
+            spreadsheet_row_id: { [Op.like]: `${mes}\\_%`, [Op.notIn]: rowIdsEnSheet }
+        }
+    });
+
+    let desactivados = 0;
+    for (const orf of huerfanos) {
+        await orf.update({ activo: false });
+        desactivados++;
+        console.log(`🚫 Desactivado (ya no está en el sheet): "${orf.nombre}" (${mes})`);
+    }
+
+    return { creados, actualizados, desactivados, total: resultado.data.length };
 };
 
 /**
@@ -346,7 +371,7 @@ export const sincronizarConDB = async (mes = null) => {
         if (mes) {
             console.log(`🔄 Sincronizando mes específico: ${mes}...`);
             const resultado = await sincronizarMes(mes);
-            console.log(`✅ Sincronización completada (${mes}): ${resultado.creados} creados, ${resultado.actualizados} actualizados`);
+            console.log(`✅ Sincronización completada (${mes}): ${resultado.creados} creados, ${resultado.actualizados} actualizados, ${resultado.desactivados} desactivados`);
 
             return {
                 success: true,
@@ -354,6 +379,7 @@ export const sincronizarConDB = async (mes = null) => {
                 meses: [mes],
                 creados: resultado.creados,
                 actualizados: resultado.actualizados,
+                desactivados: resultado.desactivados,
                 total: resultado.total
             };
         }
@@ -367,6 +393,7 @@ export const sincronizarConDB = async (mes = null) => {
 
         let totalCreados = 0;
         let totalActualizados = 0;
+        let totalDesactivados = 0;
         let totalProyectos = 0;
         const mesesSincronizados = [];
 
@@ -375,6 +402,7 @@ export const sincronizarConDB = async (mes = null) => {
                 const resultado = await sincronizarMes(m);
                 totalCreados += resultado.creados;
                 totalActualizados += resultado.actualizados;
+                totalDesactivados += resultado.desactivados;
                 totalProyectos += resultado.total;
                 mesesSincronizados.push(m);
             } catch (error) {
@@ -387,7 +415,7 @@ export const sincronizarConDB = async (mes = null) => {
             }
         }
 
-        console.log(`✅ Sincronización completada: ${totalCreados} creados, ${totalActualizados} actualizados en ${mesesSincronizados.length} mes(es)`);
+        console.log(`✅ Sincronización completada: ${totalCreados} creados, ${totalActualizados} actualizados, ${totalDesactivados} desactivados en ${mesesSincronizados.length} mes(es)`);
 
         return {
             success: true,
@@ -395,6 +423,7 @@ export const sincronizarConDB = async (mes = null) => {
             meses: mesesSincronizados,
             creados: totalCreados,
             actualizados: totalActualizados,
+            desactivados: totalDesactivados,
             total: totalProyectos
         };
 
