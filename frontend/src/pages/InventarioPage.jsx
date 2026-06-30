@@ -721,9 +721,16 @@ const InventarioPage = () => {
     // Búsqueda normal
     return articulos
       .filter((item) => {
-        // Filtrar por estado activo/desactivado
+        // Cuando hay texto en el buscador, la búsqueda abarca TODOS los almacenes:
+        // se ignoran los filtros de ubicación (almacén/sección/categoría/ubicación)
+        // y también se incluyen los SKU desactivados, para que el mismo SKU aparezca
+        // aunque esté dado de alta en otro almacén o esté desactivado y así evitar
+        // crear duplicados.
+        const buscandoGlobal = searchTerm.trim() !== '';
+
+        // Filtrar por estado activo/desactivado (en búsqueda global se muestran ambos)
         const isActive = item.activo !== false;
-        const matchesActiveFilter = mostrarDesactivados ? !isActive : isActive;
+        const matchesActiveFilter = buscandoGlobal || (mostrarDesactivados ? !isActive : isActive);
 
         const matchesSearch =
           item.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -736,14 +743,14 @@ const InventarioPage = () => {
           return item.pendiente_revision === true && isActive && matchesSearch;
         }
 
-        const matchesCategoria = !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
-        const matchesUbicacion = !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
+        const matchesCategoria = buscandoGlobal || !categoriaSeleccionada || item.categoria_id === categoriaSeleccionada;
+        const matchesUbicacion = buscandoGlobal || !ubicacionSeleccionada || item.ubicacion_id === ubicacionSeleccionada;
 
         // Filtrar por almacén
-        const matchesAlmacen = item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado);
+        const matchesAlmacen = buscandoGlobal || (item.ubicacion && (item.ubicacion.almacen_id == almacenSeleccionado || item.ubicacion.almacen_ref?.id == almacenSeleccionado));
 
         // Filtrar por sección — número (BD), 'todos' (sin filtro), o legacy stock/extras
-        const matchesSeccion = !seccionSeleccionada || seccionSeleccionada === 'todos'
+        const matchesSeccion = buscandoGlobal || !seccionSeleccionada || seccionSeleccionada === 'todos'
           || (typeof seccionSeleccionada === 'number'
             ? item.seccion_id === seccionSeleccionada
             : getSeccionArticulo(item) === seccionSeleccionada);
@@ -781,6 +788,16 @@ const InventarioPage = () => {
         }
       });
   })();
+
+  // Búsqueda global activa: hay texto en el buscador (la lista abarca todos los
+  // almacenes). Sirve para marcar los SKU que viven en otro almacén distinto al
+  // seleccionado y evitar que se den de alta duplicados.
+  const buscandoGlobalActivo = searchTerm.trim() !== '';
+  const esDeOtroAlmacen = (item) => {
+    if (!buscandoGlobalActivo || typeof almacenSeleccionado !== 'number') return false;
+    const almacenItemId = item?.ubicacion?.almacen_id ?? item?.ubicacion?.almacen_ref?.id ?? null;
+    return almacenItemId != null && almacenItemId != almacenSeleccionado;
+  };
 
   const handleAgregarAlPedido = (articulo) => {
     agregarArticulo(articulo, 1);
@@ -2619,6 +2636,18 @@ const InventarioPage = () => {
                               {item.descripcion && (
                                 <div className="text-xs text-gray-400 truncate">{item.descripcion}</div>
                               )}
+                              <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                                {esDeOtroAlmacen(item) && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 max-w-full truncate">
+                                    🏬 {item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
+                                  </span>
+                                )}
+                                {buscandoGlobalActivo && item.activo === false && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-200 text-gray-700">
+                                    🚫 Desactivado
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -2873,6 +2902,18 @@ const InventarioPage = () => {
                                   {item.descripcion && (
                                     <div className="text-xs text-gray-400 truncate">{item.descripcion}</div>
                                   )}
+                                  <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                                    {esDeOtroAlmacen(item) && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 max-w-full truncate">
+                                        🏬 {item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
+                                      </span>
+                                    )}
+                                    {buscandoGlobalActivo && item.activo === false && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-200 text-gray-700">
+                                        🚫 Desactivado
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -3214,6 +3255,20 @@ const InventarioPage = () => {
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 text-sm mb-0.5 line-clamp-1">{item.nombre}</h3>
+                        {(esDeOtroAlmacen(item) || (buscandoGlobalActivo && item.activo === false)) && (
+                          <div className="flex flex-wrap items-center gap-1 mb-1">
+                            {esDeOtroAlmacen(item) && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 max-w-full truncate">
+                                🏬 {item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
+                              </span>
+                            )}
+                            {buscandoGlobalActivo && item.activo === false && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-200 text-gray-700">
+                                🚫 Desactivado
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <p className="text-xs text-gray-500 mb-2 line-clamp-2">{item.descripcion}</p>
 
                         {/* Badges: categoría + sección (no editable para almacén) */}
@@ -3406,6 +3461,21 @@ const InventarioPage = () => {
                           {item.nombre}
                         </h3>
                       </div>
+
+                      {(esDeOtroAlmacen(item) || (buscandoGlobalActivo && item.activo === false)) && (
+                        <div className="flex flex-wrap items-center gap-1 mb-2 ml-7">
+                          {esDeOtroAlmacen(item) && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 max-w-full truncate">
+                              🏬 {item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
+                            </span>
+                          )}
+                          {buscandoGlobalActivo && item.activo === false && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-200 text-gray-700">
+                              🚫 Desactivado
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       <div className="flex gap-3 cursor-pointer ml-7" onClick={() => handleVerDetalle(item)}>
                         {/* Imagen */}
