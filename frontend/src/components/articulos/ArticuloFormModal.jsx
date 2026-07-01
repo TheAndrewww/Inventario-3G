@@ -12,7 +12,7 @@ import EAN13InputScanner from './EAN13InputScanner';
 import { useAuth } from '../../context/AuthContext';
 import { getImageUrl } from '../../utils/imageUtils';
 
-const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigoInicial = null, nombreInicial = null }) => {
+const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigoInicial = null, nombreInicial = null, permisosAlmacenAbiertos = false }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState([]);
@@ -73,14 +73,16 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
 
   const isEdit = !!articulo;
 
-  // Verificar permisos para crear proveedores (solo admin y encargado)
-  const puedeCrearProveedores = ['administrador', 'encargado'].includes(user?.rol);
-
   // Detectar si es rol almacén (campos limitados)
   const esAlmacen = user?.rol === 'almacen';
 
-  // Almacén en modo edición: solo puede cambiar nombre y foto
-  const esEdicionLimitada = esAlmacen && isEdit;
+  // Verificar permisos para crear proveedores: admin/encargado siempre; almacén
+  // cuando el admin le abrió los permisos.
+  const puedeCrearProveedores = ['administrador', 'encargado'].includes(user?.rol) || (esAlmacen && permisosAlmacenAbiertos);
+
+  // Almacén en modo edición: solo puede cambiar nombre y foto, SALVO que el admin
+  // le haya abierto los permisos (entonces edita todos los campos).
+  const esEdicionLimitada = esAlmacen && isEdit && !permisosAlmacenAbiertos;
 
   // Cargar catálogos y datos del artículo si es edición
   useEffect(() => {

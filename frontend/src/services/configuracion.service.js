@@ -8,6 +8,10 @@ const configuracionService = {
   setAjusteDirecto: async (activo) => {
     const response = await api.put('/configuracion/ajuste-directo', { activo });
     return response.data;
+  },
+  setEdicionAlmacen: async (activo) => {
+    const response = await api.put('/configuracion/edicion-almacen', { activo });
+    return response.data;
   }
 };
 

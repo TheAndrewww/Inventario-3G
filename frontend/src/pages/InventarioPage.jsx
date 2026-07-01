@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer, Wrench, Save, Check } from 'lucide-react';
+import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer, Wrench, Save, Check, Lock, Unlock } from 'lucide-react';
 import api from '../services/api';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
@@ -10,6 +10,7 @@ import seccionesService from '../services/secciones.service';
 import almacenesService from '../services/almacenes.service';
 import herramientasRentaService from '../services/herramientasRenta.service';
 import conteosCiclicosService from '../services/conteosCiclicos.service';
+import configuracionService from '../services/configuracion.service';
 import { Loader, Modal, AuthenticatedImage } from '../components/common';
 import ArticuloDetalleModal from '../components/articulos/ArticuloDetalleModal';
 import ArticuloFormModal from '../components/articulos/ArticuloFormModal';
@@ -73,6 +74,9 @@ const InventarioPage = () => {
   // antes de autorizar) e IDs que se están autorizando.
   const [nuevosAlmacenSel, setNuevosAlmacenSel] = useState({}); // { [itemId]: almacenId }
   const [autorizandoNuevos, setAutorizandoNuevos] = useState(new Set());
+  // Interruptor global "edición completa de almacén" (leído del backend)
+  const [permisosAlmacenAbiertos, setPermisosAlmacenAbiertos] = useState(false);
+  const [cambiandoPermisosAlmacen, setCambiandoPermisosAlmacen] = useState(false);
   const [modoAjusteStock, setModoAjusteStock] = useState(false); // Modo edición rápida de stocks (solo admin)
   const [stocksEditados, setStocksEditados] = useState({}); // id → nuevo valor (pendiente de guardar)
   const [guardandoStocks, setGuardandoStocks] = useState(false);
@@ -251,11 +255,18 @@ const InventarioPage = () => {
   const puedeEditarArticulos = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
   const puedeAgregarAlPedido = ['administrador', 'diseñador'].includes(user?.rol);
   const puedeGestionarInventario = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
-  // Taxonomía (categorías, ubicaciones, secciones, almacenes): almacén NO puede crear/editar/eliminar
-  const puedeGestionarTaxonomia = ['administrador', 'encargado'].includes(user?.rol);
   const puedeRegistrarSalida = ['administrador', 'almacen'].includes(user?.rol); // Almacén puede registrar salidas
   const esAdministrador = user?.rol === 'administrador';
   const esAlmacen = user?.rol === 'almacen';
+  // Interruptor global (lo gestiona el admin): cuando está activo, almacén puede
+  // editar los artículos por completo (categoría, ubicación, sección, stock, unidad,
+  // proveedor, descripción, foto). Los SKUs nuevos siguen entrando a Nuevos Registros.
+  const almacenConPermisos = esAlmacen && permisosAlmacenAbiertos;
+  // Taxonomía (categorías, ubicaciones, secciones): admin/encargado siempre; almacén
+  // solo cuando el admin le abre los permisos.
+  const puedeGestionarTaxonomia = ['administrador', 'encargado'].includes(user?.rol) || almacenConPermisos;
+  // Ajuste rápido de stock: admin siempre; almacén cuando tiene permisos abiertos.
+  const puedeAjustarStock = esAdministrador || almacenConPermisos;
 
   // NUEVOS REGISTROS: SKUs creados por almacén pendientes de revisión del admin.
   // 'nuevos' es un valor centinela de almacenSeleccionado (no es un almacén real).
@@ -353,8 +364,9 @@ const InventarioPage = () => {
     const parsed = value === '' ? null : Number(value);
     if (item[field] === parsed) return;
 
-    // Almacén: cambio de ubicación requiere aprobación de admin
-    if (esAlmacen && field === 'ubicacion_id') {
+    // Almacén: cambio de ubicación requiere aprobación de admin, SALVO que el admin
+    // le haya abierto los permisos (entonces lo aplica directo como cualquier edición).
+    if (esAlmacen && !permisosAlmacenAbiertos && field === 'ubicacion_id') {
       try {
         await solicitudesCambioService.crear({
           tipo: 'cambio_ubicacion',
@@ -393,6 +405,32 @@ const InventarioPage = () => {
       toast.error(err.message || 'Error al actualizar');
     } finally {
       setActualizandoArt(prev => { const n = new Set(prev); n.delete(item.id); return n; });
+    }
+  };
+
+  // ============ PERMISOS DE ALMACÉN (interruptor global, solo admin) ============
+  // Todos los usuarios leen el flag (almacén necesita saber si tiene permisos abiertos).
+  useEffect(() => {
+    let cancelado = false;
+    configuracionService.obtener()
+      .then(res => { if (!cancelado) setPermisosAlmacenAbiertos(!!res?.data?.almacen_edicion_completa); })
+      .catch(() => {});
+    return () => { cancelado = true; };
+  }, []);
+
+  const togglePermisosAlmacen = async () => {
+    const nuevo = !permisosAlmacenAbiertos;
+    if (nuevo && !window.confirm('¿Abrir permisos de almacén? Almacén podrá crear y editar artículos por completo (categoría, ubicación, sección, stock, unidad, proveedor, descripción y foto). Los SKUs nuevos seguirán pasando por Nuevos Registros.')) return;
+    try {
+      setCambiandoPermisosAlmacen(true);
+      const res = await configuracionService.setEdicionAlmacen(nuevo);
+      setPermisosAlmacenAbiertos(!!res?.data?.almacen_edicion_completa);
+      toast.success(res?.message || (nuevo ? 'Permisos de almacén abiertos' : 'Permisos de almacén restringidos'));
+    } catch (e) {
+      console.error(e);
+      toast.error(e.response?.data?.message || 'No se pudo cambiar la configuración');
+    } finally {
+      setCambiandoPermisosAlmacen(false);
     }
   };
 
@@ -2516,8 +2554,8 @@ const InventarioPage = () => {
             </>
           )}
 
-          {/* Ajuste rápido de stocks (solo admin) — los cambios se guardan en lote, no uno por uno */}
-          {esAdministrador && (
+          {/* Ajuste rápido de stocks — los cambios se guardan en lote, no uno por uno */}
+          {puedeAjustarStock && (
             <button
               onClick={() => modoAjusteStock ? handleCancelarAjusteStock() : setModoAjusteStock(true)}
               disabled={guardandoStocks}
@@ -2531,12 +2569,31 @@ const InventarioPage = () => {
               <span className="hidden sm:inline">{modoAjusteStock ? 'Salir de Ajuste' : 'Ajustar Stocks'}</span>
             </button>
           )}
+
+          {/* Interruptor de permisos de almacén (solo admin): abre/cierra la edición
+              completa de artículos para el rol almacén */}
+          {esAdministrador && (
+            <button
+              onClick={togglePermisosAlmacen}
+              disabled={cambiandoPermisosAlmacen}
+              className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base rounded-lg transition-colors disabled:opacity-50 ${permisosAlmacenAbiertos
+                ? 'bg-emerald-500 text-white hover:bg-emerald-600 ring-2 ring-emerald-300'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              title={permisosAlmacenAbiertos
+                ? 'Almacén puede crear y editar artículos por completo. Clic para restringir.'
+                : 'Abrir permisos: almacén podrá crear y editar artículos por completo (categoría, ubicación, sección, stock, unidad, proveedor, descripción, foto).'}
+            >
+              {permisosAlmacenAbiertos ? <Unlock size={18} /> : <Lock size={18} />}
+              <span className="hidden sm:inline">{permisosAlmacenAbiertos ? 'Permisos Almacén: ON' : 'Permisos Almacén'}</span>
+            </button>
+          )}
         </div>
 
       </div>
 
       {/* Barra flotante de ajuste de stocks: los cambios solo se aplican al presionar Guardar */}
-      {modoAjusteStock && esAdministrador && (
+      {modoAjusteStock && puedeAjustarStock && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-white border-2 border-amber-400 rounded-xl shadow-2xl">
           <span className="text-sm font-medium text-gray-700">
             {cambiosStockPendientes.length === 0
@@ -2880,7 +2937,7 @@ const InventarioPage = () => {
 
                         {/* Stock Total (para consumibles es stock actual) — editable en modo ajuste (solo admin) */}
                         <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => modoAjusteStock && e.stopPropagation()}>
-                          {modoAjusteStock && esAdministrador ? (
+                          {modoAjusteStock && puedeAjustarStock ? (
                             <input
                               type="number"
                               min="0"
@@ -3488,7 +3545,7 @@ const InventarioPage = () => {
                           </div>
                           <div className="flex items-center gap-1" onClick={(e) => modoAjusteStock && e.stopPropagation()}>
                             <span className="text-gray-500">📦</span>
-                            {modoAjusteStock && esAdministrador ? (
+                            {modoAjusteStock && puedeAjustarStock ? (
                               <input
                                 type="number"
                                 min="0"
@@ -3900,6 +3957,7 @@ const InventarioPage = () => {
         onSuccess={handleFormSuccess}
         articulo={articuloAEditar}
         codigoInicial={codigoEscaneado}
+        permisosAlmacenAbiertos={permisosAlmacenAbiertos}
       />
 
       {/* Modal del Scanner de Códigos de Barras */}
