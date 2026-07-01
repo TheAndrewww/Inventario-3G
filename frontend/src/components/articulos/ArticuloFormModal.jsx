@@ -76,13 +76,18 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
   // Detectar si es rol almacén (campos limitados)
   const esAlmacen = user?.rol === 'almacen';
 
+  // Almacén RESTRINGIDO = almacén sin permisos abiertos. Con permisos abiertos el
+  // almacén crea y edita con el formulario completo, igual que un admin (incluida la
+  // post-edición de un SKU ya creado).
+  const almacenLimitado = esAlmacen && !permisosAlmacenAbiertos;
+
   // Verificar permisos para crear proveedores: admin/encargado siempre; almacén
   // cuando el admin le abrió los permisos.
   const puedeCrearProveedores = ['administrador', 'encargado'].includes(user?.rol) || (esAlmacen && permisosAlmacenAbiertos);
 
-  // Almacén en modo edición: solo puede cambiar nombre y foto, SALVO que el admin
-  // le haya abierto los permisos (entonces edita todos los campos).
-  const esEdicionLimitada = esAlmacen && isEdit && !permisosAlmacenAbiertos;
+  // Almacén restringido en edición: solo puede cambiar nombre y foto. Con permisos
+  // abiertos edita todos los campos.
+  const esEdicionLimitada = almacenLimitado && isEdit;
 
   // Cargar catálogos y datos del artículo si es edición
   useEffect(() => {
@@ -561,37 +566,37 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
     }
 
     // Solo validar categoria y ubicacion si NO es almacen
-    if (!esAlmacen && !formData.categoria_id) {
+    if (!almacenLimitado && !formData.categoria_id) {
       toast.error('Selecciona una categoría');
       return;
     }
 
-    if (!esAlmacen && !formData.ubicacion_id) {
+    if (!almacenLimitado && !formData.ubicacion_id) {
       toast.error('Selecciona una ubicación');
       return;
     }
 
     // El rol almacén no captura stock: el SKU va a NUEVOS REGISTROS y el admin
     // asigna stock al revisarlo. Para los demás roles el stock actual es obligatorio.
-    if (!esAlmacen && (!formData.stock_actual || parseFloat(formData.stock_actual) < 0)) {
+    if (!almacenLimitado && (!formData.stock_actual || parseFloat(formData.stock_actual) < 0)) {
       toast.error('El stock actual debe ser mayor o igual a 0');
       return;
     }
 
     // Solo validar stock_minimo si NO es almacen
-    if (!esAlmacen && (!formData.stock_minimo || parseFloat(formData.stock_minimo) < 0)) {
+    if (!almacenLimitado && (!formData.stock_minimo || parseFloat(formData.stock_minimo) < 0)) {
       toast.error('El stock mínimo debe ser mayor o igual a 0');
       return;
     }
 
     // Validar que si la unidad es "piezas", los stocks sean números enteros
     if (formData.unidad === 'piezas') {
-      if (!esAlmacen && !Number.isInteger(parseFloat(formData.stock_actual))) {
+      if (!almacenLimitado && !Number.isInteger(parseFloat(formData.stock_actual))) {
         toast.error('El stock actual debe ser un número entero para piezas');
         return;
       }
       // Solo validar stock_minimo si NO es almacen
-      if (!esAlmacen && formData.stock_minimo && !Number.isInteger(parseFloat(formData.stock_minimo))) {
+      if (!almacenLimitado && formData.stock_minimo && !Number.isInteger(parseFloat(formData.stock_minimo))) {
         toast.error('El stock mínimo debe ser un número entero para piezas');
         return;
       }
@@ -608,7 +613,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       let categoriaId = formData.categoria_id;
       let ubicacionId = formData.ubicacion_id;
 
-      if (esAlmacen) {
+      if (almacenLimitado) {
         // Buscar "Sin Categoría" en la lista de categorías
         if (!categoriaId) {
           const sinCategoria = categorias.find(c =>
@@ -633,8 +638,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         descripcion: formData.descripcion.trim().toUpperCase(),
         categoria_id: parseInt(categoriaId),
         ubicacion_id: parseInt(ubicacionId),
-        stock_actual: esAlmacen ? 0 : parseFloat(formData.stock_actual),
-        stock_minimo: esAlmacen ? 0 : parseFloat(formData.stock_minimo),
+        stock_actual: almacenLimitado ? 0 : parseFloat(formData.stock_actual),
+        stock_minimo: almacenLimitado ? 0 : parseFloat(formData.stock_minimo),
         stock_maximo: formData.stock_maximo ? parseFloat(formData.stock_maximo) : null,
         unidad: formData.unidad.toUpperCase(),
         costo_unitario: parseFloat(formData.costo_unitario) || 0,
@@ -800,11 +805,13 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       closeOnBackdropClick={false}
     >
       <form onSubmit={modoIngreso ? handleIngresoInventario : handleSubmit} className="space-y-4">
-        {/* Código de Barras (solo en creación) */}
-        {!isEdit && (
+        {/* Código de Barras / SKU — en creación siempre; en edición solo para editores
+            completos (admin/encargado o almacén con permisos abiertos), permitiendo
+            la post-edición del SKU aunque el artículo ya esté creado. */}
+        {(!isEdit || !almacenLimitado) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Código de Barras / QR (Opcional)
+              Código de Barras / QR / SKU {!isEdit && '(Opcional)'}
             </label>
             <EAN13InputScanner
               value={formData.codigo_ean13}
@@ -814,7 +821,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             />
             <p className="mt-1 text-xs text-gray-500">
               Escanea cualquier código de barras, QR o ingresa manualmente.
-              {formData.codigo_tipo === 'EAN13' && ' Si no ingresas uno, se generará automáticamente.'}
+              {!isEdit && formData.codigo_tipo === 'EAN13' && ' Si no ingresas uno, se generará automáticamente.'}
+              {isEdit && ' Editar el SKU de un artículo ya creado reemplaza su código actual.'}
             </p>
             {formData.codigo_ean13 && formData.codigo_tipo && (
               <p className="mt-1 text-xs text-green-600 font-medium">
@@ -971,8 +979,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
               />
             </div>
           </>
-        ) : esAlmacen ? (
-          /* Almacén (crear o editar): Solo Nombre y Foto. El SKU va a NUEVOS REGISTROS. */
+        ) : almacenLimitado ? (
+          /* Almacén restringido (crear o editar): Solo Nombre y Foto. El SKU va a NUEVOS REGISTROS. */
           <>
             {/* Nombre */}
             <div>
@@ -1045,7 +1053,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             </div>
 
             {/* Categoría - Solo visible para admin y encargado */}
-            {!esAlmacen && (
+            {!almacenLimitado && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Categoría <span className="text-red-600">*</span>
@@ -1059,7 +1067,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
                     disabled={loading}
-                    required={!esAlmacen}
+                    required={!almacenLimitado}
                   >
                     <option value="">Seleccionar...</option>
                     {categorias.map(cat => (
@@ -1067,7 +1075,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                         {cat.nombre}
                       </option>
                     ))}
-                    {!esAlmacen && (
+                    {!almacenLimitado && (
                       <option value="nueva_categoria" className="text-red-700 font-medium">
                         + Crear nueva categoría
                       </option>
@@ -1153,7 +1161,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             )}
 
             {/* Almacén - Solo visible para admin y encargado */}
-            {!esAlmacen && (
+            {!almacenLimitado && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Almacén <span className="text-red-600">*</span>
@@ -1185,7 +1193,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             )}
 
             {/* Ubicación - Solo visible para admin y encargado */}
-            {!esAlmacen && (
+            {!almacenLimitado && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Ubicación <span className="text-red-600">*</span>
@@ -1200,7 +1208,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                       onChange={handleChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 disabled:bg-gray-100"
                       disabled={loading || !almacenSeleccionadoForm}
-                      required={!esAlmacen}
+                      required={!almacenLimitado}
                     >
                       <option value="">{almacenSeleccionadoForm ? 'Seleccionar...' : 'Primero elige un almacén'}</option>
                       {ubicaciones
@@ -1214,7 +1222,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                             {ub.codigo}{ub.descripcion ? ` - ${ub.descripcion}` : ''}
                           </option>
                         ))}
-                      {almacenSeleccionadoForm && !esAlmacen && (
+                      {almacenSeleccionadoForm && !almacenLimitado && (
                         <option value="nueva_ubicacion" className="text-red-700 font-medium">
                           + Crear nueva ubicación
                         </option>
@@ -1301,7 +1309,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             )}
 
             {/* Proveedores Múltiples */}
-            {!esAlmacen && (
+            {!almacenLimitado && (
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium text-gray-700">
@@ -1443,7 +1451,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             )}
 
             {/* Stock Actual, Mínimo y Máximo */}
-            <div className={`grid ${esAlmacen ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
+            <div className={`grid ${almacenLimitado ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Stock Actual <span className="text-red-600">*</span>
@@ -1461,7 +1469,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                 />
               </div>
 
-              {!esAlmacen && (
+              {!almacenLimitado && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Stock Mínimo <span className="text-red-600">*</span>
@@ -1475,12 +1483,12 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                     step={formData.unidad === 'piezas' ? '1' : '0.01'}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
                     placeholder="20"
-                    required={!esAlmacen}
+                    required={!almacenLimitado}
                   />
                 </div>
               )}
 
-              {!esAlmacen && (
+              {!almacenLimitado && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Stock Máximo
@@ -1500,7 +1508,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             </div>
 
             {/* Unidad y Costo */}
-            <div className={`grid ${esAlmacen ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
+            <div className={`grid ${almacenLimitado ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Unidad
@@ -1518,7 +1526,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                 </select>
               </div>
 
-              {!esAlmacen && (
+              {!almacenLimitado && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Costo Unitario
