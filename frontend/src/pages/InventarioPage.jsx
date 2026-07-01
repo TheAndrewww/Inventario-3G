@@ -825,7 +825,9 @@ const InventarioPage = () => {
         const matchesSearch =
           item.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.codigo_ean13?.includes(searchTerm) ||
-          item.categoria?.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
+          item.categoria?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          // También busca dentro de la descripción/comentarios del artículo
+          item.descripcion?.toLowerCase().includes(searchTerm.toLowerCase());
 
         // Modo NUEVOS REGISTROS: solo SKUs pendientes de revisión (creados por
         // almacén), sin filtrar por almacén/sección porque aún no se les asigna.
