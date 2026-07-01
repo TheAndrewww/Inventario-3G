@@ -834,7 +834,9 @@ export const updateArticulo = async (req, res) => {
             costo_unitario,
             imagen,
             activo,
-            es_herramienta
+            es_herramienta,
+            pendiente_revision,   // botón "Autorizar" en Nuevos Registros (admin/encargado)
+            mantener_pendiente    // ediciones en Nuevos Registros: no marcar revisado aún
         } = req.body;
 
         // Buscar artículo
@@ -923,8 +925,13 @@ export const updateArticulo = async (req, res) => {
             // Almacén (y compras) deben pasar por una solicitud de reactivación.
             ...(activo !== undefined && req.usuario?.rol === 'administrador' && { activo }),
             ...(es_herramienta !== undefined && { es_herramienta }),
-            // Si es admin o encargado, marcar como revisado
-            ...(esAdminOEncargado && { pendiente_revision: false })
+            // pendiente_revision (Nuevos Registros):
+            //  - mantener_pendiente:true  → NO se toca (el admin sigue editando la fila)
+            //  - pendiente_revision explícito de admin/encargado → se aplica (botón Autorizar)
+            //  - cualquier otra edición de admin/encargado → se marca revisado (comportamiento previo)
+            ...(esAdminOEncargado && mantener_pendiente !== true && {
+                pendiente_revision: pendiente_revision !== undefined ? !!pendiente_revision : false
+            })
         });
 
         // Actualizar múltiples proveedores si se proporcionaron

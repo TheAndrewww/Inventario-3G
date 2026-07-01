@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer, Wrench, Save } from 'lucide-react';
+import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer, Wrench, Save, Check } from 'lucide-react';
 import api from '../services/api';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
@@ -69,6 +69,10 @@ const InventarioPage = () => {
   const [todasCategorias, setTodasCategorias] = useState([]); // Todas las categorías (para edición rápida)
   const [todasUbicaciones, setTodasUbicaciones] = useState([]); // Todas las ubicaciones con su almacén (para edición rápida)
   const [actualizandoArt, setActualizandoArt] = useState(new Set()); // IDs siendo actualizados
+  // NUEVOS REGISTROS: almacén elegido localmente por fila (filtra ubicación/sección
+  // antes de autorizar) e IDs que se están autorizando.
+  const [nuevosAlmacenSel, setNuevosAlmacenSel] = useState({}); // { [itemId]: almacenId }
+  const [autorizandoNuevos, setAutorizandoNuevos] = useState(new Set());
   const [modoAjusteStock, setModoAjusteStock] = useState(false); // Modo edición rápida de stocks (solo admin)
   const [stocksEditados, setStocksEditados] = useState({}); // id → nuevo valor (pendiente de guardar)
   const [guardandoStocks, setGuardandoStocks] = useState(false);
@@ -341,7 +345,11 @@ const InventarioPage = () => {
     } catch (e) { console.error('Error cargando secciones del almacén:', e); }
   };
 
-  const handleQuickUpdate = async (item, field, value) => {
+  const handleQuickUpdate = async (item, field, value, opts = {}) => {
+    // mantenerPendiente: en "Nuevos Registros" el admin edita los campos sin que el
+    // SKU se marque como revisado (y por tanto sin que desaparezca de la lista); se
+    // autoriza aparte con el botón. Sin esta bandera, el backend marca revisado.
+    const { mantenerPendiente = false } = opts;
     const parsed = value === '' ? null : Number(value);
     if (item[field] === parsed) return;
 
@@ -363,7 +371,7 @@ const InventarioPage = () => {
 
     setActualizandoArt(prev => new Set(prev).add(item.id));
     try {
-      await articulosService.update(item.id, { [field]: parsed });
+      await articulosService.update(item.id, { [field]: parsed, ...(mantenerPendiente && { mantener_pendiente: true }) });
       // Actualizar localmente sin refetch completo
       setArticulos(prev => prev.map(a => {
         if (a.id !== item.id) return a;
@@ -385,6 +393,50 @@ const InventarioPage = () => {
       toast.error(err.message || 'Error al actualizar');
     } finally {
       setActualizandoArt(prev => { const n = new Set(prev); n.delete(item.id); return n; });
+    }
+  };
+
+  // ============ NUEVOS REGISTROS: autorizar (cargar al inventario) ============
+  // Helpers para el almacén elegido por fila y las opciones filtradas.
+  const almacenNuevoDe = (item) => (
+    nuevosAlmacenSel[item.id] ?? item.ubicacion?.almacen_id ?? item.ubicacion?.almacen_ref?.id ?? ''
+  );
+  const ubicacionesDeAlmacen = (almacenId) => (
+    !almacenId ? [] : todasUbicaciones.filter(u => String(u.almacen_id) === String(almacenId))
+  );
+  const seccionesDeAlmacen = (almacenId) => (
+    !almacenId ? [] : todasSecciones.filter(s => String(s.almacen_id) === String(almacenId))
+  );
+
+  // Al elegir almacén: guardar selección local (re-scopea ubicación/sección).
+  const handleNuevoAlmacenChange = (item, value) => {
+    setNuevosAlmacenSel(prev => ({ ...prev, [item.id]: value === '' ? null : Number(value) }));
+  };
+
+  // Autorizar: valida ubicación + sección y marca el SKU como revisado (sale de la lista).
+  const handleAutorizarNuevo = async (item) => {
+    if (!item.ubicacion_id) {
+      toast.error('Asigna una ubicación antes de autorizar');
+      return;
+    }
+    if (!item.seccion_id) {
+      toast.error('Asigna una sección antes de autorizar');
+      return;
+    }
+    setAutorizandoNuevos(prev => new Set(prev).add(item.id));
+    try {
+      await articulosService.update(item.id, { pendiente_revision: false });
+      // Sale de "Nuevos Registros" (el filtro exige pendiente_revision === true)
+      setArticulos(prev => prev.map(a =>
+        a.id === item.id ? { ...a, pendiente_revision: false, updatedAt: new Date().toISOString() } : a
+      ));
+      setNuevosAlmacenSel(prev => { const n = { ...prev }; delete n[item.id]; return n; });
+      toast.success(`"${item.nombre}" cargado al inventario`);
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Error al autorizar el artículo');
+    } finally {
+      setAutorizandoNuevos(prev => { const n = new Set(prev); n.delete(item.id); return n; });
     }
   };
 
@@ -2530,8 +2582,134 @@ const InventarioPage = () => {
           </h2>
         </div>
 
-        {/* Vista Desktop: Tabla */}
-        <div className="hidden md:block overflow-x-auto max-h-[calc(100vh-300px)] overflow-y-auto">
+        {/* Vista dedicada: NUEVOS REGISTROS — SKUs creados por almacén, pendientes de autorizar.
+            El admin asigna almacén/ubicación/sección sin que el SKU salga de la lista, y lo carga
+            al inventario con el botón Autorizar. */}
+        {modoNuevosRegistros && (
+          <div className="overflow-x-auto max-h-[calc(100vh-300px)] overflow-y-auto">
+            <div className="px-4 md:px-6 py-3 bg-orange-50 border-b border-orange-200 text-sm text-orange-800">
+              Revisa cada SKU, asigna <b>almacén</b>, <b>ubicación</b> y <b>sección</b>, y pulsa <b>Autorizar</b> para
+              cargarlo al inventario. Mientras editas, el SKU permanece en esta lista.
+            </div>
+            {filteredArticulos.length === 0 ? (
+              <div className="text-center py-16 text-gray-500">
+                <div className="text-4xl mb-2">✅</div>
+                No hay nuevos registros pendientes de autorizar.
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                  <tr>
+                    {['Artículo', 'Categoría', 'Almacén', 'Ubicación', 'Sección', 'Acción'].map((h, i) => (
+                      <th key={h} className={`px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${i === 5 ? 'text-right' : 'text-left'}`}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredArticulos.map((item) => {
+                    const almId = almacenNuevoDe(item);
+                    const ubics = ubicacionesDeAlmacen(almId);
+                    const secs = seccionesDeAlmacen(almId);
+                    const autorizando = autorizandoNuevos.has(item.id);
+                    const editando = actualizandoArt.has(item.id);
+                    const listo = !!item.ubicacion_id && !!item.seccion_id;
+                    const imagenUrl = item.imagen_url ? getImageUrl(item.imagen_url) : null;
+                    return (
+                      <tr key={item.id} className="hover:bg-gray-50 align-top">
+                        {/* Artículo */}
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {imagenUrl ? (
+                              <img src={imagenUrl} alt={item.nombre} className="w-9 h-9 object-cover rounded-lg flex-shrink-0" />
+                            ) : (
+                              <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center text-lg flex-shrink-0">{item.es_herramienta ? '🔧' : '📦'}</div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-900 truncate">{item.nombre}</div>
+                              {item.codigo_ean13 && <div className="text-xs text-gray-400 truncate">{item.codigo_ean13}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        {/* Categoría */}
+                        <td className="px-3 py-3">
+                          <select
+                            value={item.categoria_id ?? ''}
+                            onChange={(e) => handleQuickUpdate(item, 'categoria_id', e.target.value, { mantenerPendiente: true })}
+                            disabled={editando || autorizando}
+                            className="w-full min-w-[130px] px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800 border-0 cursor-pointer hover:bg-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none disabled:opacity-50"
+                          >
+                            <option value="">Sin categoría</option>
+                            {todasCategorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                          </select>
+                        </td>
+                        {/* Almacén (editable, filtra ubicación/sección) */}
+                        <td className="px-3 py-3">
+                          <select
+                            value={almId ?? ''}
+                            onChange={(e) => handleNuevoAlmacenChange(item, e.target.value)}
+                            disabled={autorizando}
+                            className="w-full min-w-[130px] px-2 py-1 text-sm rounded border border-gray-300 bg-white text-gray-700 cursor-pointer hover:bg-gray-50 focus:ring-2 focus:ring-red-400 focus:outline-none disabled:opacity-50"
+                          >
+                            <option value="">Selecciona…</option>
+                            {almacenesDisponibles.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                          </select>
+                        </td>
+                        {/* Ubicación (filtrada por almacén) */}
+                        <td className="px-3 py-3">
+                          <select
+                            value={item.ubicacion_id ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handleQuickUpdate(item, 'ubicacion_id', val, { mantenerPendiente: true });
+                              const ub = todasUbicaciones.find(u => String(u.id) === String(val));
+                              if (ub) setNuevosAlmacenSel(prev => ({ ...prev, [item.id]: ub.almacen_id }));
+                            }}
+                            disabled={!almId || editando || autorizando}
+                            className="w-full min-w-[130px] px-2 py-1 text-sm rounded border border-gray-300 bg-white text-gray-700 cursor-pointer hover:bg-gray-50 focus:ring-2 focus:ring-red-400 focus:outline-none disabled:opacity-50"
+                          >
+                            <option value="">{almId ? 'Sin asignar' : 'Elige almacén'}</option>
+                            {ubics.map(u => <option key={u.id} value={u.id}>{u.codigo || u.nombre}</option>)}
+                          </select>
+                        </td>
+                        {/* Sección (filtrada por almacén) */}
+                        <td className="px-3 py-3">
+                          <select
+                            value={item.seccion_id ?? ''}
+                            onChange={(e) => handleQuickUpdate(item, 'seccion_id', e.target.value, { mantenerPendiente: true })}
+                            disabled={!almId || editando || autorizando}
+                            className="w-full min-w-[120px] px-2 py-1 text-xs font-semibold rounded bg-purple-100 text-purple-800 border-0 cursor-pointer hover:bg-purple-200 focus:ring-2 focus:ring-purple-400 focus:outline-none disabled:opacity-50"
+                          >
+                            <option value="">{almId ? 'Sin sección' : 'Elige almacén'}</option>
+                            {secs.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                          </select>
+                        </td>
+                        {/* Acción: Autorizar */}
+                        <td className="px-3 py-3 text-right">
+                          <button
+                            onClick={() => handleAutorizarNuevo(item)}
+                            disabled={!listo || autorizando}
+                            title={listo ? 'Cargar al inventario' : 'Asigna ubicación y sección primero'}
+                            className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {autorizando ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            ) : (
+                              <Check size={16} />
+                            )}
+                            Autorizar
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        {/* Vista Desktop: Tabla (oculta en modo Nuevos Registros, que usa su vista dedicada) */}
+        <div className={`${modoNuevosRegistros ? 'hidden' : 'hidden md:block'} overflow-x-auto max-h-[calc(100vh-300px)] overflow-y-auto`}>
           <div className="flex justify-end px-4 py-1">
             <button onClick={resetColWidths} className="text-xs text-gray-500 hover:text-gray-700 underline" title="Restablecer anchos de columna">
               Restablecer columnas
@@ -3187,8 +3365,8 @@ const InventarioPage = () => {
           </table>
         </div>
 
-        {/* Vista Móvil: Cards unificadas */}
-        <div className="md:hidden divide-y divide-gray-200 max-h-[calc(100vh-300px)] overflow-y-auto">
+        {/* Vista Móvil: Cards unificadas (oculta en modo Nuevos Registros) */}
+        <div className={`${modoNuevosRegistros ? 'hidden' : 'md:hidden'} divide-y divide-gray-200 max-h-[calc(100vh-300px)] overflow-y-auto`}>
           {/* Sección: Consumibles */}
           {filteredArticulos.filter(item => !item.es_herramienta).length > 0 && (
             <>
