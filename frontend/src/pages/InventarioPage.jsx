@@ -2742,21 +2742,32 @@ const InventarioPage = () => {
                             {secs.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                           </select>
                         </td>
-                        {/* Acción: Autorizar */}
+                        {/* Acción: Editar (no saca de la lista) + Autorizar */}
                         <td className="px-3 py-3 text-right">
-                          <button
-                            onClick={() => handleAutorizarNuevo(item)}
-                            disabled={!listo || autorizando}
-                            title={listo ? 'Cargar al inventario' : 'Asigna ubicación y sección primero'}
-                            className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            {autorizando ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            ) : (
-                              <Check size={16} />
-                            )}
-                            Autorizar
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleEditar(item)}
+                              disabled={autorizando}
+                              title="Editar el SKU (nombre, código, descripción, etc.) sin sacarlo de Nuevos Registros"
+                              className="inline-flex items-center gap-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <Edit2 size={16} />
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => handleAutorizarNuevo(item)}
+                              disabled={!listo || autorizando}
+                              title={listo ? 'Cargar al inventario' : 'Asigna ubicación y sección primero'}
+                              className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              {autorizando ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              ) : (
+                                <Check size={16} />
+                              )}
+                              Autorizar
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -3960,6 +3971,7 @@ const InventarioPage = () => {
         articulo={articuloAEditar}
         codigoInicial={codigoEscaneado}
         permisosAlmacenAbiertos={permisosAlmacenAbiertos}
+        mantenerPendiente={modoNuevosRegistros}
       />
 
       {/* Modal del Scanner de Códigos de Barras */}

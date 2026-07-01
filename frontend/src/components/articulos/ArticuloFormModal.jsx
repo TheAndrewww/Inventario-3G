@@ -12,7 +12,7 @@ import EAN13InputScanner from './EAN13InputScanner';
 import { useAuth } from '../../context/AuthContext';
 import { getImageUrl } from '../../utils/imageUtils';
 
-const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigoInicial = null, nombreInicial = null, permisosAlmacenAbiertos = false }) => {
+const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigoInicial = null, nombreInicial = null, permisosAlmacenAbiertos = false, mantenerPendiente = false }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState([]);
@@ -88,6 +88,11 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
   // Almacén restringido en edición: solo puede cambiar nombre y foto. Con permisos
   // abiertos edita todos los campos.
   const esEdicionLimitada = almacenLimitado && isEdit;
+
+  // Edición relajada: no exigir datos completos (categoría/ubicación/stock). Aplica a
+  // almacén restringido y a la edición de un SKU pendiente desde Nuevos Registros
+  // (mantenerPendiente), donde el SKU aún puede estar incompleto y no debe salir de la lista.
+  const edicionRelajada = almacenLimitado || (mantenerPendiente && isEdit);
 
   // Cargar catálogos y datos del artículo si es edición
   useEffect(() => {
@@ -565,38 +570,39 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       return;
     }
 
-    // Solo validar categoria y ubicacion si NO es almacen
-    if (!almacenLimitado && !formData.categoria_id) {
+    // Solo validar categoria y ubicacion si NO es edición relajada
+    if (!edicionRelajada && !formData.categoria_id) {
       toast.error('Selecciona una categoría');
       return;
     }
 
-    if (!almacenLimitado && !formData.ubicacion_id) {
+    if (!edicionRelajada && !formData.ubicacion_id) {
       toast.error('Selecciona una ubicación');
       return;
     }
 
-    // El rol almacén no captura stock: el SKU va a NUEVOS REGISTROS y el admin
-    // asigna stock al revisarlo. Para los demás roles el stock actual es obligatorio.
-    if (!almacenLimitado && (!formData.stock_actual || parseFloat(formData.stock_actual) < 0)) {
+    // El rol almacén no captura stock (y un SKU pendiente aún puede no tenerlo): el
+    // SKU va a NUEVOS REGISTROS y el admin asigna stock al autorizarlo. Para el resto
+    // de los casos el stock actual es obligatorio.
+    if (!edicionRelajada && (!formData.stock_actual || parseFloat(formData.stock_actual) < 0)) {
       toast.error('El stock actual debe ser mayor o igual a 0');
       return;
     }
 
-    // Solo validar stock_minimo si NO es almacen
-    if (!almacenLimitado && (!formData.stock_minimo || parseFloat(formData.stock_minimo) < 0)) {
+    // Solo validar stock_minimo si NO es edición relajada
+    if (!edicionRelajada && (!formData.stock_minimo || parseFloat(formData.stock_minimo) < 0)) {
       toast.error('El stock mínimo debe ser mayor o igual a 0');
       return;
     }
 
     // Validar que si la unidad es "piezas", los stocks sean números enteros
     if (formData.unidad === 'piezas') {
-      if (!almacenLimitado && !Number.isInteger(parseFloat(formData.stock_actual))) {
+      if (!edicionRelajada && !Number.isInteger(parseFloat(formData.stock_actual))) {
         toast.error('El stock actual debe ser un número entero para piezas');
         return;
       }
-      // Solo validar stock_minimo si NO es almacen
-      if (!almacenLimitado && formData.stock_minimo && !Number.isInteger(parseFloat(formData.stock_minimo))) {
+      // Solo validar stock_minimo si NO es edición relajada
+      if (!edicionRelajada && formData.stock_minimo && !Number.isInteger(parseFloat(formData.stock_minimo))) {
         toast.error('El stock mínimo debe ser un número entero para piezas');
         return;
       }
@@ -609,11 +615,12 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
     try {
       setLoading(true);
 
-      // Si es almacen y no hay categoria/ubicacion, buscar o usar "Sin Categoría" y "Sin Ubicación"
+      // Si falta categoria/ubicacion (almacén restringido o edición de un SKU pendiente
+      // aún incompleto), usar "Sin Categoría" y "Sin Ubicación" como respaldo.
       let categoriaId = formData.categoria_id;
       let ubicacionId = formData.ubicacion_id;
 
-      if (almacenLimitado) {
+      if (edicionRelajada) {
         // Buscar "Sin Categoría" en la lista de categorías
         if (!categoriaId) {
           const sinCategoria = categorias.find(c =>
@@ -638,8 +645,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         descripcion: formData.descripcion.trim().toUpperCase(),
         categoria_id: parseInt(categoriaId),
         ubicacion_id: parseInt(ubicacionId),
-        stock_actual: almacenLimitado ? 0 : parseFloat(formData.stock_actual),
-        stock_minimo: almacenLimitado ? 0 : parseFloat(formData.stock_minimo),
+        stock_actual: edicionRelajada ? (parseFloat(formData.stock_actual) || 0) : parseFloat(formData.stock_actual),
+        stock_minimo: edicionRelajada ? (parseFloat(formData.stock_minimo) || 0) : parseFloat(formData.stock_minimo),
         stock_maximo: formData.stock_maximo ? parseFloat(formData.stock_maximo) : null,
         unidad: formData.unidad.toUpperCase(),
         costo_unitario: parseFloat(formData.costo_unitario) || 0,
@@ -670,14 +677,21 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       if (isEdit) {
         console.log('🔄 Actualizando artículo:', articulo.id);
 
+        // Editar desde Nuevos Registros no debe marcar el SKU como revisado:
+        // mantener_pendiente conserva pendiente_revision para que siga en la lista
+        // hasta que se pulse Autorizar.
         if (esEdicionLimitada) {
           // Almacén solo puede actualizar nombre y foto
           const dataLimitada = {
-            nombre: formData.nombre.trim().toUpperCase()
+            nombre: formData.nombre.trim().toUpperCase(),
+            ...(mantenerPendiente && { mantener_pendiente: true })
           };
           await articulosService.update(articulo.id, dataLimitada);
         } else {
-          await articulosService.update(articulo.id, dataToSend);
+          await articulosService.update(articulo.id, {
+            ...dataToSend,
+            ...(mantenerPendiente && { mantener_pendiente: true })
+          });
         }
 
         articuloId = articulo.id;
