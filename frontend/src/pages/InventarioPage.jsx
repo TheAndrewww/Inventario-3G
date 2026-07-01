@@ -54,6 +54,9 @@ const InventarioPage = () => {
   const [ubicaciones, setUbicaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  // Valor de búsqueda diferido: el input se actualiza al instante (searchTerm) pero el
+  // filtrado pesado usa este valor diferido, para que escribir no se sienta trabado.
+  const deferredSearchTerm = React.useDeferredValue(searchTerm);
   const [articuloEncontradoPorCodigo, setArticuloEncontradoPorCodigo] = useState(null); // Guardar artículo encontrado por código
   const [herramientasEncontradasPorCodigo, setHerramientasEncontradasPorCodigo] = useState([]); // Herramientas encontradas por búsqueda parcial
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
@@ -753,12 +756,12 @@ const InventarioPage = () => {
     }
   }, [articuloEncontradoPorCodigo]);
 
-  const filteredArticulos = (() => {
+  const filteredArticulos = React.useMemo(() => {
     // Si hay búsqueda por código de herramienta, usar solo esos resultados
     // Ahora acepta prefijos alfanuméricos como PP2-, AD1-, LL-, LC-, etc.
     const patronCodigoParcial = /^[A-Z0-9]{2,4}-/i;
     // Normalizar: convertir apóstrofes a guión (el lector QR a veces lee ' en lugar de -)
-    const codigo = searchTerm.trim().toUpperCase().replace(/['`´]/g, '-');
+    const codigo = deferredSearchTerm.trim().toUpperCase().replace(/['`´]/g, '-');
 
     if (almacenSeleccionado !== 'nuevos' && codigo && patronCodigoParcial.test(codigo) && herramientasEncontradasPorCodigo.length > 0) {
       // Filtrar las herramientas encontradas por los demás filtros
@@ -816,18 +819,18 @@ const InventarioPage = () => {
         // y también se incluyen los SKU desactivados, para que el mismo SKU aparezca
         // aunque esté dado de alta en otro almacén o esté desactivado y así evitar
         // crear duplicados.
-        const buscandoGlobal = searchTerm.trim() !== '';
+        const buscandoGlobal = deferredSearchTerm.trim() !== '';
 
         // Filtrar por estado activo/desactivado (en búsqueda global se muestran ambos)
         const isActive = item.activo !== false;
         const matchesActiveFilter = buscandoGlobal || (mostrarDesactivados ? !isActive : isActive);
 
         const matchesSearch =
-          item.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.codigo_ean13?.includes(searchTerm) ||
-          item.categoria?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.nombre?.toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
+          item.codigo_ean13?.includes(deferredSearchTerm) ||
+          item.categoria?.nombre?.toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
           // También busca dentro de la descripción/comentarios del artículo
-          item.descripcion?.toLowerCase().includes(searchTerm.toLowerCase());
+          item.descripcion?.toLowerCase().includes(deferredSearchTerm.toLowerCase());
 
         // Modo NUEVOS REGISTROS: solo SKUs pendientes de revisión (creados por
         // almacén), sin filtrar por almacén/sección porque aún no se les asigna.
@@ -879,12 +882,23 @@ const InventarioPage = () => {
             return 0;
         }
       });
-  })();
+  }, [
+    articulos,
+    deferredSearchTerm,
+    almacenSeleccionado,
+    herramientasEncontradasPorCodigo,
+    mostrarDesactivados,
+    categoriaSeleccionada,
+    ubicacionSeleccionada,
+    seccionSeleccionada,
+    ordenamiento,
+    getSeccionArticulo,
+  ]);
 
   // Búsqueda global activa: hay texto en el buscador (la lista abarca todos los
   // almacenes). Sirve para marcar los SKU que viven en otro almacén distinto al
   // seleccionado y evitar que se den de alta duplicados.
-  const buscandoGlobalActivo = searchTerm.trim() !== '';
+  const buscandoGlobalActivo = deferredSearchTerm.trim() !== '';
   const esDeOtroAlmacen = (item) => {
     if (!buscandoGlobalActivo || typeof almacenSeleccionado !== 'number') return false;
     const almacenItemId = item?.ubicacion?.almacen_id ?? item?.ubicacion?.almacen_ref?.id ?? null;
