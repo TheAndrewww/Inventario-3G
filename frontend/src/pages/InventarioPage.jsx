@@ -579,15 +579,19 @@ const InventarioPage = () => {
   };
 
   // Ubicaciones agrupadas por almacén para el dropdown
-  const ubicacionesPorAlmacen = React.useMemo(() => {
-    const grupos = {};
-    todasUbicaciones.forEach(u => {
-      const nomAl = u.almacen_ref?.nombre || u.almacen || 'SIN ALMACÉN';
-      if (!grupos[nomAl]) grupos[nomAl] = [];
-      grupos[nomAl].push(u);
-    });
-    return grupos;
-  }, [todasUbicaciones]);
+  // Aislamiento por almacén: cada almacén tiene SUS propias categorías y ubicaciones.
+  // Los filtros de la barra superior muestran solo las del almacén seleccionado
+  // (cuando hay uno concreto); si no, caen a la lista completa como respaldo.
+  const categoriasAlmacenSel = React.useMemo(() => (
+    typeof almacenSeleccionado === 'number'
+      ? todasCategorias.filter(c => String(c.almacen_id) === String(almacenSeleccionado))
+      : todasCategorias
+  ), [todasCategorias, almacenSeleccionado]);
+  const ubicacionesAlmacenSel = React.useMemo(() => (
+    typeof almacenSeleccionado === 'number'
+      ? todasUbicaciones.filter(u => String(u.almacen_id) === String(almacenSeleccionado))
+      : todasUbicaciones
+  ), [todasUbicaciones, almacenSeleccionado]);
 
   // Helper: hay un almacén seleccionado donde aplican las secciones
   const esAlmacenConSecciones = React.useMemo(() => {
@@ -601,6 +605,31 @@ const InventarioPage = () => {
       ?? (typeof almacenSeleccionado === 'number' ? almacenSeleccionado : null);
     if (!almacenId) return [];
     return todasSecciones.filter(s => s.almacen_id === almacenId);
+  };
+
+  // Categorías de un almacén concreto (para "Nuevos Registros", donde cada fila
+  // puede pertenecer a un almacén distinto). Espejo de ubicacionesDeAlmacen/seccionesDeAlmacen.
+  const categoriasDeAlmacen = (almacenId) => (
+    !almacenId ? [] : todasCategorias.filter(c => String(c.almacen_id) === String(almacenId))
+  );
+
+  // Categorías del almacén del artículo (para select inline). Deriva el almacén del
+  // propio artículo y cae al almacén seleccionado, igual que seccionesParaArticulo.
+  const categoriasParaArticulo = (item) => {
+    const almacenId = item?.ubicacion?.almacen_id
+      ?? item?.ubicacion?.almacen_ref?.id
+      ?? (typeof almacenSeleccionado === 'number' ? almacenSeleccionado : null);
+    if (!almacenId) return [];
+    return todasCategorias.filter(c => String(c.almacen_id) === String(almacenId));
+  };
+
+  // Ubicaciones del almacén del artículo (para select inline).
+  const ubicacionesParaArticulo = (item) => {
+    const almacenId = item?.ubicacion?.almacen_id
+      ?? item?.ubicacion?.almacen_ref?.id
+      ?? (typeof almacenSeleccionado === 'number' ? almacenSeleccionado : null);
+    if (!almacenId) return [];
+    return todasUbicaciones.filter(u => String(u.almacen_id) === String(almacenId));
   };
 
   // Cuando cambia el almacén seleccionado, recargar categorías, ubicaciones y secciones filtradas
@@ -2350,10 +2379,10 @@ const InventarioPage = () => {
                     Todas las categorías
                   </button>
                   <div className="border-t border-gray-200" />
-                  {todasCategorias.length === 0 ? (
+                  {categoriasAlmacenSel.length === 0 ? (
                     <div className="px-3 py-3 text-sm text-gray-500 text-center">No hay categorías</div>
                   ) : (
-                    todasCategorias.map((cat) => (
+                    categoriasAlmacenSel.map((cat) => (
                       <div
                         key={cat.id}
                         className={`flex items-center justify-between gap-2 hover:bg-gray-50 ${categoriaSeleccionada === cat.id ? 'bg-red-50' : ''}`}
@@ -2395,7 +2424,7 @@ const InventarioPage = () => {
                       </div>
                     ))
                   )}
-                  {esAdministrador && todasCategorias.length > 0 && (
+                  {esAdministrador && categoriasAlmacenSel.length > 0 && (
                     <>
                       <div className="border-t border-gray-200" />
                       <button
@@ -2458,10 +2487,10 @@ const InventarioPage = () => {
                     Todas las ubicaciones
                   </button>
                   <div className="border-t border-gray-200" />
-                  {todasUbicaciones.length === 0 ? (
+                  {ubicacionesAlmacenSel.length === 0 ? (
                     <div className="px-3 py-3 text-sm text-gray-500 text-center">No hay ubicaciones</div>
                   ) : (
-                    todasUbicaciones.map((ub) => (
+                    ubicacionesAlmacenSel.map((ub) => (
                       <div
                         key={ub.id}
                         className={`flex items-center justify-between gap-2 hover:bg-gray-50 ${ubicacionSeleccionada === ub.id ? 'bg-red-50' : ''}`}
@@ -2503,7 +2532,7 @@ const InventarioPage = () => {
                       </div>
                     ))
                   )}
-                  {esAdministrador && todasUbicaciones.length > 0 && (
+                  {esAdministrador && ubicacionesAlmacenSel.length > 0 && (
                     <>
                       <div className="border-t border-gray-200" />
                       <button
@@ -2712,7 +2741,7 @@ const InventarioPage = () => {
                             className="w-full min-w-[130px] px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800 border-0 cursor-pointer hover:bg-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none disabled:opacity-50"
                           >
                             <option value="">Sin categoría</option>
-                            {todasCategorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                            {categoriasDeAlmacen(almId).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                           </select>
                         </td>
                         {/* Almacén (editable, filtra ubicación/sección) */}
@@ -2924,7 +2953,7 @@ const InventarioPage = () => {
                               className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border-0 cursor-pointer hover:bg-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none disabled:opacity-50"
                             >
                               <option value="">Sin categoría</option>
-                              {todasCategorias.map(c => (
+                              {categoriasParaArticulo(item).map(c => (
                                 <option key={c.id} value={c.id}>{c.nombre}</option>
                               ))}
                             </select>
@@ -2945,12 +2974,8 @@ const InventarioPage = () => {
                               className={`w-full px-2 py-1 rounded border cursor-pointer focus:ring-2 focus:outline-none disabled:opacity-50 ${esUbicacionRevisar ? 'bg-yellow-100 border-yellow-400 text-yellow-900 font-bold focus:ring-yellow-400' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-red-400'}`}
                             >
                               <option value="">Sin asignar</option>
-                              {Object.entries(ubicacionesPorAlmacen).map(([nomAl, ubics]) => (
-                                <optgroup key={nomAl} label={nomAl}>
-                                  {ubics.map(u => (
-                                    <option key={u.id} value={u.id}>{u.codigo || u.nombre}</option>
-                                  ))}
-                                </optgroup>
+                              {ubicacionesParaArticulo(item).map(u => (
+                                <option key={u.id} value={u.id}>{u.codigo || u.nombre}</option>
                               ))}
                             </select>
                           ) : esUbicacionRevisar ? (
@@ -3191,7 +3216,7 @@ const InventarioPage = () => {
                                 className="w-full px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border-0 cursor-pointer hover:bg-blue-200 focus:ring-2 focus:ring-blue-400 focus:outline-none disabled:opacity-50"
                               >
                                 <option value="">Sin categoría</option>
-                                {todasCategorias.map(c => (
+                                {categoriasParaArticulo(item).map(c => (
                                   <option key={c.id} value={c.id}>{c.nombre}</option>
                                 ))}
                               </select>
@@ -3212,12 +3237,8 @@ const InventarioPage = () => {
                                 className={`w-full px-2 py-1 rounded border cursor-pointer focus:ring-2 focus:outline-none disabled:opacity-50 ${esUbicacionRevisar ? 'bg-yellow-100 border-yellow-400 text-yellow-900 font-bold focus:ring-yellow-400' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-red-400'}`}
                               >
                                 <option value="">Sin asignar</option>
-                                {Object.entries(ubicacionesPorAlmacen).map(([nomAl, ubics]) => (
-                                  <optgroup key={nomAl} label={nomAl}>
-                                    {ubics.map(u => (
-                                      <option key={u.id} value={u.id}>{u.codigo || u.nombre}</option>
-                                    ))}
-                                  </optgroup>
+                                {ubicacionesParaArticulo(item).map(u => (
+                                  <option key={u.id} value={u.id}>{u.codigo || u.nombre}</option>
                                 ))}
                               </select>
                             ) : esUbicacionRevisar ? (

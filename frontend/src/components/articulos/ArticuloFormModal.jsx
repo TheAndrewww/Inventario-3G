@@ -1075,21 +1075,27 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
 
                 {!showNuevaCategoria ? (
                   <select
-                    key={`categoria-select-${categorias.length}`}
+                    key={`categoria-select-${categorias.length}-${almacenSeleccionadoForm}`}
                     name="categoria_id"
                     value={formData.categoria_id}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                    disabled={loading}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 disabled:bg-gray-100"
+                    disabled={loading || !almacenSeleccionadoForm}
                     required={!almacenLimitado}
                   >
-                    <option value="">Seleccionar...</option>
-                    {categorias.map(cat => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.nombre}
-                      </option>
-                    ))}
-                    {!almacenLimitado && (
+                    <option value="">{almacenSeleccionadoForm ? 'Seleccionar...' : 'Primero elige un almacén'}</option>
+                    {categorias
+                      .filter(cat => {
+                        // Cada almacén tiene sus propias categorías: solo las del almacén elegido.
+                        if (!almacenSeleccionadoForm) return false;
+                        return String(cat.almacen_id) === String(almacenSeleccionadoForm);
+                      })
+                      .map(cat => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.nombre}
+                        </option>
+                      ))}
+                    {almacenSeleccionadoForm && !almacenLimitado && (
                       <option value="nueva_categoria" className="text-red-700 font-medium">
                         + Crear nueva categoría
                       </option>
