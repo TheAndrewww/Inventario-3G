@@ -201,6 +201,24 @@ const ControlCampanaPage = () => {
         return totals.byArea?.[areaId]?.[quarterId]?.[type] || 0;
     };
 
+    // Calificación en %: puntos buenos sobre el total registrado (buenos + malos).
+    // null cuando no hay puntos capturados todavía.
+    const getPct = (good, bad) => {
+        const total = (good || 0) + (bad || 0);
+        if (total === 0) return null;
+        return Math.round((good / total) * 100);
+    };
+
+    const formatPct = (pct) => (pct === null ? '—' : `${pct}%`);
+
+    // Colores tipo semáforo para la calificación (fondo claro, texto fuerte).
+    const pctClasses = (pct) => {
+        if (pct === null) return 'bg-gray-50 text-gray-400';
+        if (pct >= 80) return 'bg-green-50 text-green-700';
+        if (pct >= 50) return 'bg-yellow-50 text-yellow-700';
+        return 'bg-red-50 text-red-700';
+    };
+
     if (loading) {
         return (
             <div className="flex justify-center items-center h-screen">
@@ -249,8 +267,9 @@ const ControlCampanaPage = () => {
                                                 S{week}
                                             </th>
                                         ))}
-                                        <th className="bg-green-600 text-white border border-green-500 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-[40px] md:right-[56px] z-10 shadow-sm">✓</th>
-                                        <th className="bg-red-700 text-white border border-red-800 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-0 z-10 shadow-md">✗</th>
+                                        <th className="bg-green-600 text-white border border-green-500 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-[80px] md:right-[112px] z-10 shadow-sm">✓</th>
+                                        <th className="bg-red-700 text-white border border-red-800 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-[40px] md:right-[56px] z-10 shadow-sm">✗</th>
+                                        <th className="bg-blue-700 text-white border border-blue-800 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-0 z-10 shadow-md">%</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -281,21 +300,35 @@ const ControlCampanaPage = () => {
                                                     </td>
                                                 );
                                             })}
-                                            <td className="border border-gray-300 bg-gray-50 text-center font-bold text-green-700 sticky right-[40px] md:right-[56px] z-10 shadow-sm text-sm">
+                                            <td className="border border-gray-300 bg-gray-50 text-center font-bold text-green-700 sticky right-[80px] md:right-[112px] z-10 shadow-sm text-sm">
                                                 {getAreaSubtotal(area.id, quarter.id, 'good')}
                                             </td>
-                                            <td className="border border-gray-300 bg-gray-50 text-center font-bold text-red-700 sticky right-0 z-10 shadow-md text-sm">
+                                            <td className="border border-gray-300 bg-gray-50 text-center font-bold text-red-700 sticky right-[40px] md:right-[56px] z-10 shadow-sm text-sm">
                                                 {getAreaSubtotal(area.id, quarter.id, 'bad')}
                                             </td>
+                                            {(() => {
+                                                const pct = getPct(
+                                                    getAreaSubtotal(area.id, quarter.id, 'good'),
+                                                    getAreaSubtotal(area.id, quarter.id, 'bad')
+                                                );
+                                                return (
+                                                    <td className={`border border-gray-300 text-center font-bold sticky right-0 z-10 shadow-md text-sm ${pctClasses(pct)}`}>
+                                                        {formatPct(pct)}
+                                                    </td>
+                                                );
+                                            })()}
                                         </tr>
                                     ))}
                                     <tr className="bg-red-800 text-white font-bold">
                                         <td colSpan={14} className="p-2 text-right sticky left-0 bg-red-800 z-20 text-xs md:text-sm shadow-md">TRIM {quarter.id}</td>
-                                        <td className="p-2 text-center bg-green-700 text-sm md:text-base sticky right-[40px] md:right-[56px] z-10 shadow-sm">
+                                        <td className="p-2 text-center bg-green-700 text-sm md:text-base sticky right-[80px] md:right-[112px] z-10 shadow-sm">
                                             {getQuarterTotal(quarter.id, 'good')}
                                         </td>
-                                        <td className="p-2 text-center bg-red-900 text-sm md:text-base sticky right-0 z-10 shadow-md">
+                                        <td className="p-2 text-center bg-red-900 text-sm md:text-base sticky right-[40px] md:right-[56px] z-10 shadow-sm">
                                             {getQuarterTotal(quarter.id, 'bad')}
+                                        </td>
+                                        <td className="p-2 text-center bg-blue-800 text-sm md:text-base sticky right-0 z-10 shadow-md">
+                                            {formatPct(getPct(getQuarterTotal(quarter.id, 'good'), getQuarterTotal(quarter.id, 'bad')))}
                                         </td>
                                     </tr>
                                 </tbody>
