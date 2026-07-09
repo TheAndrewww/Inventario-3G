@@ -12,7 +12,6 @@ const QUARTERS = [
 ];
 
 const AREAS = [
-    { id: 'ventas', name: 'VENTAS', color: 'bg-gray-100 text-gray-800' },
     { id: 'ventas_dlba', name: 'VENTAS DLBA', color: 'bg-green-100 text-green-800' },
     { id: 'ventas_vrj', name: 'VENTAS VRJ', color: 'bg-blue-100 text-blue-800' },
     { id: 'diseno', name: 'DISEÑO', color: 'bg-gray-100 text-gray-800' },
@@ -209,7 +208,8 @@ const ControlCampanaPage = () => {
         return Math.round((good / total) * 100);
     };
 
-    const formatPct = (pct) => (pct === null ? '—' : `${pct}%`);
+    // Calificación del 1 al 10 a partir del porcentaje (69% -> 6.9).
+    const formatCalif = (pct) => (pct === null ? '—' : (pct / 10).toFixed(1));
 
     // Colores tipo semáforo para la calificación (fondo claro, texto fuerte).
     const pctClasses = (pct) => {
@@ -269,7 +269,7 @@ const ControlCampanaPage = () => {
                                         ))}
                                         <th className="bg-green-600 text-white border border-green-500 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-[80px] md:right-[112px] z-10 shadow-sm">✓</th>
                                         <th className="bg-red-700 text-white border border-red-800 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-[40px] md:right-[56px] z-10 shadow-sm">✗</th>
-                                        <th className="bg-blue-700 text-white border border-blue-800 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-0 z-10 shadow-md">%</th>
+                                        <th className="bg-blue-700 text-white border border-blue-800 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-0 z-10 shadow-md">CAL</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -313,7 +313,7 @@ const ControlCampanaPage = () => {
                                                 );
                                                 return (
                                                     <td className={`border border-gray-300 text-center font-bold sticky right-0 z-10 shadow-md text-sm ${pctClasses(pct)}`}>
-                                                        {formatPct(pct)}
+                                                        {formatCalif(pct)}
                                                     </td>
                                                 );
                                             })()}
@@ -328,7 +328,7 @@ const ControlCampanaPage = () => {
                                             {getQuarterTotal(quarter.id, 'bad')}
                                         </td>
                                         <td className="p-2 text-center bg-blue-800 text-sm md:text-base sticky right-0 z-10 shadow-md">
-                                            {formatPct(getPct(getQuarterTotal(quarter.id, 'good'), getQuarterTotal(quarter.id, 'bad')))}
+                                            {formatCalif(getPct(getQuarterTotal(quarter.id, 'good'), getQuarterTotal(quarter.id, 'bad')))}
                                         </td>
                                     </tr>
                                 </tbody>
