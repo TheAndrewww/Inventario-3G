@@ -45,13 +45,20 @@ export const useProduccionData = ({
                 // en la pestaña JULIO). Sin esto, las citas de fin de mes no se
                 // encuentran y producción muestra la fecha cruda de la hoja.
                 let citas = [...calResponse.data.proyectos];
+                // Citas de meses futuros: se aplican SOLO a proyectos cuyo Índice
+                // no trae fecha máxima (col D = "-"), para que no queden con un
+                // residuo viejo cuando su cita real vive en un mes posterior.
+                let citasFuturas = [];
                 try {
                     const MESES_NOMBRES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
                     const mesIdx0 = mexicoTime.getMonth();
                     const nextResp = await obtenerCalendarioMesPublico(MESES_NOMBRES[(mesIdx0 + 1) % 12]);
-                    // Solo la cola que pertenece al mes actual (mesIndex resuelto por el backend)
-                    const extra = (nextResp?.data?.proyectos || []).filter(cp => cp.mesIndex === mesIdx0);
+                    const proysNext = nextResp?.data?.proyectos || [];
+                    // Cola que pertenece al mes actual (mesIndex resuelto por el backend)
+                    const extra = proysNext.filter(cp => cp.mesIndex === mesIdx0);
                     if (extra.length) citas = citas.concat(extra);
+                    // Citas que sí pertenecen al mes siguiente (no son cola cruzada)
+                    citasFuturas = proysNext.filter(cp => cp.mesIndex !== mesIdx0);
                 } catch (e) {
                     console.warn('⚠️ No se pudo cargar la cola del mes siguiente:', e.message);
                 }
@@ -65,7 +72,7 @@ export const useProduccionData = ({
                     _fechaCalendario: false
                 }));
 
-                result = aplicarFechasCalendario(result, citas, anio, mes);
+                result = aplicarFechasCalendario(result, citas, anio, mes, citasFuturas);
 
                 // Recalcular diasRestantes para proyectos con fecha del calendario
                 const hoy = getHoyStr();

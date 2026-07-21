@@ -272,8 +272,16 @@ const sincronizarMes = async (mes) => {
                 cambios.fecha_entrada = proyecto.fechaIngreso;
             }
 
-            if (proyecto.fechaEntrega && existente.fecha_limite !== proyecto.fechaEntrega) {
-                cambios.fecha_limite = proyecto.fechaEntrega;
+            if (proyecto.fechaEntrega) {
+                if (existente.fecha_limite !== proyecto.fechaEntrega) {
+                    cambios.fecha_limite = proyecto.fechaEntrega;
+                }
+            } else if (existente.fecha_limite !== null) {
+                // Col D (fecha máxima de entrega) vacía / "-": limpiar la fecha
+                // vieja para no seguir mostrando un residuo en el panel. La fecha
+                // real, si existe, la resuelve el calendario en el frontend.
+                cambios.fecha_limite = null;
+                console.log(`🧹 "${proyecto.nombre}" (${mes}): col D sin fecha → limpiando fecha_limite previa (${existente.fecha_limite})`);
             }
 
             if (proyecto.estaEntregado && existente.etapa_actual !== 'completado') {

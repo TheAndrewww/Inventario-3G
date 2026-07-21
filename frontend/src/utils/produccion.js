@@ -361,26 +361,13 @@ const inicioUltimoBloque = (fechasAsc) => {
     return inicioBloque;
 };
 
-/**
- * Aplica fechas del calendario como fecha_limite a los proyectos de producción.
- * Para cada proyecto del calendario, busca un match de nombre (≥80%) en la lista de producción.
- * Si encuentra match, overridea fecha_limite con (fecha de instalación - 1 día hábil).
- *
- * @param {Array} proyectos - Proyectos de producción
- * @param {Array} calendarioProyectos - Proyectos del calendario [{nombre, dia, fecha, ...}]
- * @param {number} anio - Año actual (fallback si la cita no trae fecha resuelta)
- * @param {number} mes - Mes actual 1-12 (fallback si la cita no trae fecha resuelta)
- * @returns {Array} Proyectos con fecha_limite actualizada donde corresponde
- */
-export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, mes) => {
-    if (!calendarioProyectos?.length || !proyectos?.length) return proyectos;
-
-    // Mapa nombre calendario → conjunto de fechas ISO de sus citas.
-    // Usamos la fecha REAL resuelta por el backend (`cp.fecha`), que maneja las
-    // semanas cruzadas entre meses (ej. el 29 que vive en la pestaña de JULIO
-    // pero pertenece a JUNIO). Fallback a mes+dia si el backend no la envía.
+// Construye un mapa { nombreNormalizado → Set(fechas ISO) } a partir de una
+// lista de citas del calendario. Usa la fecha REAL resuelta por el backend
+// (`cp.fecha`), que maneja las semanas cruzadas entre meses (ej. el 29 que vive
+// en la pestaña de JULIO pero pertenece a JUNIO). Fallback a mes+dia.
+const construirFechasPorNombre = (calendarioProyectos, anio, mes) => {
     const fechasPorNombre = {};
-    calendarioProyectos.forEach(cp => {
+    (calendarioProyectos || []).forEach(cp => {
         if (!cp.nombre) return;
         const key = normalizarNombre(cp.nombre);
         if (!key) return;
@@ -393,44 +380,94 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
         if (!fecha) return;
         (fechasPorNombre[key] = fechasPorNombre[key] || new Set()).add(fecha);
     });
+    return fechasPorNombre;
+};
 
+// Busca la cita de un proyecto (por match de nombre ≥80%) y devuelve la fecha de
+// instalación (inicio del último bloque de días contiguos), o null si no hay match.
+const buscarFechaInstalacion = (nombreProd, fechasPorNombre, nombresCalendario) => {
+    for (const nombreCal of nombresCalendario) {
+        if (matchNombre(nombreProd, nombreCal)) {
+            const fechas = [...fechasPorNombre[nombreCal]].sort(); // ISO → orden cronológico
+            const fechaInstalacionStr = inicioUltimoBloque(fechas);
+            if (!fechaInstalacionStr) return null;
+            return { fechaInstalacionStr, nombreCal };
+        }
+    }
+    return null;
+};
+
+// fechaInstalación - 1 día hábil, en formato ISO (el proyecto debe estar
+// completado un día hábil antes de la instalación).
+const fechaLimiteDesdeInstalacion = (fechaInstalacionStr) => {
+    const fechaCompletado = restarDiasHabiles(fechaInstalacionStr, 1);
+    const y = fechaCompletado.getUTCFullYear();
+    const m = String(fechaCompletado.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(fechaCompletado.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
+/**
+ * Aplica fechas del calendario como fecha_limite a los proyectos de producción.
+ * Para cada proyecto del calendario, busca un match de nombre (≥80%) en la lista de producción.
+ * Si encuentra match, overridea fecha_limite con (fecha de instalación - 1 día hábil).
+ *
+ * @param {Array} proyectos - Proyectos de producción
+ * @param {Array} calendarioProyectos - Citas del mes actual (+ cola cruzada) [{nombre, dia, fecha, ...}]
+ * @param {number} anio - Año actual (fallback si la cita no trae fecha resuelta)
+ * @param {number} mes - Mes actual 1-12 (fallback si la cita no trae fecha resuelta)
+ * @param {Array} calendarioFuturos - Citas de meses futuros. SOLO se usan para
+ *        proyectos cuyo Índice NO trae fecha máxima (col D vacía / "-"), para no
+ *        dejarlos con un residuo viejo cuando su cita real vive en un mes posterior.
+ * @returns {Array} Proyectos con fecha_limite actualizada donde corresponde
+ */
+export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, mes, calendarioFuturos = []) => {
+    if (!proyectos?.length) return proyectos;
+
+    const fechasPorNombre = construirFechasPorNombre(calendarioProyectos, anio, mes);
     const nombresCalendario = Object.keys(fechasPorNombre);
-    if (nombresCalendario.length === 0) return proyectos;
+
+    const fechasFuturasPorNombre = construirFechasPorNombre(calendarioFuturos, anio, mes);
+    const nombresFuturos = Object.keys(fechasFuturasPorNombre);
+
+    if (nombresCalendario.length === 0 && nombresFuturos.length === 0) return proyectos;
 
     return proyectos.map(p => {
         const nombreProd = normalizarNombre(p.nombre);
         if (!nombreProd) return p;
 
-        // Buscar match en nombres del calendario
-        for (const nombreCal of nombresCalendario) {
-            if (matchNombre(nombreProd, nombreCal)) {
-                const fechas = [...fechasPorNombre[nombreCal]].sort(); // ISO → orden cronológico
-                const fechaInstalacionStr = inicioUltimoBloque(fechas);
-                if (!fechaInstalacionStr) return p;
+        const fechaIndice = p.fecha_limite_original || p.fecha_limite;
 
-                // Regla de negocio:
-                // - Si la fecha del calendario es ANTERIOR (o igual) a la fecha de
-                //   entrega del índice (columna D de la hoja), MANDA el calendario.
-                // - Si la cita del calendario es POSTERIOR, se respeta la fecha del
-                //   índice (la hoja de producción).
-                // Las fechas están en formato ISO (YYYY-MM-DD), comparables como texto.
-                const fechaIndice = p.fecha_limite_original || p.fecha_limite;
-                if (fechaIndice && fechaInstalacionStr > fechaIndice) {
-                    console.log(`   ⏩ ÍNDICE MANDA: prod="${nombreProd}" cal=${fechaInstalacionStr} es posterior a entrega=${fechaIndice} → se respeta el índice`);
-                    return p;
-                }
+        // 1) Citas del mes actual (+ cola cruzada del mes siguiente).
+        //    Regla de negocio:
+        //    - Si la cita es ANTERIOR (o igual) a la fecha de entrega del índice
+        //      (columna D), MANDA el calendario.
+        //    - Si la cita es POSTERIOR, se respeta la fecha del índice.
+        const match = buscarFechaInstalacion(nombreProd, fechasPorNombre, nombresCalendario);
+        if (match) {
+            const { fechaInstalacionStr, nombreCal } = match;
+            if (fechaIndice && fechaInstalacionStr > fechaIndice) {
+                console.log(`   ⏩ ÍNDICE MANDA: prod="${nombreProd}" cal=${fechaInstalacionStr} es posterior a entrega=${fechaIndice} → se respeta el índice`);
+                return p;
+            }
+            const nuevaFechaLimite = fechaLimiteDesdeInstalacion(fechaInstalacionStr);
+            console.log(`   ✅ CALENDARIO MANDA: prod="${nombreProd}" ↔ cal="${nombreCal}" → instalación=${fechaInstalacionStr} (antes de entrega=${fechaIndice || 'N/A'}) → fecha_limite=${nuevaFechaLimite}`);
+            return { ...p, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
+        }
 
-                // El proyecto debe estar COMPLETADO 1 día hábil antes de la instalación
-                const fechaCompletado = restarDiasHabiles(fechaInstalacionStr, 1);
-                const y = fechaCompletado.getUTCFullYear();
-                const m = String(fechaCompletado.getUTCMonth() + 1).padStart(2, '0');
-                const d = String(fechaCompletado.getUTCDate()).padStart(2, '0');
-                const nuevaFechaLimite = `${y}-${m}-${d}`;
-
-                console.log(`   ✅ CALENDARIO MANDA: prod="${nombreProd}" ↔ cal="${nombreCal}" → instalación=${fechaInstalacionStr} (antes de entrega=${fechaIndice || 'N/A'}) → fecha_limite=${nuevaFechaLimite}`);
+        // 2) Citas de meses futuros: SOLO cuando el Índice NO trae fecha máxima.
+        //    Evita que un MTO/GTIA sin fecha en la hoja (col D = "-") pero con cita
+        //    real en un mes posterior quede mostrando un residuo viejo de la base.
+        if (!fechaIndice && nombresFuturos.length) {
+            const matchFut = buscarFechaInstalacion(nombreProd, fechasFuturasPorNombre, nombresFuturos);
+            if (matchFut) {
+                const { fechaInstalacionStr, nombreCal } = matchFut;
+                const nuevaFechaLimite = fechaLimiteDesdeInstalacion(fechaInstalacionStr);
+                console.log(`   ✅ CALENDARIO FUTURO MANDA (índice sin fecha): prod="${nombreProd}" ↔ cal="${nombreCal}" → instalación=${fechaInstalacionStr} → fecha_limite=${nuevaFechaLimite}`);
                 return { ...p, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
             }
         }
+
         return p;
     });
 };
