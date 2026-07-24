@@ -12,6 +12,20 @@ import EAN13InputScanner from './EAN13InputScanner';
 import { useAuth } from '../../context/AuthContext';
 import { getImageUrl } from '../../utils/imageUtils';
 
+// Unidades que admiten decimales; cualquier otra (piezas, cajas, unidades…) es entera.
+// La comparación es case-insensitive porque la unidad se guarda en MAYÚSCULAS
+// (p. ej. "PIEZAS"), así que comparar contra 'piezas' en minúsculas fallaba al editar.
+const UNIDADES_CON_DECIMALES = ['kg', 'litros', 'metros', 'm²', 'm³', 'gramos', 'ml', 'cm', 'mm'];
+const unidadEsEntera = (unidad) => {
+  const u = (unidad || '').toLowerCase();
+  return !UNIDADES_CON_DECIMALES.some(x => u.includes(x));
+};
+// Quita los decimales de un texto numérico cuando la unidad es entera (piezas).
+const sanitizarCantidad = (value, unidad) => {
+  if (value === '' || !unidadEsEntera(unidad)) return value;
+  return String(value).replace(/[.,].*$/, '');
+};
+
 const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigoInicial = null, nombreInicial = null, permisosAlmacenAbiertos = false, mantenerPendiente = false }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -259,11 +273,17 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       }
     }
 
+    // Los campos de stock no admiten decimales cuando la unidad es entera (piezas).
+    const camposStock = ['stock_actual', 'stock_minimo', 'stock_maximo'];
+    const valorFinal = camposStock.includes(name)
+      ? sanitizarCantidad(value, formData.unidad)
+      : value;
+
     // Guardar el valor tal como viene, sin transformaciones
     // La conversión a mayúsculas se hace visualmente con CSS
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: valorFinal
     }));
   };
 
@@ -479,8 +499,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       return;
     }
 
-    // Validar que si la unidad es "piezas", la cantidad sea número entero
-    if (articuloSeleccionado.unidad === 'piezas' && !Number.isInteger(parseFloat(cantidadIngreso))) {
+    // Validar que si la unidad es entera (piezas), la cantidad sea número entero
+    if (unidadEsEntera(articuloSeleccionado.unidad) && !Number.isInteger(parseFloat(cantidadIngreso))) {
       toast.error('La cantidad debe ser un número entero para piezas');
       return;
     }
@@ -595,8 +615,8 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       return;
     }
 
-    // Validar que si la unidad es "piezas", los stocks sean números enteros
-    if (formData.unidad === 'piezas') {
+    // Validar que si la unidad es entera (piezas), los stocks sean números enteros
+    if (unidadEsEntera(formData.unidad)) {
       if (!edicionRelajada && !Number.isInteger(parseFloat(formData.stock_actual))) {
         toast.error('El stock actual debe ser un número entero para piezas');
         return;
@@ -963,9 +983,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
               <input
                 type="number"
                 value={cantidadIngreso}
-                onChange={(e) => setCantidadIngreso(e.target.value)}
+                onChange={(e) => setCantidadIngreso(sanitizarCantidad(e.target.value, articuloSeleccionado.unidad))}
                 min="0"
-                step={articuloSeleccionado.unidad === 'piezas' ? '1' : '0.01'}
+                step={unidadEsEntera(articuloSeleccionado.unidad) ? '1' : '0.01'}
                 className="w-full px-3 py-2 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-semibold"
                 placeholder={`Cantidad en ${articuloSeleccionado.unidad}`}
                 required
@@ -1485,7 +1505,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                   value={formData.stock_actual}
                   onChange={handleChange}
                   min="0"
-                  step={formData.unidad === 'piezas' ? '1' : '0.01'}
+                  step={unidadEsEntera(formData.unidad) ? '1' : '0.01'}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
                   placeholder="100"
                   required
@@ -1503,7 +1523,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                     value={formData.stock_minimo}
                     onChange={handleChange}
                     min="0"
-                    step={formData.unidad === 'piezas' ? '1' : '0.01'}
+                    step={unidadEsEntera(formData.unidad) ? '1' : '0.01'}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
                     placeholder="20"
                     required={!almacenLimitado}
@@ -1522,7 +1542,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                     value={formData.stock_maximo}
                     onChange={handleChange}
                     min="0"
-                    step={formData.unidad === 'piezas' ? '1' : '0.01'}
+                    step={unidadEsEntera(formData.unidad) ? '1' : '0.01'}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
                     placeholder="500"
                   />

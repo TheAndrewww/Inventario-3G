@@ -28,19 +28,23 @@ import BarcodeScannerIndicator from '../components/scanner/BarcodeScannerIndicat
  * - kg, litros, metros, m², m³: muestra 2 decimales
  * - piezas, cajas, unidades: muestra sin decimales
  */
+// Unidades que admiten decimales; cualquier otra (piezas, cajas, unidades…) es entera.
+// Case-insensitive: la unidad se guarda en MAYÚSCULAS ("PIEZAS").
+const UNIDADES_CON_DECIMALES = ['kg', 'litros', 'metros', 'm²', 'm³', 'gramos', 'ml', 'cm', 'mm'];
+const unidadEsEntera = (unidad) => {
+  const u = (unidad || '').toLowerCase();
+  return !UNIDADES_CON_DECIMALES.some(x => u.includes(x));
+};
+// Quita los decimales de un texto numérico cuando la unidad es entera (piezas).
+const sanitizarCantidad = (value, unidad) => {
+  if (value === '' || value == null || !unidadEsEntera(unidad)) return value;
+  return String(value).replace(/[.,].*$/, '');
+};
+
 const formatearCantidad = (cantidad, unidad) => {
   const valor = parseFloat(cantidad);
-  const unidadLower = (unidad || '').toLowerCase();
-
-  // Unidades que requieren decimales
-  const unidadesConDecimales = ['kg', 'litros', 'metros', 'm²', 'm³', 'gramos', 'ml', 'cm', 'mm'];
-
-  if (unidadesConDecimales.some(u => unidadLower.includes(u))) {
-    return valor.toFixed(2);
-  }
-
-  // Para piezas y otras unidades, sin decimales
-  return valor.toFixed(0);
+  // Para piezas y otras unidades enteras, sin decimales
+  return unidadEsEntera(unidad) ? valor.toFixed(0) : valor.toFixed(2);
 };
 
 const COLS_INVENTARIO = ['articulo', 'categoria', 'ubicacion', 'stockTotal', 'seccion', 'unidad', 'acciones'];
@@ -386,18 +390,24 @@ const InventarioPage = () => {
 
     setActualizandoArt(prev => new Set(prev).add(item.id));
     try {
-      await articulosService.update(item.id, { [field]: parsed, ...(mantenerPendiente && { mantener_pendiente: true }) });
+      const resp = await articulosService.update(item.id, { [field]: parsed, ...(mantenerPendiente && { mantener_pendiente: true }) });
+      // El backend devuelve el artículo ya hidratado (con su categoría/ubicación).
+      // Lo usamos como fuente de verdad para que el cambio se refleje al instante,
+      // incluso si la categoría se acaba de crear y aún no está en la caché local.
+      const art = resp?.articulo || resp || null;
       // Actualizar localmente sin refetch completo
       setArticulos(prev => prev.map(a => {
         if (a.id !== item.id) return a;
         const updated = { ...a, [field]: parsed, updatedAt: new Date().toISOString() };
         if (field === 'categoria_id') {
-          updated.categoria = todasCategorias.find(c => c.id === parsed) || null;
+          updated.categoria = art?.categoria
+            || todasCategorias.find(c => String(c.id) === String(parsed)) || null;
         } else if (field === 'ubicacion_id') {
-          const ub = todasUbicaciones.find(u => u.id === parsed) || null;
-          updated.ubicacion = ub;
+          // Se usa la caché local (trae almacen_id, necesario para derivar el almacén
+          // del artículo); la respuesta del backend no incluye esa relación anidada.
+          updated.ubicacion = todasUbicaciones.find(u => String(u.id) === String(parsed)) || null;
         } else if (field === 'seccion_id') {
-          updated.seccion = todasSecciones.find(s => s.id === parsed) || null;
+          updated.seccion = todasSecciones.find(s => String(s.id) === String(parsed)) || null;
         }
         return updated;
       }));
@@ -485,13 +495,15 @@ const InventarioPage = () => {
   // Los cambios se acumulan localmente y se guardan todos juntos al presionar "Guardar"
 
   const handleStockEditChange = (item, value) => {
+    // Piezas (unidad entera): no permitir decimales al escribir.
+    const limpio = sanitizarCantidad(value, item.unidad);
     setStocksEditados(prev => {
       const next = { ...prev };
       // Si el valor vuelve a ser el original, descartar el cambio pendiente
-      if (value !== '' && parseFloat(value) === parseFloat(item.stock_actual)) {
+      if (limpio !== '' && parseFloat(limpio) === parseFloat(item.stock_actual)) {
         delete next[item.id];
       } else {
-        next[item.id] = value;
+        next[item.id] = limpio;
       }
       return next;
     });
@@ -3004,7 +3016,7 @@ const InventarioPage = () => {
                             <input
                               type="number"
                               min="0"
-                              step="any"
+                              step={unidadEsEntera(item.unidad) ? '1' : 'any'}
                               value={stocksEditados[item.id] ?? String(parseFloat(item.stock_actual))}
                               onChange={(e) => handleStockEditChange(item, e.target.value)}
                               disabled={guardandoStocks}
@@ -4061,9 +4073,9 @@ const InventarioPage = () => {
             <input
               type="number"
               value={cantidadEntrada}
-              onChange={(e) => setCantidadEntrada(e.target.value)}
+              onChange={(e) => setCantidadEntrada(sanitizarCantidad(e.target.value, articuloParaEntrada?.unidad))}
               min="0"
-              step="0.01"
+              step={unidadEsEntera(articuloParaEntrada?.unidad) ? '1' : '0.01'}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
               placeholder="Ej: 100"
               disabled={loadingEntrada}
@@ -4156,9 +4168,9 @@ const InventarioPage = () => {
             <input
               type="number"
               value={cantidadSalida}
-              onChange={(e) => setCantidadSalida(e.target.value)}
+              onChange={(e) => setCantidadSalida(sanitizarCantidad(e.target.value, articuloParaSalida?.unidad))}
               min="0"
-              step="0.01"
+              step={unidadEsEntera(articuloParaSalida?.unidad) ? '1' : '0.01'}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
               placeholder="Ej: 50"
               disabled={loadingSalida}
