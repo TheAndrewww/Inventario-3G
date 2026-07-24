@@ -619,8 +619,19 @@ const InventarioPage = () => {
     const almacenId = item?.ubicacion?.almacen_id
       ?? item?.ubicacion?.almacen_ref?.id
       ?? (typeof almacenSeleccionado === 'number' ? almacenSeleccionado : null);
-    if (!almacenId) return [];
-    return todasCategorias.filter(c => String(c.almacen_id) === String(almacenId));
+    // Base: categorías del almacén del artículo. Si el almacén no se puede derivar
+    // (SKU sin ubicación asignada), NO dejar el selector vacío: mostrar todas.
+    const base = almacenId
+      ? todasCategorias.filter(c => String(c.almacen_id) === String(almacenId))
+      : todasCategorias;
+    // Garantizar SIEMPRE que la categoría actual del SKU esté presente, aunque
+    // pertenezca a otro almacén (datos legacy / mismatch tras el aislamiento).
+    // Sin esto el selector aparece en blanco y "no se puede actualizar".
+    if (item?.categoria_id && !base.some(c => String(c.id) === String(item.categoria_id))) {
+      const actual = todasCategorias.find(c => String(c.id) === String(item.categoria_id));
+      if (actual) return [actual, ...base];
+    }
+    return base;
   };
 
   // Ubicaciones del almacén del artículo (para select inline).

@@ -1080,13 +1080,16 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                     value={formData.categoria_id}
                     onChange={handleChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 disabled:bg-gray-100"
-                    disabled={loading || !almacenSeleccionadoForm}
+                    disabled={loading || (!almacenSeleccionadoForm && !formData.categoria_id)}
                     required={!almacenLimitado}
                   >
-                    <option value="">{almacenSeleccionadoForm ? 'Seleccionar...' : 'Primero elige un almacén'}</option>
+                    <option value="">{(almacenSeleccionadoForm || formData.categoria_id) ? 'Seleccionar...' : 'Primero elige un almacén'}</option>
                     {categorias
                       .filter(cat => {
                         // Cada almacén tiene sus propias categorías: solo las del almacén elegido.
+                        // Excepción: SIEMPRE mostrar la categoría actual del artículo, aunque sea
+                        // de otro almacén (datos legacy / mismatch), para poder verla y cambiarla.
+                        if (String(cat.id) === String(formData.categoria_id)) return true;
                         if (!almacenSeleccionadoForm) return false;
                         return String(cat.almacen_id) === String(almacenSeleccionadoForm);
                       })
