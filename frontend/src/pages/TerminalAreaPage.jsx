@@ -18,6 +18,7 @@ import {
     X
 } from 'lucide-react';
 import produccionService from '../services/produccion.service';
+import { esProyectoMTO, esUrgenteMTO } from '../utils/produccion';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Configuración de áreas
@@ -173,7 +174,10 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
     const [archivos, setArchivos] = useState(null);
     const [pdfAbierto, setPdfAbierto] = useState(null);
     const diasRestantes = proyecto.diasRestantes;
-    const esUrgente = proyecto.prioridad === 1 || (diasRestantes !== null && diasRestantes <= 3);
+    // MTO: solo por fecha del calendario ya vencida
+    const esUrgente = esProyectoMTO(proyecto)
+        ? esUrgenteMTO(proyecto)
+        : (proyecto.prioridad === 1 || (diasRestantes !== null && diasRestantes <= 3));
 
     // Cargar archivos de Drive cuando se monta el componente (solo para manufactura/herreria)
     useEffect(() => {

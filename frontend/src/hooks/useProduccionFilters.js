@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { sortProyectosPorUrgencia } from '../utils/produccion';
+import { sortProyectosPorUrgencia, esProyectoMTO, esUrgenteMTO } from '../utils/produccion';
 
 /**
  * Opciones de filtro disponibles
@@ -44,6 +44,8 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'activos') => {
                 case 'preparados':
                     return p.etapa_actual === 'instalacion';
                 case 'urgentes':
+                    // MTO: solo por fecha del calendario ya vencida (no por prioridad ni ventana de 3 días)
+                    if (esProyectoMTO(p)) return esUrgenteMTO(p);
                     return p.prioridad === 1 || (p.diasRestantes !== null && p.diasRestantes <= 3);
                 case 'produccion_diseno': {
                     // Proyectos que entran a producción: A/B/C, o MTO/GTIA con EXTENSIVO.

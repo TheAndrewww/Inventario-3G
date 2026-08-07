@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { User, Clock, Calendar } from 'lucide-react';
-import { s, px, calcularDiasPorEtapa } from '../../utils/produccion';
+import { s, px, calcularDiasPorEtapa, esUrgenteMTO } from '../../utils/produccion';
 import { ETAPAS_CONFIG, getColorPorTipo, calcularPorcentaje, usaTimelineSimplificado } from './constants';
 
 /**
@@ -45,7 +45,10 @@ const TimelineHeader = memo(({ proyecto }) => {
         urgenciaPorFecha = diasRestantesCheck <= 2;
     }
 
-    const esUrgente = proyecto.prioridad === 1 || esGarantia || urgenciaPorFecha || enRetraso;
+    // MTO: solo cuenta la fecha del calendario. Urgente únicamente si ya se pasó.
+    const esUrgente = esMTO
+        ? esUrgenteMTO(proyecto)
+        : (proyecto.prioridad === 1 || esGarantia || urgenciaPorFecha || enRetraso);
 
     const colorTipo = getColorPorTipo(proyecto.tipo_proyecto);
     const porcentaje = calcularPorcentaje(proyecto);

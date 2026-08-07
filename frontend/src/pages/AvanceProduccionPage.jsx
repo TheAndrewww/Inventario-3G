@@ -20,7 +20,7 @@ import {
     X
 } from 'lucide-react';
 import produccionService from '../services/produccion.service';
-import { flattenProyectos, sortProyectosPorUrgencia } from '../utils/produccion';
+import { flattenProyectos, sortProyectosPorUrgencia, esProyectoMTO, esUrgenteMTO } from '../utils/produccion';
 import toast, { Toaster } from 'react-hot-toast';
 
 // ─── Configuración de etapas ───
@@ -210,7 +210,10 @@ const EtapaButton = ({ etapa, completada, activa, onClick }) => {
 // ─── Tarjeta de proyecto ───
 const ProyectoCard = ({ proyecto, onMarcarEtapa }) => {
     const diasRestantes = proyecto.diasRestantes;
-    const esUrgente = proyecto.prioridad === 1 || (diasRestantes !== null && diasRestantes < 0);
+    // MTO: solo por fecha del calendario ya vencida
+    const esUrgente = esProyectoMTO(proyecto)
+        ? esUrgenteMTO(proyecto)
+        : (proyecto.prioridad === 1 || (diasRestantes !== null && diasRestantes < 0));
     const esAdvertencia = diasRestantes !== null && diasRestantes >= 0 && diasRestantes <= 3;
 
     // Etapas visibles para este proyecto

@@ -1,4 +1,19 @@
 /**
+ * Los MTO no siguen los tiempos por tipo (A/B/C) ni la ventana de "faltan ≤3 días":
+ * su urgencia depende SOLO de la fecha del calendario (fecha_limite, que ya viene
+ * con el override de la cita agendada). Se marcan urgentes únicamente cuando esa
+ * fecha ya se pasó.
+ */
+export const esProyectoMTO = (proyecto) => proyecto?.tipo_proyecto?.toUpperCase() === 'MTO';
+
+export const esUrgenteMTO = (proyecto) => {
+    // Ya preparado/instalado = como si hubiera terminado, nunca urgente
+    if (proyecto?.etapa_actual === 'instalacion' || proyecto?.etapa_actual === 'completado') return false;
+    const dias = proyecto?.diasRestantes;
+    return dias !== null && dias !== undefined && dias < 0;
+};
+
+/**
  * Ordena proyectos por fecha de instalación más cercana (criterio único para Dashboard y TV).
  *   1. Proyectos pausados van al final
  *   2. Por fecha límite más cercana (diasRestantes menor = primero)

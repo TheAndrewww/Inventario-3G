@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { px, calcularDiasPorEtapa } from '../../utils/produccion';
+import { px, calcularDiasPorEtapa, esProyectoMTO, esUrgenteMTO } from '../../utils/produccion';
 import { ETAPAS_CONFIG, getColorPorTipo, usaTimelineSimplificado } from './constants';
 import TimelineHeader from './TimelineHeader';
 import TimelineStepper from './TimelineStepper';
@@ -47,7 +47,10 @@ const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePaus
         }
 
         const urgenciaPorFecha = diasRestantes !== null && diasRestantes <= 3;
-        let esUrgente = proyecto.prioridad === 1 || esGarantia || urgenciaPorFecha || enRetraso;
+        // MTO: solo cuenta la fecha del calendario. Urgente únicamente si ya se pasó.
+        let esUrgente = esProyectoMTO(proyecto)
+            ? esUrgenteMTO(proyecto)
+            : (proyecto.prioridad === 1 || esGarantia || urgenciaPorFecha || enRetraso);
 
         // Lógica visual específica para Instalación
         if (proyecto.etapa_actual === 'instalacion') {
@@ -68,7 +71,7 @@ const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePaus
             style: { marginBottom: px(4) },
             isPaused: false
         };
-    }, [proyecto.diasRestantes, proyecto.tipo_proyecto, proyecto.estadoRetraso, proyecto.prioridad, proyecto.pausado]);
+    }, [proyecto.diasRestantes, proyecto.tipo_proyecto, proyecto.estadoRetraso, proyecto.prioridad, proyecto.pausado, proyecto.etapa_actual]);
 
     return (
         <div className={containerStyles.className} style={containerStyles.style}>
