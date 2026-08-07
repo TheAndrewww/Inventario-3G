@@ -453,15 +453,19 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
 
         const fechaIndice = p.fecha_limite_original || p.fecha_limite;
 
+        // Los MTO se rigen SOLO por el calendario: su cita manda siempre,
+        // aunque sea posterior a la fecha del Índice (col D).
+        const soloCalendario = esProyectoMTO(p);
+
         // 1) Citas del mes actual (+ cola cruzada del mes siguiente).
         //    Regla de negocio:
         //    - Si la cita es ANTERIOR (o igual) a la fecha de entrega del índice
         //      (columna D), MANDA el calendario.
-        //    - Si la cita es POSTERIOR, se respeta la fecha del índice.
+        //    - Si la cita es POSTERIOR, se respeta la fecha del índice (salvo MTO).
         const match = buscarFechaInstalacion(nombreProd, fechasPorNombre, nombresCalendario);
         if (match) {
             const { fechaInstalacionStr, nombreCal } = match;
-            if (fechaIndice && fechaInstalacionStr > fechaIndice) {
+            if (!soloCalendario && fechaIndice && fechaInstalacionStr > fechaIndice) {
                 console.log(`   ⏩ ÍNDICE MANDA: prod="${nombreProd}" cal=${fechaInstalacionStr} es posterior a entrega=${fechaIndice} → se respeta el índice`);
                 return p;
             }
@@ -470,10 +474,11 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
             return { ...p, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
         }
 
-        // 2) Citas de meses futuros: SOLO cuando el Índice NO trae fecha máxima.
+        // 2) Citas de meses futuros: cuando el Índice NO trae fecha máxima, o
+        //    siempre para MTO (se rigen solo por el calendario).
         //    Evita que un MTO/GTIA sin fecha en la hoja (col D = "-") pero con cita
         //    real en un mes posterior quede mostrando un residuo viejo de la base.
-        if (!fechaIndice && nombresFuturos.length) {
+        if ((!fechaIndice || soloCalendario) && nombresFuturos.length) {
             const matchFut = buscarFechaInstalacion(nombreProd, fechasFuturasPorNombre, nombresFuturos);
             if (matchFut) {
                 const { fechaInstalacionStr, nombreCal } = matchFut;
