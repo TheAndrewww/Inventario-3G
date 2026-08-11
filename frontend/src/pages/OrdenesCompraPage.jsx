@@ -2701,7 +2701,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
 };
 
 // Modal para crear orden desde solicitudes seleccionadas
-const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesIniciales = {}, generarPDFOrden, onClose, onSuccess }) => {
+export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesIniciales = {}, generarPDFOrden, onClose, onSuccess }) => {
   const [proveedores, setProveedores] = useState([]);
   const [proveedorId, setProveedorId] = useState('');
   const [observaciones, setObservaciones] = useState('');

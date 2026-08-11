@@ -5,6 +5,7 @@ import { Button } from '../components/common';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import pedidosService from '../services/pedidos.service';
+import ordenesCompraService from '../services/ordenesCompra.service';
 import camionetasService from '../services/camionetas.service';
 import articulosService from '../services/articulos.service';
 import produccionService from '../services/produccion.service';
@@ -18,6 +19,7 @@ import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import BarcodeScannerIndicator from '../components/scanner/BarcodeScannerIndicator';
 import ScanSuccessNotification from '../components/scanner/ScanSuccessNotification';
 import { generateTicketPDF } from '../utils/pdfGenerator';
+import { ModalCrearOrdenDesdeSolicitudes } from './OrdenesCompraPage';
 
 const PedidoPage = () => {
   const navigate = useNavigate();
@@ -57,6 +59,10 @@ const PedidoPage = () => {
   // Estados para pistola de códigos automática
   const [lastScannedArticle, setLastScannedArticle] = useState(null);
   const [showScanSuccess, setShowScanSuccess] = useState(false);
+
+  // Paso 2: generar orden de compra desde los faltantes de la orden de salida
+  const [mostrarModalOrden, setMostrarModalOrden] = useState(false);
+  const [solicitudesOrden, setSolicitudesOrden] = useState([]);
 
   // Estados para modal de nuevo artículo
   const [modalNuevoArticulo, setModalNuevoArticulo] = useState(false);
@@ -269,12 +275,34 @@ const PedidoPage = () => {
         toast.error('El pedido se creó pero hubo un error al generar el PDF');
       }
 
+      // La orden de salida ya quedó creada: limpiar el carrito y el formulario
       limpiarPedido();
       setProyecto('');
       setObservaciones('');
       setEquipoSeleccionado('');
       setCamionetaSeleccionada('');
       setEncargadoSeleccionado('');
+
+      // Paso 2 — Si el pedido generó solicitudes de compra automáticas por
+      // faltantes/reposición, ofrecer crear la Orden de Compra sin salir de la página.
+      const solicitudesGeneradas = response.data?.solicitudes_compra || [];
+      if (solicitudesGeneradas.length > 0) {
+        try {
+          const idsGeneradas = solicitudesGeneradas.map((s) => s.solicitud_id);
+          const resSol = await ordenesCompraService.listarSolicitudes({ estado: 'pendiente', limit: 99999 });
+          const todas = resSol?.data?.solicitudes || [];
+          const soloGeneradas = todas.filter((s) => idsGeneradas.includes(s.id));
+
+          if (soloGeneradas.length > 0) {
+            setSolicitudesOrden(soloGeneradas);
+            setMostrarModalOrden(true);
+            return; // Nos quedamos en la página para crear la orden de compra
+          }
+        } catch (solError) {
+          console.error('Error al cargar faltantes para la orden de compra:', solError);
+          toast.error('La orden de salida se creó, pero no se pudieron cargar los faltantes para la orden de compra');
+        }
+      }
 
       navigate('/historial');
     } catch (error) {
@@ -862,6 +890,25 @@ const PedidoPage = () => {
         articulo={null}
         nombreInicial={nombreNuevoArticulo}
       />
+
+      {/* Paso 2 — Crear Orden de Compra desde los faltantes de la Orden de Salida */}
+      {mostrarModalOrden && (
+        <ModalCrearOrdenDesdeSolicitudes
+          isOpen={mostrarModalOrden}
+          solicitudes={solicitudesOrden}
+          generarPDFOrden={undefined}
+          onClose={() => {
+            setMostrarModalOrden(false);
+            setSolicitudesOrden([]);
+            navigate('/historial');
+          }}
+          onSuccess={() => {
+            setMostrarModalOrden(false);
+            setSolicitudesOrden([]);
+            navigate('/historial');
+          }}
+        />
+      )}
     </div>
   );
 };
