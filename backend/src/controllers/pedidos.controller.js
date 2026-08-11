@@ -215,17 +215,22 @@ export const crearPedido = async (req, res) => {
     const ticket_id = `PED-${ddmmyy}-${hhmm}-${nn}`;
 
     // Validar que los artículos existen y procesar stock
+    // NOTA: se permiten artículos DESACTIVADOS (activo: false) para no bloquear la
+    // orden de salida por un SKU dado de baja que aún tiene stock físico. Solo se
+    // bloquea si el SKU no existe del todo en la base de datos.
     const articuloIds = articulos.map(a => a.articulo_id);
     const articulosDB = await Articulo.findAll({
-      where: { id: articuloIds, activo: true },
+      where: { id: articuloIds },
       transaction
     });
 
     if (articulosDB.length !== articuloIds.length) {
+      const idsEncontrados = new Set(articulosDB.map(a => a.id));
+      const idsFaltantes = articuloIds.filter(id => !idsEncontrados.has(id));
       await transaction.rollback();
       return res.status(400).json({
         success: false,
-        message: 'Uno o más artículos no existen o están inactivos'
+        message: `Uno o más SKU no existen en el inventario (ID: ${idsFaltantes.join(', ')}). Quítalos del carrito para continuar.`
       });
     }
 
@@ -2735,8 +2740,12 @@ export const uploadTicketToDrive = async (req, res) => {
     console.error('Error al subir ticket a Drive:', error);
 
     let message = 'Error al subir ticket a Drive';
-    if (error.message?.includes('storage quota')) {
-      message = 'Ticket no subido: la carpeta PRODUCCION debe moverse a un Shared Drive de Google para permitir subidas automáticas';
+    if (error.code === 'DRIVE_OAUTH_EXPIRADO' || error.message?.includes('invalid_grant')) {
+      message = 'Ticket no subido: el permiso de Google Drive caducó, hay que volver a autorizarlo';
+    } else if (error.message?.includes('storage quota')) {
+      message = 'Ticket no subido: Drive no está autorizado con la cuenta dueña de la carpeta PRODUCCION (correr scripts/autorizar-drive.mjs)';
+    } else if (error.message?.includes('no está autorizado')) {
+      message = error.message;
     }
 
     res.status(500).json({

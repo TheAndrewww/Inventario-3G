@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { Readable } from 'stream';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -8,6 +9,10 @@ const __dirname = path.dirname(__filename);
 
 // ID de la carpeta raíz PRODUCCION en Google Drive
 const PRODUCCION_FOLDER_ID = '1CsvTpQCIYpgnYn9dJoj9HqGYO-nInsok';
+
+// Token OAuth para ESCRITURA (subir tickets).
+// Ver más abajo (authenticateEscritura) por qué la cuenta de servicio no sirve.
+const OAUTH_TOKEN_PATH = path.join(__dirname, '../../google-oauth-token.json');
 
 /**
  * Autenticar con Google Drive API usando Service Account
@@ -49,6 +54,63 @@ const authenticate = async () => {
         console.error('❌ Error al autenticar con Google Drive:', error);
         throw new Error('No se pudo autenticar con Google Drive API');
     }
+};
+
+/**
+ * Leer las credenciales OAuth de usuario (client_id/secret/refresh_token).
+ * Prioridad: variables de entorno (producción) > archivo local (desarrollo).
+ * @returns {Object|null}
+ */
+const leerCredencialesOAuth = () => {
+    let clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    let clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+    let refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
+
+    if (!clientId || !clientSecret || !refreshToken) {
+        try {
+            if (fs.existsSync(OAUTH_TOKEN_PATH)) {
+                const data = JSON.parse(fs.readFileSync(OAUTH_TOKEN_PATH, 'utf8'));
+                clientId = clientId || data.client_id;
+                clientSecret = clientSecret || data.client_secret;
+                refreshToken = refreshToken || data.refresh_token;
+            }
+        } catch (error) {
+            console.error('⚠️ No se pudo leer google-oauth-token.json:', error.message);
+        }
+    }
+
+    if (!clientId || !clientSecret || !refreshToken) return null;
+    return { clientId, clientSecret, refreshToken };
+};
+
+/**
+ * Autenticar para ESCRIBIR en Drive (subir tickets).
+ *
+ * IMPORTANTE: la carpeta PRODUCCION vive en "Mi unidad" de una cuenta Gmail
+ * personal, y las cuentas de servicio NO tienen cuota de almacenamiento
+ * ("Service Accounts do not have storage quota", 403 storageQuotaExceeded).
+ * Por eso la cuenta de servicio sirve para LEER pero no puede crear archivos.
+ * Para subir se usa OAuth de la cuenta dueña de la carpeta, de modo que el
+ * archivo queda a nombre de esa cuenta y consume su cuota.
+ *
+ * @returns {Promise<Object>} - Cliente de Drive autenticado con OAuth de usuario
+ */
+const authenticateEscritura = async () => {
+    const creds = leerCredencialesOAuth();
+
+    if (!creds) {
+        throw new Error(
+            'Drive no está autorizado para subir archivos. Ejecuta ' +
+            '"node scripts/autorizar-drive.mjs" en el backend y configura ' +
+            'GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET y ' +
+            'GOOGLE_OAUTH_REFRESH_TOKEN.'
+        );
+    }
+
+    const oauth2Client = new google.auth.OAuth2(creds.clientId, creds.clientSecret);
+    oauth2Client.setCredentials({ refresh_token: creds.refreshToken });
+
+    return google.drive({ version: 'v3', auth: oauth2Client });
 };
 
 /**
@@ -465,30 +527,65 @@ export const sincronizarProyecto = async (proyecto) => {
  */
 export const uploadTicket = async (carpetaId, pdfBuffer, fileName) => {
     try {
-        const drive = await authenticate();
-        const stream = Readable.from(pdfBuffer);
+        // Escritura vía OAuth de usuario: la cuenta de servicio no tiene cuota
+        const drive = await authenticateEscritura();
 
-        const response = await drive.files.create({
-            requestBody: {
-                name: fileName,
-                mimeType: 'application/pdf',
-                parents: [carpetaId]
-            },
-            media: {
-                mimeType: 'application/pdf',
-                body: stream
-            },
-            fields: 'id, name, webViewLink',
-            // Soporte para Shared Drives y carpetas compartidas
-            // Esto permite que el Service Account suba archivos a carpetas
-            // donde tiene permisos de edición pero no es dueño
-            supportsAllDrives: true
+        // Si el ticket ya existe en la carpeta, se reemplaza su contenido en
+        // vez de dejar "Ticket-X.pdf", "Ticket-X.pdf (1)", etc.
+        const nombreEscapado = fileName.replace(/'/g, "\\'");
+        const existentes = await drive.files.list({
+            q: `'${carpetaId}' in parents and name = '${nombreEscapado}' and trashed = false`,
+            fields: 'files(id, name)',
+            pageSize: 1,
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true
         });
+        const existente = existentes.data.files?.[0];
 
-        console.log(`✅ Ticket "${fileName}" subido a Drive (carpeta ${carpetaId})`);
+        const media = {
+            mimeType: 'application/pdf',
+            body: Readable.from(pdfBuffer)
+        };
+
+        let response;
+        if (existente) {
+            response = await drive.files.update({
+                fileId: existente.id,
+                media,
+                fields: 'id, name, webViewLink',
+                supportsAllDrives: true
+            });
+            console.log(`✅ Ticket "${fileName}" actualizado en Drive (carpeta ${carpetaId})`);
+        } else {
+            response = await drive.files.create({
+                requestBody: {
+                    name: fileName,
+                    mimeType: 'application/pdf',
+                    parents: [carpetaId]
+                },
+                media,
+                fields: 'id, name, webViewLink',
+                // Soporte para Shared Drives y carpetas compartidas
+                supportsAllDrives: true
+            });
+            console.log(`✅ Ticket "${fileName}" subido a Drive (carpeta ${carpetaId})`);
+        }
+
         return response.data;
     } catch (error) {
         console.error('❌ Error al subir ticket a Drive:', error.message);
+
+        // invalid_grant = el refresh token caducó o fue revocado.
+        // Hay que volver a correr scripts/autorizar-drive.mjs.
+        if (error.message?.includes('invalid_grant')) {
+            const err = new Error(
+                'El permiso de Google Drive caducó. Vuelve a autorizar con ' +
+                '"node scripts/autorizar-drive.mjs" y actualiza GOOGLE_OAUTH_REFRESH_TOKEN.'
+            );
+            err.code = 'DRIVE_OAUTH_EXPIRADO';
+            throw err;
+        }
+
         throw error;
     }
 };

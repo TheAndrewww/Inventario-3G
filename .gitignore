@@ -82,3 +82,6 @@ test-*.js
 
 # Claude Code
 .claude/settings.local.json
+
+# Token OAuth de Drive (subida de tickets)
+google-oauth-token.json

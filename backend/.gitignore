@@ -32,3 +32,6 @@ coverage/
 
 # Debug scripts
 debug-*.js
+
+# Token OAuth de Drive (subida de tickets)
+google-oauth-token.json
