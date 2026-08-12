@@ -4,11 +4,15 @@ import {
     getMovimientoById,
     createMovimiento,
     updateMovimiento,
-    getMovimientosByUsuario
+    getMovimientosByUsuario,
+    crearMovimientoRapido,
+    getConsolidadoDestinos
 } from '../controllers/movimientos.controller.js';
 import {
     verificarToken,
-    esEncargadoOAdmin
+    esEncargadoOAdmin,
+    accesoInventario,
+    accesoGestion
 } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
@@ -29,11 +33,26 @@ router.get('/', verificarToken, getMovimientos);
 router.get('/usuario/:usuario_id', verificarToken, getMovimientosByUsuario);
 
 /**
+ * @route   GET /api/movimientos/consolidado
+ * @desc    Corte por destino de los movimientos rápidos (camionetas y áreas)
+ * @access  Private (encargado, administrador)
+ * @nota    Debe declararse antes de /:id para que no lo capture esa ruta
+ */
+router.get('/consolidado', verificarToken, accesoGestion, getConsolidadoDestinos);
+
+/**
  * @route   GET /api/movimientos/:id
  * @desc    Obtener detalle de un movimiento
  * @access  Private
  */
 router.get('/:id', verificarToken, getMovimientoById);
+
+/**
+ * @route   POST /api/movimientos/rapido
+ * @desc    Entrada/salida rápida hacia camioneta o área (sin ticket ni aprobación)
+ * @access  Private (almacen, compras, encargado, administrador)
+ */
+router.post('/rapido', verificarToken, accesoInventario, crearMovimientoRapido);
 
 /**
  * @route   POST /api/movimientos

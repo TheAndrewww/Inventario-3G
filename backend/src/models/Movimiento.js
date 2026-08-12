@@ -143,6 +143,16 @@ const Movimiento = sequelize.define('Movimiento', {
             key: 'id'
         },
         comment: 'ID de la orden de compra asociada (para entradas desde órdenes de compra)'
+    },
+    destino_tipo: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+        comment: 'Destino de un movimiento rápido: camioneta | area'
+    },
+    destino_area: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        comment: 'Área destino cuando destino_tipo = area (manufactura, herreria, pintura)'
     }
 }, {
     tableName: 'movimientos',

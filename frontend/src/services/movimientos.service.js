@@ -44,6 +44,26 @@ const movimientosService = {
     }
   },
 
+  // Entrada/salida rápida hacia camioneta o área (sin ticket ni aprobación)
+  async registrarRapido(data) {
+    try {
+      const response = await api.post('/movimientos/rapido', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al registrar el movimiento' };
+    }
+  },
+
+  // Corte por destino de los movimientos rápidos
+  async getConsolidado(params = {}) {
+    try {
+      const response = await api.get('/movimientos/consolidado', { params });
+      return response.data.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Error al obtener el consolidado' };
+    }
+  },
+
   // Actualizar estado de un movimiento
   async updateEstado(id, estado) {
     try {

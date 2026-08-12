@@ -38,6 +38,7 @@ import AvanceProduccionPage from './pages/AvanceProduccionPage';
 import RentaHerramientasPage from './pages/RentaHerramientasPage';
 import ReportesPage from './pages/ReportesPage';
 import StockBajoPage from './pages/StockBajoPage';
+import EntradasSalidasPage from './pages/EntradasSalidasPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAuth } from './context/AuthContext';
 
@@ -131,6 +132,7 @@ function App() {
                       <Route path="renta-herramientas" element={<RentaHerramientasPage />} />
                       <Route path="reportes" element={<ReportesPage />} />
                       <Route path="stock-bajo" element={<StockBajoPage />} />
+                      <Route path="entradas-salidas" element={<EntradasSalidasPage />} />
                       <Route path="perfil" element={<PerfilPage />} />
 
                       {/* Ruta 404 para rutas privadas no encontradas */}

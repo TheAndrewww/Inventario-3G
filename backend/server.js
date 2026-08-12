@@ -1074,6 +1074,19 @@ const startServer = async () => {
             }
         }
 
+        // Destino de los movimientos rápidos (camioneta/área) — aplica en dev y prod
+        try {
+            await sequelize.query(
+                "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS destino_tipo VARCHAR(20)"
+            );
+            await sequelize.query(
+                "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS destino_area VARCHAR(50)"
+            );
+            console.log('✅ Columnas destino_tipo/destino_area verificadas en movimientos');
+        } catch (destErr) {
+            console.error('⚠️ Error verificando columnas de destino en movimientos:', destErr.message);
+        }
+
         // Aislamiento por almacén (categorías y ubicaciones) — aplica en dev y prod
         try {
             console.log('🔍 Verificando aislamiento por almacén (categorías/ubicaciones)...');

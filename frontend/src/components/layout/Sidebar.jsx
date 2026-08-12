@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check, Inbox, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check, Inbox, Eye, EyeOff, AlertTriangle, ArrowUpDown } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 const ALL_MENU_ITEMS = [
   { path: '/inventario', icon: Package, label: 'Inventario', roles: ['administrador', 'diseñador', 'almacen', 'ventas'] },
   { path: '/recepcion-mercancia', icon: PackageCheck, label: 'Recepción Mercancía', roles: ['administrador', 'almacen'] },
+  { path: '/entradas-salidas', icon: ArrowUpDown, label: 'Entradas y Salidas', roles: ['administrador', 'almacen'] },
   { path: '/procesamiento-masivo', icon: Wand2, label: 'Procesamiento IA', roles: ['administrador'] },
   { path: '/pedido', icon: ShoppingCart, label: 'Orden de Salida', roles: ['administrador', 'diseñador'] },
   { path: '/pedidos-pendientes', icon: ClipboardList, label: 'Tickets Pendientes', roles: ['administrador', 'almacen'] },
