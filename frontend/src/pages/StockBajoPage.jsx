@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { AlertTriangle, Package, Search, RefreshCw, Download, Warehouse, ChevronDown, ChevronRight, XCircle, DollarSign } from 'lucide-react';
 import reportesService from '../services/reportes.service';
 import { Loader } from '../components/common';
+import { getImageUrl } from '../utils/imageUtils';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -30,6 +31,31 @@ const KpiCard = ({ icon, bg, label, value, sub }) => (
     </div>
 );
 
+// Miniatura del SKU; si no hay imagen (o falla la carga) se muestra el ícono
+const MiniaturaArticulo = ({ articulo, onClick }) => {
+    const [falló, setFalló] = useState(false);
+    const url = !falló ? getImageUrl(articulo.imagen_url) : null;
+
+    if (!url) {
+        return (
+            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
+                📦
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={url}
+            alt={articulo.nombre}
+            loading="lazy"
+            onError={() => setFalló(true)}
+            onClick={onClick}
+            className="w-10 h-10 object-cover rounded-lg flex-shrink-0 border border-gray-200 cursor-zoom-in hover:opacity-80 transition-opacity"
+        />
+    );
+};
+
 const BarraCobertura = ({ articulo }) => {
     const { stock_actual, stock_minimo, estado } = articulo;
     const pct = stock_minimo > 0
@@ -53,6 +79,7 @@ const StockBajoPage = () => {
     const [filtroEstado, setFiltroEstado] = useState('todos');
     const [almacenActivo, setAlmacenActivo] = useState('todos');
     const [soloConMinimo, setSoloConMinimo] = useState(false);
+    const [imagenAmpliada, setImagenAmpliada] = useState(null);
     const [colapsados, setColapsados] = useState(new Set());
 
     const cargar = async () => {
@@ -344,12 +371,17 @@ const StockBajoPage = () => {
                                                 {g.articulos.map(a => (
                                                     <tr key={a.id} className="hover:bg-gray-50">
                                                         <td className="px-4 py-2.5">
-                                                            <p className="font-medium text-gray-900">{a.nombre}</p>
-                                                            <p className="text-xs text-gray-500">
-                                                                {a.categoria}
-                                                                {a.sku ? ` · SKU ${a.sku}` : ''}
-                                                                {a.proveedor ? ` · ${a.proveedor}` : ''}
-                                                            </p>
+                                                            <div className="flex items-center gap-3">
+                                                                <MiniaturaArticulo articulo={a} onClick={() => setImagenAmpliada(a)} />
+                                                                <div className="min-w-0">
+                                                                    <p className="font-medium text-gray-900">{a.nombre}</p>
+                                                                    <p className="text-xs text-gray-500">
+                                                                        {a.categoria}
+                                                                        {a.sku ? ` · SKU ${a.sku}` : ''}
+                                                                        {a.proveedor ? ` · ${a.proveedor}` : ''}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
                                                         </td>
                                                         <td className="px-4 py-2.5 text-gray-600">{a.ubicacion || '—'}</td>
                                                         <td className="px-4 py-2.5 text-right font-semibold text-gray-900">
@@ -377,6 +409,38 @@ const StockBajoPage = () => {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Imagen ampliada */}
+            {imagenAmpliada && (
+                <div
+                    className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6"
+                    onClick={() => setImagenAmpliada(null)}
+                >
+                    <div className="bg-white rounded-xl overflow-hidden max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+                        <img
+                            src={getImageUrl(imagenAmpliada.imagen_url)}
+                            alt={imagenAmpliada.nombre}
+                            className="w-full max-h-[70vh] object-contain bg-gray-50"
+                        />
+                        <div className="p-4 flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="font-semibold text-gray-900">{imagenAmpliada.nombre}</p>
+                                <p className="text-sm text-gray-500">
+                                    {imagenAmpliada.almacen}
+                                    {imagenAmpliada.sku ? ` · SKU ${imagenAmpliada.sku}` : ''}
+                                    {' · '}{formatCantidad(imagenAmpliada.stock_actual)} de {formatCantidad(imagenAmpliada.stock_minimo)} {imagenAmpliada.unidad}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setImagenAmpliada(null)}
+                                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg shrink-0"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
