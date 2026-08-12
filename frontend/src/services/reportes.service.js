@@ -17,6 +17,14 @@ const reportesService = {
     aplicarSugerencias: async (ajustes) => {
         const res = await api.post('/reportes/aplicar-sugerencias', { ajustes });
         return res.data;
+    },
+
+    /**
+     * Artículos bajo mínimo de TODOS los almacenes (solo administrador).
+     */
+    stockBajo: async () => {
+        const res = await api.get('/reportes/stock-bajo');
+        return res.data.data;
     }
 };
 

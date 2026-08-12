@@ -2,7 +2,7 @@
  * Controlador Reportes — análisis del inventario consumible y sugerencias de ajuste.
  */
 
-import { Articulo, Categoria, Ubicacion, DetalleMovimiento, Movimiento } from '../models/index.js';
+import { Articulo, Categoria, Ubicacion, Almacen, Proveedor, DetalleMovimiento, Movimiento } from '../models/index.js';
 import { Op, fn, col, literal } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
@@ -201,6 +201,164 @@ export const reporteInventarioConsumibles = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error al generar el reporte',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * GET /api/reportes/stock-bajo
+ * Artículos por debajo (o al ras) de su stock mínimo, agrupados por almacén.
+ * Vista exclusiva de administrador: cubre TODOS los almacenes de una sola vez.
+ */
+export const stockBajoPorAlmacen = async (req, res) => {
+    try {
+        // Está bajo mínimo si se quedó en cero/negativo, o si tiene mínimo
+        // configurado y el stock actual ya lo alcanzó.
+        const whereStockBajo = {
+            activo: true,
+            es_herramienta: false,
+            [Op.or]: [
+                literal('"Articulo"."stock_actual" <= 0'),
+                literal('("Articulo"."stock_minimo" > 0 AND "Articulo"."stock_actual" <= "Articulo"."stock_minimo")')
+            ]
+        };
+
+        const includeBase = [
+            { model: Categoria, as: 'categoria', attributes: ['id', 'nombre', 'color'], required: false },
+            { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'], required: false }
+        ];
+
+        let articulos;
+        try {
+            articulos = await Articulo.findAll({
+                where: whereStockBajo,
+                attributes: ['id', 'nombre', 'codigo_ean13', 'sku', 'unidad', 'stock_actual', 'stock_minimo', 'stock_maximo', 'costo_unitario', 'imagen_url'],
+                include: [
+                    ...includeBase,
+                    {
+                        model: Ubicacion,
+                        as: 'ubicacion',
+                        attributes: ['id', 'codigo', 'almacen', 'almacen_id'],
+                        required: false,
+                        include: [{ model: Almacen, as: 'almacen_ref', attributes: ['id', 'nombre'], required: false }]
+                    }
+                ]
+            });
+        } catch (includeError) {
+            // Fallback: si la tabla almacenes no existe aún, usar el nombre legacy
+            console.log('⚠️ stockBajoPorAlmacen fallback sin Almacen include:', includeError.message?.substring(0, 80));
+            articulos = await Articulo.findAll({
+                where: whereStockBajo,
+                attributes: ['id', 'nombre', 'codigo_ean13', 'sku', 'unidad', 'stock_actual', 'stock_minimo', 'stock_maximo', 'costo_unitario', 'imagen_url'],
+                include: [
+                    ...includeBase,
+                    { model: Ubicacion, as: 'ubicacion', attributes: ['id', 'codigo', 'almacen'], required: false }
+                ]
+            });
+        }
+
+        const grupos = new Map();
+        const resumen = { total: 0, agotados: 0, criticos: 0, bajos: 0, valorReposicion: 0 };
+
+        for (const art of articulos) {
+            const stockActual = parseFloat(art.stock_actual) || 0;
+            const stockMin = parseFloat(art.stock_minimo) || 0;
+            const stockMax = art.stock_maximo !== null && art.stock_maximo !== undefined ? parseFloat(art.stock_maximo) : null;
+            const costo = parseFloat(art.costo_unitario) || 0;
+
+            let estado;
+            if (stockActual <= 0) estado = 'agotado';
+            else if (stockMin > 0 && stockActual <= stockMin * 0.5) estado = 'critico';
+            else estado = 'bajo';
+
+            // Cuánto comprar para volver al máximo (o al doble del mínimo si no hay máximo)
+            const objetivo = stockMax !== null && stockMax > 0 ? stockMax : (stockMin > 0 ? stockMin * 2 : 0);
+            const sugerido = Math.max(0, objetivo - stockActual);
+            const costoReposicion = parseFloat((sugerido * costo).toFixed(2));
+
+            const almacenRef = art.ubicacion?.almacen_ref;
+            const almacenId = almacenRef?.id ?? art.ubicacion?.almacen_id ?? null;
+            const almacenNombre = almacenRef?.nombre || art.ubicacion?.almacen || 'Sin almacén';
+            const clave = almacenId !== null && almacenId !== undefined ? `id:${almacenId}` : `nombre:${almacenNombre}`;
+
+            if (!grupos.has(clave)) {
+                grupos.set(clave, {
+                    almacen_id: almacenId,
+                    almacen: almacenNombre,
+                    total: 0,
+                    agotados: 0,
+                    criticos: 0,
+                    bajos: 0,
+                    valorReposicion: 0,
+                    articulos: []
+                });
+            }
+            const grupo = grupos.get(clave);
+
+            grupo.articulos.push({
+                id: art.id,
+                nombre: art.nombre,
+                codigo_ean13: art.codigo_ean13,
+                sku: art.sku,
+                unidad: art.unidad,
+                imagen_url: art.imagen_url,
+                categoria: art.categoria?.nombre || 'Sin categoría',
+                categoria_color: art.categoria?.color || null,
+                proveedor: art.proveedor?.nombre || null,
+                ubicacion: art.ubicacion?.codigo || null,
+                almacen_id: almacenId,
+                almacen: almacenNombre,
+                stock_actual: stockActual,
+                stock_minimo: stockMin,
+                stock_maximo: stockMax,
+                costo_unitario: costo,
+                faltante: parseFloat(Math.max(0, stockMin - stockActual).toFixed(2)),
+                sugerido_comprar: parseFloat(sugerido.toFixed(2)),
+                costo_reposicion: costoReposicion,
+                cobertura: stockMin > 0 ? parseFloat((stockActual / stockMin).toFixed(4)) : 0,
+                estado
+            });
+
+            grupo.total += 1;
+            grupo.valorReposicion += costoReposicion;
+            resumen.total += 1;
+            resumen.valorReposicion += costoReposicion;
+            if (estado === 'agotado') { grupo.agotados += 1; resumen.agotados += 1; }
+            else if (estado === 'critico') { grupo.criticos += 1; resumen.criticos += 1; }
+            else { grupo.bajos += 1; resumen.bajos += 1; }
+        }
+
+        // Dentro de cada almacén: lo más urgente primero (menor cobertura)
+        const almacenes = Array.from(grupos.values()).map(g => ({
+            ...g,
+            valorReposicion: parseFloat(g.valorReposicion.toFixed(2)),
+            articulos: g.articulos.sort((a, b) => a.cobertura - b.cobertura || a.nombre.localeCompare(b.nombre))
+        }));
+
+        // Almacenes con más problemas primero; "Sin almacén" siempre al final
+        almacenes.sort((a, b) => {
+            if (a.almacen === 'Sin almacén') return 1;
+            if (b.almacen === 'Sin almacén') return -1;
+            return (b.agotados + b.criticos) - (a.agotados + a.criticos) || b.total - a.total;
+        });
+
+        resumen.valorReposicion = parseFloat(resumen.valorReposicion.toFixed(2));
+        resumen.almacenesAfectados = almacenes.length;
+
+        res.json({
+            success: true,
+            data: {
+                generado: new Date().toISOString(),
+                resumen,
+                almacenes
+            }
+        });
+    } catch (error) {
+        console.error('Error en stockBajoPorAlmacen:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener el stock bajo',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }

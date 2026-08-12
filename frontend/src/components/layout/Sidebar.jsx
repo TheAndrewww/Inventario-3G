@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check, Inbox, Eye, EyeOff } from 'lucide-react';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check, Inbox, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -27,6 +27,7 @@ const ALL_MENU_ITEMS = [
   { path: '/rollos-membrana', icon: Layers, label: 'Rollos Membrana', roles: ['administrador'] },
   { path: '/renta-herramientas', icon: Wrench, label: 'Renta Herramientas', roles: ['administrador'] },
   { path: '/reportes', icon: BarChart3, label: 'Reportes', roles: ['administrador'] },
+  { path: '/stock-bajo', icon: AlertTriangle, label: 'Stock Bajo', roles: ['administrador'] },
 ];
 
 const storageKey = (userId) => `sidebar-order:${userId ?? 'anon'}`;

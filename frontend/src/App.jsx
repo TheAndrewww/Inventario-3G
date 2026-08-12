@@ -37,6 +37,7 @@ import RollosMembranasPage from './pages/RollosMembranasPage';
 import AvanceProduccionPage from './pages/AvanceProduccionPage';
 import RentaHerramientasPage from './pages/RentaHerramientasPage';
 import ReportesPage from './pages/ReportesPage';
+import StockBajoPage from './pages/StockBajoPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAuth } from './context/AuthContext';
 
@@ -129,6 +130,7 @@ function App() {
                       <Route path="avance-produccion" element={<AvanceProduccionPage />} />
                       <Route path="renta-herramientas" element={<RentaHerramientasPage />} />
                       <Route path="reportes" element={<ReportesPage />} />
+                      <Route path="stock-bajo" element={<StockBajoPage />} />
                       <Route path="perfil" element={<PerfilPage />} />
 
                       {/* Ruta 404 para rutas privadas no encontradas */}
