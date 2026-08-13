@@ -45,6 +45,46 @@ export const enviarWhatsApp = async (mensaje, destino = 'compras') => {
     }
 };
 
+/**
+ * Publica una orden de compra en el grupo para que la autoricen ahí mismo.
+ * Va sin importes: al grupo solo le interesa qué se está pidiendo y cuánto.
+ */
+export const pedirAutorizacionOrden = async (orden) => {
+    if (!isWhatsAppEnabled()) return false;
+
+    const articulos = (orden.detalles || []).map(d => {
+        const nombre = d.articulo?.nombre || 'Artículo';
+        const cantidad = parseFloat(d.cantidad_solicitada) || 0;
+        const unidad = d.articulo?.unidad || '';
+        return `• ${nombre}: ${cantidad} ${unidad}`.trimEnd();
+    });
+
+    const lineas = [
+        `🛒 *Orden de compra por autorizar*`,
+        `Folio: ${orden.ticket_id}`,
+        `Proveedor: ${orden.proveedor?.nombre || 'Sin proveedor'}`,
+        orden.creador?.nombre ? `La pidió: ${orden.creador.nombre}` : null,
+        '',
+        ...articulos,
+        '',
+        'Reacciona ✅ para autorizar o ❌ para rechazar.'
+    ].filter(l => l !== null);
+
+    try {
+        await AvisoWhatsApp.create({
+            destino: 'compras',
+            tipo: 'aprobacion_orden',
+            referencia_id: orden.id,
+            mensaje: lineas.join('\n').slice(0, 4000)
+        });
+        console.log(`📨 Orden ${orden.ticket_id} encolada para autorizar por WhatsApp`);
+        return true;
+    } catch (error) {
+        console.error('⚠️ No se pudo encolar la autorización:', error.message);
+        return false;
+    }
+};
+
 export const avisarComprasLlegoMaterial = async ({ proveedor, ticketOrden, folioFactura, articulos, sinIdentificar }) => {
     const lineas = [
         `📦 *Llegó material* — ${proveedor || 'proveedor sin identificar'}`,

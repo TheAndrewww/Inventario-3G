@@ -28,6 +28,17 @@ const AvisoWhatsApp = sequelize.define('AvisoWhatsApp', {
         type: DataTypes.TEXT,
         allowNull: false
     },
+    tipo: {
+        type: DataTypes.STRING(30),
+        allowNull: false,
+        defaultValue: 'informativo',
+        comment: 'informativo | aprobacion_orden. Los de aprobación esperan una reacción'
+    },
+    referencia_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: 'ID del registro al que se refiere (p. ej. la orden de compra por autorizar)'
+    },
     estado: {
         type: DataTypes.STRING(20),
         allowNull: false,

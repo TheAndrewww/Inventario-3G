@@ -16,6 +16,7 @@ import { sequelize } from '../config/database.js';
 import { notificarPorRol, crearNotificacion } from './notificaciones.controller.js';
 import admin from '../config/firebase-admin.js'; // Importar Firebase Admin
 import { enviarEmailAprobacion, enviarEmailEstadoOrden, enviarEmailOrdenCancelada, verificarTokenAprobacion } from '../services/email.service.js';
+import { pedirAutorizacionOrden } from '../services/whatsapp.service.js';
 
 /**
  * Crear una nueva orden de compra
@@ -237,6 +238,8 @@ export const crearOrdenCompra = async (req, res) => {
 
       // Enviar email de aprobación a admins (fire-and-forget, no bloquear respuesta)
       enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
+      // Y al grupo de Compras, para que la autoricen con una reacción sin esperar al correo
+      pedirAutorizacionOrden(ordenCompleta).catch(e => console.error('Error al encolar autorización:', e.message));
     } else {
       console.log(`✅ Orden ${ticket_id} creada por administrador - enviada directamente (sin aprobación)`);
 
@@ -1129,6 +1132,7 @@ export const actualizarOrdenCompra = async (req, res) => {
     // (para que los administradores puedan aprobar/rechazar desde el email)
     try {
       await enviarEmailAprobacion(ordenActualizada);
+      pedirAutorizacionOrden(ordenActualizada).catch(e => console.error('Error al encolar autorización:', e.message));
       console.log(`📧 Email de aprobación enviado para orden ${ordenActualizada.ticket_id} (actualizada desde estado: ${estadoAnterior})`);
     } catch (emailError) {
       console.error('❌ Error al enviar email de aprobación:', emailError);
@@ -1394,6 +1398,8 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
 
       // Enviar email de aprobación a admins (fire-and-forget)
       enviarEmailAprobacion(ordenCompleta).catch(e => console.error('Error al enviar email:', e.message));
+      // Y al grupo de Compras, para autorizarla con una reacción
+      pedirAutorizacionOrden(ordenCompleta).catch(e => console.error('Error al encolar autorización:', e.message));
     } else {
       console.log(`✅ Orden ${ticket_id} creada por administrador desde solicitudes - enviada directamente (sin aprobación)`);
 
