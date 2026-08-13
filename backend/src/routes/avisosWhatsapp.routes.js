@@ -119,6 +119,20 @@ router.post('/:id/decision', async (req, res) => {
             return res.status(400).json({ success: false, message: 'No se recibió el teléfono de quien reaccionó' });
         }
 
+        // Lista blanca opcional: si está puesta, solo esos números autorizan aunque
+        // haya otros administradores con teléfono capturado.
+        const listaBlanca = (process.env.ORDENES_APROBADORES || '')
+            .split(',')
+            .map(n => soloDigitos(n))
+            .filter(Boolean);
+
+        if (listaBlanca.length > 0 && !listaBlanca.includes(digitos)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Ese número no está autorizado para aprobar órdenes de compra'
+            });
+        }
+
         const administradores = await Usuario.findAll({
             where: { rol: 'administrador', activo: true },
             attributes: ['id', 'nombre', 'telefono']
@@ -132,7 +146,7 @@ router.post('/:id/decision', async (req, res) => {
             const conTelefono = administradores.filter(u => soloDigitos(u.telefono));
             const message = conTelefono.length === 0
                 ? 'Ningún administrador tiene teléfono registrado en Usuarios, así que no se puede autorizar por WhatsApp. Captúralo en el sistema.'
-                : 'Ese número no está autorizado para aprobar órdenes de compra';
+                : `El número ${digitos} no corresponde a ningún administrador. Captúralo en el usuario que va a autorizar.`;
 
             return res.status(403).json({ success: false, message });
         }
