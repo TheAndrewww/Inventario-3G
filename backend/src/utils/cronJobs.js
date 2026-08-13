@@ -101,10 +101,65 @@ export const verificarOrdenesVencidas = () => {
 };
 
 /**
+ * Cierra las ventanas de conteo que ya cumplieron sus 7 días.
+ * Se cierra con lo que haya: si almacén no contó, queda lo que decía la factura.
+ * Se ejecuta todos los días a las 8:00 AM.
+ */
+export const cerrarVentanasDeConteo = () => {
+  cron.schedule('0 8 * * *', async () => {
+    try {
+      const vencidas = await OrdenCompra.findAll({
+        where: {
+          conteo_cerrado: false,
+          conteo_hasta: { [Op.ne]: null, [Op.lte]: new Date() }
+        },
+        include: [{ model: Proveedor, as: 'proveedor', attributes: ['nombre'], required: false }]
+      });
+
+      if (vencidas.length === 0) return;
+
+      console.log(`🔒 Cerrando ${vencidas.length} ventana(s) de conteo vencida(s)...`);
+
+      const { notificarPorRol } = await import('../controllers/notificaciones.controller.js');
+      const { enviarWhatsApp } = await import('../services/whatsapp.service.js');
+
+      for (const orden of vencidas) {
+        await orden.update({ conteo_cerrado: true });
+
+        const mensaje = `Se cerró la ventana de reclamo de la orden ${orden.ticket_id}` +
+          `${orden.proveedor?.nombre ? ` (${orden.proveedor.nombre})` : ''} sin conteo registrado. ` +
+          `Quedaron las cantidades de la factura.`;
+
+        try {
+          await notificarPorRol({
+            roles: ['compras', 'administrador'],
+            tipo: 'orden_recibida_parcial',
+            titulo: 'Ventana de reclamo cerrada',
+            mensaje,
+            url: '/ordenes-compra',
+            datos_adicionales: { orden_id: orden.id, ticket_id: orden.ticket_id, cierre_automatico: true }
+          });
+          await enviarWhatsApp(`⏰ ${mensaje}`);
+        } catch (avisoError) {
+          console.error(`Error al avisar el cierre de ${orden.ticket_id}:`, avisoError.message);
+        }
+      }
+
+      console.log('✅ Ventanas de conteo vencidas cerradas');
+    } catch (error) {
+      console.error('❌ Error al cerrar ventanas de conteo:', error);
+    }
+  });
+
+  console.log('⏰ Cron job iniciado: Cierre de ventanas de conteo (8:00 AM)');
+};
+
+/**
  * Iniciar todos los cron jobs
  */
 export const iniciarCronJobs = () => {
   verificarOrdenesVencidas();
+  cerrarVentanasDeConteo();
   iniciarJobAnuncios();
   iniciarJobSincronizacion();
   iniciarJobSincronizacionSheets();

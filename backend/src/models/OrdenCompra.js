@@ -80,6 +80,17 @@ const OrdenCompra = sequelize.define('OrdenCompra', {
         type: DataTypes.DATE,
         allowNull: true,
         comment: 'Fecha en que se aprobó la orden'
+    },
+    conteo_hasta: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Fin de la ventana de conteo/reclamo: almacén tiene hasta esta fecha para contar pieza por pieza'
+    },
+    conteo_cerrado: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: 'true cuando ya se contó (o cuando venció la ventana de 7 días)'
     }
 }, {
     tableName: 'ordenes_compra',

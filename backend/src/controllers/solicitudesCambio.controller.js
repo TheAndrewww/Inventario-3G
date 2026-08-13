@@ -1,7 +1,8 @@
+import { Op } from 'sequelize';
 import { sequelize, SolicitudCambio, Articulo, Usuario, Movimiento, DetalleMovimiento, Ubicacion, Notificacion } from '../models/index.js';
 import { esAjusteDirectoActivo } from './configuracion.controller.js';
 
-const TIPOS_VALIDOS = ['cambio_ubicacion', 'entrada_stock', 'salida_stock', 'crear_articulo', 'desactivar_articulo', 'reactivar_articulo'];
+const TIPOS_VALIDOS = ['cambio_ubicacion', 'entrada_stock', 'salida_stock', 'crear_articulo', 'desactivar_articulo', 'reactivar_articulo', 'cambio_codigo'];
 
 const generarTicketID = () => {
   const ahora = new Date();
@@ -105,6 +106,30 @@ const aplicarCambioSolicitud = async (solicitud, aprobador_id, transaction) => {
       if (!articulo) throw new Error('Artículo no encontrado');
       await articulo.update({ activo: true }, { transaction });
       return { articulo_id: articulo.id, activo: true };
+    }
+
+    // El código del proveedor solo sustituye al nuestro si el admin lo aprueba:
+    // al hacerlo, la etiqueta pegada en el rack queda obsoleta y hay que reimprimir.
+    case 'cambio_codigo': {
+      const articulo = await Articulo.findByPk(solicitud.articulo_id, { transaction });
+      if (!articulo) throw new Error('Artículo no encontrado');
+
+      const nuevoCodigo = (solicitud.payload.codigo_ean13 || '').trim();
+      if (!nuevoCodigo) throw new Error('La solicitud no trae código nuevo');
+
+      const yaUsado = await Articulo.findOne({
+        where: { codigo_ean13: nuevoCodigo, id: { [Op.ne]: articulo.id } },
+        transaction
+      });
+      if (yaUsado) throw new Error(`El código ${nuevoCodigo} ya pertenece a "${yaUsado.nombre}"`);
+
+      await articulo.update({
+        codigo_ean13: nuevoCodigo,
+        codigo_tipo: solicitud.payload.codigo_tipo || 'CODE128',
+        etiquetado: false // queda marcado para reimprimir su etiqueta
+      }, { transaction });
+
+      return { articulo_id: articulo.id, codigo_ean13: nuevoCodigo, reimprimir_etiqueta: true };
     }
 
     default:

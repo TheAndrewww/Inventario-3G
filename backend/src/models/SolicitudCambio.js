@@ -13,7 +13,9 @@ const SolicitudCambio = sequelize.define('SolicitudCambio', {
       'entrada_stock',
       'salida_stock',
       'crear_articulo',
-      'desactivar_articulo'
+      'desactivar_articulo',
+      'reactivar_articulo',
+      'cambio_codigo'
     ),
     allowNull: false
   },

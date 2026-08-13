@@ -2562,10 +2562,20 @@ export const recibirMercancia = async (req, res) => {
       nuevoEstado = 'parcial';
     }
 
+    // Al recibir por primera vez se abre la ventana de conteo: almacén tiene
+    // 7 días para contar pieza por pieza y reportar faltantes o sobrantes.
+    const VENTANA_CONTEO_DIAS = 7;
+    let conteoHasta = orden.conteo_hasta;
+    if (!conteoHasta) {
+      conteoHasta = new Date();
+      conteoHasta.setDate(conteoHasta.getDate() + VENTANA_CONTEO_DIAS);
+    }
+
     // Actualizar estado de la orden
     await orden.update({
       estado: nuevoEstado,
-      fecha_recepcion: fechaRecepcionFinal
+      fecha_recepcion: fechaRecepcionFinal,
+      conteo_hasta: conteoHasta
     }, { transaction });
 
     // Si la orden quedó totalmente recibida, cerrar el ciclo de sus solicitudes:
@@ -2636,6 +2646,20 @@ export const recibirMercancia = async (req, res) => {
       });
     } catch (notifError) {
       console.error('Error al enviar notificación:', notifError);
+    }
+
+    // Aviso al grupo de Compras por WhatsApp (si el bot está configurado)
+    try {
+      const { avisarComprasLlegoMaterial } = await import('../services/whatsapp.service.js');
+      await avisarComprasLlegoMaterial({
+        proveedor: orden.proveedor?.nombre,
+        ticketOrden: orden.ticket_id,
+        folioFactura: req.body?.folio_factura || null,
+        articulos: articulosRecibidos.length,
+        sinIdentificar: parseInt(req.body?.renglones_sin_identificar) || 0
+      });
+    } catch (waError) {
+      console.error('Error al avisar por WhatsApp:', waError.message);
     }
 
     res.status(200).json({

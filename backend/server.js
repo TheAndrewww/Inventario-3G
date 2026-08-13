@@ -1074,6 +1074,32 @@ const startServer = async () => {
             }
         }
 
+        // Ventana de conteo de 7 días en órdenes de compra — aplica en dev y prod
+        try {
+            await sequelize.query(
+                "ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS conteo_hasta TIMESTAMP WITH TIME ZONE"
+            );
+            await sequelize.query(
+                "ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS conteo_cerrado BOOLEAN NOT NULL DEFAULT false"
+            );
+            console.log('✅ Columnas de ventana de conteo verificadas en ordenes_compra');
+        } catch (conteoErr) {
+            console.error('⚠️ Error verificando columnas de conteo:', conteoErr.message);
+        }
+
+        // Tipos nuevos de solicitud de cambio — aplica en dev y prod
+        // (el ENUM de Postgres no se actualiza solo al cambiar el modelo)
+        try {
+            for (const tipo of ['reactivar_articulo', 'cambio_codigo']) {
+                await sequelize.query(
+                    `ALTER TYPE "enum_solicitudes_cambio_tipo" ADD VALUE IF NOT EXISTS '${tipo}'`
+                );
+            }
+            console.log('✅ Tipos de solicitudes_cambio verificados');
+        } catch (scEnumErr) {
+            console.error('⚠️ Error verificando tipos de solicitudes_cambio:', scEnumErr.message);
+        }
+
         // Destino de los movimientos rápidos (camioneta/área) — aplica en dev y prod
         try {
             await sequelize.query(

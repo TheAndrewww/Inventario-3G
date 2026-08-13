@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { PackageCheck, Search, AlertCircle, Eye, History, Package } from 'lucide-react';
+import { PackageCheck, Search, AlertCircle, Eye, History, Package, Sparkles, ClipboardCheck } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import { Loader } from '../components/common';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import RecibirOrdenModal from '../components/ordenes/RecibirOrdenModal';
 import HistorialRecepcionesOrden from '../components/ordenes/HistorialRecepcionesOrden';
+import RecibirConFacturaModal from '../components/ordenes/RecibirConFacturaModal';
+import ConteoRecepcionModal from '../components/ordenes/ConteoRecepcionModal';
 
 const RecepcionMercanciaPage = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -15,11 +17,24 @@ const RecepcionMercanciaPage = () => {
   const [ordenARecibir, setOrdenARecibir] = useState(null);
   const [modalHistorialRecepciones, setModalHistorialRecepciones] = useState(false);
   const [ordenParaHistorial, setOrdenParaHistorial] = useState(null);
+  const [ordenConFactura, setOrdenConFactura] = useState(null);
+  const [conteosAbiertos, setConteosAbiertos] = useState([]);
+  const [conteoActivo, setConteoActivo] = useState(null);
   const { user: usuario } = useAuth();
 
   useEffect(() => {
     cargarOrdenesPendientes();
+    cargarConteosAbiertos();
   }, []);
+
+  const cargarConteosAbiertos = async () => {
+    try {
+      const conteos = await ordenesCompraService.listarConteosAbiertos();
+      setConteosAbiertos(conteos || []);
+    } catch (error) {
+      console.error('Error al cargar conteos abiertos:', error);
+    }
+  };
 
   const cargarOrdenesPendientes = async () => {
     try {
@@ -120,6 +135,45 @@ const RecepcionMercanciaPage = () => {
           </p>
         </div>
 
+        {/* Conteos abiertos: la ventana de reclamo de 7 días */}
+        {conteosAbiertos.length > 0 && (
+          <div className="mb-6 bg-white rounded-lg shadow border-l-4 border-blue-500 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ClipboardCheck className="text-blue-600" size={20} />
+              <h2 className="font-semibold text-gray-900">Pendientes de contar</h2>
+              <span className="text-sm text-gray-500">
+                ({conteosAbiertos.length}) · ventana de reclamo de 7 días
+              </span>
+            </div>
+            <div className="space-y-2">
+              {conteosAbiertos.map((conteo) => (
+                <div
+                  key={conteo.id}
+                  className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${conteo.vencido ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 truncate">
+                      {conteo.ticket_id} · {conteo.proveedor || 'Sin proveedor'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {conteo.articulos.length} artículo(s) ·{' '}
+                      {conteo.vencido
+                        ? 'la ventana ya venció, se cerrará sola'
+                        : `quedan ${conteo.dias_restantes} día(s)`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setConteoActivo(conteo)}
+                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
+                  >
+                    Contar
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Barra de búsqueda */}
         <div className="mb-6">
           <div className="relative">
@@ -210,14 +264,24 @@ const RecepcionMercanciaPage = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <div className="flex items-center justify-center gap-2">
                           {puedeRecibir && (
-                            <button
-                              onClick={() => handleAbrirModalRecibir(orden)}
-                              className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                              title="Recibir mercancía"
-                            >
-                              <PackageCheck size={16} />
-                              Recibir
-                            </button>
+                            <>
+                              <button
+                                onClick={() => setOrdenConFactura(orden)}
+                                className="bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                                title="Recibir tomando foto de la factura"
+                              >
+                                <Sparkles size={16} />
+                                Con factura
+                              </button>
+                              <button
+                                onClick={() => handleAbrirModalRecibir(orden)}
+                                className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                                title="Recibir capturando a mano"
+                              >
+                                <PackageCheck size={16} />
+                                Recibir
+                              </button>
+                            </>
                           )}
                           <button
                             onClick={() => handleAbrirHistorial(orden)}
@@ -260,6 +324,31 @@ const RecepcionMercanciaPage = () => {
           onClose={handleCerrarModalRecibir}
           orden={ordenARecibir}
           onSuccess={handleRecepcionExitosa}
+        />
+      )}
+
+      {ordenConFactura && (
+        <RecibirConFacturaModal
+          isOpen={!!ordenConFactura}
+          onClose={() => setOrdenConFactura(null)}
+          orden={ordenConFactura}
+          onSuccess={(data) => {
+            if (data?.orden) handleRecepcionExitosa(data.orden);
+            setOrdenConFactura(null);
+            cargarConteosAbiertos();
+          }}
+        />
+      )}
+
+      {conteoActivo && (
+        <ConteoRecepcionModal
+          isOpen={!!conteoActivo}
+          onClose={() => setConteoActivo(null)}
+          conteo={conteoActivo}
+          onSuccess={() => {
+            cargarConteosAbiertos();
+            cargarOrdenesPendientes();
+          }}
         />
       )}
 

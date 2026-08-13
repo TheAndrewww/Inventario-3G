@@ -102,6 +102,36 @@ const ordenesCompraService = {
     return response.data;
   },
 
+  // Leer la factura del proveedor con IA y cruzarla contra la orden
+  analizarFactura: async (id, archivos) => {
+    const formData = new FormData();
+    archivos.forEach(archivo => formData.append('facturas', archivo));
+
+    const response = await api.post(`/ordenes-compra/${id}/analizar-factura`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000 // la lectura de la factura puede tardar
+    });
+    return response.data.data;
+  },
+
+  // Guardar las equivalencias confirmadas (para que la próxima factura ya no pregunte)
+  aprenderCruce: async (id, renglones) => {
+    const response = await api.post(`/ordenes-compra/${id}/aprender-cruce`, { renglones });
+    return response.data;
+  },
+
+  // Órdenes dentro de la ventana de conteo/reclamo de 7 días
+  listarConteosAbiertos: async () => {
+    const response = await api.get('/ordenes-compra-conteos-abiertos');
+    return response.data.data.conteos;
+  },
+
+  // Cerrar el conteo con las cantidades realmente contadas
+  cerrarConteo: async (id, articulos, observaciones = null) => {
+    const response = await api.post(`/ordenes-compra/${id}/conteo`, { articulos, observaciones });
+    return response.data;
+  },
+
   // Obtener historial de recepciones de una orden
   obtenerHistorialRecepciones: async (id) => {
     const response = await api.get(`/ordenes-compra/${id}/recepciones`);

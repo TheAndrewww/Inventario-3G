@@ -27,10 +27,28 @@ import {
   reabrirOrden,
   obtenerArticulosPendientesPorProveedor
 } from '../controllers/ordenesCompra.controller.js';
+import {
+  analizarFactura,
+  aprenderCruceFactura,
+  cerrarConteo,
+  listarConteosAbiertos
+} from '../controllers/recepcionFactura.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 import { testEmail } from '../services/email.service.js';
+import multer from 'multer';
 
 const router = express.Router();
+
+// Fotos de factura: se procesan en memoria y no se guardan en disco
+const uploadFactura = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 12 * 1024 * 1024 }, // 12MB: fotos de celular sin comprimir
+  fileFilter: (req, file, cb) => {
+    const permitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic'];
+    if (permitidos.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('La factura debe ser una foto (JPG, PNG, WEBP)'), false);
+  }
+});
 
 // Rutas públicas para aprobar/rechazar por email (usan token propio en query string/body)
 router.get('/ordenes-compra/aprobar-email', aprobarPorEmail);
@@ -89,6 +107,27 @@ router.post(
   '/ordenes-compra/:id/recibir',
   verificarRol('compras', 'almacen', 'administrador'),
   recibirMercancia
+);
+
+// Recepción a partir de la foto de la factura del proveedor
+router.post(
+  '/ordenes-compra/:id/analizar-factura',
+  verificarRol('compras', 'almacen', 'administrador'),
+  uploadFactura.array('facturas', 5),
+  analizarFactura
+);
+router.post(
+  '/ordenes-compra/:id/aprender-cruce',
+  verificarRol('compras', 'almacen', 'administrador'),
+  aprenderCruceFactura
+);
+
+// Ventana de conteo (reclamo) de 7 días
+router.get('/ordenes-compra-conteos-abiertos', listarConteosAbiertos);
+router.post(
+  '/ordenes-compra/:id/conteo',
+  verificarRol('compras', 'almacen', 'administrador'),
+  cerrarConteo
 );
 router.get('/ordenes-compra/:id/recepciones', obtenerHistorialRecepciones);
 router.get('/ordenes-compra/:id/progreso', obtenerProgresoRecepcion);
