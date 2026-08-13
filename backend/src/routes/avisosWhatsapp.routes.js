@@ -51,7 +51,9 @@ router.get('/pendientes', async (req, res) => {
         res.json({ success: true, data: { avisos } });
     } catch (error) {
         console.error('Error al listar avisos pendientes:', error);
-        res.status(500).json({ success: false, message: 'Error al listar avisos' });
+        // El detalle sí se devuelve: esta ruta solo la ve el bot (va con token),
+        // y sin él es imposible diagnosticar el puente desde el otro extremo.
+        res.status(500).json({ success: false, message: 'Error al listar avisos', error: error.message });
     }
 });
 
