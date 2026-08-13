@@ -51,6 +51,11 @@ const AvisoWhatsApp = sequelize.define('AvisoWhatsApp', {
 }, {
     tableName: 'avisos_whatsapp',
     timestamps: true,
+    // El proyecto usa underscored global: las columnas reales son created_at /
+    // updated_at. Se declaran explícitas, como en OrdenCompra, para que las
+    // consultas no las busquen en camelCase.
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     indexes: [
         { fields: ['estado'] }
     ]

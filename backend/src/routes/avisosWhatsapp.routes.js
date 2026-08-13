@@ -43,9 +43,9 @@ router.get('/pendientes', async (req, res) => {
                 estado: 'pendiente',
                 intentos: { [Op.lt]: 5 } // tras 5 intentos fallidos deja de reintentarse
             },
-            order: [['createdAt', 'ASC']],
+            order: [['id', 'ASC']], // el id autoincremental ya da el orden cronológico
             limit: limite,
-            attributes: ['id', 'destino', 'mensaje', 'intentos', 'createdAt']
+            attributes: ['id', 'destino', 'mensaje', 'intentos']
         });
 
         res.json({ success: true, data: { avisos } });
