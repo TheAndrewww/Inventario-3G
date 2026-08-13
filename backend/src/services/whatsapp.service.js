@@ -11,20 +11,23 @@ import axios from 'axios';
 
 const WEBHOOK_URL = process.env.WHATSAPP_WEBHOOK_URL;
 const WEBHOOK_TOKEN = process.env.WHATSAPP_WEBHOOK_TOKEN;
-const GRUPO_COMPRAS = process.env.WHATSAPP_GRUPO_COMPRAS;
 
-export const isWhatsAppEnabled = () => !!(WEBHOOK_URL && GRUPO_COMPRAS);
+export const isWhatsAppEnabled = () => !!(WEBHOOK_URL && WEBHOOK_TOKEN);
 
 /**
- * Manda un mensaje a un grupo/chat de WhatsApp. Nunca lanza excepción:
- * un aviso que no salió no debe tumbar una recepción de mercancía.
+ * Manda un mensaje a WhatsApp. Nunca lanza excepción: un aviso que no salió
+ * no debe tumbar una recepción de mercancía.
+ *
+ * El destino es lógico ('compras', 'contable'), no un número: el bot contable
+ * es quien sabe a qué grupo corresponde. Así el inventario no puede escribirle
+ * a un chat arbitrario ni necesita conocer los JID.
  *
  * @param {string} mensaje - Texto a enviar
- * @param {string} chatId - Destino (default: grupo de Compras)
+ * @param {string} destino - Destino lógico (default: compras)
  * @returns {Promise<boolean>} - true si se envió
  */
-export const enviarWhatsApp = async (mensaje, chatId = GRUPO_COMPRAS) => {
-    if (!WEBHOOK_URL || !chatId) {
+export const enviarWhatsApp = async (mensaje, destino = 'compras') => {
+    if (!isWhatsAppEnabled()) {
         console.log('ℹ️ WhatsApp no configurado, se omite el aviso');
         return false;
     }
@@ -32,18 +35,20 @@ export const enviarWhatsApp = async (mensaje, chatId = GRUPO_COMPRAS) => {
     try {
         await axios.post(
             WEBHOOK_URL,
-            { chatId, mensaje, origen: 'inventario-3g' },
+            { destino, mensaje, origen: 'inventario-3g' },
             {
-                headers: WEBHOOK_TOKEN
-                    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${WEBHOOK_TOKEN}` }
-                    : { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${WEBHOOK_TOKEN}`
+                },
                 timeout: 15000
             }
         );
-        console.log('✅ Aviso enviado por WhatsApp');
+        console.log(`✅ Aviso enviado por WhatsApp (${destino})`);
         return true;
     } catch (error) {
-        console.error('⚠️ No se pudo enviar el WhatsApp:', error.response?.data?.message || error.message);
+        const detalle = error.response?.data?.error || error.response?.data?.message || error.message;
+        console.error('⚠️ No se pudo enviar el WhatsApp:', detalle);
         return false;
     }
 };
@@ -57,7 +62,7 @@ export const avisarComprasLlegoMaterial = async ({ proveedor, ticketOrden, folio
         sinIdentificar > 0 ? `⚠️ ${sinIdentificar} renglón(es) quedaron sin identificar` : null,
         '',
         'El conteo individual se hace durante los próximos 7 días; al cerrar se avisan los faltantes.'
-    ].filter(Boolean);
+    ].filter(l => l !== null); // ojo: filter(Boolean) borraría también los renglones en blanco
 
     return enviarWhatsApp(lineas.join('\n'));
 };
