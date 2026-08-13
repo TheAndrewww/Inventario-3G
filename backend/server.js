@@ -127,6 +127,7 @@ import checklistRoutes from './src/routes/checklist.routes.js';
 import solicitudesCambioRoutes from './src/routes/solicitudesCambio.routes.js';
 import configuracionRoutes from './src/routes/configuracion.routes.js';
 import reportesRoutes from './src/routes/reportes.routes.js';
+import avisosWhatsappRoutes from './src/routes/avisosWhatsapp.routes.js';
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -230,6 +231,7 @@ app.use('/api/checklist', checklistRoutes);
 app.use('/api/solicitudes-cambio', solicitudesCambioRoutes);
 app.use('/api/configuracion', configuracionRoutes);
 app.use('/api/reportes', reportesRoutes);
+app.use('/api/avisos-whatsapp', avisosWhatsappRoutes);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
 
@@ -1072,6 +1074,15 @@ const startServer = async () => {
             } catch (rollosError) {
                 console.error('⚠️ Error con tabla rollos_membrana:', rollosError.message);
             }
+        }
+
+        // Cola de avisos de WhatsApp (la consume el bot contable) — dev y prod
+        try {
+            const { AvisoWhatsApp } = await import('./src/models/index.js');
+            await AvisoWhatsApp.sync({ force: false });
+            console.log('✅ Tabla avisos_whatsapp verificada');
+        } catch (avisosErr) {
+            console.error('⚠️ Error verificando tabla avisos_whatsapp:', avisosErr.message);
         }
 
         // Ventana de conteo de 7 días en órdenes de compra — aplica en dev y prod

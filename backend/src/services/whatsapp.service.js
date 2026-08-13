@@ -1,54 +1,46 @@
 /**
- * Envío de avisos a WhatsApp a través del bot contable (WAHA).
+ * Avisos a WhatsApp.
  *
- * El Inventario no tiene sesión de WhatsApp propia: le pide al bot que ya
- * está conectado que publique el mensaje en el grupo correspondiente.
- * Si no está configurado, no truena nada — simplemente no manda WhatsApp
- * y los avisos siguen llegando por push y correo.
+ * El Inventario no tiene sesión de WhatsApp propia: deja el aviso en una cola
+ * y el bot contable —que sí la tiene— la consulta cada minuto y lo publica.
+ *
+ * Va en ese sentido (el bot jala) porque el VPS del bot no expone puertos a
+ * internet y su panel no tiene contraseña; el inventario, en cambio, ya está
+ * publicado con HTTPS. De paso, si el bot está caído los avisos se acumulan
+ * en lugar de perderse.
  */
 
-import axios from 'axios';
+import { AvisoWhatsApp } from '../models/index.js';
 
-const WEBHOOK_URL = process.env.WHATSAPP_WEBHOOK_URL;
-const WEBHOOK_TOKEN = process.env.WHATSAPP_WEBHOOK_TOKEN;
+const DESTINOS_VALIDOS = ['compras', 'contable'];
 
-export const isWhatsAppEnabled = () => !!(WEBHOOK_URL && WEBHOOK_TOKEN);
+export const isWhatsAppEnabled = () => !!process.env.WHATSAPP_PUENTE_TOKEN;
 
 /**
- * Manda un mensaje a WhatsApp. Nunca lanza excepción: un aviso que no salió
+ * Encola un mensaje de WhatsApp. Nunca lanza excepción: un aviso que no salió
  * no debe tumbar una recepción de mercancía.
  *
- * El destino es lógico ('compras', 'contable'), no un número: el bot contable
- * es quien sabe a qué grupo corresponde. Así el inventario no puede escribirle
- * a un chat arbitrario ni necesita conocer los JID.
- *
  * @param {string} mensaje - Texto a enviar
- * @param {string} destino - Destino lógico (default: compras)
- * @returns {Promise<boolean>} - true si se envió
+ * @param {string} destino - Destino lógico: compras | contable
+ * @returns {Promise<boolean>} - true si quedó encolado
  */
 export const enviarWhatsApp = async (mensaje, destino = 'compras') => {
     if (!isWhatsAppEnabled()) {
-        console.log('ℹ️ WhatsApp no configurado, se omite el aviso');
+        console.log('ℹ️ Puente de WhatsApp no configurado, se omite el aviso');
+        return false;
+    }
+
+    if (!DESTINOS_VALIDOS.includes(destino)) {
+        console.error(`⚠️ Destino de WhatsApp no permitido: ${destino}`);
         return false;
     }
 
     try {
-        await axios.post(
-            WEBHOOK_URL,
-            { destino, mensaje, origen: 'inventario-3g' },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${WEBHOOK_TOKEN}`
-                },
-                timeout: 15000
-            }
-        );
-        console.log(`✅ Aviso enviado por WhatsApp (${destino})`);
+        await AvisoWhatsApp.create({ destino, mensaje: String(mensaje).slice(0, 4000) });
+        console.log(`📨 Aviso de WhatsApp encolado (${destino})`);
         return true;
     } catch (error) {
-        const detalle = error.response?.data?.error || error.response?.data?.message || error.message;
-        console.error('⚠️ No se pudo enviar el WhatsApp:', detalle);
+        console.error('⚠️ No se pudo encolar el aviso de WhatsApp:', error.message);
         return false;
     }
 };

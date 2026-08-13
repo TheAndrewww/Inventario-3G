@@ -32,6 +32,7 @@ import ChecklistItemArticulo from './ChecklistItemArticulo.js';
 import ChecklistEquipo from './ChecklistEquipo.js';
 import SolicitudCambio from './SolicitudCambio.js';
 import Configuracion from './Configuracion.js';
+import AvisoWhatsApp from './AvisoWhatsApp.js';
 
 // Definir relaciones
 
@@ -719,7 +720,8 @@ export {
     ChecklistItemArticulo,
     ChecklistEquipo,
     SolicitudCambio,
-    Configuracion
+    Configuracion,
+    AvisoWhatsApp
 };
 
 export default {
@@ -756,5 +758,6 @@ export default {
     ChecklistItemArticulo,
     ChecklistEquipo,
     SolicitudCambio,
-    Configuracion
+    Configuracion,
+    AvisoWhatsApp
 };
