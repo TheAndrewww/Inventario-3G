@@ -9,9 +9,21 @@
 import axios from 'axios';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-// Modelo de texto/visión (distinto al de generación de imágenes de artículos)
-const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
-const GEMINI_TEXT_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TEXT_MODEL}:generateContent`;
+
+// Modelos de texto/visión (distintos al de generación de imágenes de artículos).
+// Se prueban en orden: Google retira modelos para las llaves nuevas (gemini-2.5-flash
+// dejó de servir así) y los devuelve como "saturado" cuando hay pico de demanda, y en
+// ambos casos la lectura tronaba aunque la llave estuviera bien. El primero es un alias
+// que Google mantiene apuntando al flash vigente, así que no caduca.
+const MODELOS_TEXTO = [
+    process.env.GEMINI_TEXT_MODEL,
+    'gemini-flash-latest',
+    'gemini-3.5-flash',
+    'gemini-3.7-flash'
+].filter((m, i, todos) => m && todos.indexOf(m) === i);
+
+const urlModelo = (modelo) =>
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`;
 
 export const isLecturaFacturaEnabled = () => {
     if (!GEMINI_API_KEY) {
@@ -131,31 +143,47 @@ export const leerFacturaProveedor = async (imagenes, articulosOrden, aprendidos 
         }
     };
 
-    console.log(`📄 Leyendo factura con Gemini (${GEMINI_TEXT_MODEL}) · ${imagenes.length} foto(s)`);
+    console.log(`📄 Leyendo factura con Gemini · ${imagenes.length} foto(s)`);
 
     let response;
-    try {
-        response = await axios.post(
-            `${GEMINI_TEXT_URL}?key=${GEMINI_API_KEY}`,
-            payload,
-            { headers: { 'Content-Type': 'application/json' }, timeout: 90000 }
-        );
-    } catch (error) {
-        // Los errores de Gemini vienen en el cuerpo; sin esto el almacenista
-        // solo vería "Request failed with status code 400".
-        const detalle = error.response?.data?.error;
-        console.error('❌ Gemini rechazó la lectura:', JSON.stringify(detalle || error.message).substring(0, 300));
+    let ultimoError = null;
 
-        if (detalle?.reason === 'API_KEY_INVALID' || detalle?.message?.includes('API key not valid')) {
-            throw new Error('La llave de Gemini no es válida. Revisa GEMINI_API_KEY en el servidor.');
+    for (const modelo of MODELOS_TEXTO) {
+        try {
+            response = await axios.post(
+                `${urlModelo(modelo)}?key=${GEMINI_API_KEY}`,
+                payload,
+                { headers: { 'Content-Type': 'application/json' }, timeout: 90000 }
+            );
+            console.log(`📄 Leída con ${modelo}`);
+            break;
+        } catch (error) {
+            // Los errores de Gemini vienen en el cuerpo; sin esto el almacenista
+            // solo vería "Request failed with status code 400".
+            const detalle = error.response?.data?.error;
+            const status = error.response?.status;
+            console.error(`❌ Gemini (${modelo}) rechazó la lectura:`, JSON.stringify(detalle || error.message).substring(0, 300));
+
+            if (detalle?.reason === 'API_KEY_INVALID' || detalle?.message?.includes('API key not valid')) {
+                throw new Error('La llave de Gemini no es válida. Revisa GEMINI_API_KEY en el servidor.');
+            }
+            if (error.code === 'ECONNABORTED') {
+                throw new Error('La lectura de la factura tardó demasiado. Intenta con una foto más ligera.');
+            }
+
+            // Modelo retirado (404) o saturado (429/503): se intenta con el siguiente
+            ultimoError = { detalle, status, modelo };
+            if ([404, 429, 503].includes(status)) continue;
+
+            throw new Error(detalle?.message || 'No se pudo leer la factura con la IA');
         }
-        if (error.response?.status === 429) {
+    }
+
+    if (!response) {
+        if ([429, 503].includes(ultimoError?.status)) {
             throw new Error('Gemini está saturado en este momento. Intenta de nuevo en un minuto.');
         }
-        if (error.code === 'ECONNABORTED') {
-            throw new Error('La lectura de la factura tardó demasiado. Intenta con una foto más ligera.');
-        }
-        throw new Error(detalle?.message || 'No se pudo leer la factura con la IA');
+        throw new Error(ultimoError?.detalle?.message || 'No se pudo leer la factura con la IA');
     }
 
     const texto = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
