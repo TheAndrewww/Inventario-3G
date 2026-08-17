@@ -85,19 +85,73 @@ export const pedirAutorizacionOrden = async (orden) => {
     }
 };
 
-export const avisarComprasLlegoMaterial = async ({ proveedor, ticketOrden, folioFactura, articulos, sinIdentificar }) => {
+// Cuántos artículos se enumeran antes de resumir el resto: el grupo necesita
+// saber qué llegó, no leer una orden de 40 renglones en el celular.
+const MAX_ARTICULOS_EN_AVISO = 8;
+
+export const construirAvisoLlegoMaterial = ({
+    proveedor, ticketOrden, folioFactura, articulos, sinIdentificar, detalle = [], ventanaConteo = false
+}) => {
+    const mostrados = detalle.slice(0, MAX_ARTICULOS_EN_AVISO).map(a => {
+        const cantidad = parseFloat(a.cantidad) || 0;
+        const unidad = a.unidad ? ` ${a.unidad}` : '';
+        return `• ${a.nombre}: ${cantidad}${unidad}`;
+    });
+    const restantes = detalle.length - mostrados.length;
+
     const lineas = [
         `📦 *Llegó material* — ${proveedor || 'proveedor sin identificar'}`,
         `Orden: ${ticketOrden}`,
         folioFactura ? `Factura: ${folioFactura}` : null,
-        `Artículos registrados: ${articulos}`,
-        sinIdentificar > 0 ? `⚠️ ${sinIdentificar} renglón(es) quedaron sin identificar` : null,
         '',
-        'El conteo individual se hace durante los próximos 7 días; al cerrar se avisan los faltantes.'
+        ...(mostrados.length > 0 ? mostrados : [`Artículos registrados: ${articulos}`]),
+        restantes > 0 ? `…y ${restantes} artículo(s) más (${detalle.length} en total)` : null,
+        sinIdentificar > 0 ? `⚠️ ${sinIdentificar} renglón(es) quedaron sin identificar` : null,
+        ventanaConteo ? '' : null,
+        ventanaConteo
+            ? 'El conteo individual se hace durante los próximos 7 días; al cerrar se avisan los faltantes.'
+            : null
     ].filter(l => l !== null); // ojo: filter(Boolean) borraría también los renglones en blanco
 
-    return enviarWhatsApp(lineas.join('\n'));
+    return lineas.join('\n');
 };
+
+export const avisarComprasLlegoMaterial = async (datos) =>
+    enviarWhatsApp(construirAvisoLlegoMaterial(datos));
+
+/**
+ * Corte semanal de los conteos cíclicos: qué días de lunes a viernes se
+ * cumplieron. Sábado y domingo no cuentan, no se conta en fin de semana.
+ *
+ * @param {{periodo: string, dias: Array<{nombre: string, cumplio: boolean, contados: number, asignados: number, abierto: boolean}>}}
+ */
+export const construirReporteConteosCiclicos = ({ periodo, dias }) => {
+    const faltaron = dias.filter(d => !d.cumplio);
+
+    const lineas = [`🗓️ *Conteos cíclicos* — semana del ${periodo}`, ''];
+
+    if (faltaron.length === 0) {
+        lineas.push('✅ Conteos cíclicos completos');
+    } else {
+        const nombres = faltaron.map(d => d.nombre);
+        const listado = nombres.length === 1
+            ? nombres[0]
+            : `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}`;
+
+        lineas.push(`⚠️ Faltó el conteo cíclico del ${listado}`);
+        lineas.push('');
+        faltaron.forEach(d => {
+            lineas.push(d.abierto
+                ? `• ${d.nombre}: ${d.contados} de ${d.asignados} artículo(s)`
+                : `• ${d.nombre}: no se abrió el conteo`);
+        });
+    }
+
+    return lineas.join('\n');
+};
+
+export const avisarConteosCiclicosSemana = async (datos) =>
+    enviarWhatsApp(construirReporteConteosCiclicos(datos));
 
 export const avisarComprasFaltantes = async ({ proveedor, ticketOrden, faltantes, sobrantes }) => {
     const lineas = [
@@ -123,4 +177,10 @@ export const avisarComprasFaltantes = async ({ proveedor, ticketOrden, faltantes
     return enviarWhatsApp(lineas.join('\n'));
 };
 
-export default { isWhatsAppEnabled, enviarWhatsApp, avisarComprasLlegoMaterial, avisarComprasFaltantes };
+export default {
+    isWhatsAppEnabled,
+    enviarWhatsApp,
+    avisarComprasLlegoMaterial,
+    avisarComprasFaltantes,
+    avisarConteosCiclicosSemana
+};

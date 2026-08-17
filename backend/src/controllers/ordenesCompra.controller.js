@@ -2664,7 +2664,15 @@ export const recibirMercancia = async (req, res) => {
         ticketOrden: orden.ticket_id,
         folioFactura: req.body?.folio_factura || null,
         articulos: articulosRecibidos.length,
-        sinIdentificar: parseInt(req.body?.renglones_sin_identificar) || 0
+        sinIdentificar: parseInt(req.body?.renglones_sin_identificar) || 0,
+        // Qué llegó, no nada más cuántos renglones
+        detalle: articulosRecibidos.map(item => ({
+          nombre: item.detalle.articulo.nombre,
+          cantidad: item.cantidad_recibida,
+          unidad: item.detalle.articulo.unidad
+        })),
+        // La leyenda de los 7 días solo aplica si esta recepción dejó ventana de conteo
+        ventanaConteo: !!conteoHasta
       });
     } catch (waError) {
       console.error('Error al avisar por WhatsApp:', waError.message);
