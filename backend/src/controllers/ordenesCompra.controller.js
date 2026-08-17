@@ -2337,7 +2337,7 @@ export const recibirMercancia = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { articulos, observaciones_generales, fecha_recepcion } = req.body;
+    const { articulos, observaciones_generales, fecha_recepcion, origen } = req.body;
     const usuario_id = req.usuario.id;
 
     // Validaciones
@@ -2568,11 +2568,13 @@ export const recibirMercancia = async (req, res) => {
       nuevoEstado = 'parcial';
     }
 
-    // Al recibir por primera vez se abre la ventana de conteo: almacén tiene
-    // 7 días para contar pieza por pieza y reportar faltantes o sobrantes.
+    // La ventana de conteo (7 días para contar pieza por pieza y reclamar
+    // faltantes) solo aplica a la recepción por foto de factura: ahí se da por
+    // buena la factura sin contar. En la recepción manual el almacén ya contó
+    // al palomear cada artículo, así que no se deja nada pendiente de contar.
     const VENTANA_CONTEO_DIAS = 7;
     let conteoHasta = orden.conteo_hasta;
-    if (!conteoHasta) {
+    if (!conteoHasta && origen === 'factura') {
       conteoHasta = new Date();
       conteoHasta.setDate(conteoHasta.getDate() + VENTANA_CONTEO_DIAS);
     }

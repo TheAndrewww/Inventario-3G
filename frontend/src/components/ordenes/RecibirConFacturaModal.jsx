@@ -133,6 +133,8 @@ const RecibirConFacturaModal = ({ isOpen, onClose, orden, onSuccess }) => {
                 observaciones_generales: lectura?.factura?.folio
                     ? `Recepción por factura ${lectura.factura.folio}`
                     : 'Recepción por foto de factura',
+                // Solo esta vía abre la ventana de 7 días para contar y reclamar
+                origen: 'factura',
                 folio_factura: lectura?.factura?.folio || null,
                 renglones_sin_identificar: renglones.filter(r => !r.detalle_id).length
             });

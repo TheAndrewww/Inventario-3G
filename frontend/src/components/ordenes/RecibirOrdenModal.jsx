@@ -1,7 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { X, PackageCheck, AlertCircle, Info, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, PackageCheck, AlertCircle, Info, CheckCircle, Check, Pencil, MessageSquarePlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ordenesCompraService from '../../services/ordenesCompra.service';
+
+const formatCantidad = (n) => {
+  const v = parseFloat(n) || 0;
+  return Number.isInteger(v) ? v : parseFloat(v.toFixed(2));
+};
 
 const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
   const [articulos, setArticulos] = useState([]);
@@ -11,10 +16,12 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
   const [mostrarModalCompletar, setMostrarModalCompletar] = useState(false);
   const [motivoCompletar, setMotivoCompletar] = useState('');
   const [completando, setCompletando] = useState(false);
+  const inputsCantidad = useRef({});
 
   useEffect(() => {
     if (isOpen && orden) {
-      // Inicializar artículos con cantidad recibida en 0
+      // Cada renglón arranca sin palomear: el almacén confirma lo que sí llegó.
+      // modo: 'pendiente' (no llegó) | 'completo' (llegó lo pendiente) | 'otra' (cantidad a mano)
       const articulosIniciales = orden.detalles.map(detalle => ({
         detalle_id: detalle.id,
         articulo_id: detalle.articulo.id,
@@ -24,8 +31,10 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
         cantidad_solicitada: parseFloat(detalle.cantidad_solicitada),
         cantidad_ya_recibida: parseFloat(detalle.cantidad_recibida) || 0,
         cantidad_pendiente: parseFloat(detalle.cantidad_solicitada) - (parseFloat(detalle.cantidad_recibida) || 0),
-        cantidad_recibida: '', // Campo vacío por defecto
-        observaciones: ''
+        cantidad_recibida: '',
+        modo: 'pendiente',
+        observaciones: '',
+        mostrarNota: false
       }));
       setArticulos(articulosIniciales);
       setObservacionesGenerales('');
@@ -33,53 +42,110 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
     }
   }, [isOpen, orden]);
 
-  const handleCantidadChange = (detalleId, valor) => {
-    const valorNumerico = parseFloat(valor) || 0;
+  const actualizarArticulo = (detalleId, cambios) => {
+    setArticulos(prev => prev.map(art =>
+      art.detalle_id === detalleId ? { ...art, ...cambios } : art
+    ));
+  };
 
-    setArticulos(articulos.map(art => {
-      if (art.detalle_id === detalleId) {
-        // Validar que no exceda lo pendiente
-        const nuevosErrores = { ...errores };
+  const limpiarError = (detalleId) => {
+    setErrores(prev => {
+      if (!prev[detalleId]) return prev;
+      const nuevos = { ...prev };
+      delete nuevos[detalleId];
+      return nuevos;
+    });
+  };
 
-        if (valorNumerico > art.cantidad_pendiente) {
-          nuevosErrores[detalleId] = `Máximo permitido: ${art.cantidad_pendiente} ${art.unidad}`;
-        } else if (valorNumerico < 0) {
-          nuevosErrores[detalleId] = 'La cantidad debe ser mayor a 0';
-        } else {
-          delete nuevosErrores[detalleId];
-        }
+  // Palomear = llegó completo lo que faltaba de ese artículo
+  const marcarCompleto = (articulo) => {
+    if (articulo.cantidad_pendiente <= 0) return;
+    actualizarArticulo(articulo.detalle_id, {
+      modo: 'completo',
+      cantidad_recibida: articulo.cantidad_pendiente
+    });
+    limpiarError(articulo.detalle_id);
+  };
 
-        setErrores(nuevosErrores);
+  const togglePalomear = (articulo) => {
+    if (articulo.cantidad_pendiente <= 0) return;
 
-        return {
-          ...art,
-          cantidad_recibida: valor
-        };
+    if (articulo.modo === 'pendiente') {
+      marcarCompleto(articulo);
+    } else {
+      actualizarArticulo(articulo.detalle_id, { modo: 'pendiente', cantidad_recibida: '' });
+      limpiarError(articulo.detalle_id);
+    }
+  };
+
+  // Llegó una cantidad distinta: ahí sí se escribe a mano
+  const activarOtraCantidad = (articulo) => {
+    if (articulo.cantidad_pendiente <= 0) return;
+    actualizarArticulo(articulo.detalle_id, { modo: 'otra', cantidad_recibida: '' });
+    limpiarError(articulo.detalle_id);
+    setTimeout(() => inputsCantidad.current[articulo.detalle_id]?.focus(), 0);
+  };
+
+  const handleCantidadChange = (articulo, valor) => {
+    const valorNumerico = parseFloat(valor);
+
+    if (valor !== '' && !isNaN(valorNumerico)) {
+      if (valorNumerico > articulo.cantidad_pendiente) {
+        setErrores(prev => ({
+          ...prev,
+          [articulo.detalle_id]: `Máximo permitido: ${formatCantidad(articulo.cantidad_pendiente)} ${articulo.unidad}`
+        }));
+      } else if (valorNumerico < 0) {
+        setErrores(prev => ({ ...prev, [articulo.detalle_id]: 'La cantidad debe ser mayor a 0' }));
+      } else {
+        limpiarError(articulo.detalle_id);
       }
-      return art;
-    }));
+    } else {
+      limpiarError(articulo.detalle_id);
+    }
+
+    actualizarArticulo(articulo.detalle_id, { cantidad_recibida: valor });
+  };
+
+  const recibiblesIds = articulos.filter(a => a.cantidad_pendiente > 0).map(a => a.detalle_id);
+  const palomeados = articulos.filter(a => a.cantidad_pendiente > 0 && a.modo !== 'pendiente');
+  const todoPalomeado = recibiblesIds.length > 0 && palomeados.length === recibiblesIds.length;
+
+  // Recepción masiva: un clic marca toda la orden como recibida completa
+  const togglePalomearTodo = () => {
+    if (todoPalomeado) {
+      setArticulos(prev => prev.map(art =>
+        art.cantidad_pendiente > 0 ? { ...art, modo: 'pendiente', cantidad_recibida: '' } : art
+      ));
+      setErrores({});
+      return;
+    }
+
+    setArticulos(prev => prev.map(art =>
+      art.cantidad_pendiente > 0
+        ? { ...art, modo: 'completo', cantidad_recibida: art.cantidad_pendiente }
+        : art
+    ));
+    setErrores({});
   };
 
   const handleObservacionChange = (detalleId, valor) => {
-    setArticulos(articulos.map(art =>
-      art.detalle_id === detalleId ? { ...art, observaciones: valor } : art
-    ));
+    actualizarArticulo(detalleId, { observaciones: valor });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Filtrar solo artículos con cantidad recibida > 0
+    // Solo entra lo que se palomeó (o lo que se capturó con otra cantidad)
     const articulosConRecepcion = articulos.filter(art =>
-      parseFloat(art.cantidad_recibida) > 0
+      art.modo !== 'pendiente' && parseFloat(art.cantidad_recibida) > 0
     );
 
     if (articulosConRecepcion.length === 0) {
-      toast.error('Debes ingresar al menos una cantidad recibida');
+      toast.error('Palomea al menos un artículo para registrar la recepción');
       return;
     }
 
-    // Validar que no haya errores
     if (Object.keys(errores).length > 0) {
       toast.error('Corrige los errores antes de continuar');
       return;
@@ -94,7 +160,9 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
           cantidad_recibida: parseFloat(art.cantidad_recibida),
           observaciones: art.observaciones || null
         })),
-        observaciones_generales: observacionesGenerales || null
+        observaciones_generales: observacionesGenerales || null,
+        // Recepción contada a mano: no deja la orden pendiente de volver a contar
+        origen: 'manual'
       };
 
       const response = await ordenesCompraService.recibirMercancia(orden.id, data);
@@ -218,124 +286,227 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
             />
           </div>
           <div className="flex items-center justify-between mt-2 text-xs text-gray-600">
-            <span>Ya recibido: {progreso.totalYaRecibido}</span>
-            <span>Ahora: +{progreso.totalAhoraRecibido}</span>
-            <span>Total: {progreso.totalRecibido} / {progreso.totalSolicitado}</span>
+            <span>Ya recibido: {formatCantidad(progreso.totalYaRecibido)}</span>
+            <span>Ahora: +{formatCantidad(progreso.totalAhoraRecibido)}</span>
+            <span>Total: {formatCantidad(progreso.totalRecibido)} / {formatCantidad(progreso.totalSolicitado)}</span>
           </div>
         </div>
 
         {/* Contenido */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-4">
-            {/* Información importante */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-              <Info className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
-              <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">Instrucciones:</p>
-                <ul className="list-disc list-inside space-y-1 text-xs">
-                  <li>Ingresa la cantidad recibida para cada artículo</li>
-                  <li>Puedes recibir parcialmente (no es necesario recibir todo)</li>
-                  <li>No puedes exceder la cantidad pendiente de cada artículo</li>
-                  <li>Deja en blanco los artículos que no recibiste</li>
-                </ul>
+            {/* Recepción masiva: palomear toda la orden de un golpe */}
+            {hayArticulosPendientes && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <Info className="text-green-700 flex-shrink-0 mt-0.5" size={20} />
+                  <div className="text-sm text-green-900">
+                    <p className="font-medium">Palomea lo que llegó completo</p>
+                    <p className="text-xs text-green-800 mt-0.5">
+                      Solo escribes a mano cuando llegó una cantidad distinta a la solicitada.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={togglePalomearTodo}
+                  disabled={guardando}
+                  className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 ${
+                    todoPalomeado
+                      ? 'bg-white border border-green-600 text-green-700 hover:bg-green-100'
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
+                >
+                  <Check size={18} />
+                  {todoPalomeado ? 'Quitar todas las palomas' : 'Llegó todo completo'}
+                </button>
               </div>
-            </div>
+            )}
 
             {/* Lista de artículos */}
             <div className="space-y-3">
-              {articulos.map((articulo) => (
-                <div
-                  key={articulo.detalle_id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start gap-4 mb-3">
-                    {/* Imagen del artículo */}
-                    {articulo.imagen_url ? (
-                      <img
-                        src={articulo.imagen_url}
-                        alt={articulo.nombre}
-                        className="w-20 h-20 object-cover rounded-lg border border-gray-200 flex-shrink-0"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Crect x="3" y="3" width="18" height="18" rx="2" ry="2"%3E%3C/rect%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"%3E%3C/circle%3E%3Cpolyline points="21 15 16 10 5 21"%3E%3C/polyline%3E%3C/svg%3E';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-20 h-20 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                          <polyline points="21 15 16 10 5 21"></polyline>
-                        </svg>
-                      </div>
-                    )}
+              {articulos.map((articulo) => {
+                const yaCompleto = articulo.cantidad_pendiente <= 0;
+                const palomeado = articulo.modo === 'completo';
+                const otraCantidad = articulo.modo === 'otra';
+                const cantidadCapturada = parseFloat(articulo.cantidad_recibida) || 0;
 
-                    {/* Información del artículo */}
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 text-lg">
-                        {articulo.nombre}
-                      </h3>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
-                        <span>Solicitado: <span className="font-medium">{articulo.cantidad_solicitada} {articulo.unidad}</span></span>
-                        <span>Ya recibido: <span className="font-medium">{articulo.cantidad_ya_recibida} {articulo.unidad}</span></span>
-                        <span className="text-blue-600 font-medium">
-                          Pendiente: {articulo.cantidad_pendiente} {articulo.unidad}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                return (
+                  <div
+                    key={articulo.detalle_id}
+                    className={`border rounded-lg p-4 transition-all ${
+                      yaCompleto
+                        ? 'border-gray-200 bg-gray-50 opacity-70'
+                        : palomeado
+                          ? 'border-green-300 bg-green-50'
+                          : otraCantidad
+                            ? 'border-amber-300 bg-amber-50'
+                            : 'border-gray-200 hover:shadow-md'
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* Paloma: el clic principal de toda la pantalla */}
+                      <button
+                        type="button"
+                        onClick={() => togglePalomear(articulo)}
+                        disabled={guardando || yaCompleto}
+                        title={palomeado ? 'Quitar la paloma' : 'Llegó completo'}
+                        className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-colors disabled:cursor-not-allowed ${
+                          palomeado
+                            ? 'bg-green-600 border-green-600 text-white'
+                            : otraCantidad
+                              ? 'bg-amber-500 border-amber-500 text-white'
+                              : 'bg-white border-gray-300 text-transparent hover:border-green-500 hover:text-green-200'
+                        }`}
+                      >
+                        <Check size={26} strokeWidth={3} />
+                      </button>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Cantidad recibida */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Cantidad Recibida <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          value={articulo.cantidad_recibida}
-                          onChange={(e) => handleCantidadChange(articulo.detalle_id, e.target.value)}
-                          step="1"
-                          min="0"
-                          max={articulo.cantidad_pendiente}
-                          placeholder="0"
-                          disabled={guardando}
-                          className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-lg font-semibold text-center ${
-                            errores[articulo.detalle_id]
-                              ? 'border-red-300 focus:ring-red-500 bg-red-50'
-                              : 'border-gray-300 focus:ring-blue-500'
-                          }`}
+                      {/* Imagen del artículo */}
+                      {articulo.imagen_url ? (
+                        <img
+                          src={articulo.imagen_url}
+                          alt={articulo.nombre}
+                          className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Crect x="3" y="3" width="18" height="18" rx="2" ry="2"%3E%3C/rect%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"%3E%3C/circle%3E%3Cpolyline points="21 15 16 10 5 21"%3E%3C/polyline%3E%3C/svg%3E';
+                          }}
                         />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-                          {articulo.unidad}
-                        </span>
-                      </div>
-                      {errores[articulo.detalle_id] && (
-                        <div className="mt-1 flex items-center gap-1 text-red-600 text-xs">
-                          <AlertCircle size={14} />
-                          <span>{errores[articulo.detalle_id]}</span>
+                      ) : (
+                        <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center flex-shrink-0">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                          </svg>
                         </div>
                       )}
-                    </div>
 
-                    {/* Observaciones */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Observaciones (opcional)
-                      </label>
-                      <textarea
-                        value={articulo.observaciones}
-                        onChange={(e) => handleObservacionChange(articulo.detalle_id, e.target.value)}
-                        placeholder="Ej: Llegó dañado, embalaje deteriorado..."
-                        rows={2}
-                        disabled={guardando}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                      />
+                      {/* Información del artículo */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-lg truncate">
+                          {articulo.nombre}
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-600">
+                          <span>Solicitado: <span className="font-medium">{formatCantidad(articulo.cantidad_solicitada)} {articulo.unidad}</span></span>
+                          {articulo.cantidad_ya_recibida > 0 && (
+                            <span>Ya recibido: <span className="font-medium">{formatCantidad(articulo.cantidad_ya_recibida)} {articulo.unidad}</span></span>
+                          )}
+                          {!yaCompleto && (
+                            <span className="text-blue-600 font-medium">
+                              Falta: {formatCantidad(articulo.cantidad_pendiente)} {articulo.unidad}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Estado del renglón */}
+                        <div className="mt-2 flex flex-wrap items-center gap-3">
+                          {yaCompleto ? (
+                            <span className="text-sm text-gray-500 font-medium">Ya se recibió completo</span>
+                          ) : otraCantidad ? (
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <label className="text-sm font-medium text-gray-700">
+                                  Llegaron:
+                                </label>
+                                <div className="relative">
+                                  <input
+                                    ref={(el) => { inputsCantidad.current[articulo.detalle_id] = el; }}
+                                    type="number"
+                                    value={articulo.cantidad_recibida}
+                                    onChange={(e) => handleCantidadChange(articulo, e.target.value)}
+                                    step="0.01"
+                                    min="0"
+                                    max={articulo.cantidad_pendiente}
+                                    placeholder="0"
+                                    disabled={guardando}
+                                    className={`w-32 pl-3 pr-12 py-2 border rounded-lg focus:outline-none focus:ring-2 text-lg font-semibold text-center ${
+                                      errores[articulo.detalle_id]
+                                        ? 'border-red-300 focus:ring-red-500 bg-red-50'
+                                        : 'border-gray-300 focus:ring-blue-500'
+                                    }`}
+                                  />
+                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs">
+                                    {articulo.unidad}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => marcarCompleto(articulo)}
+                                  disabled={guardando}
+                                  className="text-sm text-green-700 hover:underline"
+                                >
+                                  Llegó completo
+                                </button>
+                              </div>
+                              {errores[articulo.detalle_id] && (
+                                <div className="mt-1 flex items-center gap-1 text-red-600 text-xs">
+                                  <AlertCircle size={14} />
+                                  <span>{errores[articulo.detalle_id]}</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : palomeado ? (
+                            <>
+                              <span className="text-sm font-semibold text-green-700 flex items-center gap-1">
+                                <CheckCircle size={16} />
+                                Llegó completo: {formatCantidad(cantidadCapturada)} {articulo.unidad}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => activarOtraCantidad(articulo)}
+                                disabled={guardando}
+                                className="text-sm text-gray-600 hover:text-blue-600 flex items-center gap-1"
+                              >
+                                <Pencil size={14} />
+                                Llegó otra cantidad
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-sm text-gray-500">Sin recibir</span>
+                              <button
+                                type="button"
+                                onClick={() => activarOtraCantidad(articulo)}
+                                disabled={guardando}
+                                className="text-sm text-gray-600 hover:text-blue-600 flex items-center gap-1"
+                              >
+                                <Pencil size={14} />
+                                Llegó otra cantidad
+                              </button>
+                            </>
+                          )}
+
+                          {!yaCompleto && !articulo.mostrarNota && (
+                            <button
+                              type="button"
+                              onClick={() => actualizarArticulo(articulo.detalle_id, { mostrarNota: true })}
+                              disabled={guardando}
+                              className="text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1"
+                            >
+                              <MessageSquarePlus size={14} />
+                              Nota
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Observaciones del renglón (solo si se piden) */}
+                        {articulo.mostrarNota && !yaCompleto && (
+                          <textarea
+                            value={articulo.observaciones}
+                            onChange={(e) => handleObservacionChange(articulo.detalle_id, e.target.value)}
+                            placeholder="Ej: Llegó dañado, embalaje deteriorado..."
+                            rows={2}
+                            disabled={guardando}
+                            className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Observaciones generales */}
@@ -373,6 +544,9 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
 
             {/* Botones de acción */}
             <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600 hidden sm:inline">
+                {palomeados.length} de {recibiblesIds.length} artículo(s) marcados
+              </span>
               <button
                 type="button"
                 onClick={onClose}
