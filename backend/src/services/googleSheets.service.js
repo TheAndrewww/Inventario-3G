@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import path from 'path';
+import { obtenerComentariosPorHoja, letraColumna } from './calendarioComentarios.service.js';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -170,6 +171,16 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
     const sheetData = response.data.sheets[0];
     const rowData = sheetData.data[0].rowData || [];
 
+    // Comentarios anclados a celdas de esta pestaña (motivo de las fallas).
+    // Si falla la lectura, el calendario se sirve igual, solo sin los motivos.
+    let comentariosHoja = {};
+    try {
+      const todos = await obtenerComentariosPorHoja();
+      comentariosHoja = todos[mes.toUpperCase()] || {};
+    } catch (e) {
+      console.warn('⚠️ No se pudieron leer los comentarios del calendario:', e.message);
+    }
+
     // Estructura para almacenar el calendario
     const calendario = {
       mes: mes,
@@ -295,6 +306,13 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
             const tipoProyecto = getTipoProyectoFromColor(backgroundColorProyecto);
             const equipoHora = getEquipoFromColor(backgroundColorHora);
 
+            // El rango leído arranca en A6, así que rowIndex 0 = fila 6 de la hoja
+            const filaHoja = rowIndex + 6;
+            const comentarioCelda =
+              comentariosHoja[`${letraColumna(colHora)}${filaHoja}`] ||
+              comentariosHoja[`${letraColumna(colProyecto)}${filaHoja}`] ||
+              null;
+
             // Parsear el proyecto (formato: "NOMBRE / CLIENTE" o "NOMBRE")
             const partes = nombreProyecto.split('/').map(p => p.trim());
             const nombre = partes[0];
@@ -335,7 +353,8 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
               nombreDia: dia.nombre,
               // Comentario de la celda: cuando la hora se marca en rojo (FALLA)
               // ahí se escribe el motivo por el que hay que reprogramar.
-              nota: cellHora?.note || cellProyecto?.note || null
+              nota: comentarioCelda?.texto || cellHora?.note || cellProyecto?.note || null,
+              notaResuelta: comentarioCelda?.resuelto || false
             };
 
             dia.proyectos.push(proyecto);
