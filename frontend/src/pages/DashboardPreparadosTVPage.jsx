@@ -152,7 +152,7 @@ const DashboardPreparadosTVPage = () => {
 
                     <div className="pb-20" style={{ gap: px(16), display: 'flex', flexDirection: 'column' }}>
                         {proyectosPreparados.map(proyecto => (
-                            <ProyectoTimeline key={proyecto.id} proyecto={proyecto} />
+                            <ProyectoTimeline key={proyecto.id} proyecto={proyecto} modoPreparados />
                         ))}
                         {proyectosPreparados.length === 0 && (
                             <div className="text-center text-gray-500 font-bold" style={{ padding: px(80), fontSize: `calc(1.5rem * var(--escala, 1))` }}>

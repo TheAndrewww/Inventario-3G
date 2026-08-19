@@ -364,7 +364,7 @@ export const matchNombre = (nombreA, nombreB) => {
  * quedó con texto residual, las fechas tienen un hueco → se usa el bloque más
  * reciente (la cita real).
  */
-const inicioUltimoBloque = (fechasAsc) => {
+const rangoUltimoBloque = (fechasAsc) => {
     if (!fechasAsc.length) return null;
     const toUTC = (s) => { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d); };
     const UN_DIA = 86400000;
@@ -373,15 +373,16 @@ const inicioUltimoBloque = (fechasAsc) => {
         const diff = (toUTC(fechasAsc[i]) - toUTC(fechasAsc[i - 1])) / UN_DIA;
         if (diff > 1) inicioBloque = fechasAsc[i]; // hueco → arranca un bloque nuevo
     }
-    return inicioBloque;
+    // El bloque más reciente termina siempre en la última fecha de la lista.
+    return { inicio: inicioBloque, fin: fechasAsc[fechasAsc.length - 1] };
 };
 
 // Construye un mapa { nombreNormalizado → Set(fechas ISO) } a partir de una
 // lista de citas del calendario. Usa la fecha REAL resuelta por el backend
 // (`cp.fecha`), que maneja las semanas cruzadas entre meses (ej. el 29 que vive
 // en la pestaña de JULIO pero pertenece a JUNIO). Fallback a mes+dia.
-const construirFechasPorNombre = (calendarioProyectos, anio, mes) => {
-    const fechasPorNombre = {};
+const construirCitasPorNombre = (calendarioProyectos, anio, mes) => {
+    const citasPorNombre = {};
     (calendarioProyectos || []).forEach(cp => {
         if (!cp.nombre) return;
         const key = normalizarNombre(cp.nombre);
@@ -393,20 +394,37 @@ const construirFechasPorNombre = (calendarioProyectos, anio, mes) => {
             fecha = `${anio}-${String(mes).padStart(2, '0')}-${String(cp.dia).padStart(2, '0')}`;
         }
         if (!fecha) return;
-        (fechasPorNombre[key] = fechasPorNombre[key] || new Set()).add(fecha);
+        const lista = (citasPorNombre[key] = citasPorNombre[key] || []);
+        if (lista.some(c => c.fecha === fecha)) return; // misma fecha repetida
+        lista.push({
+            fecha,
+            // La hora en rojo oscuro = FALLA en la instalación (hay que reprogramar)
+            falla: cp.equipoHora === 'FALLA',
+            nota: cp.nota || null
+        });
     });
-    return fechasPorNombre;
+    return citasPorNombre;
 };
 
 // Busca la cita de un proyecto (por match de nombre ≥80%) y devuelve la fecha de
 // instalación (inicio del último bloque de días contiguos), o null si no hay match.
-const buscarFechaInstalacion = (nombreProd, fechasPorNombre, nombresCalendario) => {
+const buscarFechaInstalacion = (nombreProd, citasPorNombre, nombresCalendario) => {
     for (const nombreCal of nombresCalendario) {
         if (matchNombre(nombreProd, nombreCal)) {
-            const fechas = [...fechasPorNombre[nombreCal]].sort(); // ISO → orden cronológico
-            const fechaInstalacionStr = inicioUltimoBloque(fechas);
-            if (!fechaInstalacionStr) return null;
-            return { fechaInstalacionStr, nombreCal };
+            const citas = [...citasPorNombre[nombreCal]].sort((a, b) => a.fecha.localeCompare(b.fecha));
+            const rango = rangoUltimoBloque(citas.map(c => c.fecha));
+            if (!rango) return null;
+            // Solo interesa el estado del bloque más reciente: si una instalación
+            // vieja falló y ya se reprogramó, manda la cita nueva.
+            const citasBloque = citas.filter(c => c.fecha >= rango.inicio && c.fecha <= rango.fin);
+            const citaFalla = citasBloque.find(c => c.falla);
+            return {
+                fechaInstalacionStr: rango.inicio,
+                fechaFinInstalacionStr: rango.fin,
+                nombreCal,
+                falla: !!citaFalla,
+                nota: citaFalla?.nota || citasBloque.find(c => c.nota)?.nota || null
+            };
         }
     }
     return null;
@@ -423,6 +441,43 @@ const fechaLimiteDesdeInstalacion = (fechaInstalacionStr) => {
 };
 
 /**
+ * Estado de cierre de un proyecto que ya está en Preparados.
+ *
+ * Regla de negocio: un proyecto sigue en Preparados mientras el calendario le dé
+ * días de instalación. En cuanto pasa el ÚLTIMO día de su cita (ej. instalación
+ * del 17 al 20 → el 21), el proyecto ya salió de instalación y hay que cerrarlo:
+ * se enmarca en rojo.
+ *
+ * Excepción: si esa última cita quedó marcada como FALLA (hora en rojo oscuro en
+ * el calendario), la instalación no terminó bien y hay que reprogramarla, así que
+ * NO se pide cerrar; se avisa la falla con el comentario de la celda. Cuando se
+ * agenda la cita nueva y esa fecha pasa, entonces sí toca cerrar.
+ *
+ * @returns {{debeCerrar: boolean, falla: boolean, nota: string|null, diasDesde: number}}
+ */
+export const getEstadoCierrePreparado = (proyecto) => {
+    const vacio = { debeCerrar: false, falla: false, nota: null, diasDesde: 0 };
+    if (!proyecto || proyecto.pausado) return vacio;
+
+    const fin = proyecto._fechaFinInstalacion;
+    if (!fin) return vacio;
+
+    // La última cita falló → espera reprogramación, no cierre (se avisa desde el
+    // mismo día en que se marca la falla en el calendario).
+    if (proyecto._fallaInstalacion) {
+        return { debeCerrar: false, falla: true, nota: proyecto._notaFalla || null, diasDesde: 0 };
+    }
+
+    const hoy = getHoyStr();
+    if (hoy <= fin) return vacio; // la instalación sigue en curso o está por venir
+
+    const toUTC = (str) => { const [y, m, d] = str.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+    const diasDesde = Math.round((toUTC(hoy) - toUTC(fin)) / 86400000);
+
+    return { debeCerrar: true, falla: false, nota: proyecto._notaFalla || null, diasDesde };
+};
+
+/**
  * Aplica fechas del calendario como fecha_limite a los proyectos de producción.
  * Para cada proyecto del calendario, busca un match de nombre (≥80%) en la lista de producción.
  * Si encuentra match, overridea fecha_limite con (fecha de instalación - 1 día hábil).
@@ -434,22 +489,42 @@ const fechaLimiteDesdeInstalacion = (fechaInstalacionStr) => {
  * @param {Array} calendarioFuturos - Citas de meses futuros. SOLO se usan para
  *        proyectos cuyo Índice NO trae fecha máxima (col D vacía / "-"), para no
  *        dejarlos con un residuo viejo cuando su cita real vive en un mes posterior.
+ * @param {Array} calendarioPasados - Citas de meses anteriores. NO alteran fecha_limite;
+ *        solo alimentan el estado de cierre (_fechaFinInstalacion) para que un
+ *        proyecto instalado el mes pasado y nunca cerrado se siga detectando.
  * @returns {Array} Proyectos con fecha_limite actualizada donde corresponde
  */
-export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, mes, calendarioFuturos = []) => {
+export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, mes, calendarioFuturos = [], calendarioPasados = []) => {
     if (!proyectos?.length) return proyectos;
 
-    const fechasPorNombre = construirFechasPorNombre(calendarioProyectos, anio, mes);
+    const fechasPorNombre = construirCitasPorNombre(calendarioProyectos, anio, mes);
     const nombresCalendario = Object.keys(fechasPorNombre);
 
-    const fechasFuturasPorNombre = construirFechasPorNombre(calendarioFuturos, anio, mes);
+    const fechasFuturasPorNombre = construirCitasPorNombre(calendarioFuturos, anio, mes);
     const nombresFuturos = Object.keys(fechasFuturasPorNombre);
 
-    if (nombresCalendario.length === 0 && nombresFuturos.length === 0) return proyectos;
+    // Universo completo de citas (pasadas + actuales + futuras) SOLO para calcular
+    // el estado de cierre del dashboard de Preparados. No toca fecha_limite.
+    const citasCierre = construirCitasPorNombre(
+        [...(calendarioPasados || []), ...(calendarioProyectos || []), ...(calendarioFuturos || [])],
+        anio, mes
+    );
+    const nombresCierre = Object.keys(citasCierre);
+
+    if (nombresCalendario.length === 0 && nombresFuturos.length === 0 && nombresCierre.length === 0) return proyectos;
 
     return proyectos.map(p => {
         const nombreProd = normalizarNombre(p.nombre);
         if (!nombreProd) return p;
+
+        // Metadata de cierre: último bloque de días que el calendario le dio a
+        // este proyecto, y si esa última cita quedó marcada como FALLA.
+        const cierre = buscarFechaInstalacion(nombreProd, citasCierre, nombresCierre);
+        const metaCierre = cierre ? {
+            _fechaFinInstalacion: cierre.fechaFinInstalacionStr,
+            _fallaInstalacion: cierre.falla,
+            _notaFalla: cierre.nota
+        } : {};
 
         const fechaIndice = p.fecha_limite_original || p.fecha_limite;
 
@@ -467,11 +542,11 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
             const { fechaInstalacionStr, nombreCal } = match;
             if (!soloCalendario && fechaIndice && fechaInstalacionStr > fechaIndice) {
                 console.log(`   ⏩ ÍNDICE MANDA: prod="${nombreProd}" cal=${fechaInstalacionStr} es posterior a entrega=${fechaIndice} → se respeta el índice`);
-                return p;
+                return { ...p, ...metaCierre };
             }
             const nuevaFechaLimite = fechaLimiteDesdeInstalacion(fechaInstalacionStr);
             console.log(`   ✅ CALENDARIO MANDA: prod="${nombreProd}" ↔ cal="${nombreCal}" → instalación=${fechaInstalacionStr} (antes de entrega=${fechaIndice || 'N/A'}) → fecha_limite=${nuevaFechaLimite}`);
-            return { ...p, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
+            return { ...p, ...metaCierre, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
         }
 
         // 2) Citas de meses futuros: cuando el Índice NO trae fecha máxima, o
@@ -484,10 +559,10 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
                 const { fechaInstalacionStr, nombreCal } = matchFut;
                 const nuevaFechaLimite = fechaLimiteDesdeInstalacion(fechaInstalacionStr);
                 console.log(`   ✅ CALENDARIO FUTURO MANDA (índice sin fecha): prod="${nombreProd}" ↔ cal="${nombreCal}" → instalación=${fechaInstalacionStr} → fecha_limite=${nuevaFechaLimite}`);
-                return { ...p, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
+                return { ...p, ...metaCierre, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
             }
         }
 
-        return p;
+        return { ...p, ...metaCierre };
     });
 };

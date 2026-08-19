@@ -332,7 +332,10 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
                 blue: Math.round((backgroundColorHora.blue || 0) * 255)
               } : null,
               dia: dia.numero,
-              nombreDia: dia.nombre
+              nombreDia: dia.nombre,
+              // Comentario de la celda: cuando la hora se marca en rojo (FALLA)
+              // ahí se escribe el motivo por el que hay que reprogramar.
+              nota: cellHora?.note || cellProyecto?.note || null
             };
 
             dia.proyectos.push(proyecto);

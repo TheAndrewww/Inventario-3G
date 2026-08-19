@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { px, calcularDiasPorEtapa, esProyectoMTO, esUrgenteMTO } from '../../utils/produccion';
+import { px, s as escalar, calcularDiasPorEtapa, esProyectoMTO, esUrgenteMTO, getEstadoCierrePreparado } from '../../utils/produccion';
 import { ETAPAS_CONFIG, getColorPorTipo, usaTimelineSimplificado } from './constants';
 import TimelineHeader from './TimelineHeader';
 import TimelineStepper from './TimelineStepper';
@@ -16,8 +16,17 @@ export { ETAPAS_ORDEN } from './constants';
  * @param {object}   props.proyecto    - Datos del proyecto
  * @param {function} props.onCompletar - Callback para avanzar etapa (opcional)
  * @param {function} props.onTogglePausa - Callback para pausar/reanudar (opcional)
+ * @param {boolean}  props.modoPreparados - Vista de Preparados: marca en rojo los
+ *        proyectos cuya instalación ya terminó según el calendario (hay que
+ *        cerrarlos) y avisa cuando la última cita quedó marcada como FALLA.
  */
-const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa }) => {
+const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, modoPreparados = false }) => {
+    // Estado de cierre (solo aplica en la vista de Preparados)
+    const estadoCierre = useMemo(
+        () => (modoPreparados ? getEstadoCierrePreparado(proyecto) : { debeCerrar: false, falla: false, nota: null, diasDesde: 0 }),
+        [modoPreparados, proyecto._fechaFinInstalacion, proyecto._fallaInstalacion, proyecto._notaFalla, proyecto.pausado]
+    );
+
     // Memoizar cálculos de estilo del contenedor
     const containerStyles = useMemo(() => {
         const diasRestantes = proyecto.diasRestantes;
@@ -66,16 +75,33 @@ const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePaus
         const bgFinal = mostrarComoRetraso ? 'bg-red-50' : colorTipo.bg;
         const borderFinal = mostrarComoRetraso ? 'border-l-4 border-red-500' : colorTipo.border;
 
+        // Preparados: la instalación ya pasó según el calendario → hay que cerrar
+        // el proyecto. Se enmarca en rojo aunque la etapa sea 'instalacion'.
+        const marcoCierre = estadoCierre.debeCerrar
+            ? 'ring-2 ring-red-500'
+            : (estadoCierre.falla ? 'ring-2 ring-amber-500' : '');
+
         return {
-            className: `${bgFinal} ${borderFinal} overflow-hidden transition-all ${esUrgente ? 'ring-2 ring-red-400' : ''} rounded-lg shadow-sm`,
+            className: `${bgFinal} ${borderFinal} overflow-hidden transition-all ${marcoCierre || (esUrgente ? 'ring-2 ring-red-400' : '')} rounded-lg shadow-sm`,
             style: { marginBottom: px(4) },
             isPaused: false
         };
-    }, [proyecto.diasRestantes, proyecto.tipo_proyecto, proyecto.estadoRetraso, proyecto.prioridad, proyecto.pausado, proyecto.etapa_actual]);
+    }, [proyecto.diasRestantes, proyecto.tipo_proyecto, proyecto.estadoRetraso, proyecto.prioridad, proyecto.pausado, proyecto.etapa_actual, estadoCierre]);
 
     return (
         <div className={containerStyles.className} style={containerStyles.style}>
             <TimelineHeader proyecto={proyecto} isPaused={containerStyles.isPaused} />
+            {estadoCierre.falla && (
+                <div
+                    className="bg-amber-100 border-y border-amber-300 text-amber-900 font-semibold"
+                    style={{ padding: `${px(4)} ${px(12)}`, fontSize: escalar(0.8) }}
+                >
+                    ⚠️ FALLA EN INSTALACIÓN · reprogramar
+                    {estadoCierre.nota && (
+                        <span className="font-normal"> — {estadoCierre.nota}</span>
+                    )}
+                </div>
+            )}
             <TimelineStepper proyecto={proyecto} isPaused={containerStyles.isPaused} />
             <TimelineFooter proyecto={proyecto} onCompletar={onCompletar} onRegresar={onRegresar} onTogglePausa={onTogglePausa} isPaused={containerStyles.isPaused} onCompletarSubEtapa={onCompletarSubEtapa} onToggleEtapa={onToggleEtapa} />
         </div>

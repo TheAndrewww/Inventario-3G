@@ -63,6 +63,20 @@ export const useProduccionData = ({
                     console.warn('⚠️ No se pudo cargar la cola del mes siguiente:', e.message);
                 }
 
+                // Citas del mes anterior: NO cambian fecha_limite, solo sirven para
+                // detectar proyectos que ya se instalaron el mes pasado y siguen
+                // colgados en Preparados sin cerrar (al cambiar de pestaña se
+                // perderían de vista).
+                let citasPasadas = [];
+                try {
+                    const MESES_NOMBRES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+                    const mesIdx0 = mexicoTime.getMonth();
+                    const prevResp = await obtenerCalendarioMesPublico(MESES_NOMBRES[(mesIdx0 + 11) % 12]);
+                    citasPasadas = (prevResp?.data?.proyectos || []).filter(cp => cp.mesIndex !== mesIdx0);
+                } catch (e) {
+                    console.warn('⚠️ No se pudo cargar el calendario del mes anterior:', e.message);
+                }
+
                 // Guardar la fecha original (usar la que ya tenía si es re-aplicación)
                 let result = proys.map(p => ({
                     ...p,
@@ -72,7 +86,7 @@ export const useProduccionData = ({
                     _fechaCalendario: false
                 }));
 
-                result = aplicarFechasCalendario(result, citas, anio, mes, citasFuturas);
+                result = aplicarFechasCalendario(result, citas, anio, mes, citasFuturas, citasPasadas);
 
                 // Recalcular diasRestantes para proyectos con fecha del calendario
                 const hoy = getHoyStr();
