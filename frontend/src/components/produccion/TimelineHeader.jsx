@@ -7,7 +7,7 @@ import { ETAPAS_CONFIG, getColorPorTipo, calcularPorcentaje, usaTimelineSimplifi
  * Header de la tarjeta de proyecto
  * Muestra: badges, nombre, cliente y círculo de progreso
  */
-const TimelineHeader = memo(({ proyecto }) => {
+const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
     const diasRestantes = proyecto.diasRestantes;
     const esGarantia = proyecto.tipo_proyecto?.toUpperCase() === 'GTIA';
     const esMTO = proyecto.tipo_proyecto?.toUpperCase() === 'MTO';
@@ -102,16 +102,39 @@ const TimelineHeader = memo(({ proyecto }) => {
                     </span>
                 </div>
 
-                {/* Nombre y cliente */}
-                <h3 className="font-bold text-gray-900 leading-tight truncate" style={{ fontSize: s(1.8) }}>
-                    {proyecto.nombre}
-                </h3>
+                {/* Nombre y cliente. Con onAbrirCarpeta, abren la carpeta de Drive. */}
+                {onAbrirCarpeta ? (
+                    <button
+                        type="button"
+                        onClick={onAbrirCarpeta}
+                        title="Ver la carpeta de producción de este proyecto"
+                        className="text-left w-full rounded hover:bg-black/5 transition-colors cursor-pointer"
+                        style={{ minWidth: 0 }}
+                    >
+                        <h3 className="font-bold text-gray-900 leading-tight truncate" style={{ fontSize: s(1.8) }}>
+                            {proyecto.nombre}
+                        </h3>
 
-                {proyecto.cliente && (
-                    <p className="text-gray-500 flex items-center" style={{ marginTop: px(8), fontSize: s(1.5), gap: px(6) }}>
-                        <User style={{ width: s(1.4), height: s(1.4) }} className="text-gray-400" />
-                        {proyecto.cliente}
-                    </p>
+                        {proyecto.cliente && (
+                            <p className="text-gray-500 flex items-center" style={{ marginTop: px(8), fontSize: s(1.5), gap: px(6) }}>
+                                <User style={{ width: s(1.4), height: s(1.4) }} className="text-gray-400" />
+                                {proyecto.cliente}
+                            </p>
+                        )}
+                    </button>
+                ) : (
+                    <>
+                        <h3 className="font-bold text-gray-900 leading-tight truncate" style={{ fontSize: s(1.8) }}>
+                            {proyecto.nombre}
+                        </h3>
+
+                        {proyecto.cliente && (
+                            <p className="text-gray-500 flex items-center" style={{ marginTop: px(8), fontSize: s(1.5), gap: px(6) }}>
+                                <User style={{ width: s(1.4), height: s(1.4) }} className="text-gray-400" />
+                                {proyecto.cliente}
+                            </p>
+                        )}
+                    </>
                 )}
             </div>
 

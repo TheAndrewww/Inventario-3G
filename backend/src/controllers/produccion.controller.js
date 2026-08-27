@@ -799,6 +799,10 @@ export const previewProyectosSheets = async (req, res) => {
 // ===== ENDPOINTS DE GOOGLE DRIVE =====
 
 import googleDriveService from '../services/googleDrive.service.js';
+import {
+    listarArchivosProduccion,
+    obtenerArchivoProduccion
+} from '../services/driveProduccion.service.js';
 
 /**
  * GET /api/produccion/:id/archivos
@@ -956,5 +960,134 @@ export const sincronizarTodosDrive = async (req, res) => {
             message: 'Error en sincronización masiva',
             error: error.message
         });
+    }
+};
+
+/**
+ * GET /api/produccion/:id/carpeta
+ * Contenido de la carpeta de PRODUCCION del proyecto: planos de manufactura y
+ * herrería, tickets de almacén y lo demás que haya, agrupado por categoría.
+ *
+ * Es lo que ve almacén/calidad al dar click a un proyecto en el dashboard.
+ * Quedan fuera el pedido, lo que trae importes y los formatos de cierre.
+ */
+export const obtenerCarpetaProduccion = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const proyecto = await ProduccionProyecto.findByPk(id);
+
+        if (!proyecto) {
+            return res.status(404).json({
+                success: false,
+                message: 'Proyecto no encontrado'
+            });
+        }
+
+        // Si todavía no se le conoce carpeta, se intenta ubicar en Drive.
+        if (!proyecto.drive_folder_id) {
+            const resultado = await googleDriveService.sincronizarProyecto(proyecto);
+            if (resultado.success) await proyecto.reload();
+        }
+
+        const datosProyecto = {
+            id: proyecto.id,
+            nombre: proyecto.nombre,
+            cliente: proyecto.cliente,
+            descripcion: proyecto.descripcion,
+            tipo_proyecto: proyecto.tipo_proyecto,
+            etapa_actual: proyecto.etapa_actual,
+            fecha_limite: proyecto.fecha_limite,
+            fecha_entrada: proyecto.fecha_entrada,
+            pausado: proyecto.pausado,
+            pausado_motivo: proyecto.pausado_motivo,
+            es_premium: proyecto.es_premium,
+            es_extensivo: proyecto.es_extensivo,
+            tiene_manufactura: proyecto.tiene_manufactura,
+            tiene_herreria: proyecto.tiene_herreria,
+            manufactura_completado: proyecto.manufactura_completado,
+            herreria_completado: proyecto.herreria_completado,
+            drive_sync_at: proyecto.drive_sync_at
+        };
+
+        if (!proyecto.drive_folder_id) {
+            return res.json({
+                success: true,
+                data: {
+                    proyecto: datosProyecto,
+                    carpeta: null,
+                    archivos: [],
+                    ocultos: 0,
+                    mensaje: 'Este proyecto todavía no tiene carpeta en Drive'
+                }
+            });
+        }
+
+        const { archivos, ocultos } = await listarArchivosProduccion(proyecto.drive_folder_id);
+
+        res.json({
+            success: true,
+            data: {
+                proyecto: datosProyecto,
+                carpeta: {
+                    id: proyecto.drive_folder_id,
+                    nombre: proyecto.nombre,
+                    link: `https://drive.google.com/drive/folders/${proyecto.drive_folder_id}`
+                },
+                archivos,
+                ocultos
+            }
+        });
+    } catch (error) {
+        console.error('Error al obtener la carpeta de producción:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener la carpeta del proyecto',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * GET /api/produccion/carpeta/archivo/:archivoId
+ * Servir un archivo de la carpeta de producción, solo para verlo (nunca como
+ * descarga). El servicio valida que cuelgue de PRODUCCION y que no sea excluido.
+ */
+export const obtenerArchivoCarpetaProduccion = async (req, res) => {
+    try {
+        const { archivoId } = req.params;
+
+        const archivo = await obtenerArchivoProduccion(archivoId);
+
+        if (!archivo) {
+            return res.status(404).json({
+                success: false,
+                message: 'Archivo no disponible'
+            });
+        }
+
+        res.setHeader('Content-Type', archivo.mimeType || 'application/octet-stream');
+        res.setHeader(
+            'Content-Disposition',
+            `inline; filename*=UTF-8''${encodeURIComponent(archivo.nombre)}`
+        );
+        res.setHeader('Cache-Control', 'private, max-age=300');
+
+        archivo.stream.on('error', (error) => {
+            console.error('Error al transmitir archivo de producción:', error);
+            if (!res.headersSent) res.status(500).end();
+            else res.end();
+        });
+
+        archivo.stream.pipe(res);
+    } catch (error) {
+        console.error('Error en obtenerArchivoCarpetaProduccion:', error);
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                message: 'Error al obtener el archivo',
+                error: error.message
+            });
+        }
     }
 };

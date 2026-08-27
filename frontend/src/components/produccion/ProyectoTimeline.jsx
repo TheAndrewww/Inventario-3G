@@ -16,11 +16,13 @@ export { ETAPAS_ORDEN } from './constants';
  * @param {object}   props.proyecto    - Datos del proyecto
  * @param {function} props.onCompletar - Callback para avanzar etapa (opcional)
  * @param {function} props.onTogglePausa - Callback para pausar/reanudar (opcional)
+ * @param {Function} props.onAbrirCarpeta - Si se pasa, el nombre del proyecto
+ *                   abre la carpeta de Drive (dashboard de producción).
  * @param {boolean}  props.modoPreparados - Vista de Preparados: marca en rojo los
  *        proyectos cuya instalación ya terminó según el calendario (hay que
  *        cerrarlos) y avisa cuando la última cita quedó marcada como FALLA.
  */
-const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, modoPreparados = false }) => {
+const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, onAbrirCarpeta, modoPreparados = false }) => {
     // Estado de cierre (solo aplica en la vista de Preparados)
     const estadoCierre = useMemo(
         () => (modoPreparados ? getEstadoCierrePreparado(proyecto) : { debeCerrar: false, falla: false, nota: null, diasDesde: 0 }),
@@ -90,7 +92,7 @@ const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePaus
 
     return (
         <div className={containerStyles.className} style={containerStyles.style}>
-            <TimelineHeader proyecto={proyecto} isPaused={containerStyles.isPaused} />
+            <TimelineHeader proyecto={proyecto} isPaused={containerStyles.isPaused} onAbrirCarpeta={onAbrirCarpeta} />
             {estadoCierre.falla && (
                 <div
                     className="bg-amber-100 border-y border-amber-300 text-amber-900 font-semibold"

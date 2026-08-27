@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ID de la carpeta raíz PRODUCCION en Google Drive
-const PRODUCCION_FOLDER_ID = '1CsvTpQCIYpgnYn9dJoj9HqGYO-nInsok';
+export const PRODUCCION_FOLDER_ID = '1CsvTpQCIYpgnYn9dJoj9HqGYO-nInsok';
 
 // Token OAuth para ESCRITURA (subir tickets).
 // Ver más abajo (authenticateEscritura) por qué la cuenta de servicio no sirve.

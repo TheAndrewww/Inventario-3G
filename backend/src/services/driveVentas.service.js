@@ -19,6 +19,19 @@
  * depender del refresh token.
  */
 import { authenticate, authenticateEscritura } from './googleDrive.service.js';
+import {
+    PATRONES_DINERO,
+    PATRONES_CIERRE,
+    PATRONES_TICKET,
+    crearFiltro,
+    normalizar,
+    listarHijos,
+    listarArchivos,
+    obtenerArchivo,
+    getCache,
+    setCache,
+    limpiarCache
+} from './driveCarpetas.service.js';
 
 // ID de la carpeta raíz de VENTAS en Drive (Mi unidad / 2026 / VENTAS).
 // Se puede sobrescribir con la variable de entorno VENTAS_FOLDER_ID.
@@ -33,29 +46,8 @@ const MAX_PROFUNDIDAD = 3;
 // al listar sus archivos (p.ej. PROYECTO/FOTOS/foto1.jpg).
 const MAX_PROFUNDIDAD_ARCHIVOS = 2;
 
-// Caché en memoria para no golpear la API de Drive en cada click.
-const TTL_CACHE_MS = 5 * 60 * 1000;
-const cache = new Map();
-
-// Devuelve undefined si no hay nada cacheado. Se distingue de null a propósito:
-// null es un resultado válido ("este proyecto no tiene carpeta") y también se
-// cachea, para no repetir el barrido de Drive en cada click.
-const getCache = (clave) => {
-    const entrada = cache.get(clave);
-    if (!entrada) return undefined;
-    if (Date.now() - entrada.ts > TTL_CACHE_MS) {
-        cache.delete(clave);
-        return undefined;
-    }
-    return entrada.valor;
-};
-
-const setCache = (clave, valor) => {
-    cache.set(clave, { ts: Date.now(), valor });
-};
-
 export const limpiarCacheVentas = () => {
-    cache.clear();
+    limpiarCache();
     clienteDrive = null;
 };
 
@@ -110,52 +102,15 @@ const obtenerDrive = async () => {
 };
 
 /**
- * Patrones de archivos que NUNCA se muestran a almacén/calidad.
- * Dos motivos distintos, misma lista:
- *   - el pedido y todo lo que trae importes;
- *   - los formatos de cierre (carta garantía, control de calidad, checks), que
- *     el jefe pidió dejar fuera de esta vista.
+ * Qué se oculta en la carpeta de ventas: el pedido y el dinero, los formatos de
+ * cierre y también los tickets (esos se consultan en el dashboard de producción,
+ * no aquí).
  */
-const PATRONES_EXCLUIDOS = [
-    // Pedido y documentos con dinero
-    /\bPEDIDO/,
-    /\bCOTIZA/,          // COTIZACION, COTIZACIÓN, COTIZ
-    /\bPRECIO/,
-    /\bANTICIPO/,
-    /\bCONTRATO/,
-    /\bFACTURA/,
-    /\bTICKET/,
-    /\bPAGO/,
-    /\bCOMPROBANTE/,
-    /\bDEPOSITO/,
-    /\bLIQUIDACION/,
-    /\bPRESUPUESTO/,
-    /\bREMISION/,
-
-    // Formatos de cierre
-    /\bGARANTIA/,        // GARANTIA, CARTA GARANTIA, CARTA DE GARANTIA
-    /\bGTIA/,
-    /\bCALIDAD/,         // CONTROL DE CALIDAD, FORMATO DE CALIDAD
-    /\bCHECK/            // CHECK, CHECKLIST, CHECK LIST
-];
-
-const normalizar = (texto = '') =>
-    texto
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toUpperCase()
-        .replace(/\s+/g, ' ')
-        .trim();
-
-/**
- * ¿Este archivo/carpeta se le oculta a almacén?
- * @param {string} nombre - Nombre del archivo o carpeta
- * @returns {boolean}
- */
-export const esExcluido = (nombre) => {
-    const norm = normalizar(nombre);
-    return PATRONES_EXCLUIDOS.some(p => p.test(norm));
-};
+export const esExcluido = crearFiltro([
+    ...PATRONES_DINERO,
+    ...PATRONES_CIERRE,
+    ...PATRONES_TICKET
+]);
 
 /**
  * Variantes del nombre del proyecto para hacer match con el nombre de la
@@ -177,23 +132,6 @@ const generarVariantes = (nombreProyecto) => {
     if (sinTitulo && !variantes.includes(sinTitulo)) variantes.push(sinTitulo);
 
     return variantes.filter(v => v.length >= 4);
-};
-
-const listarHijos = async (drive, parentId, soloCarpetas = false) => {
-    const filtroTipo = soloCarpetas
-        ? "and mimeType = 'application/vnd.google-apps.folder'"
-        : '';
-
-    const response = await drive.files.list({
-        q: `'${parentId}' in parents and trashed = false ${filtroTipo}`,
-        fields: 'files(id, name, mimeType, webViewLink, webContentLink, iconLink, thumbnailLink, size, createdTime, modifiedTime, shortcutDetails)',
-        pageSize: 500,
-        orderBy: 'folder,name',
-        supportsAllDrives: true,
-        includeItemsFromAllDrives: true
-    });
-
-    return response.data.files || [];
 };
 
 /**
@@ -318,164 +256,37 @@ export const buscarCarpetaVentas = async (nombreProyecto, mesHint = null) => {
     return null;
 };
 
-const tipoDeArchivo = (archivo) => {
-    const mime = archivo.shortcutDetails?.targetMimeType || archivo.mimeType || '';
-    if (mime.startsWith('image/')) return 'imagen';
-    if (mime === 'application/pdf') return 'pdf';
-    if (mime.startsWith('video/')) return 'video';
-    if (mime.includes('spreadsheet') || mime.includes('excel')) return 'hoja';
-    if (mime.includes('document') || mime.includes('word')) return 'documento';
-    if (mime.includes('presentation')) return 'presentacion';
-    return 'otro';
-};
-
-const mapearArchivo = (archivo, carpetaNombre = null) => {
-    const id = archivo.shortcutDetails?.targetId || archivo.id;
-    return {
-        id,
-        nombre: archivo.name,
-        tipo: tipoDeArchivo(archivo),
-        mimeType: archivo.shortcutDetails?.targetMimeType || archivo.mimeType,
-        subcarpeta: carpetaNombre,
-        link: archivo.webViewLink || `https://drive.google.com/file/d/${id}/view`,
-        linkPreview: `https://drive.google.com/file/d/${id}/preview`,
-        linkDescarga: archivo.webContentLink || null,
-        thumbnail: archivo.thumbnailLink || null,
-        tamaño: archivo.size ? Number(archivo.size) : null,
-        creado: archivo.createdTime,
-        modificado: archivo.modifiedTime
-    };
-};
-
 /**
  * Listar los archivos visibles de una carpeta de ventas.
- * Recorre subcarpetas hasta MAX_PROFUNDIDAD_ARCHIVOS niveles y quita todo lo
- * que cae en PATRONES_EXCLUIDOS (pedido, cotizaciones, dinero).
- *
  * @param {string} carpetaId
- * @returns {Promise<Object>} - { archivos, ocultos }
+ * @returns {Promise<{archivos: Array, ocultos: number}>}
  */
 export const listarArchivosVentas = async (carpetaId) => {
-    const claveCache = `archivos:${carpetaId}`;
-    const enCache = getCache(claveCache);
-    if (enCache !== undefined) return enCache;
-
     const drive = await obtenerDrive();
-    const archivos = [];
-    let ocultos = 0;
-
-    const recorrer = async (id, nombreCarpeta, profundidad) => {
-        const hijos = await listarHijos(drive, id, false);
-
-        for (const hijo of hijos) {
-            const esCarpeta = hijo.mimeType === 'application/vnd.google-apps.folder';
-
-            if (esExcluido(hijo.name)) {
-                ocultos++;
-                continue;
-            }
-
-            if (esCarpeta) {
-                if (profundidad < MAX_PROFUNDIDAD_ARCHIVOS) {
-                    await recorrer(hijo.id, hijo.name, profundidad + 1);
-                }
-                continue;
-            }
-
-            archivos.push(mapearArchivo(hijo, nombreCarpeta));
-        }
-    };
-
-    await recorrer(carpetaId, null, 1);
-
-    // Imágenes y PDFs primero (es lo que le sirve a calidad), luego por nombre
-    const peso = { imagen: 0, pdf: 1, documento: 2, hoja: 3, presentacion: 4, video: 5, otro: 6 };
-    archivos.sort((a, b) => (peso[a.tipo] - peso[b.tipo]) || a.nombre.localeCompare(b.nombre, 'es'));
-
-    const resultado = { archivos, ocultos };
-    setCache(claveCache, resultado);
-    return resultado;
+    return listarArchivos({
+        drive,
+        carpetaId,
+        esExcluido,
+        maxProfundidad: MAX_PROFUNDIDAD_ARCHIVOS,
+        prefijoCache: 'ventas'
+    });
 };
 
 /**
- * Descargar un archivo de la carpeta de VENTAS para servirlo desde el backend.
- *
- * Almacén/calidad NO tiene acceso a Drive: los archivos se ven a través del
- * sistema. Por eso hay que validar dos cosas antes de entregar nada:
- *   1. Que el archivo cuelgue realmente de la raíz de VENTAS (no de cualquier
- *      otro lado de Drive).
- *   2. Que no sea un archivo excluido — si no, bastaría con conocer el id del
- *      pedido (o del control de calidad) para saltarse el filtro de la lista.
- *
+ * Entregar un archivo de la carpeta de VENTAS para servirlo desde el backend.
  * @param {string} archivoId
- * @returns {Promise<Object|null>} - { nombre, mimeType, stream } o null si no
- *                                   pertenece a VENTAS / está excluido
+ * @returns {Promise<Object|null>}
  */
 export const obtenerArchivoVentas = async (archivoId) => {
     const drive = await obtenerDrive();
-
-    const claveCache = `permitido:${archivoId}`;
-    let permitido = getCache(claveCache);
-
-    if (permitido === undefined) {
-        let actual;
-        try {
-            actual = (await drive.files.get({
-                fileId: archivoId,
-                fields: 'id, name, mimeType, parents',
-                supportsAllDrives: true
-            })).data;
-        } catch (error) {
-            console.log(`⛔ [VENTAS] Archivo ${archivoId} no accesible: ${error.message}`);
-            setCache(claveCache, false);
-            return null;
-        }
-
-        if (esExcluido(actual.name)) {
-            console.log(`⛔ [VENTAS] Archivo excluido: "${actual.name}"`);
-            setCache(claveCache, false);
-            return null;
-        }
-
-        // Subir por los padres hasta toparse con la raíz de VENTAS.
-        let dentroDeVentas = false;
-        let padre = actual.parents?.[0];
-        for (let i = 0; i < MAX_PROFUNDIDAD + MAX_PROFUNDIDAD_ARCHIVOS + 1 && padre; i++) {
-            if (padre === VENTAS_FOLDER_ID) { dentroDeVentas = true; break; }
-            try {
-                const meta = (await drive.files.get({
-                    fileId: padre,
-                    fields: 'id, name, parents',
-                    supportsAllDrives: true
-                })).data;
-                padre = meta.parents?.[0];
-            } catch {
-                break;
-            }
-        }
-
-        if (!dentroDeVentas) {
-            console.log(`⛔ [VENTAS] Archivo ${archivoId} fuera de la carpeta de VENTAS`);
-            setCache(claveCache, false);
-            return null;
-        }
-
-        permitido = { nombre: actual.name, mimeType: actual.mimeType };
-        setCache(claveCache, permitido);
-    }
-
-    if (permitido === false) return null;
-
-    const respuesta = await drive.files.get(
-        { fileId: archivoId, alt: 'media', supportsAllDrives: true },
-        { responseType: 'stream' }
-    );
-
-    return {
-        nombre: permitido.nombre,
-        mimeType: permitido.mimeType,
-        stream: respuesta.data
-    };
+    return obtenerArchivo({
+        drive,
+        archivoId,
+        raizId: VENTAS_FOLDER_ID,
+        esExcluido,
+        maxSaltos: MAX_PROFUNDIDAD + MAX_PROFUNDIDAD_ARCHIVOS + 1,
+        etiqueta: 'VENTAS'
+    });
 };
 
 export default {

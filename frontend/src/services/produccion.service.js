@@ -116,6 +116,16 @@ export const obtenerArchivosDriveTerminal = async (proyectoId) => {
 };
 
 /**
+ * Contenido de la carpeta de PRODUCCION del proyecto (planos de manufactura y
+ * herrería, tickets de almacén), sin el pedido, los importes ni los formatos
+ * de cierre. Es lo que se ve al dar click a un proyecto en el dashboard.
+ */
+export const obtenerCarpetaProduccion = async (proyectoId) => {
+    const response = await api.get(`/produccion/${proyectoId}/carpeta`);
+    return response.data;
+};
+
+/**
  * Forzar sincronización con Drive de un proyecto
  */
 export const sincronizarProyectoDrive = async (proyectoId) => {
@@ -137,6 +147,7 @@ export const toggleEtapa = async (proyectoId, etapa, completado) => {
 };
 
 export default {
+    obtenerCarpetaProduccion,
     obtenerDashboard,
     obtenerEstadisticas,
     obtenerProyectosArea,

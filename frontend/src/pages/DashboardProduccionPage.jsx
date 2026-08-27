@@ -12,6 +12,7 @@ import {
 import { Loader, Modal, Button } from '../components/common';
 import toast from 'react-hot-toast';
 import ProyectoTimeline from '../components/produccion/ProyectoTimeline';
+import ProyectoCarpetaModal from '../components/produccion/ProyectoCarpetaModal';
 import EstadisticasHeader from '../components/produccion/EstadisticasHeader';
 import { useProduccionData } from '../hooks/useProduccionData';
 import { useProduccionFilters } from '../hooks/useProduccionFilters';
@@ -160,6 +161,8 @@ const FiltrosProyectos = ({ filtro, setFiltro, opciones }) => (
 // ============ Página principal ============
 const DashboardProduccionPage = () => {
     const [modalOpen, setModalOpen] = useState(false);
+    // Proyecto cuya carpeta de Drive se está viendo (click en el nombre).
+    const [proyectoCarpeta, setProyectoCarpeta] = useState(null);
     const { user } = useAuth();
     const esAlmacen = user?.rol === 'almacen';
 
@@ -359,6 +362,7 @@ const DashboardProduccionPage = () => {
                         <ProyectoTimeline
                             key={proyecto.id}
                             proyecto={proyecto}
+                            onAbrirCarpeta={() => setProyectoCarpeta(proyecto)}
                             onCompletar={esAlmacen ? undefined : completarEtapa}
                             onRegresar={esAlmacen ? undefined : regresarEtapa}
                             onCompletarSubEtapa={esAlmacen ? undefined : completarSubEtapa}
@@ -373,6 +377,13 @@ const DashboardProduccionPage = () => {
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
                 onCrear={crearProyecto}
+            />
+
+            {/* Carpeta de producción del proyecto (planos y tickets) */}
+            <ProyectoCarpetaModal
+                isOpen={!!proyectoCarpeta}
+                onClose={() => setProyectoCarpeta(null)}
+                proyecto={proyectoCarpeta}
             />
         </div>
     );

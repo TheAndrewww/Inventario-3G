@@ -17,7 +17,9 @@ import {
     obtenerArchivosDrive,
     sincronizarProyectoDrive,
     sincronizarTodosDrive,
-    toggleEtapa
+    toggleEtapa,
+    obtenerCarpetaProduccion,
+    obtenerArchivoCarpetaProduccion
 } from '../controllers/produccion.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
@@ -192,6 +194,34 @@ router.post('/:id/sincronizar-drive', verificarRol('administrador', 'almacenista
  * Acceso: Solo Administrador
  */
 router.post('/sincronizar-drive', verificarRol('administrador'), sincronizarTodosDrive);
+
+/**
+ * GET /api/produccion/carpeta/archivo/:archivoId
+ * Ver un archivo de la carpeta de producción (proxy: almacén no tiene acceso
+ * directo a Drive). Solo visualización, no se sirve como descarga.
+ * Acceso: los mismos roles que ven el dashboard.
+ *
+ * No choca con /:id/archivos ni con /:id/carpeta: son de dos segmentos y esta
+ * de tres, así que "carpeta" nunca se lee como un id.
+ */
+router.get(
+    '/carpeta/archivo/:archivoId',
+    verificarRol('administrador', 'almacen', 'diseñador'),
+    obtenerArchivoCarpetaProduccion
+);
+
+/**
+ * GET /api/produccion/:id/carpeta
+ * Contenido de la carpeta de PRODUCCION del proyecto (planos de manufactura y
+ * herrería, tickets de almacén), sin el pedido, los importes ni los formatos
+ * de cierre.
+ * Acceso: los mismos roles que ven el dashboard.
+ */
+router.get(
+    '/:id/carpeta',
+    verificarRol('administrador', 'almacen', 'diseñador'),
+    obtenerCarpetaProduccion
+);
 
 export default router;
 
