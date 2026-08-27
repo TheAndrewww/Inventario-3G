@@ -2358,7 +2358,6 @@ export const recibirPedido = async (req, res) => {
     if (pedido.proyecto) {
       await avisarTicketCerrado({
         proyecto: pedido.proyecto,
-        ticketId: pedido.ticket_id,
         recibio: req.usuario?.nombre
       }).catch(err => console.error('⚠️ No se pudo avisar el cierre del ticket:', err.message));
     }
@@ -2650,7 +2649,6 @@ export const marcarPedidoEntregadoDirecto = async (req, res) => {
     if (pedido.proyecto) {
       await avisarTicketCerrado({
         proyecto: pedido.proyecto,
-        ticketId: pedido.ticket_id,
         recibio: req.usuario?.nombre
       }).catch(err => console.error('⚠️ No se pudo avisar el cierre del ticket:', err.message));
     }
@@ -2757,7 +2755,7 @@ export const uploadTicketToDrive = async (req, res) => {
     // El grupo de producción se entera de la salida de almacén. Se avisa aquí
     // (y no en la sincronización de Drive) porque los tickets no se guardan en
     // la base: la clasificación de archivos los descarta.
-    await avisarTicketSubido({ proyecto, ticketId: ticket_id })
+    await avisarTicketSubido({ proyecto })
       .catch(err => console.error('⚠️ No se pudo avisar el ticket al grupo:', err.message));
 
     res.json({

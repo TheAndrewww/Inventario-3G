@@ -72,13 +72,15 @@ export const avisarArchivosNuevos = async (datos) => {
 
 /**
  * Se subió el ticket de salida de almacén a la carpeta del proyecto.
+ *
+ * El ticket se nombra por su proyecto, no por su folio: al grupo el código
+ * (PED-260826-0410-02) no le dice nada, el nombre del proyecto sí.
  */
-export const construirAvisoTicketSubido = ({ proyecto, ticketId }) =>
+export const construirAvisoTicketSubido = ({ proyecto }) =>
     [
         '🎫 *Se subió ticket de salida*',
-        proyecto,
-        ticketId ? `Ticket: ${ticketId}` : null
-    ].filter(l => l !== null).join('\n');
+        proyecto
+    ].join('\n');
 
 export const avisarTicketSubido = async (datos) =>
     enviarWhatsApp(construirAvisoTicketSubido(datos), DESTINO);
@@ -86,11 +88,10 @@ export const avisarTicketSubido = async (datos) =>
 /**
  * Se cerró (se entregó) el ticket de salida de un proyecto.
  */
-export const construirAvisoTicketCerrado = ({ proyecto, ticketId, recibio }) =>
+export const construirAvisoTicketCerrado = ({ proyecto, recibio }) =>
     [
         '✅ *Ticket cerrado*',
         proyecto || 'Sin proyecto',
-        ticketId ? `Ticket: ${ticketId}` : null,
         recibio ? `Lo recibió: ${recibio}` : null
     ].filter(l => l !== null).join('\n');
 
@@ -133,9 +134,8 @@ export const avisarEtapaCompletada = async (datos) =>
 export const construirAvisoProyectoCompletado = ({ proyecto }) =>
     [
         '🏁 *Proyecto completado*',
-        proyecto,
         '',
-        'Ya puede confirmarse en calendario.'
+        `Ya puede confirmarse en calendario de ${proyecto}.`
     ].join('\n');
 
 export const avisarProyectoCompletado = async (datos) =>
