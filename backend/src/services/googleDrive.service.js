@@ -487,7 +487,11 @@ export const sincronizarProyecto = async (proyecto) => {
         // Qué apareció desde la última pasada. Sirve para avisar al grupo de
         // producción; en la PRIMERA sincronización del proyecto no se reporta
         // nada, porque ahí "nuevo" es simplemente todo lo que ya existía.
-        const esPrimerSync = !proyecto.drive_sync_at;
+        // También cuenta como primera vez cuando el proyecto aún no tenía carpeta:
+        // un sync anterior pudo fallar con "Carpeta no encontrada" (que igual
+        // sella drive_sync_at), y al encontrarla por fin toda la carpeta se
+        // vería como recién subida.
+        const esPrimerSync = !proyecto.drive_sync_at || !proyecto.drive_folder_id;
         const idsPrevios = (lista) => new Set((lista || []).map(a => a.id));
         const nuevos = esPrimerSync
             ? { manufactura: [], herreria: [] }
