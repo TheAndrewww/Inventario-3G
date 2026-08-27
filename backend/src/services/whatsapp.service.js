@@ -119,14 +119,11 @@ export const construirAvisoLlegoMaterial = ({
     return lineas.join('\n');
 };
 
-export const avisarComprasLlegoMaterial = async (datos) => {
-    const mensaje = construirAvisoLlegoMaterial(datos);
-    // El mismo aviso va a los dos grupos: Compras lo necesita para la factura y almacén
-    // para contar. Ya viene sin importes, así que se manda tal cual.
-    const ok = await enviarWhatsApp(mensaje);
-    await enviarWhatsApp(mensaje, 'requisiciones');
-    return ok;
-};
+// Solo a COMPRAS: la recepción la captura el propio almacén, así que mandársela de vuelta
+// sería contarle lo que acaba de reportar. Quien necesita enterarse es Compras, que con eso
+// persigue la factura del proveedor.
+export const avisarComprasLlegoMaterial = async (datos) =>
+    enviarWhatsApp(construirAvisoLlegoMaterial(datos));
 
 /**
  * Corte semanal de los conteos cíclicos: qué días de lunes a viernes se
@@ -189,7 +186,8 @@ export const avisarComprasFaltantes = async ({ proveedor, ticketOrden, faltantes
 
     const mensaje = lineas.join('\n');
     const ok = await enviarWhatsApp(mensaje);
-    await enviarWhatsApp(mensaje, 'requisiciones');   // quien contó tiene que ver en qué acabó
+    // Este sí regresa a almacén: es el cierre de lo que contaron y de lo que se va a reclamar.
+    await enviarWhatsApp(mensaje, 'requisiciones');
     return ok;
 };
 
