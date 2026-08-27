@@ -119,11 +119,18 @@ export const construirAvisoLlegoMaterial = ({
     return lineas.join('\n');
 };
 
-// Solo a COMPRAS: la recepción la captura el propio almacén, así que mandársela de vuelta
-// sería contarle lo que acaba de reportar. Quien necesita enterarse es Compras, que con eso
-// persigue la factura del proveedor.
-export const avisarComprasLlegoMaterial = async (datos) =>
-    enviarWhatsApp(construirAvisoLlegoMaterial(datos));
+/**
+ * A los DOS grupos. Sí, hoy la recepción la captura el propio almacén y el aviso le repite
+ * lo que acaba de reportar; se deja igual a propósito: el día que CALIDAD y ALMACÉN se
+ * separen, quien no capturó necesita ver qué llegó, y el grupo ya trae el historial completo
+ * en vez de empezar de cero. Compras lo necesita aparte, para perseguir la factura.
+ */
+export const avisarComprasLlegoMaterial = async (datos) => {
+    const mensaje = construirAvisoLlegoMaterial(datos);
+    const ok = await enviarWhatsApp(mensaje);
+    await enviarWhatsApp(mensaje, 'requisiciones');
+    return ok;
+};
 
 /**
  * Corte semanal de los conteos cíclicos: qué días de lunes a viernes se
