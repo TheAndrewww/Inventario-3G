@@ -302,9 +302,17 @@ export const buscarCarpetaProyecto = async (nombreProyecto, mesHint = null) => {
 };
 
 /**
+ * El reporte diario que se sube a la carpeta del proyecto no es producción:
+ * no es un plano que alguien tenga que fabricar. Se ignora igual que el ticket,
+ * para que no cuente como manufactura ni se le avise al grupo de PRODUCCIÓN.
+ */
+const ES_REPORTE_DIARIO = /REPORTE[ _-]?DIARIO/;
+
+/**
  * Clasificar archivos PDF de una carpeta según la lógica de negocio
  * - HERRERIA*.pdf → Herrería
  * - Ticket*.pdf → Ignorar
+ * - REPORTE_DIARIO*.pdf → Ignorar
  * - Cualquier otro .pdf → Manufactura
  * @param {string} carpetaId - ID de la carpeta del proyecto
  * @returns {Promise<Object>} - Archivos clasificados
@@ -366,7 +374,8 @@ export const clasificarArchivosPDF = async (carpetaId) => {
                     creado: archivo.createdTime
                 });
 
-            } else if (nombreNormalizado.startsWith('TICKET')) {
+            } else if (nombreNormalizado.startsWith('TICKET') ||
+                       ES_REPORTE_DIARIO.test(nombreNormalizado)) {
                 resultado.ignorados.push(archivo.name);
 
             } else {
