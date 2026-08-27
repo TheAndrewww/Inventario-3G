@@ -91,8 +91,22 @@ const obtenerDrive = async () => {
         console.log(`🔑 [VENTAS] Cuenta de servicio sin acceso (${error.message}); usando OAuth`);
     }
 
-    clienteDrive = await authenticateEscritura();
-    return clienteDrive;
+    // El OAuth es el plan B y existe para SUBIR tickets: si no está configurado
+    // (p.ej. faltan las GOOGLE_OAUTH_* en Railway) su error habla de subidas y
+    // no se entiende aquí. Se traduce a lo que de verdad hay que hacer.
+    try {
+        clienteDrive = await authenticateEscritura();
+        return clienteDrive;
+    } catch (error) {
+        console.error('❌ [VENTAS] Sin forma de leer la carpeta:', error.message);
+        throw new Error(
+            'El sistema no puede leer la carpeta de VENTAS en Drive. Compártela ' +
+            'como lector con la cuenta del sistema ' +
+            '(inventario-calendar-reader@calendario-3g.iam.gserviceaccount.com), ' +
+            'o configura GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET y ' +
+            'GOOGLE_OAUTH_REFRESH_TOKEN en el servidor.'
+        );
+    }
 };
 
 /**
