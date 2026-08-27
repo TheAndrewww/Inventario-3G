@@ -225,7 +225,23 @@ export const avisarRequisicionesOrdenAprobada = async (orden) => {
         llegada ? `📅 Llegada estimada: ${llegada}` : '📅 Sin fecha de llegada capturada'
     ].filter(l => l !== null);
 
-    return enviarWhatsApp(lineas.join('\n'), 'requisiciones');
+    // Va marcado como 'orden_aprobada': el bot contable lo INTERCEPTA en vez de publicarlo
+    // tal cual, porque autorizar no es pedir. Con un proveedor que no es de crédito, el
+    // material no sale hasta que se le paga, así que el bot retiene el aviso hasta cruzar el
+    // pago; y la fecha de llegada la completa él (tiempos conocidos, o le pregunta a compras).
+    // Aquí solo se aporta el dato: quién, qué y el folio.
+    try {
+        await AvisoWhatsApp.create({
+            destino: 'requisiciones',
+            tipo: 'orden_aprobada',
+            referencia_id: orden.id,
+            mensaje: lineas.join('\n').slice(0, 4000)
+        });
+        return true;
+    } catch (error) {
+        console.error('⚠️ No se pudo encolar el aviso de orden aprobada:', error.message);
+        return false;
+    }
 };
 
 export default {
