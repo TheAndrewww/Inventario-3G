@@ -9,6 +9,12 @@ import {
 
 import { ETAPAS_CONFIG, ETAPAS_ORDEN, TIEMPOS_POR_TIPO, DIAS_INDIVIDUALES_POR_TIPO, usaTimelineSimplificado } from './constants';
 
+// Filas de las sub-etapas cuando el proyecto lleva manufactura Y herrería.
+// Las usan tanto las líneas del SVG (viewBox 0-100) como los nodos, para que
+// la línea siempre pase por el centro del círculo.
+const Y_MFRA = 28;
+const Y_HERR = 72;
+
 /**
  * Calcula los días restantes y fechas límite para cada etapa de un proyecto.
  * Retorna un objeto { diseno: { dias, fechaLimite }, compras: {...}, produccion: {...}, instalacion: {...} }
@@ -26,6 +32,15 @@ const TimelineStepper = memo(({ proyecto }) => {
     const esMTO = proyecto.tipo_proyecto?.toUpperCase() === 'MTO';
     const timelineSimplificado = usaTimelineSimplificado(proyecto);
     const tieneProduccion = proyecto.tiene_manufactura || proyecto.tiene_herreria;
+
+    // Con manufactura Y herrería los nodos se parten en dos filas, y cada uno
+    // lleva su etiqueta ("Mfra." arriba, "Herr." abajo). Ese apilado no cabe en
+    // el alto normal: la etiqueta de arriba se salía del recuadro y se encimaba
+    // con el nombre del proyecto. En ese caso el stepper crece.
+    const tieneAmbasSubEtapas = tieneProduccion &&
+        proyecto.tiene_manufactura !== false &&
+        proyecto.tiene_herreria !== false;
+    const altoStepper = tieneAmbasSubEtapas ? 190 : 160;
 
     const estadoRetraso = proyecto.estadoRetraso || { enRetraso: false };
     let enRetraso = estadoRetraso.enRetraso;
@@ -108,10 +123,10 @@ const TimelineStepper = memo(({ proyecto }) => {
 
                 {tieneAmbas && (
                     <>
-                        <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 20 L ${splitEnd} 20`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                        <path d={`M ${splitEnd} 20 L ${POS.P4 - 5} 20 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                        <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} 60 L ${splitEnd} 60`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                        <path d={`M ${splitEnd} 60 L ${POS.P4 - 5} 60 L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                        <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} ${Y_MFRA} L ${splitEnd} ${Y_MFRA}`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                        <path d={`M ${splitEnd} ${Y_MFRA} L ${POS.P4 - 5} ${Y_MFRA} L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('manufactura')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                        <path d={`M ${splitStart} 40 L ${splitMid} 40 L ${splitMid} ${Y_HERR} L ${splitEnd} ${Y_HERR}`} fill="none" stroke={getStrokeColor('compras')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                        <path d={`M ${splitEnd} ${Y_HERR} L ${POS.P4 - 5} ${Y_HERR} L ${POS.P4 - 5} 40 L ${POS.P4} 40`} fill="none" stroke={getSubStageStroke('herreria')} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                     </>
                 )}
 
@@ -238,7 +253,7 @@ const TimelineStepper = memo(({ proyecto }) => {
             if (tieneManufacturaLocal) {
                 nodes.push({
                     stage: 'manufactura', icon: Scissors, label: 'Mfra.', pos: POS5.P3, idx: 3,
-                    topPercent: tieneHerreriaLocal ? '15%' : '40%',
+                    topPercent: tieneHerreriaLocal ? `${Y_MFRA}%` : '40%',
                     isSubStage: true,
                     labelPosition: tieneHerreriaLocal ? 'top' : 'bottom'
                 });
@@ -246,7 +261,7 @@ const TimelineStepper = memo(({ proyecto }) => {
             if (tieneHerreriaLocal) {
                 nodes.push({
                     stage: 'herreria', icon: Wrench, label: 'Herr.', pos: POS5.P3, idx: 3,
-                    topPercent: tieneManufacturaLocal ? '65%' : '40%',
+                    topPercent: tieneManufacturaLocal ? `${Y_HERR}%` : '40%',
                     isSubStage: true,
                     labelPosition: 'bottom'
                 });
@@ -384,7 +399,7 @@ const TimelineStepper = memo(({ proyecto }) => {
     }, [proyecto.etapa_actual, proyecto.tiene_manufactura, proyecto.tiene_herreria, proyecto.estadoSubEtapas, proyecto.estadoRetraso, proyecto.tipo_proyecto, diasRestantes, esMTO, esGarantia, enRetraso, timelineSimplificado, tieneProduccion]);
 
     return (
-        <div className="bg-gray-50 relative overflow-visible" style={{ height: px(160), padding: px(12) }}>
+        <div className="bg-gray-50 relative overflow-visible" style={{ height: px(altoStepper), padding: px(12) }}>
             {proyecto.fecha_limite && (
                 <div
                     className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center origin-right rounded-xl shadow-md ${diasRestantes !== null && (diasRestantes < 0 && proyecto.etapa_actual !== 'instalacion')
