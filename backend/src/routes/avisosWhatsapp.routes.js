@@ -207,6 +207,13 @@ router.post('/:id/decision', async (req, res) => {
         enviarEmailEstadoOrden(orden, aprobado ? 'aprobada' : 'rechazada', motivo || null, `${autorizador.nombre} (por WhatsApp)`)
             .catch(e => console.error('Error al avisar por correo:', e.message));
 
+        // Aprobada = ya se pidió: almacén tiene que saber qué va a llegar y cuándo.
+        if (aprobado) {
+            import('../services/whatsapp.service.js')
+                .then(({ avisarRequisicionesOrdenAprobada }) => avisarRequisicionesOrdenAprobada(orden))
+                .catch(e => console.error('Error al avisar a Requisiciones:', e.message));
+        }
+
         console.log(`🛒 Orden ${orden.ticket_id} ${aprobado ? 'aprobada' : 'rechazada'} por ${autorizador.nombre} desde WhatsApp`);
 
         res.json({

@@ -12,7 +12,10 @@
 
 import { AvisoWhatsApp } from '../models/index.js';
 
-const DESTINOS_VALIDOS = ['compras', 'contable', 'produccion'];
+// 'requisiciones' = grupo de ALMACÉN/CALIDAD. Ahí no puede salir ni un precio: está
+// separado de Compras justo para que quien recibe el material no vea cotizaciones ni
+// transferencias. Todo lo que se manda a este destino va sin importes.
+const DESTINOS_VALIDOS = ['compras', 'contable', 'produccion', 'requisiciones'];
 
 export const isWhatsAppEnabled = () => !!process.env.WHATSAPP_PUENTE_TOKEN;
 
@@ -116,8 +119,14 @@ export const construirAvisoLlegoMaterial = ({
     return lineas.join('\n');
 };
 
-export const avisarComprasLlegoMaterial = async (datos) =>
-    enviarWhatsApp(construirAvisoLlegoMaterial(datos));
+export const avisarComprasLlegoMaterial = async (datos) => {
+    const mensaje = construirAvisoLlegoMaterial(datos);
+    // El mismo aviso va a los dos grupos: Compras lo necesita para la factura y almacén
+    // para contar. Ya viene sin importes, así que se manda tal cual.
+    const ok = await enviarWhatsApp(mensaje);
+    await enviarWhatsApp(mensaje, 'requisiciones');
+    return ok;
+};
 
 /**
  * Corte semanal de los conteos cíclicos: qué días de lunes a viernes se
@@ -150,8 +159,12 @@ export const construirReporteConteosCiclicos = ({ periodo, dias }) => {
     return lineas.join('\n');
 };
 
-export const avisarConteosCiclicosSemana = async (datos) =>
-    enviarWhatsApp(construirReporteConteosCiclicos(datos));
+export const avisarConteosCiclicosSemana = async (datos) => {
+    const mensaje = construirReporteConteosCiclicos(datos);
+    const ok = await enviarWhatsApp(mensaje);
+    await enviarWhatsApp(mensaje, 'requisiciones');   // el conteo lo hace almacén: es su corte
+    return ok;
+};
 
 export const avisarComprasFaltantes = async ({ proveedor, ticketOrden, faltantes, sobrantes }) => {
     const lineas = [
@@ -174,7 +187,40 @@ export const avisarComprasFaltantes = async ({ proveedor, ticketOrden, faltantes
         lineas.push('', 'Compras: evaluar reclamo al proveedor o cerrar la compra.');
     }
 
-    return enviarWhatsApp(lineas.join('\n'));
+    const mensaje = lineas.join('\n');
+    const ok = await enviarWhatsApp(mensaje);
+    await enviarWhatsApp(mensaje, 'requisiciones');   // quien contó tiene que ver en qué acabó
+    return ok;
+};
+
+/**
+ * Avisa a ALMACÉN que una orden ya se autorizó: qué se pidió y cuándo se espera.
+ * Va sin importes ni proveedor de más: es para que sepan qué va a llegar y lo esperen.
+ */
+export const avisarRequisicionesOrdenAprobada = async (orden) => {
+    if (!isWhatsAppEnabled() || !orden) return false;
+
+    const articulos = (orden.detalles || []).map(d => {
+        const nombre = d.articulo?.nombre || 'Artículo';
+        const cantidad = parseFloat(d.cantidad_solicitada) || 0;
+        const unidad = d.articulo?.unidad || '';
+        return `• ${nombre}: ${cantidad} ${unidad}`.trimEnd();
+    });
+
+    const llegada = orden.fecha_llegada_estimada
+        ? new Date(orden.fecha_llegada_estimada).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
+        : null;
+
+    const lineas = [
+        '🛒 *Se pidió* — ' + (orden.proveedor?.nombre || 'proveedor por asignar'),
+        `Orden: ${orden.ticket_id}`,
+        '',
+        ...articulos,
+        '',
+        llegada ? `📅 Llegada estimada: ${llegada}` : '📅 Sin fecha de llegada capturada'
+    ].filter(l => l !== null);
+
+    return enviarWhatsApp(lineas.join('\n'), 'requisiciones');
 };
 
 export default {
@@ -182,5 +228,6 @@ export default {
     enviarWhatsApp,
     avisarComprasLlegoMaterial,
     avisarComprasFaltantes,
-    avisarConteosCiclicosSemana
+    avisarConteosCiclicosSemana,
+    avisarRequisicionesOrdenAprobada
 };

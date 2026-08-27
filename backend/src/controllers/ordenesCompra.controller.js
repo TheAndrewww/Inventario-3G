@@ -3167,6 +3167,11 @@ export const aprobarOrden = async (req, res) => {
       console.error('   Stack:', e.stack);
     });
 
+    // Almacén se entera de lo que va a llegar (sin importes): es quien lo va a recibir.
+    import('../services/whatsapp.service.js')
+      .then(({ avisarRequisicionesOrdenAprobada }) => avisarRequisicionesOrdenAprobada(orden))
+      .catch(e => console.error('Error al avisar a Requisiciones:', e.message));
+
     res.json({
       success: true,
       message: `Orden ${orden.ticket_id} aprobada exitosamente`,
