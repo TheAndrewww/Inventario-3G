@@ -6,6 +6,7 @@
 import { ProduccionProyecto } from '../models/index.js';
 import { Op } from 'sequelize';
 import googleDriveService from '../services/googleDrive.service.js';
+import { avisarArchivosNuevos } from '../services/avisosProduccion.service.js';
 
 /**
  * Sincronizar proyectos activos con Google Drive
@@ -57,6 +58,7 @@ export const sincronizarProyectosConDrive = async (options = {}) => {
             fallidos: 0,
             sinCarpeta: 0,
             actualizados: 0,
+            avisados: 0,
             inicio: new Date(),
             fin: null
         };
@@ -69,6 +71,19 @@ export const sincronizarProyectosConDrive = async (options = {}) => {
                     resultados.exitosos++;
                     if (resultado.tieneManufactura || resultado.tieneHerreria) {
                         resultados.actualizados++;
+                    }
+
+                    // Avisar al grupo de PRODUCCIÓN lo que se subió a la carpeta
+                    // desde la pasada anterior. Un aviso que falla no debe
+                    // interrumpir la sincronización del resto.
+                    const nuevos = resultado.nuevos;
+                    if (nuevos && (nuevos.manufactura.length > 0 || nuevos.herreria.length > 0)) {
+                        resultados.avisados++;
+                        await avisarArchivosNuevos({
+                            proyecto: proyecto.nombre,
+                            manufactura: nuevos.manufactura,
+                            herreria: nuevos.herreria
+                        }).catch(err => console.error('   ⚠️ No se pudo avisar al grupo:', err.message));
                     }
                 } else {
                     resultados.fallidos++;
@@ -95,6 +110,7 @@ export const sincronizarProyectosConDrive = async (options = {}) => {
         console.log(`   ❌ Fallidos: ${resultados.fallidos}`);
         console.log(`   📁 Sin carpeta: ${resultados.sinCarpeta}`);
         console.log(`   📄 Con archivos: ${resultados.actualizados}`);
+        console.log(`   📨 Avisados al grupo: ${resultados.avisados}`);
         console.log(`   ⏱️ Duración: ${duracion.toFixed(1)}s`);
 
         return resultados;

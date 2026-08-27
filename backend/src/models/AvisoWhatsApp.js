@@ -22,7 +22,7 @@ const AvisoWhatsApp = sequelize.define('AvisoWhatsApp', {
         type: DataTypes.STRING(30),
         allowNull: false,
         defaultValue: 'compras',
-        comment: 'Destino lógico: compras | contable. El bot resuelve a qué chat corresponde'
+        comment: 'Destino lógico: compras | contable | produccion. El bot resuelve a qué chat corresponde'
     },
     mensaje: {
         type: DataTypes.TEXT,

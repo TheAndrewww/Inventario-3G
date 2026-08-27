@@ -1,6 +1,11 @@
 import { ProduccionProyecto, Usuario, sequelize } from '../models/index.js';
 import { Op } from 'sequelize';
 import produccionSheetsService from '../services/produccionSheets.service.js';
+import {
+    avisarArchivosNuevos,
+    avisarEtapaCompletada,
+    avisarProyectoCompletado
+} from '../services/avisosProduccion.service.js';
 
 // Colores por área (del sistema de calendario existente)
 const COLORES_AREAS = {
@@ -18,6 +23,31 @@ const CODIGOS_AREA = {
     'MAN-2026': 'manufactura',
     'HER-2026': 'herreria',
     'INS-2026': 'instalacion'
+};
+
+/**
+ * Avisa al grupo de PRODUCCIÓN lo que acaba de pasar con un proyecto: la etapa
+ * que se cerró y, si con eso el proyecto cayó en Completados, el cierre.
+ *
+ * En el dashboard "Completado" es la etapa interna 'instalacion' (la etapa
+ * 'completado' está reservada para los proyectos cerrados desde el Índice), por
+ * eso el corte se mira contra 'instalacion'.
+ *
+ * Nunca lanza: un aviso que no salió no debe tumbar el avance del proyecto.
+ */
+const avisarCambioDeEtapa = async ({ proyecto, etapa, etapaNueva, etapaPrevia, usuario }) => {
+    try {
+        if (etapa) {
+            await avisarEtapaCompletada({ proyecto: proyecto.nombre, etapa, usuario });
+        }
+
+        const llegoACompletados = etapaNueva === 'instalacion' && etapaPrevia !== 'instalacion';
+        if (llegoACompletados) {
+            await avisarProyectoCompletado({ proyecto: proyecto.nombre });
+        }
+    } catch (error) {
+        console.error('⚠️ No se pudo avisar al grupo de producción:', error.message);
+    }
 };
 
 /**
@@ -182,6 +212,14 @@ export const completarEtapa = async (req, res) => {
 
         console.log(`✅ Proyecto "${proyecto.nombre}" avanzó de ${etapaAnterior} a ${proyecto.etapa_actual}`);
 
+        await avisarCambioDeEtapa({
+            proyecto,
+            etapa: etapaAnterior,
+            etapaNueva: proyecto.etapa_actual,
+            etapaPrevia: etapaAnterior,
+            usuario: req.usuario?.nombre
+        });
+
         res.json({
             success: true,
             message: `Etapa "${etapaAnterior}" completada`,
@@ -301,6 +339,15 @@ export const completarSubEtapa = async (req, res) => {
         const nombreSubEtapa = nombresSubEtapa[subEtapa] || subEtapa;
 
         console.log(`✅ ${nombreSubEtapa} completada para "${proyecto.nombre}"`);
+
+        await avisarCambioDeEtapa({
+            proyecto,
+            etapa: subEtapa,
+            etapaNueva: resultado.proyecto.etapa_actual,
+            // autoAvanzado indica que esta sub-etapa fue la que cerró producción
+            etapaPrevia: resultado.autoAvanzado ? 'produccion' : resultado.proyecto.etapa_actual,
+            usuario: req.usuario?.nombre
+        });
 
         res.json({
             success: true,
@@ -523,6 +570,18 @@ export const toggleEtapa = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Etapa inválida' });
         }
 
+        // Calidad (rol almacén) solo cierra producción. Diseño, compras y el
+        // cierre del proyecto no le tocan; a Completados el proyecto llega solo
+        // cuando manufactura y herrería quedan listas.
+        if (req.usuario?.rol === 'almacen' && !['manufactura', 'herreria'].includes(etapa)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Desde almacén solo se pueden marcar manufactura y herrería'
+            });
+        }
+
+        const etapaPrevia = proyecto.etapa_actual;
+
         // Actualizar timestamps/flags
         if (completado) {
             proyecto[config.campo] = ahora;
@@ -607,6 +666,20 @@ export const toggleEtapa = async (req, res) => {
         await proyecto.save();
 
         console.log(`✅ Etapa "${etapa}" ${completado ? 'marcada' : 'desmarcada'} para "${proyecto.nombre}". Nueva etapa actual: ${nuevaEtapa}`);
+
+        // Solo se avisa al marcar. Desmarcar es una corrección, y avisarla en el
+        // grupo confundiría más de lo que aclara. La etapa que se anuncia es la
+        // que se tocó: marcar "Preparado" arrastra manufactura y herrería, y no
+        // tiene caso mandar tres mensajes por un solo clic.
+        if (completado) {
+            await avisarCambioDeEtapa({
+                proyecto,
+                etapa: etapa === 'instalacion' ? null : etapa,
+                etapaNueva: nuevaEtapa,
+                etapaPrevia,
+                usuario: req.usuario?.nombre
+            });
+        }
 
         res.json({
             success: true,
@@ -882,6 +955,17 @@ export const sincronizarProyectoDrive = async (req, res) => {
 
         if (resultado.success) {
             await proyecto.reload();
+
+            // El "Sync Drive" a mano también avisa lo que apareció en la carpeta:
+            // si no, el aviso dependería de cuándo corra el job.
+            const nuevos = resultado.nuevos;
+            if (nuevos && (nuevos.manufactura.length > 0 || nuevos.herreria.length > 0)) {
+                await avisarArchivosNuevos({
+                    proyecto: proyecto.nombre,
+                    manufactura: nuevos.manufactura,
+                    herreria: nuevos.herreria
+                }).catch(err => console.error('⚠️ No se pudo avisar al grupo:', err.message));
+            }
         }
 
         res.json({

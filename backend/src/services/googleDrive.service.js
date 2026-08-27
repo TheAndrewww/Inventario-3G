@@ -484,6 +484,22 @@ export const sincronizarProyecto = async (proyecto) => {
         // Clasificar archivos PDF
         const clasificacion = await clasificarArchivosPDF(carpeta.id);
 
+        // Qué apareció desde la última pasada. Sirve para avisar al grupo de
+        // producción; en la PRIMERA sincronización del proyecto no se reporta
+        // nada, porque ahí "nuevo" es simplemente todo lo que ya existía.
+        const esPrimerSync = !proyecto.drive_sync_at;
+        const idsPrevios = (lista) => new Set((lista || []).map(a => a.id));
+        const nuevos = esPrimerSync
+            ? { manufactura: [], herreria: [] }
+            : {
+                manufactura: clasificacion.archivos.manufactura
+                    .filter(a => !idsPrevios(proyecto.archivos_manufactura).has(a.id))
+                    .map(a => a.nombre),
+                herreria: clasificacion.archivos.herreria
+                    .filter(a => !idsPrevios(proyecto.archivos_herreria).has(a.id))
+                    .map(a => a.nombre)
+            };
+
         // Preparar datos para actualizar
         const datosActualizacion = {
             drive_folder_id: carpeta.id,
@@ -506,7 +522,8 @@ export const sincronizarProyecto = async (proyecto) => {
             tieneManufactura: clasificacion.tieneManufactura,
             tieneHerreria: clasificacion.tieneHerreria,
             totalArchivosManufactura: clasificacion.archivos.manufactura.length,
-            totalArchivosHerreria: clasificacion.archivos.herreria.length
+            totalArchivosHerreria: clasificacion.archivos.herreria.length,
+            nuevos
         };
     } catch (error) {
         console.error(`❌ Error al sincronizar proyecto "${proyecto.nombre}":`, error);

@@ -22,7 +22,7 @@ export { ETAPAS_ORDEN } from './constants';
  *        proyectos cuya instalación ya terminó según el calendario (hay que
  *        cerrarlos) y avisa cuando la última cita quedó marcada como FALLA.
  */
-const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, onAbrirCarpeta, modoPreparados = false }) => {
+const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, etapasPermitidas = null, onAbrirCarpeta, modoPreparados = false }) => {
     // Estado de cierre (solo aplica en la vista de Preparados)
     const estadoCierre = useMemo(
         () => (modoPreparados ? getEstadoCierrePreparado(proyecto) : { debeCerrar: false, falla: false, nota: null, diasDesde: 0 }),
@@ -105,7 +105,7 @@ const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePaus
                 </div>
             )}
             <TimelineStepper proyecto={proyecto} isPaused={containerStyles.isPaused} />
-            <TimelineFooter proyecto={proyecto} onCompletar={onCompletar} onRegresar={onRegresar} onTogglePausa={onTogglePausa} isPaused={containerStyles.isPaused} onCompletarSubEtapa={onCompletarSubEtapa} onToggleEtapa={onToggleEtapa} />
+            <TimelineFooter proyecto={proyecto} onCompletar={onCompletar} onRegresar={onRegresar} onTogglePausa={onTogglePausa} isPaused={containerStyles.isPaused} onCompletarSubEtapa={onCompletarSubEtapa} onToggleEtapa={onToggleEtapa} etapasPermitidas={etapasPermitidas} />
         </div>
     );
 });

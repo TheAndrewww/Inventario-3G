@@ -6,7 +6,7 @@ import { ETAPAS_CONFIG, ETAPAS_ORDEN, usaTimelineSimplificado } from './constant
  * Footer de la tarjeta de proyecto
  * Muestra: estado sub-etapas, mensaje completado, botón avanzar, botón pausar
  */
-const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, isPaused }) => {
+const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, etapasPermitidas = null, isPaused }) => {
     const [loading, setLoading] = useState(false);
     const [regresarLoading, setRegresarLoading] = useState(false);
     const [pauseLoading, setPauseLoading] = useState(false);
@@ -67,8 +67,9 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
         }
     };
 
-    // Si no hay callbacks, no mostrar nada
-    if (!onCompletar && !onTogglePausa && !onRegresar) return null;
+    // Si no hay callbacks, no mostrar nada. Se cuenta onToggleEtapa: calidad
+    // solo recibe ese, para marcar las sub-etapas de producción.
+    if (!onCompletar && !onTogglePausa && !onRegresar && !onToggleEtapa) return null;
 
     // Puede regresar si no está en diseño o pendiente
     const puedeRegresar = onRegresar && !isPaused && !['pendiente', 'diseno'].includes(proyecto.etapa_actual);
@@ -149,6 +150,11 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
                                 { key: 'herreria', label: 'Herrería', done: proyecto.estadoSubEtapas?.herreria?.completado || proyecto.herreria_completado, color: 'red' },
                                 { key: 'instalacion', label: 'Completado', done: !!proyecto.instalacion_completado_en, color: 'blue' }
                             ].filter((etapa) => {
+                                // etapasPermitidas acota qué puede tocar el usuario
+                                // (calidad solo marca producción). null = todas.
+                                if (etapasPermitidas && !etapasPermitidas.includes(etapa.key)) {
+                                    return false;
+                                }
                                 // Ocultar Manufactura/Herrería si el proyecto no las tiene activas
                                 if (etapa.key === 'manufactura') {
                                     return proyecto.tiene_manufactura || etapa.done;

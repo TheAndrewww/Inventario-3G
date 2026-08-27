@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { crearNotificacion, notificarPorRol } from './notificaciones.controller.js';
 import { buscarCarpetaProyecto, uploadTicket } from '../services/googleDrive.service.js';
+import { avisarTicketSubido, avisarTicketCerrado } from '../services/avisosProduccion.service.js';
 import admin from 'firebase-admin';
 
 // Normalización: minúsculas, sin acentos, espacios colapsados.
@@ -2351,6 +2352,17 @@ export const recibirPedido = async (req, res) => {
 
     await transaction.commit();
 
+    // El grupo de producción se entera del cierre del ticket del proyecto.
+    // Los pedidos de equipo no le interesan al grupo, por eso solo los de
+    // proyecto. Un aviso que falla no revierte la entrega: ya está en firme.
+    if (pedido.proyecto) {
+      await avisarTicketCerrado({
+        proyecto: pedido.proyecto,
+        ticketId: pedido.ticket_id,
+        recibio: req.usuario?.nombre
+      }).catch(err => console.error('⚠️ No se pudo avisar el cierre del ticket:', err.message));
+    }
+
     // Obtener pedido completo
     const pedidoCompleto = await Movimiento.findByPk(pedido_id, {
       include: [
@@ -2632,6 +2644,17 @@ export const marcarPedidoEntregadoDirecto = async (req, res) => {
 
     await transaction.commit();
 
+    // El grupo de producción se entera del cierre del ticket del proyecto.
+    // Los pedidos de equipo no le interesan al grupo, por eso solo los de
+    // proyecto. Un aviso que falla no revierte la entrega: ya está en firme.
+    if (pedido.proyecto) {
+      await avisarTicketCerrado({
+        proyecto: pedido.proyecto,
+        ticketId: pedido.ticket_id,
+        recibio: req.usuario?.nombre
+      }).catch(err => console.error('⚠️ No se pudo avisar el cierre del ticket:', err.message));
+    }
+
     // Obtener pedido completo
     const pedidoCompleto = await Movimiento.findByPk(pedido_id, {
       include: [
@@ -2730,6 +2753,12 @@ export const uploadTicketToDrive = async (req, res) => {
     const fileName = `Ticket-${ticket_id}.pdf`;
 
     const archivo = await uploadTicket(carpetaId, pdfBuffer, fileName);
+
+    // El grupo de producción se entera de la salida de almacén. Se avisa aquí
+    // (y no en la sincronización de Drive) porque los tickets no se guardan en
+    // la base: la clasificación de archivos los descarta.
+    await avisarTicketSubido({ proyecto, ticketId: ticket_id })
+      .catch(err => console.error('⚠️ No se pudo avisar el ticket al grupo:', err.message));
 
     res.json({
       success: true,

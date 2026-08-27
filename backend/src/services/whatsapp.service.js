@@ -12,7 +12,7 @@
 
 import { AvisoWhatsApp } from '../models/index.js';
 
-const DESTINOS_VALIDOS = ['compras', 'contable'];
+const DESTINOS_VALIDOS = ['compras', 'contable', 'produccion'];
 
 export const isWhatsAppEnabled = () => !!process.env.WHATSAPP_PUENTE_TOKEN;
 
@@ -21,7 +21,7 @@ export const isWhatsAppEnabled = () => !!process.env.WHATSAPP_PUENTE_TOKEN;
  * no debe tumbar una recepción de mercancía.
  *
  * @param {string} mensaje - Texto a enviar
- * @param {string} destino - Destino lógico: compras | contable
+ * @param {string} destino - Destino lógico: compras | contable | produccion
  * @returns {Promise<boolean>} - true si quedó encolado
  */
 export const enviarWhatsApp = async (mensaje, destino = 'compras') => {

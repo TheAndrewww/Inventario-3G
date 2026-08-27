@@ -365,9 +365,13 @@ const DashboardProduccionPage = () => {
                             onAbrirCarpeta={() => setProyectoCarpeta(proyecto)}
                             onCompletar={esAlmacen ? undefined : completarEtapa}
                             onRegresar={esAlmacen ? undefined : regresarEtapa}
-                            onCompletarSubEtapa={esAlmacen ? undefined : completarSubEtapa}
+                            onCompletarSubEtapa={completarSubEtapa}
                             onTogglePausa={esAlmacen ? undefined : togglePausa}
-                            onToggleEtapa={esAlmacen ? undefined : toggleEtapa}
+                            onToggleEtapa={toggleEtapa}
+                            // Calidad solo cierra producción: no mueve diseño ni
+                            // compras, ni marca el proyecto como completado (eso
+                            // se da solo cuando manufactura y herrería terminan).
+                            etapasPermitidas={esAlmacen ? ['manufactura', 'herreria'] : null}
                         />
                     ))
                 )}
