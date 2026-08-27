@@ -99,8 +99,8 @@ router.get(
 
 /**
  * GET /api/calendario/proyecto/ventas/archivo/:archivoId
- * Ver o descargar un archivo de la carpeta de ventas (proxy: almacén no tiene
- * acceso directo a Drive). Agregar ?descargar=true para forzar la descarga.
+ * Ver un archivo de la carpeta de ventas (proxy: almacén no tiene acceso
+ * directo a Drive). Solo visualización, no se sirve como descarga.
  * Acceso: los mismos roles que ven el calendario.
  */
 router.get(

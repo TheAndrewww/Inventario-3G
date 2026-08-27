@@ -258,7 +258,8 @@ export const obtenerCarpetaVentasProyecto = async (req, res) => {
 };
 
 /**
- * Servir un archivo de la carpeta de VENTAS.
+ * Servir un archivo de la carpeta de VENTAS, solo para verlo (nunca como
+ * descarga).
  *
  * Almacén/calidad no tiene acceso a Drive, así que el archivo se entrega desde
  * el backend. El servicio valida que el archivo cuelgue de VENTAS y que no sea
@@ -269,7 +270,6 @@ export const obtenerCarpetaVentasProyecto = async (req, res) => {
 export const obtenerArchivoCarpetaVentas = async (req, res) => {
   try {
     const { archivoId } = req.params;
-    const { descargar } = req.query;
 
     const archivo = await obtenerArchivoVentas(archivoId);
 
@@ -281,9 +281,10 @@ export const obtenerArchivoCarpetaVentas = async (req, res) => {
     }
 
     res.setHeader('Content-Type', archivo.mimeType || 'application/octet-stream');
+    // Siempre inline: estos archivos se consultan, no se descargan.
     res.setHeader(
       'Content-Disposition',
-      `${descargar === 'true' ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(archivo.nombre)}`
+      `inline; filename*=UTF-8''${encodeURIComponent(archivo.nombre)}`
     );
     res.setHeader('Cache-Control', 'private, max-age=300');
 

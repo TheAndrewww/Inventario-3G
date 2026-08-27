@@ -6,7 +6,6 @@ import {
   Image as ImageIcon,
   Film,
   File,
-  Download,
   ArrowLeft,
   AlertCircle,
   Lock,
@@ -115,21 +114,6 @@ const Miniatura = ({ archivo, onClick }) => {
 const Visor = ({ archivo, onVolver }) => {
   const { url, error } = useArchivoBlob(archivo.id);
 
-  const descargar = async () => {
-    try {
-      const response = await api.get(`${rutaArchivo(archivo.id)}?descargar=true`, {
-        responseType: 'blob'
-      });
-      const enlace = document.createElement('a');
-      enlace.href = URL.createObjectURL(new Blob([response.data]));
-      enlace.download = archivo.nombre;
-      enlace.click();
-      URL.revokeObjectURL(enlace.href);
-    } catch (err) {
-      console.error('Error al descargar archivo:', err);
-    }
-  };
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 mb-3">
@@ -142,14 +126,6 @@ const Visor = ({ archivo, onVolver }) => {
           Volver
         </button>
         <span className="text-sm font-medium text-gray-700 truncate flex-1">{archivo.nombre}</span>
-        <button
-          type="button"
-          onClick={descargar}
-          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-violet-600 text-white hover:bg-violet-700 rounded-lg transition-colors"
-        >
-          <Download size={16} />
-          Descargar
-        </button>
       </div>
 
       <div className="flex-1 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center min-h-[50vh]">
@@ -169,7 +145,7 @@ const Visor = ({ archivo, onVolver }) => {
         ) : (
           <div className="text-center text-gray-600 p-6">
             <File size={32} className="mx-auto mb-2 text-gray-400" />
-            Este tipo de archivo no se puede ver aquí. Descárgalo para abrirlo.
+            Este tipo de archivo no se puede ver aquí.
           </div>
         )}
       </div>
