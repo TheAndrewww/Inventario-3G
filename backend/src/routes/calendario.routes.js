@@ -3,9 +3,11 @@ import {
   obtenerCalendarioMes,
   obtenerProyectosDelDia,
   obtenerDistribucionEquiposMes,
-  obtenerCalendarioActual
+  obtenerCalendarioActual,
+  obtenerCarpetaVentasProyecto,
+  obtenerArchivoCarpetaVentas
 } from '../controllers/calendario.controller.js';
-import { verificarToken } from '../middleware/auth.middleware.js';
+import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
@@ -80,5 +82,31 @@ router.get('/mes/:mes/dia/:dia', obtenerProyectosDelDia);
  * Ejemplo: /api/calendario/mes/NOVIEMBRE/equipos
  */
 router.get('/mes/:mes/equipos', obtenerDistribucionEquiposMes);
+
+/**
+ * GET /api/calendario/proyecto/ventas?nombre=...&mes=...
+ * Información de la carpeta de VENTAS del proyecto (archivos + datos), sin el
+ * pedido, los documentos con importes ni los formatos de cierre.
+ * Acceso: los mismos roles que ven el calendario.
+ *
+ * Ejemplo: /api/calendario/proyecto/ventas?nombre=ARQ.%20VIRIDIANA%20NU%C3%91EZ%20RAMIREZ&mes=AGOSTO
+ */
+router.get(
+  '/proyecto/ventas',
+  verificarRol('administrador', 'almacen', 'encargado', 'diseñador', 'ventas'),
+  obtenerCarpetaVentasProyecto
+);
+
+/**
+ * GET /api/calendario/proyecto/ventas/archivo/:archivoId
+ * Ver o descargar un archivo de la carpeta de ventas (proxy: almacén no tiene
+ * acceso directo a Drive). Agregar ?descargar=true para forzar la descarga.
+ * Acceso: los mismos roles que ven el calendario.
+ */
+router.get(
+  '/proyecto/ventas/archivo/:archivoId',
+  verificarRol('administrador', 'almacen', 'encargado', 'diseñador', 'ventas'),
+  obtenerArchivoCarpetaVentas
+);
 
 export default router;

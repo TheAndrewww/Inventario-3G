@@ -14,6 +14,7 @@ import {
 import { obtenerCalendarioMes, obtenerDistribucionEquipos } from '../services/calendario.service';
 import { toast } from 'react-hot-toast';
 import { useCalendario } from '../context/CalendarioContext';
+import ProyectoVentasModal from '../components/calendario/ProyectoVentasModal';
 
 const MESES = [
   'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
@@ -54,6 +55,9 @@ const CalendarioPage = () => {
     return escalaGuardada ? parseFloat(escalaGuardada) : 100;
   });
   const [mostrarControles, setMostrarControles] = useState(true);
+  // Proyecto abierto desde el calendario: { proyecto, dia, mes }.
+  // Almacén/calidad lo usa para ver la carpeta de ventas sin salir del calendario.
+  const [proyectoSeleccionado, setProyectoSeleccionado] = useState(null);
   const { modoPantallaCompleta, togglePantallaCompleta, setModoPantallaCompleta } = useCalendario();
 
   // Cargar datos del calendario
@@ -557,10 +561,14 @@ const CalendarioPage = () => {
               const hoy = new Date();
               const diaHoy = hoy.getDate();
 
-              // Combinar semanas del mes actual y el siguiente
+              // Combinar semanas del mes actual y el siguiente.
+              // Se etiqueta cada semana con su mes: al abrir un proyecto hay que
+              // saber en qué mes buscar su carpeta de ventas.
+              const indiceMesActual = MESES.indexOf(mesActual);
+              const mesSiguiente = MESES[indiceMesActual === 11 ? 0 : indiceMesActual + 1];
               const todasLasSemanas = [
-                ...(calendario?.semanas || []),
-                ...(calendarioSiguienteMes?.semanas || [])
+                ...(calendario?.semanas || []).map(s => ({ ...s, mes: mesActual })),
+                ...(calendarioSiguienteMes?.semanas || []).map(s => ({ ...s, mes: mesSiguiente }))
               ];
 
               // Encontrar la semana actual
@@ -668,9 +676,16 @@ const CalendarioPage = () => {
                                       marginBottom: `calc(0.25rem * var(--escala, 1))`
                                     }}
                                   >
-                                    {/* Nombre del proyecto */}
-                                    <div
-                                      className={`flex-1 ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded flex items-center overflow-hidden min-w-0`}
+                                    {/* Nombre del proyecto (abre la carpeta de ventas) */}
+                                    <button
+                                      type="button"
+                                      onClick={() => setProyectoSeleccionado({
+                                        proyecto,
+                                        dia: dia.numero,
+                                        mes: semana.mes || mesActual
+                                      })}
+                                      title="Ver la carpeta de ventas de este proyecto"
+                                      className={`flex-1 text-left ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded flex items-center overflow-hidden min-w-0 cursor-pointer hover:brightness-95 hover:shadow transition-all`}
                                       style={{
                                         padding: esGrande ? `calc(0.625rem * var(--escala, 1)) calc(0.75rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))`
                                       }}
@@ -681,7 +696,7 @@ const CalendarioPage = () => {
                                       >
                                         {textoProyecto}
                                       </span>
-                                    </div>
+                                    </button>
 
                                     {/* Hora */}
                                     {proyecto.hora && (
@@ -795,12 +810,21 @@ const CalendarioPage = () => {
                                   key={proyectoIndex}
                                   className="flex items-stretch gap-1 mb-1"
                                 >
-                                  {/* Nombre del proyecto con color del equipo */}
-                                  <div className={`flex-1 ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded px-2 py-2 flex items-center overflow-hidden min-w-0`}>
+                                  {/* Nombre del proyecto (abre la carpeta de ventas) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setProyectoSeleccionado({
+                                      proyecto,
+                                      dia: dia.numero,
+                                      mes: mesActual
+                                    })}
+                                    title="Ver la carpeta de ventas de este proyecto"
+                                    className={`flex-1 text-left ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded px-2 py-2 flex items-center overflow-hidden min-w-0 cursor-pointer hover:brightness-95 hover:shadow transition-all`}
+                                  >
                                     <span className={`font-medium text-xs ${coloresProyecto.text} leading-relaxed break-words w-full`}>
                                       {textoProyecto}
                                     </span>
-                                  </div>
+                                  </button>
 
                                   {/* Hora rotada 90° con color del equipo */}
                                   {proyecto.hora && (
@@ -841,6 +865,15 @@ const CalendarioPage = () => {
       )}
       </div>
       {/* Fin del contenedor con escala */}
+
+      {/* Carpeta de ventas del proyecto (sin pedido, importes ni formatos de cierre) */}
+      <ProyectoVentasModal
+        isOpen={!!proyectoSeleccionado}
+        onClose={() => setProyectoSeleccionado(null)}
+        proyecto={proyectoSeleccionado?.proyecto}
+        mes={proyectoSeleccionado?.mes}
+        dia={proyectoSeleccionado?.dia}
+      />
     </div>
   );
 };

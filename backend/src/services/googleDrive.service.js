@@ -17,7 +17,7 @@ const OAUTH_TOKEN_PATH = path.join(__dirname, '../../google-oauth-token.json');
 /**
  * Autenticar con Google Drive API usando Service Account
  */
-const authenticate = async () => {
+export const authenticate = async () => {
     try {
         let authConfig;
 
@@ -95,7 +95,7 @@ const leerCredencialesOAuth = () => {
  *
  * @returns {Promise<Object>} - Cliente de Drive autenticado con OAuth de usuario
  */
-const authenticateEscritura = async () => {
+export const authenticateEscritura = async () => {
     const creds = leerCredencialesOAuth();
 
     if (!creds) {
@@ -591,6 +591,8 @@ export const uploadTicket = async (carpetaId, pdfBuffer, fileName) => {
 };
 
 export default {
+    authenticate,
+    authenticateEscritura,
     buscarCarpetaProyecto,
     clasificarArchivosPDF,
     obtenerLinksArchivo,

@@ -57,6 +57,25 @@ export const obtenerDistribucionEquipos = async (mes) => {
   }
 };
 
+/**
+ * Obtener la carpeta de VENTAS de un proyecto del calendario: datos del
+ * proyecto + archivos de Drive, sin el pedido, los documentos con importes ni
+ * los formatos de cierre (garantía, control de calidad, check).
+ * @param {string} nombre - Nombre del proyecto tal como aparece en el calendario
+ * @param {string} mes - Mes del calendario en mayúsculas (ej: "AGOSTO")
+ */
+export const obtenerCarpetaVentas = async (nombre, mes) => {
+  try {
+    const response = await api.get('/calendario/proyecto/ventas', {
+      params: { nombre, mes }
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error al obtener carpeta de ventas de "${nombre}":`, error);
+    throw error;
+  }
+};
+
 // ============================================
 // VERSIONES PÚBLICAS (sin autenticación)
 // ============================================
@@ -108,6 +127,7 @@ export default {
   obtenerCalendarioMes,
   obtenerProyectosDia,
   obtenerDistribucionEquipos,
+  obtenerCarpetaVentas,
 
   // Funciones públicas (sin autenticación)
   obtenerCalendarioActualPublico,
