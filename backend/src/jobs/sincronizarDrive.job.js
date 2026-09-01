@@ -132,9 +132,14 @@ export const sincronizarProyectosConDrive = async (options = {}) => {
 
 /**
  * Iniciar job periódico de sincronización
- * @param {number} intervaloMinutos - Intervalo en minutos (default: 30)
+ *
+ * Cada 10 minutos: es lo que tarda el grupo de PRODUCCIÓN en enterarse de que
+ * se subió un plano o un ticket a la carpeta del proyecto. Con 30 minutos el
+ * aviso llegaba tan tarde que la gente ya había preguntado por WhatsApp.
+ *
+ * @param {number} intervaloMinutos - Intervalo en minutos (default: 10)
  */
-export const iniciarJobSincronizacion = (intervaloMinutos = 30) => {
+export const iniciarJobSincronizacion = (intervaloMinutos = 10) => {
     console.log(`📅 Programando sincronización de Drive cada ${intervaloMinutos} minutos`);
 
     // Ejecutar una vez al iniciar (después de 1 minuto para dar tiempo a que arranque el servidor)
@@ -144,12 +149,26 @@ export const iniciarJobSincronizacion = (intervaloMinutos = 30) => {
             .catch(err => console.error('Error en sincronización inicial:', err));
     }, 60000);
 
-    // Programar ejecución periódica
+    // Programar ejecución periódica. Con el intervalo corto una pasada lenta
+    // (Drive tardando, muchos proyectos) podría alcanzar a la siguiente y
+    // dejarlas encimadas, avisando dos veces lo mismo: si la anterior sigue
+    // corriendo, esta vuelta se salta y espera la que sigue.
+    let corriendo = false;
     const intervaloMs = intervaloMinutos * 60 * 1000;
-    setInterval(() => {
+    setInterval(async () => {
+        if (corriendo) {
+            console.log('⏭️ Sincronización de Drive aún corriendo, se salta esta vuelta');
+            return;
+        }
+        corriendo = true;
         console.log('\n⏰ Ejecutando sincronización programada de Drive...');
-        sincronizarProyectosConDrive({ soloSinCarpeta: false, limite: 50 })
-            .catch(err => console.error('Error en sincronización programada:', err));
+        try {
+            await sincronizarProyectosConDrive({ soloSinCarpeta: false, limite: 50 });
+        } catch (err) {
+            console.error('Error en sincronización programada:', err);
+        } finally {
+            corriendo = false;
+        }
     }, intervaloMs);
 };
 
