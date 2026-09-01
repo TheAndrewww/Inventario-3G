@@ -381,7 +381,8 @@ export const clasificarArchivosPDF = async (carpetaId) => {
                 // puede llegar por el endpoint o subido a mano si aquel falló.
                 resultado.tickets.push({
                     id: archivo.id,
-                    nombre: archivo.name
+                    nombre: archivo.name,
+                    creado: archivo.createdTime
                 });
 
             } else if (ES_REPORTE_DIARIO.test(nombreNormalizado)) {
@@ -503,38 +504,34 @@ export const sincronizarProyecto = async (proyecto) => {
         // Clasificar archivos PDF
         const clasificacion = await clasificarArchivosPDF(carpeta.id);
 
-        // Qué apareció desde la última pasada. Sirve para avisar al grupo de
-        // producción; en la PRIMERA sincronización del proyecto no se reporta
-        // nada, porque ahí "nuevo" es simplemente todo lo que ya existía.
-        // También cuenta como primera vez cuando el proyecto aún no tenía carpeta:
-        // un sync anterior pudo fallar con "Carpeta no encontrada" (que igual
-        // sella drive_sync_at), y al encontrarla por fin toda la carpeta se
-        // vería como recién subida.
+        // Qué apareció desde la última pasada. Normalmente es lo que no estaba
+        // en la lista guardada.
+        //
+        // El caso especial es la PRIMERA vez que se mira un proyecto —recién dado
+        // de alta, o su carpeta apareció apenas—: ahí no hay lista contra qué
+        // comparar y "nuevo" sería la carpeta entera, que puede traer meses de
+        // archivos. Pero tampoco puede callarse todo: cuando se da de alta un
+        // proyecto, el diseñador acaba de subir sus planos minutos antes, y ese es
+        // justamente el aviso que el grupo necesita. Así que en la primera pasada
+        // se avisa solo lo subido hace poco y el resto solo se anota.
         const esPrimerSync = !proyecto.drive_sync_at || !proyecto.drive_folder_id;
-        const idsPrevios = (lista) => new Set((lista || []).map(a => a.id));
-
         // Los tickets llevan su propia lista, más nueva que las otras dos: null
-        // significa que este proyecto todavía no la tiene registrada, y ahí
-        // "nuevo" sería todo ticket que ya estuviera en la carpeta. La primera
-        // pasada solo los anota, para no vaciar los tickets viejos al grupo.
+        // significa que este proyecto todavía no la tiene registrada.
         const esPrimerRegistroDeTickets = proyecto.archivos_ticket == null;
-        const nuevos = esPrimerSync
-            ? { manufactura: [], herreria: [], tickets: [] }
-            : {
-                manufactura: clasificacion.archivos.manufactura
-                    .filter(a => !idsPrevios(proyecto.archivos_manufactura).has(a.id))
-                    .map(a => a.nombre),
-                herreria: clasificacion.archivos.herreria
-                    .filter(a => !idsPrevios(proyecto.archivos_herreria).has(a.id))
-                    .map(a => a.nombre),
-                // El ticket que ya se avisó al subirlo por el sistema viene guardado
-                // aquí, así que este barrido solo pesca el que entró por otro lado.
-                tickets: esPrimerRegistroDeTickets
-                    ? []
-                    : clasificacion.archivos.tickets
-                        .filter(a => !idsPrevios(proyecto.archivos_ticket).has(a.id))
-                        .map(a => a.nombre)
-            };
+
+        const VENTANA_PRIMER_AVISO_MS = 48 * 60 * 60 * 1000;
+        const esReciente = (a) => a.creado &&
+            (Date.now() - new Date(a.creado).getTime()) < VENTANA_PRIMER_AVISO_MS;
+        const idsPrevios = (lista) => new Set((lista || []).map(a => a.id));
+        const nuevosDe = (archivos, previos, primeraVez) => archivos
+            .filter(a => primeraVez ? esReciente(a) : !idsPrevios(previos).has(a.id))
+            .map(a => a.nombre);
+
+        const nuevos = {
+            manufactura: nuevosDe(clasificacion.archivos.manufactura, proyecto.archivos_manufactura, esPrimerSync),
+            herreria: nuevosDe(clasificacion.archivos.herreria, proyecto.archivos_herreria, esPrimerSync),
+            tickets: nuevosDe(clasificacion.archivos.tickets, proyecto.archivos_ticket, esPrimerRegistroDeTickets)
+        };
 
         // Preparar datos para actualizar
         const datosActualizacion = {
