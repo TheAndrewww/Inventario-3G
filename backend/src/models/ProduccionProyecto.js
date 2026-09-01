@@ -247,6 +247,11 @@ const ProduccionProyecto = sequelize.define('ProduccionProyecto', {
         allowNull: true,
         comment: 'Array de archivos PDF de Herrería [{id, nombre, link}]'
     },
+    archivos_ticket: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: 'Tickets de salida ya vistos en la carpeta [{id, nombre}]. No son producción: se guardan solo para no repetir el aviso al grupo'
+    },
     drive_sync_at: {
         type: DataTypes.DATE,
         allowNull: true,

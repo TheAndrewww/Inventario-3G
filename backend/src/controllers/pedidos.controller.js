@@ -2722,7 +2722,7 @@ export const uploadTicketToDrive = async (req, res) => {
     // 1. Buscar drive_folder_id en la base de datos (más rápido que Drive API)
     const proyectoObj = await ProduccionProyecto.findOne({
       where: { nombre: proyecto, activo: true },
-      attributes: ['id', 'nombre', 'drive_folder_id']
+      attributes: ['id', 'nombre', 'drive_folder_id', 'archivos_ticket']
     });
 
     let carpetaId = proyectoObj?.drive_folder_id;
@@ -2752,11 +2752,22 @@ export const uploadTicketToDrive = async (req, res) => {
 
     const archivo = await uploadTicket(carpetaId, pdfBuffer, fileName);
 
-    // El grupo de producción se entera de la salida de almacén. Se avisa aquí
-    // (y no en la sincronización de Drive) porque los tickets no se guardan en
-    // la base: la clasificación de archivos los descarta.
+    // El grupo de producción se entera de la salida de almacén. Se avisa aquí,
+    // en caliente, para que no dependa de cuándo corra el barrido de Drive.
     await avisarTicketSubido({ proyecto })
       .catch(err => console.error('⚠️ No se pudo avisar el ticket al grupo:', err.message));
+
+    // Se anota el ticket como ya visto para que el barrido no lo vuelva a avisar.
+    // El barrido es la red por si esta subida falla y alguien lo sube a mano; si
+    // salió bien, el aviso ya se dio aquí y no debe repetirse dentro de 30 minutos.
+    if (proyectoObj && archivo?.id) {
+      const vistos = proyectoObj.archivos_ticket || [];
+      if (!vistos.some(t => t.id === archivo.id)) {
+        await proyectoObj.update({
+          archivos_ticket: [...vistos, { id: archivo.id, nombre: archivo.name || fileName }]
+        }).catch(err => console.error('⚠️ No se pudo anotar el ticket:', err.message));
+      }
+    }
 
     res.json({
       success: true,

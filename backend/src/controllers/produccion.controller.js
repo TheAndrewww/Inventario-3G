@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import produccionSheetsService from '../services/produccionSheets.service.js';
 import {
     avisarArchivosNuevos,
+    avisarTicketSubido,
     avisarEtapaCompletada,
     avisarProyectoCompletado
 } from '../services/avisosProduccion.service.js';
@@ -965,6 +966,13 @@ export const sincronizarProyectoDrive = async (req, res) => {
                     manufactura: nuevos.manufactura,
                     herreria: nuevos.herreria
                 }).catch(err => console.error('⚠️ No se pudo avisar al grupo:', err.message));
+            }
+
+            // Un ticket que entró a la carpeta a mano (porque falló la subida desde
+            // el sistema) también se avisa: si no, la salida de almacén pasa callada.
+            for (const ticket of (nuevos?.tickets || [])) {
+                await avisarTicketSubido({ proyecto: proyecto.nombre })
+                    .catch(err => console.error(`⚠️ No se pudo avisar el ticket ${ticket}:`, err.message));
             }
         }
 

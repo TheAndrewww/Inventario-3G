@@ -311,7 +311,7 @@ const ES_REPORTE_DIARIO = /REPORTE[ _-]?DIARIO/;
 /**
  * Clasificar archivos PDF de una carpeta según la lógica de negocio
  * - HERRERIA*.pdf → Herrería
- * - Ticket*.pdf → Ignorar
+ * - Ticket*.pdf → Ticket de salida (no es producción, pero se avisa al grupo)
  * - REPORTE_DIARIO*.pdf → Ignorar
  * - Cualquier otro .pdf → Manufactura
  * @param {string} carpetaId - ID de la carpeta del proyecto
@@ -349,6 +349,7 @@ export const clasificarArchivosPDF = async (carpetaId) => {
         const resultado = {
             herreria: [],
             manufactura: [],
+            tickets: [],
             ignorados: []
         };
 
@@ -374,8 +375,16 @@ export const clasificarArchivosPDF = async (carpetaId) => {
                     creado: archivo.createdTime
                 });
 
-            } else if (nombreNormalizado.startsWith('TICKET') ||
-                       ES_REPORTE_DIARIO.test(nombreNormalizado)) {
+            } else if (nombreNormalizado.startsWith('TICKET')) {
+                // El ticket no es producción —no entra a las TV de manufactura ni
+                // herrería—, pero sí se avisa al grupo cuando aparece uno nuevo:
+                // puede llegar por el endpoint o subido a mano si aquel falló.
+                resultado.tickets.push({
+                    id: archivo.id,
+                    nombre: archivo.name
+                });
+
+            } else if (ES_REPORTE_DIARIO.test(nombreNormalizado)) {
                 resultado.ignorados.push(archivo.name);
 
             } else {
@@ -481,6 +490,7 @@ export const sincronizarProyecto = async (proyecto) => {
                 tiene_herreria: false,
                 archivos_manufactura: [],
                 archivos_herreria: [],
+                archivos_ticket: [],
                 drive_sync_at: new Date()
             });
             return {
@@ -502,15 +512,28 @@ export const sincronizarProyecto = async (proyecto) => {
         // vería como recién subida.
         const esPrimerSync = !proyecto.drive_sync_at || !proyecto.drive_folder_id;
         const idsPrevios = (lista) => new Set((lista || []).map(a => a.id));
+
+        // Los tickets llevan su propia lista, más nueva que las otras dos: null
+        // significa que este proyecto todavía no la tiene registrada, y ahí
+        // "nuevo" sería todo ticket que ya estuviera en la carpeta. La primera
+        // pasada solo los anota, para no vaciar los tickets viejos al grupo.
+        const esPrimerRegistroDeTickets = proyecto.archivos_ticket == null;
         const nuevos = esPrimerSync
-            ? { manufactura: [], herreria: [] }
+            ? { manufactura: [], herreria: [], tickets: [] }
             : {
                 manufactura: clasificacion.archivos.manufactura
                     .filter(a => !idsPrevios(proyecto.archivos_manufactura).has(a.id))
                     .map(a => a.nombre),
                 herreria: clasificacion.archivos.herreria
                     .filter(a => !idsPrevios(proyecto.archivos_herreria).has(a.id))
-                    .map(a => a.nombre)
+                    .map(a => a.nombre),
+                // El ticket que ya se avisó al subirlo por el sistema viene guardado
+                // aquí, así que este barrido solo pesca el que entró por otro lado.
+                tickets: esPrimerRegistroDeTickets
+                    ? []
+                    : clasificacion.archivos.tickets
+                        .filter(a => !idsPrevios(proyecto.archivos_ticket).has(a.id))
+                        .map(a => a.nombre)
             };
 
         // Preparar datos para actualizar
@@ -520,6 +543,7 @@ export const sincronizarProyecto = async (proyecto) => {
             tiene_herreria: clasificacion.tieneHerreria,
             archivos_manufactura: clasificacion.archivos.manufactura,
             archivos_herreria: clasificacion.archivos.herreria,
+            archivos_ticket: clasificacion.archivos.tickets,
             drive_sync_at: new Date()
         };
 

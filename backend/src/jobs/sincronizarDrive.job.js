@@ -6,7 +6,7 @@
 import { ProduccionProyecto } from '../models/index.js';
 import { Op } from 'sequelize';
 import googleDriveService from '../services/googleDrive.service.js';
-import { avisarArchivosNuevos } from '../services/avisosProduccion.service.js';
+import { avisarArchivosNuevos, avisarTicketSubido } from '../services/avisosProduccion.service.js';
 
 /**
  * Sincronizar proyectos activos con Google Drive
@@ -84,6 +84,15 @@ export const sincronizarProyectosConDrive = async (options = {}) => {
                             manufactura: nuevos.manufactura,
                             herreria: nuevos.herreria
                         }).catch(err => console.error('   ⚠️ No se pudo avisar al grupo:', err.message));
+                    }
+
+                    // El ticket de salida se avisa al subirlo desde el sistema, pero si
+                    // esa subida falla y alguien lo arrastra a la carpeta a mano, el
+                    // grupo se quedaba sin enterarse. Aquí se pesca ese caso.
+                    for (const ticket of (nuevos?.tickets || [])) {
+                        resultados.avisados++;
+                        await avisarTicketSubido({ proyecto: proyecto.nombre })
+                            .catch(err => console.error(`   ⚠️ No se pudo avisar el ticket ${ticket}:`, err.message));
                     }
                 } else {
                     resultados.fallidos++;

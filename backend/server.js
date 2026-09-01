@@ -1088,6 +1088,17 @@ const startServer = async () => {
             console.error('⚠️ Error verificando tabla avisos_whatsapp:', avisosErr.message);
         }
 
+        // Tickets de salida ya vistos en la carpeta del proyecto — aplica en dev y prod.
+        // Sirve para no repetir el aviso 🎫 al grupo de PRODUCCIÓN en cada barrido.
+        try {
+            await sequelize.query(
+                "ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS archivos_ticket JSON"
+            );
+            console.log('✅ Columna archivos_ticket verificada en produccion_proyectos');
+        } catch (ticketColErr) {
+            console.error('⚠️ Error verificando archivos_ticket:', ticketColErr.message);
+        }
+
         // Ventana de conteo de 7 días en órdenes de compra — aplica en dev y prod
         try {
             await sequelize.query(
