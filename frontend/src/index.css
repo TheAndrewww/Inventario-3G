@@ -52,3 +52,12 @@ body {
 
   /* red-300 */
 }
+/* La hora del calendario va en vertical solo cuando la columna del día es
+   angosta (escritorio, 7 columnas). En teléfono y tableta los días se apilan y
+   la hora se lee horizontal. */
+@media (min-width: 768px) {
+  .hora-vertical {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+  }
+}

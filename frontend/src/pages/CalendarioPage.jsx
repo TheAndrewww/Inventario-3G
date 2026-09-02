@@ -54,6 +54,12 @@ const CalendarioPage = () => {
     const escalaGuardada = localStorage.getItem('calendarioEscala');
     return escalaGuardada ? parseFloat(escalaGuardada) : 100;
   });
+  // Zoom de la vista normal: almacén, tabletas y teléfonos ajustan el tamaño a
+  // su pantalla y queda recordado en ese dispositivo.
+  const [escalaNormal, setEscalaNormal] = useState(() => {
+    const guardada = localStorage.getItem('calendarioEscalaNormal');
+    return guardada ? parseFloat(guardada) : 100;
+  });
   const [mostrarControles, setMostrarControles] = useState(true);
   // Proyecto abierto desde el calendario: { proyecto, dia, mes }.
   // Almacén/calidad lo usa para ver la carpeta de ventas sin salir del calendario.
@@ -129,10 +135,22 @@ const CalendarioPage = () => {
     setEscala(prev => Math.max(prev - 10, 30)); // Mínimo 30%
   };
 
+  const aumentarEscalaNormal = () => {
+    setEscalaNormal(prev => Math.min(prev + 10, 150));
+  };
+
+  const reducirEscalaNormal = () => {
+    setEscalaNormal(prev => Math.max(prev - 10, 50));
+  };
+
   // Guardar escala en localStorage
   useEffect(() => {
     localStorage.setItem('calendarioEscala', escala.toString());
   }, [escala]);
+
+  useEffect(() => {
+    localStorage.setItem('calendarioEscalaNormal', escalaNormal.toString());
+  }, [escalaNormal]);
 
   // Actualizar reloj cada segundo
   useEffect(() => {
@@ -200,17 +218,17 @@ const CalendarioPage = () => {
 
   return (
     <div
-      className={`h-screen flex flex-col ${modoPantallaCompleta ? 'p-2 bg-gray-900' : 'p-4 bg-gradient-to-br from-red-50 to-orange-100'} overflow-hidden`}
+      className={`flex flex-col ${modoPantallaCompleta ? 'h-screen overflow-hidden p-2 bg-gray-900' : 'min-h-full p-2 sm:p-4 bg-gradient-to-br from-red-50 to-orange-100'}`}
       style={modoPantallaCompleta && !mostrarControles ? { cursor: 'none' } : undefined}
     >
       {/* Header compacto - Solo en modo normal */}
       {!modoPantallaCompleta && (
         <div className="mb-4">
-          <div className="flex items-center justify-between bg-white rounded-lg shadow-md p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-lg shadow-md p-3">
             <div className="flex items-center space-x-3">
-              <Calendar className="w-8 h-8 text-red-700" />
+              <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-red-700 flex-shrink-0" />
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">
+                <h1 className="text-lg sm:text-2xl font-bold text-gray-800">
                   Calendario de Entregas 2026
                 </h1>
                 <div className="flex items-center space-x-4 mt-1">
@@ -220,7 +238,7 @@ const CalendarioPage = () => {
                   >
                     <ChevronLeft className="w-5 h-5 text-gray-600" />
                   </button>
-                  <h2 className="text-xl font-bold text-gray-800">
+                  <h2 className="text-base sm:text-xl font-bold text-gray-800">
                     {mesActual}
                   </h2>
                   <button
@@ -234,6 +252,29 @@ const CalendarioPage = () => {
             </div>
 
             <div className="flex items-center space-x-3">
+              {/* Zoom de la vista: cada pantalla se ajusta a su tamaño */}
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={reducirEscalaNormal}
+                  disabled={escalaNormal <= 50}
+                  className="p-1.5 rounded hover:bg-gray-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Ver más chico (cabe más en pantalla)"
+                >
+                  <ZoomOut className="w-4 h-4 text-gray-700" />
+                </button>
+                <span className="text-xs font-bold text-gray-700 w-10 text-center tabular-nums">
+                  {escalaNormal}%
+                </span>
+                <button
+                  onClick={aumentarEscalaNormal}
+                  disabled={escalaNormal >= 150}
+                  className="p-1.5 rounded hover:bg-gray-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Ver más grande"
+                >
+                  <ZoomIn className="w-4 h-4 text-gray-700" />
+                </button>
+              </div>
+
               {/* Botón actualizar manualmente */}
               <button
                 onClick={() => cargarCalendario(true)}
@@ -304,10 +345,10 @@ const CalendarioPage = () => {
 
       {/* Contenedor con escala aplicada mediante variables CSS */}
       <div
-        className="flex-1 flex flex-col overflow-hidden"
-        style={modoPantallaCompleta ? {
-          '--escala': escala / 100,
-        } : undefined}
+        className={modoPantallaCompleta ? 'flex-1 flex flex-col overflow-hidden' : 'flex-1 flex flex-col'}
+        style={modoPantallaCompleta
+          ? { '--escala': escala / 100 }
+          : { zoom: escalaNormal / 100 }}
       >
         {/* Distribución de Equipos y Reloj */}
         {distribucionEquipos && distribucionEquipos.equipos && distribucionEquipos.equipos.length > 0 && (
@@ -520,14 +561,14 @@ const CalendarioPage = () => {
               </div>
 
               {/* Vista Normal - Reloj - 1/3 del ancho */}
-              <div className="bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md p-6 flex flex-col items-center justify-center text-white">
+              <div className="bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md p-4 sm:p-6 flex flex-col items-center justify-center text-white">
                 <div className="flex items-center space-x-2 mb-4">
                   <Clock className="w-8 h-8" />
                   <h3 className="text-lg font-bold">Hora Actual</h3>
                 </div>
 
                 <div className="text-center">
-                  <div className="text-6xl font-bold mb-2 tabular-nums">
+                  <div className="text-4xl sm:text-6xl font-bold mb-2 tabular-nums">
                     {horaActual.toLocaleTimeString('es-MX', {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -536,7 +577,7 @@ const CalendarioPage = () => {
                       timeZone: 'America/Mexico_City'
                     })}
                   </div>
-                  <div className="text-xl font-medium opacity-90">
+                  <div className="text-base sm:text-xl font-medium opacity-90">
                     {horaActual.toLocaleDateString('es-MX', {
                       weekday: 'long',
                       day: 'numeric',
@@ -757,42 +798,42 @@ const CalendarioPage = () => {
             })()
           ) : (
             // Vista Normal: Todas las semanas en 2 columnas
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4 pb-4">
               {calendario.semanas.map((semana, semanaIndex) => {
                 const hoy = new Date();
                 const diaHoy = hoy.getDate();
 
                 return (
                   <div key={semanaIndex} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
-                    <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-7 md:min-h-[16rem] divide-y md:divide-y-0 md:divide-x divide-gray-200">
                       {semana.dias.map((dia, diaIndex) => {
                         const esDiaActual = dia.numero === diaHoy;
                         const esAsueto = dia.proyectos.some(p => p.nombre.toUpperCase().includes('ASUETO'));
 
                         return (
-                          <div key={diaIndex} className={`flex flex-col ${dia.numero === null ? 'bg-gray-100' : esAsueto ? 'bg-red-50' : esDiaActual ? 'bg-yellow-50' : ''} overflow-hidden`}>
+                          <div key={diaIndex} className={`flex-col ${dia.numero === null ? 'hidden md:flex bg-gray-100' : 'flex'} ${esAsueto ? 'bg-red-50' : esDiaActual ? 'bg-yellow-50' : ''} overflow-hidden`}>
                             {/* Header del día */}
-                            <div className={`${dia.numero === null ? 'bg-gray-400' : esAsueto ? 'bg-red-600' : esDiaActual ? 'bg-yellow-500' : 'bg-blue-600'} text-white p-1.5 ${esDiaActual || esAsueto ? 'shadow-md' : ''}`}>
-                              <div className="font-bold text-[10px]">
+                            <div className={`${dia.numero === null ? 'bg-gray-400' : esAsueto ? 'bg-red-600' : esDiaActual ? 'bg-yellow-500' : 'bg-blue-600'} text-white px-2 py-1.5 md:p-1.5 flex items-center gap-2 md:block ${esDiaActual || esAsueto ? 'shadow-md' : ''}`}>
+                              <div className="font-bold text-sm md:text-[10px] uppercase">
                                 {dia.nombre}
                               </div>
                               <div className="text-lg font-bold">
                                 {dia.numero || '-'}
                               </div>
                               {esDiaActual && (
-                                <div className="text-[8px] font-bold mt-0.5 animate-pulse">
+                                <div className="text-[10px] md:text-[8px] font-bold md:mt-0.5 animate-pulse">
                                   HOY
                                 </div>
                               )}
                               {esAsueto && (
-                                <div className="text-[8px] font-bold mt-0.5">
+                                <div className="text-[10px] md:text-[8px] font-bold md:mt-0.5">
                                   ASUETO
                                 </div>
                               )}
                             </div>
 
                         {/* Proyectos del día */}
-                        <div className="flex-1 p-1.5 space-y-1.5 overflow-y-auto overflow-x-hidden">
+                        <div className="flex-1 p-2 md:p-1.5 space-y-2 md:space-y-1.5 overflow-x-hidden">
                           {dia.proyectos.filter(p => !p.nombre.toUpperCase().includes('ASUETO')).length === 0 ? (
                             <div className="text-center text-gray-400 text-xs mt-2">
                               Sin proyectos
@@ -821,27 +862,16 @@ const CalendarioPage = () => {
                                     title="Ver la carpeta de ventas de este proyecto"
                                     className={`flex-1 text-left ${coloresProyecto.bg} ${coloresProyecto.border} border-l-4 rounded px-2 py-2 flex items-center overflow-hidden min-w-0 cursor-pointer hover:brightness-95 hover:shadow transition-all`}
                                   >
-                                    <span className={`font-medium text-xs ${coloresProyecto.text} leading-relaxed break-words w-full`}>
+                                    <span className={`font-medium text-sm md:text-xs ${coloresProyecto.text} leading-relaxed break-words w-full`}>
                                       {textoProyecto}
                                     </span>
                                   </button>
 
                                   {/* Hora rotada 90° con color del equipo */}
                                   {proyecto.hora && (
-                                    <div className={`${coloresHora.bg} ${coloresHora.text} rounded flex items-center justify-center flex-shrink-0 overflow-hidden`}
-                                      style={{
-                                        width: '24px',
-                                        maxWidth: '24px',
-                                        padding: '8px 4px'
-                                      }}
-                                    >
-                                      <div style={{
-                                        writingMode: 'vertical-rl',
-                                        textOrientation: 'mixed',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden'
-                                      }}>
-                                        <span className="font-bold text-[10px] text-center leading-tight">
+                                    <div className={`${coloresHora.bg} ${coloresHora.text} rounded flex items-center justify-center flex-shrink-0 overflow-hidden px-2 py-1 md:px-1 md:py-2 md:w-6 md:max-w-[24px]`}>
+                                      <div className="hora-vertical whitespace-nowrap overflow-hidden">
+                                        <span className="font-bold text-xs md:text-[10px] text-center leading-tight">
                                           {proyecto.hora}
                                         </span>
                                       </div>
