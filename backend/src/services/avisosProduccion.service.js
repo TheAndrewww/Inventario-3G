@@ -114,6 +114,15 @@ export const NOMBRES_ETAPA = {
 };
 
 /**
+ * Etapas que NO se avisan al grupo de PRODUCCIÓN.
+ *
+ * Compras no es producción: que el área de compras cierre su etapa no le dice
+ * nada a quien fabrica, y ese movimiento ya se sigue en los grupos de Compras y
+ * Requisiciones. En PRODUCCIÓN solo era ruido.
+ */
+const ETAPAS_SIN_AVISO = new Set(['compras']);
+
+/**
  * Se completó una etapa o sub-etapa del proyecto.
  */
 export const construirAvisoEtapaCompletada = ({ proyecto, etapa, usuario }) => {
@@ -125,8 +134,10 @@ export const construirAvisoEtapaCompletada = ({ proyecto, etapa, usuario }) => {
     ].filter(l => l !== null).join('\n');
 };
 
-export const avisarEtapaCompletada = async (datos) =>
-    enviarWhatsApp(construirAvisoEtapaCompletada(datos), DESTINO);
+export const avisarEtapaCompletada = async (datos) => {
+    if (ETAPAS_SIN_AVISO.has(datos?.etapa)) return false;
+    return enviarWhatsApp(construirAvisoEtapaCompletada(datos), DESTINO);
+};
 
 /**
  * El proyecto terminó producción y se movió a Completados.
