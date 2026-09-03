@@ -229,6 +229,7 @@ export const crearTipo = async (req, res) => {
 
         // Validaciones
         if (!nombre || !categoria_id || !ubicacion_id) {
+            await transaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: 'Faltan campos requeridos'
@@ -236,6 +237,7 @@ export const crearTipo = async (req, res) => {
         }
 
         if (!cantidad_unidades || cantidad_unidades < 1) {
+            await transaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: 'La cantidad de unidades debe ser mayor a 0'
@@ -514,6 +516,7 @@ export const asignarHerramienta = async (req, res) => {
 
         // Validaciones
         if (!unidad_id) {
+            await transaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: 'El ID de la unidad es requerido'
@@ -521,6 +524,7 @@ export const asignarHerramienta = async (req, res) => {
         }
 
         if (!usuario_id && !camioneta_id) {
+            await transaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: 'Debe asignar a un usuario o camioneta'
@@ -531,6 +535,7 @@ export const asignarHerramienta = async (req, res) => {
         const unidad = await UnidadHerramientaRenta.findByPk(unidad_id);
 
         if (!unidad) {
+            await transaction.rollback();
             return res.status(404).json({
                 success: false,
                 message: 'Unidad no encontrada'
@@ -539,6 +544,7 @@ export const asignarHerramienta = async (req, res) => {
 
         // Verificar disponibilidad usando el campo estado existente
         if (unidad.estado === 'asignada') {
+            await transaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: `La unidad ya está asignada`
@@ -639,6 +645,7 @@ export const devolverHerramienta = async (req, res) => {
         const unidad = await UnidadHerramientaRenta.findByPk(unidadId);
 
         if (!unidad) {
+            await transaction.rollback();
             return res.status(404).json({
                 success: false,
                 message: 'Unidad no encontrada'
@@ -647,6 +654,7 @@ export const devolverHerramienta = async (req, res) => {
 
         // Verificar que esté asignada usando el nuevo campo estatus
         if (unidad.estatus !== 'asignado') {
+            await transaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: `La unidad no está asignada. Estatus actual: ${unidad.estatus}`

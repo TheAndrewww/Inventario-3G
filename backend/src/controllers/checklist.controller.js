@@ -9,6 +9,7 @@ export const importarItems = async (req, res) => {
         // items: [{ nombre, especificacion, seccion, tipo, cantidad_requerida }]
 
         if (!items || !Array.isArray(items) || items.length === 0) {
+            await t.rollback();
             return res.status(400).json({ success: false, message: 'No se proporcionaron ítems para importar' });
         }
 

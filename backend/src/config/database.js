@@ -36,7 +36,13 @@ if (databaseUrl) {
             ssl: process.env.NODE_ENV === 'production' ? {
                 require: true,
                 rejectUnauthorized: false
-            } : false
+            } : false,
+            // Si una petición abre una transacción y se va sin cerrarla, esa
+            // conexión se quedaba tomada para siempre y, con el pool en 5,
+            // bastaban unas pocas para que TODO lo que escribe (completar un
+            // ticket, palomear un artículo) se quedara colgado. Postgres la
+            // suelta sola al minuto.
+            idle_in_transaction_session_timeout: 60000
         },
         logging: process.env.NODE_ENV === 'development' ? console.log : false,
         pool: {
@@ -81,6 +87,7 @@ if (databaseUrl) {
             dialect: 'postgres',
             dialectOptions: {
                 charset: 'utf8mb4',
+                idle_in_transaction_session_timeout: 60000
             },
             logging: process.env.NODE_ENV === 'development' ? console.log : false,
             pool: {

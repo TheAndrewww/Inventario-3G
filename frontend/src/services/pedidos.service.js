@@ -174,7 +174,9 @@ const pedidosService = {
    * Marcar pedido como entregado directamente (solo admin)
    */
   entregarDirecto: async (pedidoId) => {
-    const response = await api.put(`/pedidos/${pedidoId}/entregar-directo`);
+    // Con tope de tiempo: si el backend no contesta, Almacén ve un error y no
+    // un botón "Completando..." que se queda girando para siempre.
+    const response = await api.put(`/pedidos/${pedidoId}/entregar-directo`, null, { timeout: 45000 });
     return response.data;
   },
 

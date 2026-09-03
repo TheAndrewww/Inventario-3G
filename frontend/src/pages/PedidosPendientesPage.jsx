@@ -187,7 +187,14 @@ const PedidosPendientesPage = () => {
       await cargarDatos();
     } catch (error) {
       console.error('Error al completar ticket:', error);
-      toast.error(error.response?.data?.message || 'Error al completar el ticket');
+      toast.error(
+        error.response?.data?.message ||
+        (error.code === 'ECONNABORTED'
+          ? 'El sistema no respondió. El ticket NO se cerró, vuelve a intentarlo.'
+          : 'Error al completar el ticket')
+      );
+      // Recargar para que la pantalla muestre cómo quedó de verdad el ticket.
+      await cargarDatos();
     } finally {
       setProcesando(false);
     }

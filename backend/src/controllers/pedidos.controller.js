@@ -142,6 +142,7 @@ export const crearPedido = async (req, res) => {
 
     // Validaciones
     if (!articulos || !Array.isArray(articulos) || articulos.length === 0) {
+      await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: 'Debe proporcionar al menos un artículo para el pedido'
