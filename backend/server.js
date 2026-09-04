@@ -543,6 +543,28 @@ const startServer = async () => {
                 console.log('✅ Base de datos ya inicializada');
             }
 
+            // El estado de un movimiento es un ENUM de Postgres. Si a la base le
+            // falta alguno de los valores que usa el código —pasa cuando una
+            // migración vieja no se aplicó completa—, la lectura funciona pero
+            // escribirlo truena: cerrar una Orden de Salida daba 500 mientras
+            // todo lo demás se veía bien. Los ALTER son idempotentes y van
+            // fuera de transacción (Postgres lo exige) y con su propio try:
+            // si algo falla, el sistema arranca igual.
+            try {
+                const ESTADOS_MOVIMIENTO = [
+                    'pendiente', 'pendiente_aprobacion', 'aprobado', 'rechazado',
+                    'listo_para_entrega', 'entregado', 'completado', 'cancelado'
+                ];
+                for (const valor of ESTADOS_MOVIMIENTO) {
+                    await sequelize.query(
+                        `ALTER TYPE "enum_movimientos_estado" ADD VALUE IF NOT EXISTS '${valor}'`
+                    );
+                }
+                console.log('✅ Valores de estado de movimientos verificados');
+            } catch (e) {
+                console.log('⚠️ No se pudieron verificar los estados de movimientos:', e.message);
+            }
+
             // Migración: conteos_ciclicos schema v2 (agregar fecha, total_asignados)
             try {
                 const [fechaCol] = await sequelize.query(
