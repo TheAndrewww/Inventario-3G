@@ -187,11 +187,15 @@ const PedidosPendientesPage = () => {
       await cargarDatos();
     } catch (error) {
       console.error('Error al completar ticket:', error);
+      // El detalle del backend se muestra tal cual: sin él, un fallo en
+      // producción solo se ve como "error" y no hay por dónde empezar.
+      const detalle = error.response?.data?.error;
       toast.error(
-        error.response?.data?.message ||
-        (error.code === 'ECONNABORTED'
+        error.code === 'ECONNABORTED'
           ? 'El sistema no respondió. El ticket NO se cerró, vuelve a intentarlo.'
-          : 'Error al completar el ticket')
+          : [error.response?.data?.message || 'Error al completar el ticket', detalle]
+              .filter(Boolean).join(': '),
+        { duration: 12000 }
       );
       // Recargar para que la pantalla muestre cómo quedó de verdad el ticket.
       await cargarDatos();

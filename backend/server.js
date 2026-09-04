@@ -166,6 +166,29 @@ app.get('/', (req, res) => {
     });
 });
 
+/**
+ * Diagnóstico del backend, sin sesión: sirve para saber desde fuera si el
+ * sistema está sano cuando alguien reporta que "todo se queda cargando".
+ *
+ * Lo que importa es `conexiones`: si `libres` es 0 y hay peticiones
+ * `esperando`, el pool está agotado y NADA que escriba en la base va a
+ * terminar (completar un ticket, palomear, crear una orden). No expone
+ * ningún dato del negocio.
+ */
+app.get('/api/estado-sistema', (req, res) => {
+    const pool = sequelize?.connectionManager?.pool;
+    res.json({
+        version: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || 'desconocida',
+        arriba_desde_segundos: Math.round(process.uptime()),
+        conexiones: pool ? {
+            en_uso: pool.using,
+            libres: pool.available,
+            esperando: pool.waiting,
+            maximo: pool.maxSize
+        } : null
+    });
+});
+
 // Rutas de API
 app.use('/api/auth', authRoutes);
 app.use('/api/articulos', articulosRoutes);
