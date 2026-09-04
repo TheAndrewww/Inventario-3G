@@ -10,6 +10,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { sequelize } from './src/config/database.js';
+import { registrarError, ultimosErrores } from './src/utils/diagnostico.js';
 import './src/models/index.js'; // Importar modelos y relaciones
 import { iniciarCronJobs } from './src/utils/cronJobs.js';
 import { ejecutarAutoMigracion } from './src/utils/autoMigrate.js';
@@ -185,7 +186,8 @@ app.get('/api/estado-sistema', (req, res) => {
             libres: pool.available,
             esperando: pool.waiting,
             maximo: pool.maxSize
-        } : null
+        } : null,
+        ultimos_errores: ultimosErrores()
     });
 });
 
@@ -376,6 +378,7 @@ app.get('/api/admin/limpiar-db', async (req, res) => {
 // Manejo de errores
 app.use((err, req, res, next) => {
     console.error(err.stack);
+    registrarError(`${req.method} ${req.originalUrl}`, err);
     res.status(500).json({
         message: 'Algo salió mal!',
         error: process.env.NODE_ENV === 'development' ? err.message : {}

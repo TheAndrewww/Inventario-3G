@@ -4,6 +4,7 @@ import { sequelize } from '../config/database.js';
 import { crearNotificacion, notificarPorRol } from './notificaciones.controller.js';
 import { buscarCarpetaProyecto, uploadTicket } from '../services/googleDrive.service.js';
 import { avisarTicketSubido, avisarTicketCerrado } from '../services/avisosProduccion.service.js';
+import { registrarError } from '../utils/diagnostico.js';
 import admin from 'firebase-admin';
 
 // Normalización: minúsculas, sin acentos, espacios colapsados.
@@ -2695,8 +2696,9 @@ export const marcarPedidoEntregadoDirecto = async (req, res) => {
     });
 
   } catch (error) {
-    await transaction.rollback();
+    await transaction.rollback().catch(() => {});
     console.error('Error al marcar pedido como entregado:', error);
+    registrarError('PUT /api/pedidos/:id/entregar-directo', error);
     res.status(500).json({
       success: false,
       message: 'Error al marcar pedido como entregado',
