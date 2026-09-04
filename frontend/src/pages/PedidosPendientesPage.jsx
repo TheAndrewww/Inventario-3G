@@ -189,7 +189,10 @@ const PedidosPendientesPage = () => {
       console.error('Error al completar ticket:', error);
       // El detalle del backend se muestra tal cual: sin él, un fallo en
       // producción solo se ve como "error" y no hay por dónde empezar.
-      const detalle = error.response?.data?.error;
+      // El manejador global del backend manda `error: {}` en producción; sin
+      // este filtro el aviso terminaba en "[object Object]".
+      const crudo = error.response?.data?.error;
+      const detalle = typeof crudo === 'string' && crudo.trim() ? crudo : null;
       toast.error(
         error.code === 'ECONNABORTED'
           ? 'El sistema no respondió. El ticket NO se cerró, vuelve a intentarlo.'
