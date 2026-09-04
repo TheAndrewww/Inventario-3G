@@ -176,7 +176,9 @@ const pedidosService = {
   entregarDirecto: async (pedidoId) => {
     // Con tope de tiempo: si el backend no contesta, Almacén ve un error y no
     // un botón "Completando..." que se queda girando para siempre.
-    const response = await api.put(`/pedidos/${pedidoId}/entregar-directo`, null, { timeout: 45000 });
+    // El cuerpo va como objeto vacío, no como null: `null` viaja literal y el
+    // analizador de JSON de Express lo rechaza antes de llegar al controlador.
+    const response = await api.put(`/pedidos/${pedidoId}/entregar-directo`, {}, { timeout: 45000 });
     return response.data;
   },
 
