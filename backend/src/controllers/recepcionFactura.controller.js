@@ -462,8 +462,8 @@ export const cerrarConteo = async (req, res) => {
         }
 
         try {
-            const { avisarComprasFaltantes } = await import('../services/whatsapp.service.js');
-            await avisarComprasFaltantes({
+            const { avisarResultadoConteo } = await import('../services/whatsapp.service.js');
+            await avisarResultadoConteo({
                 proveedor: orden.proveedor?.nombre,
                 ticketOrden: orden.ticket_id,
                 faltantes,

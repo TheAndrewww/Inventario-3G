@@ -23,11 +23,15 @@ export const isWhatsAppEnabled = () => !!process.env.WHATSAPP_PUENTE_TOKEN;
  * Encola un mensaje de WhatsApp. Nunca lanza excepción: un aviso que no salió
  * no debe tumbar una recepción de mercancía.
  *
+ * El destino por defecto es REQUISICIONES: de todo lo que manda el inventario, en
+ * Compras solo se quiere la orden por autorizar (esa lo pide explícito). Los avisos
+ * son de almacén y van a su grupo; mandarlos a los dos era leer lo mismo dos veces.
+ *
  * @param {string} mensaje - Texto a enviar
- * @param {string} destino - Destino lógico: compras | contable | produccion
+ * @param {string} destino - Destino lógico: requisiciones | compras | contable | produccion
  * @returns {Promise<boolean>} - true si quedó encolado
  */
-export const enviarWhatsApp = async (mensaje, destino = 'compras') => {
+export const enviarWhatsApp = async (mensaje, destino = 'requisiciones') => {
     if (!isWhatsAppEnabled()) {
         console.log('ℹ️ Puente de WhatsApp no configurado, se omite el aviso');
         return false;
@@ -168,7 +172,11 @@ export const avisarConteosCiclicosSemana = async (datos) => {
     return enviarWhatsApp(mensaje, 'requisiciones');
 };
 
-export const avisarComprasFaltantes = async ({ proveedor, ticketOrden, faltantes, sobrantes }) => {
+/**
+ * Resultado del conteo contra la factura. SOLO a Requisiciones: es el cierre de lo que
+ * contó almacén. Antes salía igual en Compras y era la misma copia.
+ */
+export const avisarResultadoConteo = async ({ proveedor, ticketOrden, faltantes, sobrantes }) => {
     const lineas = [
         `🔎 *Conteo terminado* — ${proveedor || 'proveedor'}`,
         `Orden: ${ticketOrden}`,
@@ -186,14 +194,10 @@ export const avisarComprasFaltantes = async ({ proveedor, ticketOrden, faltantes
             lineas.push('*Sobrantes:*');
             sobrantes.forEach(s => lineas.push(`• ${s.nombre}: llegaron ${s.diferencia} ${s.unidad} de más`));
         }
-        lineas.push('', 'Compras: evaluar reclamo al proveedor o cerrar la compra.');
+        lineas.push('', 'Falta decidir si se le reclama al proveedor o se cierra la compra.');
     }
 
-    const mensaje = lineas.join('\n');
-    const ok = await enviarWhatsApp(mensaje);
-    // Este sí regresa a almacén: es el cierre de lo que contaron y de lo que se va a reclamar.
-    await enviarWhatsApp(mensaje, 'requisiciones');
-    return ok;
+    return enviarWhatsApp(lineas.join('\n'), 'requisiciones');
 };
 
 /**
@@ -246,7 +250,7 @@ export default {
     isWhatsAppEnabled,
     enviarWhatsApp,
     avisarLlegoMaterial,
-    avisarComprasFaltantes,
+    avisarResultadoConteo,
     avisarConteosCiclicosSemana,
     avisarRequisicionesOrdenAprobada
 };

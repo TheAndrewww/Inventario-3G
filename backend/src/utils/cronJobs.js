@@ -139,7 +139,9 @@ export const cerrarVentanasDeConteo = () => {
             url: '/ordenes-compra',
             datos_adicionales: { orden_id: orden.id, ticket_id: orden.ticket_id, cierre_automatico: true }
           });
-          await enviarWhatsApp(`⏰ ${mensaje}`);
+          // A Requisiciones: los avisos del inventario son de almacén. En Compras solo
+          // se publica la orden por autorizar.
+          await enviarWhatsApp(`⏰ ${mensaje}`, 'requisiciones');
         } catch (avisoError) {
           console.error(`Error al avisar el cierre de ${orden.ticket_id}:`, avisoError.message);
         }
