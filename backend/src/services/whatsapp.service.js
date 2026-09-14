@@ -120,16 +120,14 @@ export const construirAvisoLlegoMaterial = ({
 };
 
 /**
- * A los DOS grupos. Sí, hoy la recepción la captura el propio almacén y el aviso le repite
- * lo que acaba de reportar; se deja igual a propósito: el día que CALIDAD y ALMACÉN se
- * separen, quien no capturó necesita ver qué llegó, y el grupo ya trae el historial completo
- * en vez de empezar de cero. Compras lo necesita aparte, para perseguir la factura.
+ * SOLO a REQUISICIONES (almacén/calidad). Antes salía también en Compras y era el mismo
+ * texto en los dos grupos: el jefe lo lee dos veces y el aviso pierde fuerza. La recepción
+ * la captura y la revisa almacén, así que el aviso vive donde se trabaja; Compras ya se
+ * entera de lo suyo por su propia vía (el cierre del conteo y la persecución de la factura).
  */
-export const avisarComprasLlegoMaterial = async (datos) => {
+export const avisarLlegoMaterial = async (datos) => {
     const mensaje = construirAvisoLlegoMaterial(datos);
-    const ok = await enviarWhatsApp(mensaje);
-    await enviarWhatsApp(mensaje, 'requisiciones');
-    return ok;
+    return enviarWhatsApp(mensaje, 'requisiciones');
 };
 
 /**
@@ -163,11 +161,11 @@ export const construirReporteConteosCiclicos = ({ periodo, dias }) => {
     return lineas.join('\n');
 };
 
+// El conteo cíclico lo hace ALMACÉN: el corte es suyo y solo va a su grupo. En Compras era
+// una copia idéntica que nadie ahí puede atender.
 export const avisarConteosCiclicosSemana = async (datos) => {
     const mensaje = construirReporteConteosCiclicos(datos);
-    const ok = await enviarWhatsApp(mensaje);
-    await enviarWhatsApp(mensaje, 'requisiciones');   // el conteo lo hace almacén: es su corte
-    return ok;
+    return enviarWhatsApp(mensaje, 'requisiciones');
 };
 
 export const avisarComprasFaltantes = async ({ proveedor, ticketOrden, faltantes, sobrantes }) => {
@@ -247,7 +245,7 @@ export const avisarRequisicionesOrdenAprobada = async (orden) => {
 export default {
     isWhatsAppEnabled,
     enviarWhatsApp,
-    avisarComprasLlegoMaterial,
+    avisarLlegoMaterial,
     avisarComprasFaltantes,
     avisarConteosCiclicosSemana,
     avisarRequisicionesOrdenAprobada

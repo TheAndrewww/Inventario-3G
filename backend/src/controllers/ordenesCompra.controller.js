@@ -2656,10 +2656,10 @@ export const recibirMercancia = async (req, res) => {
       console.error('Error al enviar notificación:', notifError);
     }
 
-    // Aviso al grupo de Compras por WhatsApp (si el bot está configurado)
+    // Aviso al grupo de Requisiciones (almacén) por WhatsApp (si el bot está configurado)
     try {
-      const { avisarComprasLlegoMaterial } = await import('../services/whatsapp.service.js');
-      await avisarComprasLlegoMaterial({
+      const { avisarLlegoMaterial } = await import('../services/whatsapp.service.js');
+      await avisarLlegoMaterial({
         proveedor: orden.proveedor?.nombre,
         ticketOrden: orden.ticket_id,
         folioFactura: req.body?.folio_factura || null,
