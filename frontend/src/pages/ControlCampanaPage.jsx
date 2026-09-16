@@ -39,7 +39,7 @@ const leerOcultos = () => {
 };
 
 const AREAS = [
-    { id: 'ventas_dlba', name: 'VENTAS DLBA', color: 'bg-green-100 text-green-800' },
+    { id: 'ventas_dlba', name: 'VENTAS DLAB', color: 'bg-green-100 text-green-800' },
     { id: 'ventas_vrj', name: 'VENTAS VRJ', color: 'bg-blue-100 text-blue-800' },
     { id: 'diseno', name: 'DISEÑO', color: 'bg-gray-100 text-gray-800' },
     { id: 'manufactura', name: 'MANUFACTURA', color: 'bg-gray-100 text-gray-800' },
