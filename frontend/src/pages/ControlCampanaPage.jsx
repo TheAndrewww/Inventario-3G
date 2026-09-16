@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { Loader2, Check, X, Trash2, Save, XCircle, Download, Eye } from 'lucide-react';
+import { Loader2, Check, X, Trash2, Save, XCircle, Download, Eye, ChevronDown, ChevronRight } from 'lucide-react';
 import { campanaControlService } from '../services/campanaControl.service';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,6 +10,33 @@ const QUARTERS = [
     { id: 3, name: '3ER TRIMESTRE', weeks: Array.from({ length: 13 }, (_, i) => i + 27) },
     { id: 4, name: '4TO TRIMESTRE', weeks: Array.from({ length: 13 }, (_, i) => i + 40) },
 ];
+
+// Semana ISO del año (lunes a domingo) para saber en qué trimestre estamos hoy.
+const semanaActual = () => {
+    const d = new Date();
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dia = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - dia);
+    const inicio = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return Math.ceil(((t - inicio) / 86400000 + 1) / 7);
+};
+
+const trimestreActual = () => {
+    const semana = semanaActual();
+    return QUARTERS.find(q => q.weeks.includes(semana))?.id || 4;
+};
+
+const OCULTOS_KEY = 'campanaControl.trimestresOcultos';
+
+// Por defecto se ocultan los trimestres que ya pasaron.
+const leerOcultos = () => {
+    try {
+        const guardado = JSON.parse(localStorage.getItem(OCULTOS_KEY));
+        if (Array.isArray(guardado)) return guardado;
+    } catch { /* sin almacenamiento */ }
+    const actual = trimestreActual();
+    return QUARTERS.filter(q => q.id < actual).map(q => q.id);
+};
 
 const AREAS = [
     { id: 'ventas_dlba', name: 'VENTAS DLBA', color: 'bg-green-100 text-green-800' },
@@ -38,6 +65,21 @@ const ControlCampanaPage = () => {
     const [selectedCell, setSelectedCell] = useState(null);
     const [modalData, setModalData] = useState({ status: null, note: '' });
     const [saving, setSaving] = useState(false);
+    const [ocultos, setOcultos] = useState(leerOcultos);
+
+    const guardarOcultos = (lista) => {
+        setOcultos(lista);
+        try { localStorage.setItem(OCULTOS_KEY, JSON.stringify(lista)); } catch { /* sin almacenamiento */ }
+    };
+
+    const toggleTrimestre = (id) => {
+        guardarOcultos(ocultos.includes(id) ? ocultos.filter(x => x !== id) : [...ocultos, id]);
+    };
+
+    const soloActual = () => {
+        const actual = trimestreActual();
+        guardarOcultos(QUARTERS.filter(q => q.id !== actual).map(q => q.id));
+    };
 
     useEffect(() => {
         loadData();
@@ -236,6 +278,19 @@ const ControlCampanaPage = () => {
                         CAMPAÑA DE <span className="text-red-700">CONTROL</span> 2026
                     </h1>
                 </div>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                    onClick={soloActual}
+                    className="bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all text-sm md:text-base"
+                >
+                    Solo trimestre actual
+                </button>
+                <button
+                    onClick={() => guardarOcultos([])}
+                    className="bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all text-sm md:text-base"
+                >
+                    Mostrar todos
+                </button>
                 <button
                     onClick={exportarComentarios}
                     className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 active:transform active:scale-95 transition-all flex items-center gap-2 shadow-md text-sm md:text-base"
@@ -243,19 +298,49 @@ const ControlCampanaPage = () => {
                     <Download className="w-4 h-4 md:w-5 md:h-5" />
                     Exportar Comentarios
                 </button>
+                </div>
             </header>
 
             <div className="space-y-6 md:space-y-8 pb-20">
-                {QUARTERS.map(quarter => (
+                {QUARTERS.map(quarter => ocultos.includes(quarter.id) ? (
+                    <button
+                        key={quarter.id}
+                        onClick={() => toggleTrimestre(quarter.id)}
+                        className="w-full bg-white rounded-lg shadow-sm border border-gray-200 px-4 py-3 flex items-center justify-between gap-3 hover:bg-gray-50 transition-colors"
+                    >
+                        <span className="flex items-center gap-2 font-bold text-gray-600 text-sm md:text-base">
+                            <ChevronRight className="w-5 h-5" />
+                            {quarter.name}
+                            <span className="text-xs font-normal text-gray-400">(oculto · clic para mostrar)</span>
+                        </span>
+                        <span className="flex items-center gap-2 text-xs md:text-sm font-bold">
+                            <span className="text-green-700">✓ {getQuarterTotal(quarter.id, 'good')}</span>
+                            <span className="text-red-700">✗ {getQuarterTotal(quarter.id, 'bad')}</span>
+                            {(() => {
+                                const pct = getPct(getQuarterTotal(quarter.id, 'good'), getQuarterTotal(quarter.id, 'bad'));
+                                return <span className={`px-2 py-0.5 rounded ${pctClasses(pct)}`}>CAL {formatCalif(pct)}</span>;
+                            })()}
+                        </span>
+                    </button>
+                ) : (
                     <section key={quarter.id} className="bg-white rounded-lg shadow-md overflow-hidden relative pl-0 md:pl-12 border border-gray-200">
-                        <div className="hidden md:flex absolute left-0 top-0 bottom-0 w-12 items-center justify-center bg-gray-100 border-r border-gray-200">
+                        <button
+                            onClick={() => toggleTrimestre(quarter.id)}
+                            title="Ocultar trimestre"
+                            className="hidden md:flex absolute left-0 top-0 bottom-0 w-12 flex-col items-center justify-center gap-10 bg-gray-100 border-r border-gray-200 hover:bg-gray-200 transition-colors"
+                        >
+                            <ChevronDown className="w-5 h-5 text-gray-500" />
                             <div className="-rotate-90 whitespace-nowrap text-sm font-bold text-gray-500 tracking-wider">
                                 {quarter.name}
                             </div>
-                        </div>
-                        <div className="md:hidden text-center py-2 font-bold text-red-700 bg-red-50 border-b border-red-100 text-lg sticky top-0 z-20">
+                        </button>
+                        <button
+                            onClick={() => toggleTrimestre(quarter.id)}
+                            className="md:hidden w-full flex items-center justify-center gap-2 py-2 font-bold text-red-700 bg-red-50 border-b border-red-100 text-lg sticky top-0 z-20"
+                        >
+                            <ChevronDown className="w-5 h-5" />
                             {quarter.name}
-                        </div>
+                        </button>
 
                         <div className="overflow-x-auto custom-scrollbar">
                             <table className="w-full border-collapse min-w-[max-content]">
