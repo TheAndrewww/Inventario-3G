@@ -9,11 +9,33 @@ import {
   Ubicacion,
   Movimiento,
   DetalleMovimiento,
-  TipoHerramientaRenta
+  TipoHerramientaRenta,
+  ArticuloProveedor
 } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { notificarPorRol, crearNotificacion } from './notificaciones.controller.js';
+
+/**
+ * Costo con el que se valúa una partida de la orden.
+ *
+ * El precio de un mismo artículo cambia según a quién se le compre, así que manda el costo
+ * pactado con ESE proveedor (`articulos_proveedores`, que se mantiene solo con cada factura
+ * que llega) y solo si no hay se usa el del catálogo general. Antes se usaba siempre el del
+ * catálogo, que está vacío: de ahí que las órdenes salgan en $0.
+ */
+const costoDePartida = async (articulo, proveedorId, transaction = undefined) => {
+  if (proveedorId && articulo?.id) {
+    const rel = await ArticuloProveedor.findOne({
+      where: { articulo_id: articulo.id, proveedor_id: proveedorId },
+      transaction
+    });
+    const delProveedor = parseFloat(rel?.costo_unitario) || 0;
+    if (delProveedor > 0) return delProveedor;
+  }
+  return parseFloat(articulo?.costo_unitario) || 0;
+};
+
 import admin from '../config/firebase-admin.js'; // Importar Firebase Admin
 import { enviarEmailAprobacion, enviarEmailEstadoOrden, enviarEmailOrdenCancelada, verificarTokenAprobacion } from '../services/email.service.js';
 import { pedirAutorizacionOrden } from '../services/whatsapp.service.js';
@@ -122,7 +144,7 @@ export const crearOrdenCompra = async (req, res) => {
     for (const item of articulos) {
       const articulo = articulosMap[item.articulo_id];
       const cantidad = parseFloat(item.cantidad);
-      const costo = item.costo_unitario ? parseFloat(item.costo_unitario) : parseFloat(articulo.costo_unitario);
+      const costo = item.costo_unitario ? parseFloat(item.costo_unitario) : await costoDePartida(articulo, ordenCompra.proveedor_id, transaction);
       const subtotal = cantidad * costo;
 
       totalEstimado += subtotal;
@@ -1061,7 +1083,7 @@ export const actualizarOrdenCompra = async (req, res) => {
       for (const item of articulos) {
         const articulo = articulosMap[item.articulo_id];
         const cantidad = parseFloat(item.cantidad);
-        const costo_unitario = parseFloat(item.costo_unitario || articulo.costo_unitario || 0);
+        const costo_unitario = parseFloat(item.costo_unitario) || await costoDePartida(articulo, orden.proveedor_id, transaction);
         const subtotal = cantidad * costo_unitario;
 
         await DetalleOrdenCompra.create({
@@ -1244,7 +1266,7 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
     for (const solicitud of solicitudes) {
       const articulo = solicitud.articulo;
       const cantidadOriginal = parseFloat(solicitud.cantidad_solicitada);
-      const costo = parseFloat(articulo.costo_unitario) || 0;
+      const costo = await costoDePartida(articulo, proveedor_id || null);
 
       // Si ya existe el artículo en la orden
       if (articulosMap.has(articulo.id)) {

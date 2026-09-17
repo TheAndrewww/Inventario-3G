@@ -7,7 +7,7 @@
 
 import express from 'express';
 import { Op } from 'sequelize';
-import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo } from '../models/index.js';
+import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor } from '../models/index.js';
 import { crearNotificacion } from '../controllers/notificaciones.controller.js';
 import { enviarEmailEstadoOrden } from '../services/email.service.js';
 
@@ -226,6 +226,106 @@ router.post('/:id/decision', async (req, res) => {
     } catch (error) {
         console.error('Error al procesar la decisión:', error);
         res.status(500).json({ success: false, message: 'Error al procesar la decisión', error: error.message });
+    }
+});
+
+/**
+ * POST /api/avisos-whatsapp/costos
+ * Precios de una factura de proveedor, que manda el bot contable al leer su CFDI.
+ *
+ * Las órdenes de compra nacen en $0 porque el catálogo de costos está vacío, y sin importe
+ * nadie puede decidir qué orden pagó un depósito. El precio real ya viene en cada factura:
+ * aquí se guarda, por proveedor y en el artículo, para que la siguiente orden nazca con su
+ * importe.
+ *
+ * Reglas, en este orden:
+ *  1. Se cruza por el CÓDIGO del proveedor (`sku_proveedor`), que es lo que almacén ya enseña
+ *     al cruzar una factura en la recepción.
+ *  2. Si no hay código, por nombre EXACTO del artículo (normalizado). Nada de parecidos: un
+ *     precio en el artículo equivocado se arrastra a todas sus órdenes.
+ *  3. Si la unidad de la factura no es la del artículo (cajas contra piezas), NO se escribe:
+ *     el precio sería de otra cosa.
+ * Lo que no cruza se ignora. Nunca se dan de alta artículos desde aquí.
+ *
+ * Body: { uuid, proveedor_rfc, proveedor_nombre, fecha, partidas: [{ descripcion, codigo, unidad, cantidad, valor_unitario }] }
+ */
+const normalizarTexto = (s) => String(s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().replace(/[^A-Z0-9\s/."]/g, ' ').replace(/\s+/g, ' ').trim();
+
+router.post('/costos', async (req, res) => {
+    try {
+        const { uuid, proveedor_rfc, proveedor_nombre, partidas } = req.body || {};
+        if (!Array.isArray(partidas) || partidas.length === 0) {
+            return res.status(400).json({ success: false, message: 'La factura no trae partidas con precio' });
+        }
+
+        // El proveedor se busca por RFC (la prueba dura del CFDI) y si no, por nombre.
+        let proveedor = null;
+        if (proveedor_rfc) proveedor = await Proveedor.findOne({ where: { rfc: proveedor_rfc } });
+        if (!proveedor && proveedor_nombre) {
+            const todos = await Proveedor.findAll({ attributes: ['id', 'nombre'] });
+            const buscado = normalizarTexto(proveedor_nombre);
+            proveedor = todos.find(p => normalizarTexto(p.nombre) === buscado) || null;
+        }
+
+        const resultado = { uuid, proveedor: proveedor?.nombre || null, actualizados: 0, sin_cruce: 0, unidad_distinta: 0 };
+
+        for (const partida of partidas) {
+            const precio = parseFloat(partida.valor_unitario) || 0;
+            if (precio <= 0) { resultado.sin_cruce += 1; continue; }
+
+            let articulo = null;
+
+            // 1) Por código del proveedor
+            const codigo = String(partida.codigo || '').trim();
+            if (proveedor && codigo) {
+                const rel = await ArticuloProveedor.findOne({
+                    where: { proveedor_id: proveedor.id, sku_proveedor: codigo }
+                });
+                if (rel) articulo = await Articulo.findByPk(rel.articulo_id);
+            }
+
+            // 2) Por nombre exacto del artículo
+            if (!articulo) {
+                const buscado = normalizarTexto(partida.descripcion);
+                if (buscado.length >= 4) {
+                    const candidatos = await Articulo.findAll({ where: { activo: true }, attributes: ['id', 'nombre', 'unidad', 'costo_unitario'] });
+                    const iguales = candidatos.filter(a => normalizarTexto(a.nombre) === buscado);
+                    if (iguales.length === 1) articulo = await Articulo.findByPk(iguales[0].id);
+                }
+            }
+
+            if (!articulo) { resultado.sin_cruce += 1; continue; }
+
+            // 3) La unidad tiene que ser la misma o el precio es de otra cosa.
+            const uFactura = normalizarTexto(partida.unidad);
+            const uArticulo = normalizarTexto(articulo.unidad);
+            if (uFactura && uArticulo && uFactura !== uArticulo
+                && !uFactura.startsWith(uArticulo.slice(0, 3)) && !uArticulo.startsWith(uFactura.slice(0, 3))) {
+                resultado.unidad_distinta += 1;
+                continue;
+            }
+
+            // Precio del proveedor (se crea la relación si no existía) y costo del artículo,
+            // que es el que la orden de compra usa para calcular su total.
+            if (proveedor) {
+                const [rel] = await ArticuloProveedor.findOrCreate({
+                    where: { articulo_id: articulo.id, proveedor_id: proveedor.id },
+                    defaults: { articulo_id: articulo.id, proveedor_id: proveedor.id, costo_unitario: precio, sku_proveedor: codigo || null }
+                });
+                await rel.update({ costo_unitario: precio, ...(codigo && !rel.sku_proveedor ? { sku_proveedor: codigo } : {}) });
+            }
+            await articulo.update({ costo_unitario: precio });
+            resultado.actualizados += 1;
+        }
+
+        console.log(`🏷️ Costos de ${resultado.proveedor || proveedor_nombre || 'proveedor'}: ${resultado.actualizados} actualizados, ${resultado.sin_cruce} sin cruce`);
+        res.json({ success: true, data: resultado });
+
+    } catch (error) {
+        console.error('Error al guardar costos de factura:', error);
+        res.status(500).json({ success: false, message: 'Error al guardar costos', error: error.message });
     }
 });
 

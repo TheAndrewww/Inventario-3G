@@ -243,8 +243,19 @@ export const aprenderCruceFactura = async (req, res) => {
                     transaction
                 });
 
-                if (!creada && relacion.sku_proveedor !== etiquetaProveedor) {
-                    await relacion.update({ sku_proveedor: etiquetaProveedor }, { transaction });
+                // El precio de la factura se guardaba SOLO al crear la relación, así que la
+                // segunda compra del mismo artículo ya no lo refrescaba y el catálogo se
+                // quedaba viejo (o en $0, que es de donde salen las órdenes sin importe).
+                const precioFactura = parseFloat(renglon.precio_unitario) || 0;
+                if (!creada) {
+                    const cambios = {};
+                    if (relacion.sku_proveedor !== etiquetaProveedor) cambios.sku_proveedor = etiquetaProveedor;
+                    if (precioFactura > 0) cambios.costo_unitario = precioFactura;
+                    if (Object.keys(cambios).length) await relacion.update(cambios, { transaction });
+                }
+                // Y el costo del ARTÍCULO, que es el que la orden de compra usa para su total.
+                if (precioFactura > 0 && parseFloat(articulo.costo_unitario) !== precioFactura) {
+                    await articulo.update({ costo_unitario: precioFactura }, { transaction });
                 }
                 resultado.equivalencias += 1;
             }
