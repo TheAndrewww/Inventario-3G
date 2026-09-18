@@ -386,7 +386,9 @@ export const aplicarSugerencias = async (req, res) => {
             if (typeof aj.stock_minimo === 'number' && aj.stock_minimo >= 0) updates.stock_minimo = aj.stock_minimo;
             if (typeof aj.stock_maximo === 'number' && aj.stock_maximo >= 0) updates.stock_maximo = aj.stock_maximo;
             if (Object.keys(updates).length === 0) continue;
-            const [count] = await Articulo.update(updates, { where: { id: aj.id }, transaction: t });
+            // individualHooks: pasa por el hook del modelo, así un mínimo 0 deja
+            // el SKU desactivado (regla stock_minimo = 0 → sin reposición).
+            const [count] = await Articulo.update(updates, { where: { id: aj.id }, transaction: t, individualHooks: true });
             actualizados += count;
         }
 

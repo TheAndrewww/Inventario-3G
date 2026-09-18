@@ -128,6 +128,8 @@ const ReportesPage = () => {
     const [seleccion, setSeleccion] = useState(new Set());
     const [aplicando, setAplicando] = useState(false);
     const [filtroAccion, setFiltroAccion] = useState('todos');
+    // Mín/máx escritos a mano en la tabla: id → { min, max } (texto del input)
+    const [valores, setValores] = useState({});
 
     const cargar = async () => {
         try {
@@ -135,6 +137,7 @@ const ReportesPage = () => {
             const res = await reportesService.inventarioConsumibles(dias);
             setData(res);
             setSeleccion(new Set());
+            setValores({});
         } catch (err) {
             console.error(err);
             toast.error('Error al cargar el reporte');
@@ -150,6 +153,26 @@ const ReportesPage = () => {
         if (filtroAccion === 'todos') return data.sugerencias;
         return data.sugerencias.filter(s => s.sugerencia.accion === filtroAccion);
     }, [data, filtroAccion]);
+
+    // Lo que se propone aplicar en cada fila: la sugerencia del reporte donde la
+    // hay, si no el valor actual. El usuario lo puede sobrescribir en la tabla.
+    const propuesta = (s) => {
+        const acc = s.sugerencia.accion;
+        const cambiaMin = acc === 'aumentar_min' || acc === 'reducir_min' || acc === 'sin_movimiento';
+        const cambiaMax = acc === 'reducir_max' || acc === 'definir_max';
+        const min = cambiaMin ? (acc === 'sin_movimiento' ? 0 : s.sugerencia.stock_min_sugerido) : s.stock_minimo;
+        const max = cambiaMax ? s.sugerencia.stock_max_sugerido : s.stock_maximo;
+        return {
+            min: valores[s.id]?.min ?? String(min ?? 0),
+            max: valores[s.id]?.max ?? (max === null || max === undefined ? '' : String(max))
+        };
+    };
+
+    const editarValor = (id, campo, texto) => {
+        setValores(prev => ({ ...prev, [id]: { ...prev[id], [campo]: texto } }));
+        // Editar una fila la selecciona para aplicarla
+        setSeleccion(prev => (prev.has(id) ? prev : new Set(prev).add(id)));
+    };
 
     const toggleSeleccion = (id) => {
         setSeleccion(prev => {
@@ -172,21 +195,31 @@ const ReportesPage = () => {
             toast.error('Selecciona al menos un artículo');
             return;
         }
-        const ajustes = sugerenciasFiltradas
-            .filter(s => seleccion.has(s.id))
-            .map(s => {
-                const a = { id: s.id };
-                const acc = s.sugerencia.accion;
-                if (acc === 'aumentar_min' || acc === 'reducir_min') {
-                    a.stock_minimo = s.sugerencia.stock_min_sugerido;
-                } else if (acc === 'reducir_max' || acc === 'definir_max') {
-                    a.stock_maximo = s.sugerencia.stock_max_sugerido;
-                } else if (acc === 'sin_movimiento') {
-                    a.stock_minimo = 0;
-                }
-                return a;
-            });
-        if (!window.confirm(`¿Aplicar ${ajustes.length} ajuste(s) de stock? Esta acción modifica los artículos.`)) return;
+        const ajustes = [];
+        const errores = [];
+        for (const s of sugerenciasFiltradas.filter(x => seleccion.has(x.id))) {
+            const p = propuesta(s);
+            const min = p.min.trim() === '' ? null : Number(p.min);
+            const max = p.max.trim() === '' ? null : Number(p.max);
+            if (min === null || !Number.isFinite(min) || min < 0) { errores.push(`${s.nombre}: mínimo inválido`); continue; }
+            if (max !== null && (!Number.isFinite(max) || max < 0)) { errores.push(`${s.nombre}: máximo inválido`); continue; }
+            if (max !== null && max > 0 && max < min) { errores.push(`${s.nombre}: el máximo (${max}) es menor que el mínimo (${min})`); continue; }
+            const a = { id: s.id };
+            if (min !== s.stock_minimo) a.stock_minimo = min;
+            if (max !== null && max !== s.stock_maximo) a.stock_maximo = max;
+            if (Object.keys(a).length > 1) ajustes.push(a);
+        }
+        if (errores.length > 0) {
+            toast.error(errores.slice(0, 3).join('\n') + (errores.length > 3 ? `\n…y ${errores.length - 3} más` : ''));
+            return;
+        }
+        if (ajustes.length === 0) {
+            toast('Los artículos seleccionados ya tienen esos valores');
+            return;
+        }
+        const aCero = ajustes.filter(a => a.stock_minimo === 0).length;
+        const avisoCero = aCero > 0 ? `\n\n${aCero} quedará(n) con mínimo 0 y se desactivarán.` : '';
+        if (!window.confirm(`¿Aplicar ${ajustes.length} ajuste(s) de stock? Esta acción modifica los artículos.${avisoCero}`)) return;
         try {
             setAplicando(true);
             const res = await reportesService.aplicarSugerencias(ajustes);
@@ -311,7 +344,7 @@ const ReportesPage = () => {
                             Sugerencias de ajuste
                         </h2>
                         <p className="text-sm text-gray-500 mt-0.5">
-                            Mínimo sugerido = consumo diario × {parametros?.lead_time_dias} días · Máximo = consumo × {parametros?.cobertura_dias} días
+                            Mínimo sugerido = consumo diario × {parametros?.lead_time_dias} días · Máximo = consumo × {parametros?.cobertura_dias} días · Puedes corregir cualquier valor antes de aplicar
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -369,8 +402,9 @@ const ReportesPage = () => {
                                     const est = ESTADO_LABEL[s.estado] || ESTADO_LABEL.ok;
                                     const acc = ACCION_LABEL[s.sugerencia.accion] || ACCION_LABEL.ok;
                                     const sel = seleccion.has(s.id);
-                                    const cambiaMin = s.stock_minimo !== s.sugerencia.stock_min_sugerido && (s.sugerencia.accion === 'aumentar_min' || s.sugerencia.accion === 'reducir_min' || s.sugerencia.accion === 'sin_movimiento');
-                                    const cambiaMax = s.stock_maximo !== s.sugerencia.stock_max_sugerido && (s.sugerencia.accion === 'reducir_max' || s.sugerencia.accion === 'definir_max');
+                                    const p = propuesta(s);
+                                    const editadoMin = valores[s.id]?.min !== undefined;
+                                    const editadoMax = valores[s.id]?.max !== undefined;
                                     return (
                                         <tr key={s.id} className={sel ? 'bg-blue-50' : 'hover:bg-gray-50'}>
                                             <td className="px-3 py-3">
@@ -388,23 +422,32 @@ const ReportesPage = () => {
                                             </td>
                                             <td className="px-3 py-3 text-right text-gray-900">{formatNumber(s.stock_actual)}</td>
                                             <td className="px-3 py-3 text-right text-gray-700">{s.consumo_mensual.toFixed(1)}</td>
-                                            <td className="px-3 py-3 text-right">
+                                            <td className="px-3 py-3 text-right whitespace-nowrap">
                                                 <span className="text-gray-500">{formatNumber(s.stock_minimo)}</span>
-                                                {cambiaMin && (
-                                                    <>
-                                                        {' → '}
-                                                        <span className="font-semibold text-gray-900">{formatNumber(s.sugerencia.stock_min_sugerido)}</span>
-                                                    </>
-                                                )}
+                                                {' → '}
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="1"
+                                                    value={p.min}
+                                                    onChange={(e) => editarValor(s.id, 'min', e.target.value)}
+                                                    className={`w-20 px-2 py-1 text-right border rounded ${editadoMin ? 'border-blue-500 bg-blue-50 font-semibold' : 'border-gray-300'}`}
+                                                    title={`Sugerido: ${formatNumber(s.sugerencia.stock_min_sugerido)}`}
+                                                />
                                             </td>
-                                            <td className="px-3 py-3 text-right">
+                                            <td className="px-3 py-3 text-right whitespace-nowrap">
                                                 <span className="text-gray-500">{s.stock_maximo !== null ? formatNumber(s.stock_maximo) : '-'}</span>
-                                                {cambiaMax && (
-                                                    <>
-                                                        {' → '}
-                                                        <span className="font-semibold text-gray-900">{formatNumber(s.sugerencia.stock_max_sugerido)}</span>
-                                                    </>
-                                                )}
+                                                {' → '}
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="1"
+                                                    value={p.max}
+                                                    placeholder="-"
+                                                    onChange={(e) => editarValor(s.id, 'max', e.target.value)}
+                                                    className={`w-20 px-2 py-1 text-right border rounded ${editadoMax ? 'border-blue-500 bg-blue-50 font-semibold' : 'border-gray-300'}`}
+                                                    title={`Sugerido: ${formatNumber(s.sugerencia.stock_max_sugerido)}`}
+                                                />
                                             </td>
                                             <td className="px-3 py-3">
                                                 <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded border ${acc.color}`} title={s.sugerencia.razon}>
