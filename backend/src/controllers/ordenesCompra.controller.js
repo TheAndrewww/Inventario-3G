@@ -39,6 +39,7 @@ const costoDePartida = async (articulo, proveedorId, transaction = undefined) =>
 import admin from '../config/firebase-admin.js'; // Importar Firebase Admin
 import { enviarEmailAprobacion, enviarEmailEstadoOrden, enviarEmailOrdenCancelada, verificarTokenAprobacion } from '../services/email.service.js';
 import { pedirAutorizacionOrden } from '../services/whatsapp.service.js';
+import { programarBarridoCompras, consumoDiarioPorArticulo, stockProyectado } from '../services/barridoCompras.service.js';
 
 /**
  * Crear una nueva orden de compra
@@ -478,11 +479,20 @@ export const cancelarSolicitudesObsoletas = async (articulo_id = null, transacti
 
     let canceladas = 0;
 
+    // El barrido pide con el stock PROYECTADO (consumo de los próximos días):
+    // una solicitud solo sobra si aun descontando ese consumo se cumple el mínimo.
+    let consumo = new Map();
+    try {
+      consumo = await consumoDiarioPorArticulo(solicitudes.map(s => s.articulo_id));
+    } catch (e) {
+      console.log('⚠️ No se pudo calcular el consumo para las obsoletas:', e.message);
+    }
+
     for (const solicitud of solicitudes) {
       const articulo = solicitud.articulo;
 
-      // Verificar si el stock actual ya está por encima o igual al mínimo
-      if (articulo && parseFloat(articulo.stock_actual) >= parseFloat(articulo.stock_minimo)) {
+      // Verificar si el stock proyectado ya está por encima o igual al mínimo
+      if (articulo && stockProyectado(articulo.stock_actual, consumo.get(articulo.id)) >= parseFloat(articulo.stock_minimo)) {
         // Cancelar automáticamente esta solicitud
         await solicitud.update({
           estado: 'cancelada',
@@ -2314,6 +2324,8 @@ export const crearSolicitudCompraManual = async (req, res) => {
     // Commit de la transacción
     await transaction.commit();
 
+    programarBarridoCompras({ usuarioId: req.usuario.id });
+
     // Notificar al rol de compras (no crítico, si falla no afecta la creación)
     try {
       await notificarPorRol(
@@ -3107,6 +3119,7 @@ export const generarSolicitudesStockBajo = async (req, res) => {
     await transaction.commit();
 
     console.log(`✨ ${solicitudesCreadas.length} solicitudes de compra generadas automáticamente`);
+    programarBarridoCompras({ usuarioId: req.usuario.id });
 
     res.status(201).json({
       success: true,

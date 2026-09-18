@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { rutaInicialPorRol } from '../components/layout/Sidebar';
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 const LoginPage = () => {
   const navigate = useNavigate();
   const { login, isAuthenticated, user } = useAuth();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -19,9 +20,13 @@ const LoginPage = () => {
   // Redirigir si ya está autenticado
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(rutaInicialPorRol(user?.rol), { replace: true });
+      const from = location.state?.from;
+      const destino = from?.pathname && from.pathname !== '/login' && from.pathname !== '/'
+        ? `${from.pathname}${from.search || ''}`
+        : rutaInicialPorRol(user?.rol);
+      navigate(destino, { replace: true });
     }
-  }, [isAuthenticated, navigate, user]);
+  }, [isAuthenticated, navigate, user, location.state]);
 
   const handleChange = (e) => {
     setFormData({

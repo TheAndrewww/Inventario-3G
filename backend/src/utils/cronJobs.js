@@ -221,8 +221,21 @@ export const reportarConteosCiclicosSemana = () => {
 /**
  * Iniciar todos los cron jobs
  */
+/**
+ * Barrido diario de compras: stock mínimo + salidas previstas. Solo avisa al
+ * grupo de Compras si encontró algo nuevo. Además del disparo por solicitud.
+ */
+export const barridoComprasDiario = () => {
+  cron.schedule('30 8 * * 1-6', async () => {
+    const { barridoComprasProgramado } = await import('../services/barridoCompras.service.js');
+    await barridoComprasProgramado();
+  }, { timezone: 'America/Mexico_City' });
+  console.log('⏰ Cron job iniciado: Barrido de compras (8:30 AM lun-sáb)');
+};
+
 export const iniciarCronJobs = () => {
   verificarOrdenesVencidas();
+  barridoComprasDiario();
   cerrarVentanasDeConteo();
   reportarConteosCiclicosSemana();
   iniciarJobAnuncios();

@@ -6,6 +6,7 @@ import { buscarCarpetaProyecto, uploadTicket } from '../services/googleDrive.ser
 import { avisarTicketSubido, avisarTicketCerrado } from '../services/avisosProduccion.service.js';
 import { registrarError } from '../utils/diagnostico.js';
 import admin from 'firebase-admin';
+import { programarBarridoCompras } from '../services/barridoCompras.service.js';
 
 // Normalización: minúsculas, sin acentos, espacios colapsados.
 function normalizarNombreProyecto(s) {
@@ -510,6 +511,8 @@ export const crearPedido = async (req, res) => {
 
     // Enviar notificaciones para las solicitudes de compra creadas
     if (solicitudesCreadas.length > 0) {
+      // Barrido de stock mínimo + salidas previstas y un solo aviso a Compras
+      programarBarridoCompras({ usuarioId: usuario_id });
       try {
         for (const solicitudCreada of solicitudesCreadas) {
           const prioridad = solicitudCreada.deficit ? 'ALTA' : 'MEDIA';
