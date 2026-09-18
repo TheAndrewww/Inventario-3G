@@ -568,6 +568,44 @@ const startServer = async () => {
                 console.log('⚠️ No se pudieron verificar los estados de movimientos:', e.message);
             }
 
+            // Regla stock_minimo = 0 → SKU desactivado. El UPDATE de arriba solo
+            // corría en desarrollo, así que en producción seguían activos y
+            // salían en Stock Bajo y en las compras. Se aplica UNA vez (queda
+            // marcada en `configuracion`) para no volver a apagar en cada deploy
+            // un SKU que alguien reactive a propósito. Las herramientas no se
+            // tocan: su stock va ligado a las unidades de renta.
+            try {
+                const CLAVE_REGLA = 'regla_minimo_cero_aplicada_20260917';
+                const { Configuracion } = await import('./src/models/index.js');
+                await Configuracion.sync(); // crea la tabla solo si no existe
+                const [ya] = await sequelize.query(
+                    'SELECT 1 FROM configuracion WHERE clave = :clave',
+                    { replacements: { clave: CLAVE_REGLA } }
+                );
+                if (ya.length === 0) {
+                    const [desactivados] = await sequelize.query(
+                        `UPDATE articulos SET activo = false, updated_at = NOW()
+                         WHERE activo = true AND es_herramienta = false AND COALESCE(stock_minimo, 0) = 0
+                         RETURNING id`
+                    );
+                    await sequelize.query(
+                        `INSERT INTO configuracion (clave, valor, descripcion, created_at, updated_at)
+                         VALUES (:clave, :valor, :descripcion, NOW(), NOW())
+                         ON CONFLICT (clave) DO NOTHING`,
+                        {
+                            replacements: {
+                                clave: CLAVE_REGLA,
+                                valor: String(desactivados.length),
+                                descripcion: 'SKUs activos con stock_minimo = 0 desactivados (una sola vez). Valor = cuántos.'
+                            }
+                        }
+                    );
+                    console.log(`✅ Regla stock_minimo=0: ${desactivados.length} SKUs desactivados`);
+                }
+            } catch (e) {
+                console.log('⚠️ No se pudo aplicar regla stock_minimo=0:', e.message);
+            }
+
             // Migración: conteos_ciclicos schema v2 (agregar fecha, total_asignados)
             try {
                 const [fechaCol] = await sequelize.query(

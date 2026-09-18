@@ -2995,6 +2995,8 @@ export const generarSolicitudesStockBajo = async (req, res) => {
     const articulosBajos = await Articulo.findAll({
       where: {
         activo: true,
+        // stock_minimo = 0 → SKU sin reposición, no se compra por stock bajo
+        stock_minimo: { [Op.gt]: 0 },
         stock_actual: {
           [Op.lt]: sequelize.col('stock_minimo')
         }
@@ -3935,6 +3937,8 @@ export const obtenerArticulosPendientesPorProveedor = async (req, res) => {
       where: {
         proveedor_id: proveedor_id,
         activo: true,
+        // stock_minimo = 0 → SKU sin reposición, no se sugiere comprar
+        stock_minimo: { [Op.gt]: 0 },
         stock_actual: {
           [Op.lt]: sequelize.col('stock_minimo')
         }

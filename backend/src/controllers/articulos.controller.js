@@ -203,7 +203,9 @@ export const getArticulos = async (req, res) => {
         // Si se solicita filtrar por stock bajo
         let articulosFiltrados = articulos;
         if (stock_bajo === 'true') {
-            articulosFiltrados = articulos.filter(art => art.stock_actual <= art.stock_minimo);
+            articulosFiltrados = articulos.filter(art =>
+                parseFloat(art.stock_minimo) > 0 && parseFloat(art.stock_actual) <= parseFloat(art.stock_minimo)
+            );
         }
 
         res.status(200).json({

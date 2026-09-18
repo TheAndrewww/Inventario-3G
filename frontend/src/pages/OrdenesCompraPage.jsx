@@ -330,6 +330,7 @@ const OrdenesCompraPage = () => {
       // Filtrar artículos con stock bajo mínimo, excluyendo los que ya tienen
       // una orden de compra activa (para no duplicar las compras)
       const articulosBajoStock = todosArticulos.filter(art =>
+        parseFloat(art.stock_minimo) > 0 &&
         parseFloat(art.stock_actual) < parseFloat(art.stock_minimo) &&
         !idsEnOrden.includes(art.id)
       );

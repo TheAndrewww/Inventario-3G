@@ -213,14 +213,15 @@ export const reporteInventarioConsumibles = async (req, res) => {
  */
 export const stockBajoPorAlmacen = async (req, res) => {
     try {
-        // Está bajo mínimo si se quedó en cero/negativo, o si tiene mínimo
-        // configurado y el stock actual ya lo alcanzó.
+        // Está bajo mínimo si tiene mínimo configurado y el stock actual ya lo
+        // alcanzó. Un SKU con stock_minimo = 0 no se repone (va desactivado),
+        // así que nunca sale aquí aunque esté en cero o negativo.
         const whereStockBajo = {
             activo: true,
             es_herramienta: false,
-            [Op.or]: [
-                literal('"Articulo"."stock_actual" <= 0'),
-                literal('("Articulo"."stock_minimo" > 0 AND "Articulo"."stock_actual" <= "Articulo"."stock_minimo")')
+            [Op.and]: [
+                literal('"Articulo"."stock_minimo" > 0'),
+                literal('"Articulo"."stock_actual" <= "Articulo"."stock_minimo"')
             ]
         };
 

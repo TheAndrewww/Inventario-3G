@@ -270,9 +270,11 @@ export const crearPedido = async (req, res) => {
         // Stock negativo: necesitamos comprar para cubrir el déficit + reponer hasta el máximo
         const deficit = Math.abs(nuevoStock); // Cantidad en negativo
 
-        // Calcular stock máximo con valores predeterminados si son NULL
-        const stockMin = parseFloat(articulo.stock_minimo) || 10; // Default: 10
-        const stockMaximo = parseFloat(articulo.stock_maximo) || (stockMin * 3); // Default: 3x mínimo
+        // Reposición hasta el máximo SOLO si el SKU tiene mínimo. Con
+        // stock_minimo = 0 el SKU no se repone: se compra únicamente el déficit
+        // que dejó la salida (antes se inventaba un mínimo de 10 y pedía +30).
+        const stockMin = parseFloat(articulo.stock_minimo) || 0;
+        const stockMaximo = stockMin > 0 ? (parseFloat(articulo.stock_maximo) || (stockMin * 3)) : 0;
 
         // CONSOLIDACIÓN: Verificar si ya existe una solicitud pendiente de este artículo
         const solicitudExistente = await SolicitudCompra.findOne({
@@ -327,7 +329,9 @@ export const crearPedido = async (req, res) => {
             ticket_id: ticket_id_solicitud,
             articulo_id: articulo.id,
             cantidad_solicitada: cantidadTotal,
-            motivo: `Stock negativo después de pedido ${nombrePedido}. Déficit: ${deficit} ${articulo.unidad}. Se solicitan ${cantidadTotal} ${articulo.unidad} (${deficit} para cubrir déficit + ${stockMaximo} para reposición hasta stock máximo).`,
+            motivo: stockMaximo > 0
+              ? `Stock negativo después de pedido ${nombrePedido}. Déficit: ${deficit} ${articulo.unidad}. Se solicitan ${cantidadTotal} ${articulo.unidad} (${deficit} para cubrir déficit + ${stockMaximo} para reposición hasta stock máximo).`
+              : `Stock negativo después de pedido ${nombrePedido}. Se solicitan ${deficit} ${articulo.unidad} para cubrir el déficit (SKU sin stock mínimo, no se repone).`,
             pedido_origen_id: null, // Se asignará después de crear el pedido
             usuario_solicitante_id: usuario_id,
             proveedor_id: proveedor_id_detectado, // Proveedor detectado automáticamente
