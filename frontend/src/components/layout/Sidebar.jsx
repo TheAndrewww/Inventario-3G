@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 
 // Definir todas las opciones del menú con sus roles permitidos.
 // El array es el ORDEN POR DEFECTO. El usuario puede reordenar en la UI.
-const ALL_MENU_ITEMS = [
+export const ALL_MENU_ITEMS = [
   { path: '/inventario', icon: Package, label: 'Inventario', roles: ['administrador', 'diseñador', 'almacen', 'ventas'] },
   { path: '/recepcion-mercancia', icon: PackageCheck, label: 'Recepción Mercancía', roles: ['administrador', 'almacen'] },
   { path: '/entradas-salidas', icon: ArrowUpDown, label: 'Entradas y Salidas', roles: ['administrador', 'almacen'] },
@@ -30,6 +30,21 @@ const ALL_MENU_ITEMS = [
   { path: '/reportes', icon: BarChart3, label: 'Reportes', roles: ['administrador'] },
   { path: '/stock-bajo', icon: AlertTriangle, label: 'Stock Bajo', roles: ['administrador'] },
 ];
+
+// ¿El rol puede entrar a esta ruta del menú? Rutas fuera del menú: sí.
+export const rolPuedeVer = (rol, path) => {
+  const item = ALL_MENU_ITEMS.find(i => i.path === path);
+  return !item || item.roles.includes(rol);
+};
+
+// Pantalla de inicio según el rol: Inventario si lo tiene; compras va a sus
+// órdenes; el resto, a la primera vista de su menú (encargado → Calendario,
+// operador → Mi Equipo). Antes todos caían en Inventario aunque no lo tuvieran.
+export const rutaInicialPorRol = (rol) => {
+  if (rol === 'compras') return '/ordenes-compra';
+  if (rolPuedeVer(rol, '/inventario')) return '/inventario';
+  return ALL_MENU_ITEMS.find(i => i.roles.includes(rol))?.path || '/perfil';
+};
 
 const storageKey = (userId) => `sidebar-order:${userId ?? 'anon'}`;
 const storageKeyHidden = (userId) => `sidebar-hidden:${userId ?? 'anon'}`;

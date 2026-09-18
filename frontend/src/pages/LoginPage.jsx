@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { rutaInicialPorRol } from '../components/layout/Sidebar';
 import { Input, Button } from '../components/common';
 import toast from 'react-hot-toast';
 
@@ -18,11 +19,7 @@ const LoginPage = () => {
   // Redirigir si ya está autenticado
   useEffect(() => {
     if (isAuthenticated) {
-      if (user?.rol === 'compras') {
-        navigate('/ordenes-compra', { replace: true });
-      } else {
-        navigate('/inventario', { replace: true });
-      }
+      navigate(rutaInicialPorRol(user?.rol), { replace: true });
     }
   }, [isAuthenticated, navigate, user]);
 

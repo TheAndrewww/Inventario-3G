@@ -61,6 +61,10 @@ const InventarioPage = () => {
   // Valor de búsqueda diferido: el input se actualiza al instante (searchTerm) pero el
   // filtrado pesado usa este valor diferido, para que escribir no se sienta trabado.
   const deferredSearchTerm = React.useDeferredValue(searchTerm);
+  // Buscador de la pantalla "¿Qué deseas consultar?": encuentra un SKU en
+  // cualquier almacén sin tener que entrar a cada uno.
+  const [busquedaInicio, setBusquedaInicio] = useState('');
+  const busquedaInicioDiferida = React.useDeferredValue(busquedaInicio);
   const [articuloEncontradoPorCodigo, setArticuloEncontradoPorCodigo] = useState(null); // Guardar artículo encontrado por código
   const [herramientasEncontradasPorCodigo, setHerramientasEncontradasPorCodigo] = useState([]); // Herramientas encontradas por búsqueda parcial
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
@@ -879,6 +883,7 @@ const InventarioPage = () => {
 
         const matchesSearch =
           item.nombre?.toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
+          item.sku?.toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
           item.codigo_ean13?.includes(deferredSearchTerm) ||
           item.categoria?.nombre?.toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
           // También busca dentro de la descripción/comentarios del artículo
@@ -965,6 +970,52 @@ const InventarioPage = () => {
   const handleVerDetalle = (articulo) => {
     setArticuloSeleccionado(articulo);
     setModalDetalleOpen(true);
+  };
+
+  const resultadosInicio = React.useMemo(() => {
+    const q = busquedaInicioDiferida.trim().toLowerCase();
+    if (!q) return [];
+    return articulos
+      .filter(a =>
+        a.nombre?.toLowerCase().includes(q) ||
+        a.sku?.toLowerCase().includes(q) ||
+        a.codigo_ean13?.toLowerCase().includes(q)
+      )
+      // Primero coincidencias exactas de SKU/código, luego activos, luego por nombre
+      .sort((a, b) => {
+        const exacto = x => (x.sku?.toLowerCase() === q || x.codigo_ean13?.toLowerCase() === q) ? 0 : 1;
+        return exacto(a) - exacto(b)
+          || (a.activo === false) - (b.activo === false)
+          || (a.nombre || '').localeCompare(b.nombre || '');
+      })
+      .slice(0, 50);
+  }, [articulos, busquedaInicioDiferida]);
+
+  const nombreAlmacenDe = (articulo) => {
+    const id = articulo.ubicacion?.almacen_ref?.id ?? articulo.ubicacion?.almacen_id;
+    return articulo.ubicacion?.almacen_ref?.nombre
+      || almacenesDisponibles.find(a => a.id == id)?.nombre
+      || articulo.ubicacion?.almacen
+      || 'Sin almacén';
+  };
+
+  // Entra al almacén del SKU (con la búsqueda ya puesta) y abre su detalle
+  const abrirDesdeBusquedaInicio = (articulo) => {
+    const termino = busquedaInicio.trim();
+    setBusquedaInicio('');
+    if (articulo.pendiente_revision && (esAdministrador || esAlmacen)) {
+      setAlmacenSeleccionado('nuevos');
+    } else {
+      const almacenId = articulo.ubicacion?.almacen_ref?.id ?? articulo.ubicacion?.almacen_id ?? almacenesDisponibles[0]?.id;
+      if (almacenId === null || almacenId === undefined) return;
+      setAlmacenSeleccionado(almacenId);
+    }
+    setTabActivo(articulo.es_herramienta ? 'herramientas' : 'consumibles');
+    setSeccionSeleccionada('todos');
+    setCategoriaSeleccionada(null);
+    setUbicacionSeleccionada(null);
+    setSearchTerm(termino);
+    handleVerDetalle(articulo);
   };
 
   // Función para expandir/colapsar unidades de herramientas
@@ -2025,6 +2076,74 @@ const InventarioPage = () => {
           <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">¿Qué deseas consultar?</h1>
             <p className="text-gray-600">Elige un almacén o ve directamente a herramientas</p>
+          </div>
+          <div className="relative max-w-2xl mx-auto mb-8">
+            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={busquedaInicio}
+              onChange={(e) => setBusquedaInicio(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && resultadosInicio.length > 0) {
+                  const q = busquedaInicio.trim().toLowerCase();
+                  const exacto = resultadosInicio.find(a => a.sku?.toLowerCase() === q || a.codigo_ean13?.toLowerCase() === q);
+                  if (exacto || resultadosInicio.length === 1) abrirDesdeBusquedaInicio(exacto || resultadosInicio[0]);
+                } else if (e.key === 'Escape') {
+                  setBusquedaInicio('');
+                }
+              }}
+              placeholder="Buscar SKU en todos los almacenes (nombre, SKU o código)"
+              className="w-full pl-12 pr-10 py-3 text-base border-2 border-gray-200 rounded-xl focus:outline-none focus:border-red-700"
+              autoFocus
+            />
+            {busquedaInicio && (
+              <button
+                type="button"
+                onClick={() => setBusquedaInicio('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700"
+                aria-label="Limpiar búsqueda"
+              >
+                <X size={18} />
+              </button>
+            )}
+            {busquedaInicio.trim() && (
+              <div className="absolute z-20 left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-[60vh] overflow-y-auto">
+                {resultadosInicio.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-gray-500">Sin resultados</div>
+                ) : (
+                  resultadosInicio.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => abrirDesdeBusquedaInicio(a)}
+                      className="w-full text-left px-4 py-3 hover:bg-red-50 border-b border-gray-100 last:border-b-0 flex items-center gap-3"
+                    >
+                      {a.es_herramienta
+                        ? <Wrench size={18} className="text-blue-700 shrink-0" />
+                        : <Package size={18} className="text-red-700 shrink-0" />}
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-gray-900 truncate">{a.nombre}</div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {a.sku ? `SKU ${a.sku} · ` : ''}{nombreAlmacenDe(a)}
+                          {a.ubicacion?.codigo ? ` · ${a.ubicacion.codigo}` : ''}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className={`text-sm font-semibold ${parseFloat(a.stock_minimo) > 0 && parseFloat(a.stock_actual) <= parseFloat(a.stock_minimo) ? 'text-red-600' : 'text-gray-900'}`}>
+                          {parseFloat(a.stock_actual)} {a.unidad}
+                        </div>
+                        {a.activo === false && (
+                          <span className="text-[10px] uppercase font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">Desactivado</span>
+                        )}
+                        {a.pendiente_revision && (
+                          <span className="text-[10px] uppercase font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">Nuevo</span>
+                        )}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {almacenesDisponibles.map((almacen) => {

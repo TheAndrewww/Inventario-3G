@@ -41,13 +41,20 @@ import StockBajoPage from './pages/StockBajoPage';
 import EntradasSalidasPage from './pages/EntradasSalidasPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAuth } from './context/AuthContext';
+import { rolPuedeVer, rutaInicialPorRol } from './components/layout/Sidebar';
 
 const IndexRedirect = () => {
   const { user } = useAuth();
-  if (user?.rol === 'compras') {
-    return <Navigate to="/ordenes-compra" replace />;
+  return <Navigate to={rutaInicialPorRol(user?.rol)} replace />;
+};
+
+// Quien no tiene esa vista en su menú no entra aunque teclee la URL
+const SoloConVista = ({ path, children }) => {
+  const { user } = useAuth();
+  if (!rolPuedeVer(user?.rol, path)) {
+    return <Navigate to={rutaInicialPorRol(user?.rol)} replace />;
   }
-  return <Navigate to="/inventario" replace />;
+  return children;
 };
 
 function App() {
@@ -109,7 +116,7 @@ function App() {
                       }
                     >
                       <Route index element={<IndexRedirect />} />
-                      <Route path="inventario" element={<InventarioPage />} />
+                      <Route path="inventario" element={<SoloConVista path="/inventario"><InventarioPage /></SoloConVista>} />
                       <Route path="recepcion-mercancia" element={<RecepcionMercanciaPage />} />
                       <Route path="pedido" element={<PedidoPage />} />
                       <Route path="pedidos-pendientes" element={<PedidosPendientesPage />} />
@@ -136,7 +143,7 @@ function App() {
                       <Route path="perfil" element={<PerfilPage />} />
 
                       {/* Ruta 404 para rutas privadas no encontradas */}
-                      <Route path="*" element={<Navigate to="/inventario" replace />} />
+                      <Route path="*" element={<IndexRedirect />} />
                     </Route>
                   </Routes>
                 </PedidoProvider>
