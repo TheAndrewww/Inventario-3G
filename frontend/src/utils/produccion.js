@@ -306,7 +306,8 @@ const normalizarNombre = (str) => {
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9\s]/g, '')
+        // Signos → espacio: "TEOFILO/MTO/RETIRO" debe separar sus palabras
+        .replace(/[^a-z0-9\s]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 };
@@ -336,11 +337,29 @@ const levenshtein = (a, b) => {
  * - La similitud Levenshtein es >= 80%, O
  * - Uno contiene al otro como substring (para nombres parciales del calendario)
  */
+// Palabras del calendario que describen la cita, no al cliente
+const PALABRAS_DE_CITA = new Set(['mto', 'gtia', 'retiro', 'reinst', 'reinstalacion', 'instalacion', 'extensivo', 'falla']);
+// Números que distinguen dos proyectos del mismo cliente: "AURELIO AMEZOLA" ≠ "AURELIO AMEZOLA II"
+const NUMERALES = new Set(['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
+
+const numeralesDe = (normalizado) =>
+    normalizado.split(' ').filter(t => NUMERALES.has(t)).sort().join(' ');
+
+// Nombre del cliente sin las palabras que describen la cita (MTO, RETIRO...)
+const nombreBase = (normalizado) =>
+    normalizado.split(' ').filter(t => t && !PALABRAS_DE_CITA.has(t)).join(' ');
+
+// La cita es un RETIRO (se recoge para mantenimiento): no es una entrega
+const esCitaRetiro = (normalizado) => normalizado.split(' ').includes('retiro');
+
 export const matchNombre = (nombreA, nombreB) => {
     const a = normalizarNombre(nombreA);
     const b = normalizarNombre(nombreB);
     if (!a || !b) return false;
     if (a === b) return true;
+
+    // Si uno lleva número (II, 2...) y el otro no, o distinto, son proyectos distintos
+    if (numeralesDe(a) !== numeralesDe(b)) return false;
     
     // Check substring containment (calendar often has shorter names)
     // Solo si el substring tiene al menos 8 caracteres para evitar falsos positivos
@@ -398,6 +417,7 @@ const construirCitasPorNombre = (calendarioProyectos, anio, mes) => {
         if (lista.some(c => c.fecha === fecha)) return; // misma fecha repetida
         lista.push({
             fecha,
+            retiro: esCitaRetiro(key),
             // La hora en rojo oscuro = FALLA en la instalación (hay que reprogramar)
             falla: cp.equipoHora === 'FALLA',
             nota: cp.nota || null
@@ -406,28 +426,56 @@ const construirCitasPorNombre = (calendarioProyectos, anio, mes) => {
     return citasPorNombre;
 };
 
-// Busca la cita de un proyecto (por match de nombre ≥80%) y devuelve la fecha de
-// instalación (inicio del último bloque de días contiguos), o null si no hay match.
+// Busca las citas de un proyecto y devuelve la fecha de instalación (inicio del
+// último bloque de días contiguos), o null si no hay match.
+//
+// Un mismo proyecto aparece en el calendario con varios nombres ("X / MTO /
+// RETIRO", "X / MTO"): se juntan todas sus citas. Si alguna coincide con el
+// nombre del proyecto quitando esas palabras, solo se usan esas; si no, se cae
+// al parecido de nombres (≥80% o contenido). Los RETIROS no cuentan: son la
+// recolección, no la entrega.
 const buscarFechaInstalacion = (nombreProd, citasPorNombre, nombresCalendario) => {
-    for (const nombreCal of nombresCalendario) {
-        if (matchNombre(nombreProd, nombreCal)) {
-            const citas = [...citasPorNombre[nombreCal]].sort((a, b) => a.fecha.localeCompare(b.fecha));
-            const rango = rangoUltimoBloque(citas.map(c => c.fecha));
-            if (!rango) return null;
-            // Solo interesa el estado del bloque más reciente: si una instalación
-            // vieja falló y ya se reprogramó, manda la cita nueva.
-            const citasBloque = citas.filter(c => c.fecha >= rango.inicio && c.fecha <= rango.fin);
-            const citaFalla = citasBloque.find(c => c.falla);
-            return {
-                fechaInstalacionStr: rango.inicio,
-                fechaFinInstalacionStr: rango.fin,
-                nombreCal,
-                falla: !!citaFalla,
-                nota: citaFalla?.nota || citasBloque.find(c => c.nota)?.nota || null
+    const baseProd = nombreBase(nombreProd);
+    let nombres = nombresCalendario.filter(n => nombreBase(n) === baseProd);
+    if (nombres.length === 0) {
+        nombres = nombresCalendario.filter(n => matchNombre(nombreProd, n));
+        if (nombres.length > 1) {
+            // Con varios parecidos, solo los del mismo cliente que el más parecido
+            const similitud = (n) => {
+                const a = nombreBase(n), b = baseProd;
+                const max = Math.max(a.length, b.length) || 1;
+                return 1 - levenshtein(a, b) / max;
             };
+            const mejor = nombres.reduce((m, n) => (similitud(n) > similitud(m) ? n : m));
+            nombres = nombres.filter(n => nombreBase(n) === nombreBase(mejor));
         }
     }
-    return null;
+    if (nombres.length === 0) return null;
+
+    const porFecha = new Map();
+    for (const n of nombres) {
+        for (const c of citasPorNombre[n]) {
+            if (c.retiro) continue;
+            const previa = porFecha.get(c.fecha);
+            porFecha.set(c.fecha, previa
+                ? { ...previa, falla: previa.falla || c.falla, nota: previa.nota || c.nota }
+                : c);
+        }
+    }
+    const citas = [...porFecha.values()].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const rango = rangoUltimoBloque(citas.map(c => c.fecha));
+    if (!rango) return null;
+    // Solo interesa el estado del bloque más reciente: si una instalación
+    // vieja falló y ya se reprogramó, manda la cita nueva.
+    const citasBloque = citas.filter(c => c.fecha >= rango.inicio && c.fecha <= rango.fin);
+    const citaFalla = citasBloque.find(c => c.falla);
+    return {
+        fechaInstalacionStr: rango.inicio,
+        fechaFinInstalacionStr: rango.fin,
+        nombreCal: nombres.join(' + '),
+        falla: !!citaFalla,
+        nota: citaFalla?.nota || citasBloque.find(c => c.nota)?.nota || null
+    };
 };
 
 // fechaInstalación - 1 día hábil, en formato ISO (el proyecto debe estar
