@@ -6,25 +6,33 @@ import { sortProyectosPorUrgencia, esProyectoMTO, esUrgenteMTO } from '../utils/
  */
 export const FILTRO_OPCIONES = [
     { value: 'todos', label: 'Todos' },
-    { value: 'activos', label: 'En Proceso' },
-    { value: 'preparados', label: '📦 Preparados' },
+    { value: 'completados', label: '✅ Completados' },
     { value: 'urgentes', label: '🔴 Urgentes' },
     { value: '_separator', label: '|' },
-    { value: 'produccion_diseno', label: '🏗️ Producción / Diseño' },
+    { value: 'diseno', label: '✏️ Diseño' },
+    { value: 'produccion', label: '🏗️ Producción' },
     { value: 'manufactura', label: '🏭 Manufactura' },
     { value: 'herreria', label: '⚒️ Herrería' }
 ];
+
+const esCancelado = (p) => p.tipo_proyecto?.toUpperCase().startsWith('CANCELADO');
+
+// MTO/GTIA sin EXTENSIVO no pasan por diseño/producción: van directo a Completados
+const entraAProduccion = (p) => {
+    const tipo = p.tipo_proyecto?.toUpperCase();
+    return !(tipo === 'MTO' || tipo === 'GTIA') || p.es_extensivo;
+};
 
 /**
  * Hook para gestionar filtros del dashboard de producción
  * 
  * @param {array} proyectos - Array de proyectos a filtrar
- * @param {string} filtroInicial - Filtro inicial (default: 'activos')
+ * @param {string} filtroInicial - Filtro inicial (default: 'todos')
  */
 const normalizarTexto = (s) =>
     (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-export const useProduccionFilters = (proyectos, filtroInicial = 'activos') => {
+export const useProduccionFilters = (proyectos, filtroInicial = 'todos') => {
     const [filtro, setFiltro] = useState(filtroInicial);
     const [busqueda, setBusqueda] = useState('');
 
@@ -39,24 +47,20 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'activos') => {
             }
 
             switch (filtro) {
-                case 'activos':
-                    return p.etapa_actual !== 'completado' && p.etapa_actual !== 'pendiente' && p.etapa_actual !== 'instalacion';
-                case 'preparados':
+                case 'completados':
+                    // 'instalacion' es la etapa que la UI llama "Completado" (antes 📦 Preparados)
                     return p.etapa_actual === 'instalacion';
                 case 'urgentes':
                     // MTO: solo por fecha del calendario ya vencida (no por prioridad ni ventana de 3 días)
                     if (esProyectoMTO(p)) return esUrgenteMTO(p);
                     return p.prioridad === 1 || (p.diasRestantes !== null && p.diasRestantes <= 3);
-                case 'produccion_diseno': {
-                    // Proyectos que entran a producción: A/B/C, o MTO/GTIA con EXTENSIVO.
-                    // Se excluyen completados (incluye 'instalacion' que en UI se etiqueta
-                    // como "Completado" y vive en la pantalla 📦 Preparados) y cancelados.
-                    if (p.etapa_actual === 'completado' || p.etapa_actual === 'instalacion') return false;
-                    if (p.tipo_proyecto?.toUpperCase().startsWith('CANCELADO')) return false;
-                    const tipo = p.tipo_proyecto?.toUpperCase();
-                    const esMTOoGTIA = tipo === 'MTO' || tipo === 'GTIA';
-                    return !esMTOoGTIA || p.es_extensivo;
-                }
+                case 'diseno':
+                    return p.etapa_actual === 'diseno' && !esCancelado(p) && entraAProduccion(p);
+                case 'produccion':
+                    // Compras cuenta como producción: el proyecto ya salió de diseño
+                    // y está juntando material para arrancar.
+                    return (p.etapa_actual === 'compras' || p.etapa_actual === 'produccion')
+                        && !esCancelado(p) && entraAProduccion(p);
                 case 'manufactura':
                     return p.tiene_manufactura
                         && p.etapa_actual !== 'completado'
