@@ -367,6 +367,12 @@ router.get('/produccion/agenda', async (req, res) => {
             if (p.tiene_manufactura && p.manufactura_completado) listas.push('manufactura');
             if (p.tiene_herreria && p.herreria_completado) listas.push('herreria');
 
+            // Un proyecto sin planos en Drive no tiene áreas que contar, y si solo se mirara
+            // `pendientes` saldría como "listo" estando en Diseño. Lo que de verdad dice que
+            // producción cerró es que la etapa ya pasó de ahí.
+            const sinPlanos = !p.tiene_manufactura && !p.tiene_herreria;
+            const etapaPasoProduccion = ['instalacion', 'completado'].includes(p.etapa_actual);
+
             return {
                 id: p.id,
                 proyecto: p.nombre,
@@ -374,8 +380,8 @@ router.get('/produccion/agenda', async (req, res) => {
                 etapa_actual: p.etapa_actual,
                 pendientes,
                 listas,
-                // "Entregado" = producción cerrada: ya no le falta ningún área con planos.
-                produccion_cerrada: pendientes.length === 0,
+                sin_planos: sinPlanos,
+                produccion_cerrada: etapaPasoProduccion || (pendientes.length === 0 && !sinPlanos),
                 produccion_completado_en: p.produccion_completado_en
             };
         });
