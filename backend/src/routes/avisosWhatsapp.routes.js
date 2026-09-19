@@ -7,7 +7,7 @@
 
 import express from 'express';
 import { Op } from 'sequelize';
-import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor } from '../models/index.js';
+import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor, ProduccionProyecto } from '../models/index.js';
 import { crearNotificacion } from '../controllers/notificaciones.controller.js';
 import { enviarEmailEstadoOrden } from '../services/email.service.js';
 
@@ -326,6 +326,65 @@ router.post('/costos', async (req, res) => {
     } catch (error) {
         console.error('Error al guardar costos de factura:', error);
         res.status(500).json({ success: false, message: 'Error al guardar costos', error: error.message });
+    }
+});
+
+/**
+ * GET /api/avisos-whatsapp/produccion/agenda?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
+ * Proyectos con fecha de INSTALACIÓN en ese rango y qué les falta de producción.
+ *
+ * La fecha del calendario (`fecha_limite`) es el día en que el proyecto SE VA a instalar, así
+ * que producción tiene que haberlo entregado el día anterior. El bot contable usa esto para
+ * los recordatorios del grupo de PRODUCCIÓN: de aquí saca qué falta, no lo adivina.
+ *
+ * Solo lectura: no cambia nada del proyecto.
+ */
+router.get('/produccion/agenda', async (req, res) => {
+    try {
+        const { desde, hasta } = req.query;
+        if (!desde || !hasta) {
+            return res.status(400).json({ success: false, message: 'Faltan las fechas desde/hasta' });
+        }
+
+        const proyectos = await ProduccionProyecto.findAll({
+            where: {
+                fecha_limite: { [Op.between]: [desde, hasta] },
+                etapa_actual: { [Op.ne]: 'completado' }
+            },
+            order: [['fecha_limite', 'ASC'], ['nombre', 'ASC']]
+        });
+
+        const agenda = proyectos.map(p => {
+            // Un área solo cuenta si el proyecto la tiene (hay planos suyos en Drive).
+            const pendientes = [];
+            if (p.tiene_manufactura && !p.manufactura_completado) pendientes.push('manufactura');
+            if (p.tiene_herreria && !p.herreria_completado) {
+                if (p.herreria_armado_completado && !p.herreria_pintado_completado) pendientes.push('herreria_pintado');
+                else if (!p.herreria_armado_completado && p.herreria_pintado_completado) pendientes.push('herreria_armado');
+                else pendientes.push('herreria');
+            }
+            const listas = [];
+            if (p.tiene_manufactura && p.manufactura_completado) listas.push('manufactura');
+            if (p.tiene_herreria && p.herreria_completado) listas.push('herreria');
+
+            return {
+                id: p.id,
+                proyecto: p.nombre,
+                fecha_instalacion: p.fecha_limite,
+                etapa_actual: p.etapa_actual,
+                pendientes,
+                listas,
+                // "Entregado" = producción cerrada: ya no le falta ningún área con planos.
+                produccion_cerrada: pendientes.length === 0,
+                produccion_completado_en: p.produccion_completado_en
+            };
+        });
+
+        res.json({ success: true, data: { agenda } });
+
+    } catch (error) {
+        console.error('Error al listar la agenda de producción:', error);
+        res.status(500).json({ success: false, message: 'Error al listar la agenda', error: error.message });
     }
 });
 
