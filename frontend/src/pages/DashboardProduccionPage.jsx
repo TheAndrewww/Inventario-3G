@@ -136,27 +136,91 @@ const ModalNuevoProyecto = ({ isOpen, onClose, onCrear }) => {
 };
 
 // ============ Filtros ============
-const FiltrosProyectos = ({ filtro, setFiltro, opciones }) => (
-    <div className="flex flex-wrap gap-2 mb-4 items-center">
-        {opciones.map(op => {
-            if (op.value === '_separator') {
-                return <div key="_sep" className="w-px h-8 bg-gray-300 mx-1 hidden sm:block" />;
-            }
-            return (
+// Orden de las pestañas de filtro, por usuario (se arrastran para reordenar).
+// Las pestañas nuevas que no estén en el orden guardado van al final.
+const claveOrdenFiltros = (userId) => `produccion-filtros-orden:${userId ?? 'anon'}`;
+
+const ordenarOpciones = (opciones, guardado) => {
+    if (!Array.isArray(guardado) || guardado.length === 0) return opciones;
+    const porValor = new Map(opciones.map(o => [o.value, o]));
+    const ordenadas = guardado.filter(v => porValor.has(v)).map(v => porValor.get(v));
+    const restantes = opciones.filter(o => !guardado.includes(o.value));
+    return [...ordenadas, ...restantes];
+};
+
+const FiltrosProyectos = ({ filtro, setFiltro, opciones, userId }) => {
+    const [orden, setOrden] = useState(() => {
+        try {
+            return ordenarOpciones(opciones, JSON.parse(localStorage.getItem(claveOrdenFiltros(userId)) || 'null'));
+        } catch {
+            return opciones;
+        }
+    });
+    const [arrastrando, setArrastrando] = useState(null);
+    const [sobre, setSobre] = useState(null);
+
+    const guardar = (nuevas) => {
+        setOrden(nuevas);
+        try { localStorage.setItem(claveOrdenFiltros(userId), JSON.stringify(nuevas.map(o => o.value))); } catch { /* sin almacenamiento: solo esta sesión */ }
+    };
+
+    const soltarEn = (destino) => {
+        if (arrastrando === null || arrastrando === destino) return;
+        const nuevas = [...orden];
+        const desde = nuevas.findIndex(o => o.value === arrastrando);
+        const hacia = nuevas.findIndex(o => o.value === destino);
+        if (desde < 0 || hacia < 0) return;
+        const [movida] = nuevas.splice(desde, 1);
+        nuevas.splice(hacia, 0, movida);
+        guardar(nuevas);
+    };
+
+    const personalizado = orden.some((o, i) => o.value !== opciones[i]?.value);
+
+    return (
+        <div className="flex flex-wrap gap-2 mb-4 items-center">
+            {orden.map(op => {
+                const esSeparador = op.value === '_separator';
+                const props = {
+                    draggable: true,
+                    onDragStart: (e) => { setArrastrando(op.value); e.dataTransfer.effectAllowed = 'move'; },
+                    onDragOver: (e) => { e.preventDefault(); if (sobre !== op.value) setSobre(op.value); },
+                    onDragLeave: () => setSobre(s => (s === op.value ? null : s)),
+                    onDrop: (e) => { e.preventDefault(); soltarEn(op.value); setArrastrando(null); setSobre(null); },
+                    onDragEnd: () => { setArrastrando(null); setSobre(null); }
+                };
+                const marcaSoltar = sobre === op.value && arrastrando !== op.value ? 'ring-2 ring-blue-400' : '';
+                if (esSeparador) {
+                    return <div key="_sep" {...props} title="Arrastra para mover" className={`w-1.5 h-8 rounded bg-gray-300 mx-1 hidden sm:block cursor-grab ${marcaSoltar}`} />;
+                }
+                return (
+                    <button
+                        key={op.value}
+                        {...props}
+                        onClick={() => setFiltro(op.value)}
+                        title="Clic para filtrar · arrastra para mover"
+                        className={`px-4 py-2 rounded-lg font-medium transition-all text-sm cursor-grab active:cursor-grabbing ${arrastrando === op.value ? 'opacity-40' : ''} ${marcaSoltar} ${filtro === op.value
+                            ? 'bg-gray-900 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                    >
+                        {op.label}
+                    </button>
+                );
+            })}
+            {personalizado && (
                 <button
-                    key={op.value}
-                    onClick={() => setFiltro(op.value)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${filtro === op.value
-                        ? 'bg-gray-900 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                    type="button"
+                    onClick={() => { guardar(opciones); try { localStorage.removeItem(claveOrdenFiltros(userId)); } catch { /* nada */ } }}
+                    className="text-xs text-gray-500 hover:text-gray-800 underline ml-1"
+                    title="Regresar las pestañas al orden original"
                 >
-                    {op.label}
+                    Orden original
                 </button>
-            );
-        })}
-    </div>
-);
+            )}
+        </div>
+    );
+};
 
 // ============ Página principal ============
 const DashboardProduccionPage = () => {
@@ -344,7 +408,7 @@ const DashboardProduccionPage = () => {
 
             {/* Filtros */}
             {!esAlmacen && (
-                <FiltrosProyectos filtro={filtro} setFiltro={setFiltro} opciones={opciones} />
+                <FiltrosProyectos filtro={filtro} setFiltro={setFiltro} opciones={opciones} userId={user?.id} />
             )}
 
             {/* Lista de Proyectos */}

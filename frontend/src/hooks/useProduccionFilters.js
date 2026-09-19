@@ -10,6 +10,7 @@ export const FILTRO_OPCIONES = [
     { value: 'urgentes', label: '🔴 Urgentes' },
     { value: '_separator', label: '|' },
     { value: 'diseno', label: '✏️ Diseño' },
+    { value: 'compras', label: '🛒 Compras' },
     { value: 'produccion', label: '🏗️ Producción' },
     { value: 'manufactura', label: '🏭 Manufactura' },
     { value: 'herreria', label: '⚒️ Herrería' }
@@ -62,11 +63,17 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'todos') => {
                         && p.etapa_actual !== 'instalacion'
                         && p.etapa_actual !== 'completado'
                         && !esCancelado(p) && entraAProduccion(p);
-                case 'produccion':
-                    // Compras cuenta como producción: el proyecto ya salió de diseño
-                    // y está juntando material para arrancar.
-                    return (p.etapa_actual === 'compras' || p.etapa_actual === 'produccion')
+                case 'compras':
+                    // Diseño ya marcado y compras todavía no: está juntando material.
+                    // Por casillas (no etapa_actual) porque se marcan en cualquier orden.
+                    return !!p.diseno_completado_en
+                        && !p.compras_completado_en
+                        && p.etapa_actual !== 'instalacion'
+                        && p.etapa_actual !== 'completado'
                         && !esCancelado(p) && entraAProduccion(p);
+                case 'produccion':
+                    // Compras (o alguna área de producción) ya marcada y sin terminar
+                    return p.etapa_actual === 'produccion' && !esCancelado(p) && entraAProduccion(p);
                 case 'manufactura':
                     return p.tiene_manufactura
                         && p.etapa_actual !== 'completado'
