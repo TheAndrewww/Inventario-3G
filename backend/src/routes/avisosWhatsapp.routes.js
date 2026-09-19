@@ -341,9 +341,26 @@ router.post('/costos', async (req, res) => {
  */
 router.get('/produccion/agenda', async (req, res) => {
     try {
-        const { desde, hasta } = req.query;
+        const { desde, hasta, fresco } = req.query;
         if (!desde || !hasta) {
             return res.status(400).json({ success: false, message: 'Faltan las fechas desde/hasta' });
+        }
+
+        // El calendario se mueve durante el día: un proyecto que en la mañana se instalaba
+        // mañana, a mediodía ya se recorrió. Antes de avisar al grupo se relee la hoja, para
+        // no mandar un recordatorio de algo que ya cambió. La sincronización automática corre
+        // cada 5 minutos; esto es la pasada de más que se hace justo antes de hablar.
+        let sincronizado = false;
+        if (fresco === '1' || fresco === 'true') {
+            try {
+                const { sincronizarSheetsAutomatico } = await import('../jobs/sincronizarSheets.job.js');
+                await sincronizarSheetsAutomatico();
+                sincronizado = true;
+            } catch (e) {
+                // Que la hoja falle no deja al grupo sin aviso: se responde con lo que hay en
+                // la base y se dice que no se pudo releer.
+                console.error('No se pudo releer el calendario antes de la agenda:', e.message);
+            }
         }
 
         const proyectos = await ProduccionProyecto.findAll({
@@ -386,7 +403,7 @@ router.get('/produccion/agenda', async (req, res) => {
             };
         });
 
-        res.json({ success: true, data: { agenda } });
+        res.json({ success: true, data: { agenda, sincronizado } });
 
     } catch (error) {
         console.error('Error al listar la agenda de producción:', error);
