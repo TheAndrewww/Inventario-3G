@@ -2702,7 +2702,13 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
 };
 
 // Modal para crear orden desde solicitudes seleccionadas
-export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesIniciales = {}, generarPDFOrden, onClose, onSuccess }) => {
+// Default FIJO: un `{}` en la firma es un objeto nuevo en cada render y el efecto
+// que inicializa cantidades (depende de él) se disparaba sin fin, borrando lo que
+// se escribía y trabando el modal. Pasaba al abrirlo desde la Orden de Salida,
+// que no manda cantidadesIniciales.
+const SIN_CANTIDADES_INICIALES = {};
+
+export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidadesIniciales = SIN_CANTIDADES_INICIALES, generarPDFOrden, onClose, onSuccess }) => {
   const [proveedores, setProveedores] = useState([]);
   const [proveedorId, setProveedorId] = useState('');
   const [observaciones, setObservaciones] = useState('');
