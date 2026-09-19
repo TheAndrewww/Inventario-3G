@@ -55,7 +55,13 @@ export const useProduccionFilters = (proyectos, filtroInicial = 'todos') => {
                     if (esProyectoMTO(p)) return esUrgenteMTO(p);
                     return p.prioridad === 1 || (p.diasRestantes !== null && p.diasRestantes <= 3);
                 case 'diseno':
-                    return p.etapa_actual === 'diseno' && !esCancelado(p) && entraAProduccion(p);
+                    // Por la casilla de diseño, no por etapa_actual: las etapas se
+                    // marcan en cualquier orden y etapa_actual es la MÁS avanzada, así
+                    // que marcar Compras sin Diseño lo sacaba de aquí.
+                    return !p.diseno_completado_en
+                        && p.etapa_actual !== 'instalacion'
+                        && p.etapa_actual !== 'completado'
+                        && !esCancelado(p) && entraAProduccion(p);
                 case 'produccion':
                     // Compras cuenta como producción: el proyecto ya salió de diseño
                     // y está juntando material para arrancar.
