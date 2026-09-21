@@ -17,7 +17,7 @@
  */
 import { Op } from 'sequelize';
 import { leerCalendarioMes } from './googleSheets.service.js';
-import { ProduccionProyecto, AvisoWhatsApp } from '../models/index.js';
+import { ProduccionProyecto, AvisoWhatsApp, Configuracion } from '../models/index.js';
 import { isWhatsAppEnabled } from './whatsapp.service.js';
 
 const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
@@ -238,10 +238,34 @@ const fechaEnPalabras = (iso) => {
 };
 
 /**
- * Última fecha de instalación vista por proyecto. En memoria: tras un reinicio la primera
- * pasada solo toma la foto (no avisa), porque sin la foto anterior no se sabe qué cambió.
+ * Última fecha de instalación vista por proyecto, guardada en `configuracion` para que un
+ * reinicio del servidor (cada deploy) no deje ciega la comparación: con la foto solo en
+ * memoria, un adelanto hecho en esos minutos no se avisaba nunca.
  */
-const ultimaFecha = new Map();
+const CLAVE_FOTO = 'produccion_fechas_instalacion';
+let ultimaFecha = null;
+
+const cargarFoto = async () => {
+    if (ultimaFecha) return ultimaFecha;
+    ultimaFecha = new Map();
+    try {
+        const fila = await Configuracion.findOne({ where: { clave: CLAVE_FOTO } });
+        const obj = fila?.valor ? JSON.parse(fila.valor) : {};
+        for (const [id, fecha] of Object.entries(obj)) ultimaFecha.set(Number(id), fecha);
+    } catch (e) {
+        console.error('⚠️ No se pudo leer la foto de fechas de instalación:', e.message);
+    }
+    return ultimaFecha;
+};
+
+const guardarFoto = async (mapa) => {
+    const valor = JSON.stringify(Object.fromEntries(mapa));
+    const [fila, creada] = await Configuracion.findOrCreate({
+        where: { clave: CLAVE_FOTO },
+        defaults: { valor, descripcion: 'Última fecha de instalación vista por proyecto (aviso de adelantos a PRODUCCIÓN)' }
+    });
+    if (!creada && fila.valor !== valor) await fila.update({ valor });
+};
 
 /**
  * Compara la fecha de instalación de cada proyecto contra la pasada anterior y, si alguno se
@@ -250,20 +274,31 @@ const ultimaFecha = new Map();
  * adelanto a media tarde nadie lo sabía hasta que el camión se iba sin la pieza.
  *
  * Los proyectos sin planos (MTO) no se avisan, igual que en los recordatorios del bot.
+ * Una sola pasada a la vez: la sincronización de cada 5 min y la que pide el bot antes de
+ * avisar pueden coincidir, y las dos verían el mismo cambio.
  */
-export const revisarAdelantos = async () => {
+let pasadaEnCurso = null;
+export const revisarAdelantos = () => {
+    pasadaEnCurso ||= revisarAdelantosUnaVez().finally(() => { pasadaEnCurso = null; });
+    return pasadaEnCurso;
+};
+
+const revisarAdelantosUnaVez = async () => {
     const proyectos = await proyectosAbiertos();
     const citas = await leerCitasCercanas();
     const fechas = resolverFechasInstalacion(proyectos, citas);
     const hoy = hoyMexico();
     const manana = sumarDias(hoy, 1);
-    const primeraPasada = ultimaFecha.size === 0;
+    const foto = await cargarFoto();
+    // Sin foto guardada (la primera vez que corre) no se sabe qué cambió: solo se toma.
+    const primeraPasada = foto.size === 0;
+    const vistos = new Map();
 
     let avisados = 0;
     for (const p of proyectos) {
         const nueva = fechas.get(p.id)?.fecha || null;
-        const anterior = ultimaFecha.get(p.id);
-        ultimaFecha.set(p.id, nueva);
+        const anterior = foto.get(p.id);
+        vistos.set(p.id, nueva);
         if (primeraPasada || !nueva || !anterior || nueva >= anterior) continue;
         if (nueva < hoy || nueva > manana) continue;
 
@@ -292,5 +327,8 @@ export const revisarAdelantos = async () => {
         console.log(`📅 Adelanto de instalación avisado: "${p.nombre}" ${anterior} → ${nueva}`);
         avisados++;
     }
+    // La foto se queda solo con los proyectos abiertos: los cerrados salen solos.
+    ultimaFecha = vistos;
+    try { await guardarFoto(vistos); } catch (e) { console.error('⚠️ No se pudo guardar la foto de fechas de instalación:', e.message); }
     return { avisados, primeraPasada };
 };

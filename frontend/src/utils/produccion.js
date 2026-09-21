@@ -434,7 +434,8 @@ const construirCitasPorNombre = (calendarioProyectos, anio, mes) => {
 // nombre del proyecto quitando esas palabras, solo se usan esas; si no, se cae
 // al parecido de nombres (≥80% o contenido). Los RETIROS no cuentan: son la
 // recolección, no la entrega.
-const buscarFechaInstalacion = (nombreProd, citasPorNombre, nombresCalendario) => {
+// Nombres del calendario que corresponden a un proyecto (por nombre base o parecido).
+const elegirNombres = (nombreProd, nombresCalendario) => {
     const baseProd = nombreBase(nombreProd);
     let nombres = nombresCalendario.filter(n => nombreBase(n) === baseProd);
     if (nombres.length === 0) {
@@ -450,6 +451,51 @@ const buscarFechaInstalacion = (nombreProd, citasPorNombre, nombresCalendario) =
             nombres = nombres.filter(n => nombreBase(n) === nombreBase(mejor));
         }
     }
+    return nombres;
+};
+
+/**
+ * Respaldo por número. El cruce normal nunca liga "X / SECCIÓN 3" con "X" (el número separa
+ * AURELIO AMEZOLA de AURELIO AMEZOLA II), pero el calendario escribe corto: COLEGIO ATENAS /
+ * MADRE LILA / SECCIÓN 3 aparece solo como "COLEGIO ATENAS" (21-sep-2026). Se liga
+ * únicamente si la cita no trae número, ningún otro proyecto la reclamó y UN SOLO proyecto
+ * cuadra con ella; con dos candidatos no se adivina. Misma regla que el backend
+ * (backend/src/services/fechaInstalacion.service.js).
+ *
+ * @returns {Map<string, string[]>} clave del proyecto → nombres del calendario
+ */
+const clave = (p) => String(p.id ?? p.nombre);
+const ligarPorNumero = (proyectos, nombresCalendario) => {
+    const reclamados = new Set();
+    const sinCita = [];
+    for (const p of proyectos) {
+        const nombreProd = normalizarNombre(p.nombre);
+        if (!nombreProd) continue;
+        const nombres = elegirNombres(nombreProd, nombresCalendario);
+        if (nombres.length) nombres.forEach(n => reclamados.add(n));
+        else if (numeralesDe(nombreProd)) sinCita.push({ p, nombreProd });
+    }
+    const libres = nombresCalendario.filter(n => !reclamados.has(n) && !numeralesDe(n));
+    const candidatos = new Map();
+    for (const { p, nombreProd } of sinCita) {
+        const sinNumero = nombreProd.split(' ').filter(t => !NUMERALES.has(t)).join(' ');
+        for (const n of libres) {
+            if (!matchNombre(sinNumero, n)) continue;
+            if (!candidatos.has(n)) candidatos.set(n, []);
+            candidatos.get(n).push(clave(p));
+        }
+    }
+    const res = new Map();
+    for (const [n, claves] of candidatos) {
+        if (claves.length !== 1 || res.has(claves[0])) continue;
+        res.set(claves[0], [n]);
+    }
+    return res;
+};
+
+const buscarFechaInstalacion = (nombreProd, citasPorNombre, nombresCalendario, porNumero = null) => {
+    let nombres = elegirNombres(nombreProd, nombresCalendario);
+    if (nombres.length === 0 && porNumero) nombres = porNumero;
     if (nombres.length === 0) return null;
 
     const porFecha = new Map();
@@ -561,13 +607,17 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
 
     if (nombresCalendario.length === 0 && nombresFuturos.length === 0 && nombresCierre.length === 0) return proyectos;
 
+    const porNumeroActual = ligarPorNumero(proyectos, nombresCalendario);
+    const porNumeroFuturo = ligarPorNumero(proyectos, nombresFuturos);
+    const porNumeroCierre = ligarPorNumero(proyectos, nombresCierre);
+
     return proyectos.map(p => {
         const nombreProd = normalizarNombre(p.nombre);
         if (!nombreProd) return p;
 
         // Metadata de cierre: último bloque de días que el calendario le dio a
         // este proyecto, y si esa última cita quedó marcada como FALLA.
-        const cierre = buscarFechaInstalacion(nombreProd, citasCierre, nombresCierre);
+        const cierre = buscarFechaInstalacion(nombreProd, citasCierre, nombresCierre, porNumeroCierre.get(clave(p)));
         const metaCierre = cierre ? {
             _fechaFinInstalacion: cierre.fechaFinInstalacionStr,
             _fallaInstalacion: cierre.falla,
@@ -585,7 +635,7 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
         //    - Si la cita es ANTERIOR (o igual) a la fecha de entrega del índice
         //      (columna D), MANDA el calendario.
         //    - Si la cita es POSTERIOR, se respeta la fecha del índice (salvo MTO).
-        const match = buscarFechaInstalacion(nombreProd, fechasPorNombre, nombresCalendario);
+        const match = buscarFechaInstalacion(nombreProd, fechasPorNombre, nombresCalendario, porNumeroActual.get(clave(p)));
         if (match) {
             const { fechaInstalacionStr, nombreCal } = match;
             if (!soloCalendario && fechaIndice && fechaInstalacionStr > fechaIndice) {
@@ -602,7 +652,7 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
         //    Evita que un MTO/GTIA sin fecha en la hoja (col D = "-") pero con cita
         //    real en un mes posterior quede mostrando un residuo viejo de la base.
         if ((!fechaIndice || soloCalendario) && nombresFuturos.length) {
-            const matchFut = buscarFechaInstalacion(nombreProd, fechasFuturasPorNombre, nombresFuturos);
+            const matchFut = buscarFechaInstalacion(nombreProd, fechasFuturasPorNombre, nombresFuturos, porNumeroFuturo.get(clave(p)));
             if (matchFut) {
                 const { fechaInstalacionStr, nombreCal } = matchFut;
                 const nuevaFechaLimite = fechaLimiteDesdeInstalacion(fechaInstalacionStr);
