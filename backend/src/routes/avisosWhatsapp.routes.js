@@ -7,6 +7,7 @@
 
 import express from 'express';
 import { Op } from 'sequelize';
+import { proyectosAbiertos, resolverFechasInstalacion, leerCitasCercanas, resumenProduccion } from '../services/fechaInstalacion.service.js';
 import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor, ProduccionProyecto } from '../models/index.js';
 import { crearNotificacion } from '../controllers/notificaciones.controller.js';
 import { enviarEmailEstadoOrden } from '../services/email.service.js';
@@ -363,47 +364,36 @@ router.get('/produccion/agenda', async (req, res) => {
             }
         }
 
-        const proyectos = await ProduccionProyecto.findAll({
-            where: {
-                fecha_limite: { [Op.between]: [desde, hasta] },
-                etapa_actual: { [Op.ne]: 'completado' }
-            },
-            order: [['fecha_limite', 'ASC'], ['nombre', 'ASC']]
-        });
+        // La fecha que manda es la del CALENDARIO de instalaciones cuando va antes que la col D
+        // (la misma regla del dashboard). Antes solo se miraba la col D y un proyecto adelantado
+        // en el calendario (COLEGIO ATENAS, 21-sep) nunca entraba a los recordatorios.
+        const proyectos = await proyectosAbiertos();
+        let fechas = null;
+        let calendarioLeido = false;
+        try {
+            fechas = resolverFechasInstalacion(proyectos, await leerCitasCercanas());
+            calendarioLeido = true;
+        } catch (e) {
+            // Sin calendario se contesta con la col D, como antes: mejor un aviso con la fecha
+            // del Índice que ninguno.
+            console.error('No se pudo leer el calendario para la agenda:', e.message);
+        }
 
-        const agenda = proyectos.map(p => {
-            // Un área solo cuenta si el proyecto la tiene (hay planos suyos en Drive).
-            const pendientes = [];
-            if (p.tiene_manufactura && !p.manufactura_completado) pendientes.push('manufactura');
-            if (p.tiene_herreria && !p.herreria_completado) {
-                if (p.herreria_armado_completado && !p.herreria_pintado_completado) pendientes.push('herreria_pintado');
-                else if (!p.herreria_armado_completado && p.herreria_pintado_completado) pendientes.push('herreria_armado');
-                else pendientes.push('herreria');
-            }
-            const listas = [];
-            if (p.tiene_manufactura && p.manufactura_completado) listas.push('manufactura');
-            if (p.tiene_herreria && p.herreria_completado) listas.push('herreria');
-
-            // Un proyecto sin planos en Drive no tiene áreas que contar, y si solo se mirara
-            // `pendientes` saldría como "listo" estando en Diseño. Lo que de verdad dice que
-            // producción cerró es que la etapa ya pasó de ahí.
-            const sinPlanos = !p.tiene_manufactura && !p.tiene_herreria;
-            const etapaPasoProduccion = ['instalacion', 'completado'].includes(p.etapa_actual);
-
-            return {
+        const agenda = proyectos
+            .map(p => ({ p, fecha: fechas ? fechas.get(p.id)?.fecha : p.fecha_limite }))
+            .filter(({ fecha }) => fecha && fecha >= desde && fecha <= hasta)
+            .sort((x, y) => x.fecha.localeCompare(y.fecha) || x.p.nombre.localeCompare(y.p.nombre))
+            .map(({ p, fecha }) => ({
                 id: p.id,
                 proyecto: p.nombre,
-                fecha_instalacion: p.fecha_limite,
+                fecha_instalacion: fecha,
+                fecha_indice: p.fecha_limite,
                 etapa_actual: p.etapa_actual,
-                pendientes,
-                listas,
-                sin_planos: sinPlanos,
-                produccion_cerrada: etapaPasoProduccion || (pendientes.length === 0 && !sinPlanos),
+                ...resumenProduccion(p),
                 produccion_completado_en: p.produccion_completado_en
-            };
-        });
+            }));
 
-        res.json({ success: true, data: { agenda, sincronizado } });
+        res.json({ success: true, data: { agenda, sincronizado, calendarioLeido } });
 
     } catch (error) {
         console.error('Error al listar la agenda de producción:', error);

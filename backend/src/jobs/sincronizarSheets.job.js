@@ -6,6 +6,7 @@
  */
 
 import produccionSheetsService from '../services/produccionSheets.service.js';
+import { revisarAdelantos } from '../services/fechaInstalacion.service.js';
 
 /**
  * Sincronizar proyectos desde Google Sheets a la base de datos
@@ -17,6 +18,14 @@ export const sincronizarSheetsAutomatico = async () => {
         const resultado = await produccionSheetsService.sincronizarConDB();
 
         console.log(`✅ [Sheets Job] Sincronización completada: ${resultado.creados} nuevos, ${resultado.actualizados} actualizados (${resultado.meses?.length || 1} meses)`);
+
+        // Con la base al día, ¿algún proyecto se adelantó en el calendario a hoy o mañana?
+        // Que falle no tumba la sincronización.
+        try {
+            await revisarAdelantos();
+        } catch (e) {
+            console.error('⚠️ [Sheets Job] No se pudieron revisar los adelantos del calendario:', e.message);
+        }
 
         return resultado;
     } catch (error) {
