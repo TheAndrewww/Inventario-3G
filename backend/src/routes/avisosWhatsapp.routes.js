@@ -418,16 +418,23 @@ router.get('/produccion/citas', async (req, res) => {
 
         const citas = (await leerCitasCercanas())
             .filter(c => c.fecha === fecha && c.nombre)
-            .map(c => ({
-                nombre: String(c.nombre).trim(),
-                cliente: c.cliente || null,
-                hora: c.hora || null,
-                // El calendario escribe la clase de cita dentro del nombre.
-                tipo: /retiro/i.test(c.nombre) ? 'RETIRO'
-                    : /gtia|garant/i.test(c.nombre) ? 'GTIA'
-                        : /mto|mantenim/i.test(c.nombre) ? 'MTO' : 'INSTALACION',
-                falla: c.equipoHora === 'FALLA'
-            }));
+            .map(c => {
+                const nombre = String(c.nombre).trim();
+                const cliente = (c.cliente || '').trim();
+                // La celda del calendario trae el cliente en el segundo renglón, y ahí es donde
+                // suele decir de qué es la cita: "MARCO ANTONIO ZAVALA" + "MTO".
+                const completo = cliente ? `${nombre} / ${cliente}` : nombre;
+                return {
+                    nombre,
+                    cliente: cliente || null,
+                    etiqueta: completo,
+                    hora: c.hora || null,
+                    tipo: /retiro/i.test(completo) ? 'RETIRO'
+                        : /gtia|garant/i.test(completo) ? 'GTIA'
+                            : /\bmto\b|mantenim/i.test(completo) ? 'MTO' : 'INSTALACION',
+                    falla: c.equipoHora === 'FALLA'
+                };
+            });
 
         // El mismo proyecto puede aparecer en varias celdas del día (equipos distintos).
         const vistas = new Set();
