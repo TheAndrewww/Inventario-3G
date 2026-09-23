@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check, Inbox, Eye, EyeOff, AlertTriangle, ArrowUpDown, ShoppingBag, ChevronDown, ChevronRight } from 'lucide-react';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check, Inbox, Eye, EyeOff, AlertTriangle, ArrowUpDown, ShoppingBag, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -16,6 +16,7 @@ export const ALL_MENU_ITEMS = [
   { path: '/usuarios', icon: UserCog, label: 'Usuarios', roles: ['administrador'] },
   { path: '/solicitudes-cambio', icon: Inbox, label: 'Solicitudes', roles: ['administrador', 'almacen', 'compras'] },
   { path: '/ordenes-compra', icon: FileText, label: 'Órdenes de Compra', roles: ['administrador', 'diseñador', 'ventas', 'compras'], grupo: 'compras' },
+  { path: '/solicitudes-compra', icon: AlertCircle, label: 'Solicitudes Pendientes', roles: ['administrador', 'diseñador', 'ventas', 'compras'], grupo: 'compras' },
   { path: '/calendario', icon: Calendar, label: 'Calendario', roles: ['administrador', 'diseñador', 'ventas', 'encargado', 'almacen'] },
   { path: '/mi-equipo', icon: User, label: 'Mi Equipo', roles: ['administrador', 'diseñador', 'ventas', 'encargado', 'operador'] },
   { path: '/produccion', icon: Factory, label: 'Dashboard Producción', roles: ['administrador', 'diseñador', 'almacen'] },
@@ -39,7 +40,7 @@ export const MENU_GRUPOS = {
     path: '/compras',
     icon: ShoppingBag,
     label: 'Compras',
-    orden: ['/ordenes-compra', '/recepcion-mercancia', '/stock-bajo', '/proveedores']
+    orden: ['/ordenes-compra', '/solicitudes-compra', '/recepcion-mercancia', '/stock-bajo', '/proveedores']
   }
 };
 
@@ -79,7 +80,8 @@ export const rolPuedeVer = (rol, path) => {
 // órdenes; el resto, a la primera vista de su menú (encargado → Calendario,
 // operador → Mi Equipo). Antes todos caían en Inventario aunque no lo tuvieran.
 export const rutaInicialPorRol = (rol) => {
-  if (rol === 'compras') return '/ordenes-compra';
+  // Compras arrancaba en la vista de solicitudes; ahora es su propia sub-pestaña
+  if (rol === 'compras') return '/solicitudes-compra';
   if (rolPuedeVer(rol, '/inventario')) return '/inventario';
   return ALL_MENU_ITEMS.find(i => i.roles.includes(rol))?.path || '/perfil';
 };

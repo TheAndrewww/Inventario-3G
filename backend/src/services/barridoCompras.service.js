@@ -42,7 +42,7 @@ const MARCA_BARRIDO = '[Barrido]';
 export const urlSolicitudes = () => {
     const env = process.env.FRONTEND_URL || '';
     const base = (/^https:\/\//.test(env) && !/localhost|127\.0\.0\.1/.test(env) ? env : 'https://inventario-3-g.vercel.app').replace(/\/+$/, '');
-    return `${base}/ordenes-compra?vista=solicitudes`;
+    return `${base}/solicitudes-compra`;
 };
 
 const fmt = (n) => {

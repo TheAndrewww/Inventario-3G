@@ -13,14 +13,16 @@ import { jsPDF } from 'jspdf';
 import AnularOrdenCompraModal from '../components/ordenes-compra/AnularOrdenCompraModal';
 import EditarOrdenModal from '../components/ordenes/EditarOrdenModal';
 
-const OrdenesCompraPage = () => {
+// La misma pantalla sirve dos sub-pestañas del menú Compras:
+// /ordenes-compra (vista="ordenes") y /solicitudes-compra (vista="solicitudes")
+const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
   const [ordenes, setOrdenes] = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
   const [vistaOrdenes, setVistaOrdenes] = useState('activas'); // 'activas', 'completadas', 'canceladas'
-  const [vistaActual, setVistaActual] = useState('solicitudes'); // 'solicitudes' o 'ordenes'
+  const vistaActual = vista; // 'solicitudes' o 'ordenes' (la decide la ruta)
   const [modalNuevaOrden, setModalNuevaOrden] = useState(false);
   const [modalDetalle, setModalDetalle] = useState(false);
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
@@ -925,41 +927,6 @@ const OrdenesCompraPage = () => {
           </div>
         </div>
       )}
-
-      {/* Tabs */}
-      <div className="mb-6 border-b border-gray-200">
-        <div className="flex gap-4">
-          <button
-            onClick={() => setVistaActual('ordenes')}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${vistaActual === 'ordenes'
-              ? 'border-red-700 text-red-700'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            <div className="flex items-center gap-2">
-              <ShoppingCart size={18} />
-              Órdenes de Compra
-            </div>
-          </button>
-          <button
-            onClick={() => setVistaActual('solicitudes')}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${vistaActual === 'solicitudes'
-              ? 'border-red-700 text-red-700'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            <div className="flex items-center gap-2">
-              <AlertCircle size={18} />
-              Solicitudes Pendientes
-              {solicitudes.length > 0 && (
-                <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                  {solicitudes.length}
-                </span>
-              )}
-            </div>
-          </button>
-        </div>
-      </div>
 
       {/* Vista de Órdenes */}
       {vistaActual === 'ordenes' && (

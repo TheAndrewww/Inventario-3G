@@ -20,6 +20,7 @@ const Header = ({ toggleSidebar, isMobile }) => {
       '/proveedores': 'Compras',
       '/reportes': 'Reportes',
       '/ordenes-compra': 'Compras',
+      '/solicitudes-compra': 'Compras',
       '/recepcion-mercancia': 'Compras',
       '/stock-bajo': 'Compras',
       '/entrada-inventario': 'Entrada Inventario',

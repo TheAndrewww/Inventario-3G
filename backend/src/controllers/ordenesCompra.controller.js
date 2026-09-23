@@ -2436,7 +2436,7 @@ export const crearSolicitudCompraManual = async (req, res) => {
         'nueva_solicitud_compra',
         `Nueva solicitud de compra: ${solicitud.ticket_id}`,
         `Se ha creado una solicitud manual para ${cantidad_solicitada} ${articulo.unidad} de ${articulo.nombre}`,
-        `/ordenes-compra?vista=solicitudes`
+        `/solicitudes-compra`
       );
     } catch (notifError) {
       console.error('Error al enviar notificación (no crítico):', notifError);

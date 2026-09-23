@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { PedidoProvider } from './context/PedidoContext';
@@ -55,6 +55,16 @@ const SoloConVista = ({ path, children }) => {
     return <Navigate to={rutaInicialPorRol(user?.rol)} replace />;
   }
   return children;
+};
+
+// Las ligas viejas (/ordenes-compra?vista=solicitudes, p. ej. del aviso de WhatsApp)
+// llevan a la sub-pestaña Solicitudes Pendientes
+const OrdenesCompraRuta = () => {
+  const { search } = useLocation();
+  if (new URLSearchParams(search).get('vista') === 'solicitudes') {
+    return <Navigate to="/solicitudes-compra" replace />;
+  }
+  return <OrdenesCompraPage key="ordenes" vista="ordenes" />;
 };
 
 function App() {
@@ -124,7 +134,8 @@ function App() {
                       <Route path="camionetas" element={<CamionetasPage />} />
                       <Route path="usuarios" element={<UsuariosPage />} />
                       <Route path="solicitudes-cambio" element={<SolicitudesCambioPage />} />
-                      <Route path="ordenes-compra" element={<OrdenesCompraPage />} />
+                      <Route path="ordenes-compra" element={<OrdenesCompraRuta />} />
+                      <Route path="solicitudes-compra" element={<OrdenesCompraPage key="solicitudes" vista="solicitudes" />} />
                       <Route path="historial" element={<HistorialPage />} />
                       <Route path="proveedores" element={<ProveedoresPage />} />
                       <Route path="calendario" element={<CalendarioPage />} />
