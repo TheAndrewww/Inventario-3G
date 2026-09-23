@@ -147,8 +147,11 @@ const ordenesCompraService = {
   },
 
   // Completar orden manualmente (cuando el proveedor no enviará el resto)
-  completarManualmente: async (id, motivo) => {
-    const response = await api.put(`/ordenes-compra/${id}/completar`, { motivo });
+  // Cerrar la orden aunque no haya llegado todo.
+  // datos: { faltantes: { [detalle_id]: motivo }, comentario }
+  completarManualmente: async (id, datos) => {
+    const body = typeof datos === 'string' ? { motivo: datos } : datos;
+    const response = await api.put(`/ordenes-compra/${id}/completar`, body);
     return response.data;
   },
 

@@ -116,18 +116,20 @@ const proveedorDe = (articulo) => {
     return preferido?.id || articulo.proveedor_id || articulo.proveedores?.[0]?.id || null;
 };
 
-const siguienteTicket = async () => {
+// `transaction` para que vea las solicitudes que se van creando dentro de ella
+export const siguienteTicket = async (transaction = undefined) => {
     const now = new Date();
     const ddmmyy = `${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getFullYear()).slice(-2)}`;
     const hhmm = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
     let n = await SolicitudCompra.count({
-        where: { created_at: { [Op.gte]: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } }
+        where: { created_at: { [Op.gte]: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } },
+        transaction
     });
     // El folio es único: si otro proceso tomó el número, se prueba el siguiente
     for (let intento = 0; intento < 20; intento++) {
         n++;
         const ticket = `SC-${ddmmyy}-${hhmm}-${String(n).padStart(2, '0')}`;
-        const existe = await SolicitudCompra.count({ where: { ticket_id: ticket } });
+        const existe = await SolicitudCompra.count({ where: { ticket_id: ticket }, transaction });
         if (!existe) return ticket;
     }
     return `SC-${ddmmyy}-${hhmm}-${Date.now().toString().slice(-4)}`;

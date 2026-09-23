@@ -91,6 +91,11 @@ const OrdenCompra = sequelize.define('OrdenCompra', {
         allowNull: false,
         defaultValue: false,
         comment: 'true cuando ya se contó (o cuando venció la ventana de 7 días)'
+    },
+    cierre_incompleto: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+        comment: 'Reporte al cerrar la orden sin que llegara todo: { fecha, cerrado_por, comentario, faltantes:[{articulo_id, nombre, unidad, solicitado, recibido, faltante, motivo, motivo_texto}] }'
     }
 }, {
     tableName: 'ordenes_compra',

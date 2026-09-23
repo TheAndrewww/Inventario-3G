@@ -2448,7 +2448,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                 {orden.estado === 'pendiente_aprobacion' && '⏳ Pendiente de Aprobación'}
                 {orden.estado === 'enviada' && '✅ Enviada'}
                 {orden.estado === 'parcial' && 'Parcial'}
-                {orden.estado === 'recibida' && 'Recibida'}
+                {orden.estado === 'recibida' && (orden.cierre_incompleto?.faltantes?.length > 0 ? 'Recibida (cerrada incompleta)' : 'Recibida')}
                 {orden.estado === 'cancelada' && 'Cancelada'}
                 {orden.estado === 'rechazada' && '❌ Rechazada'}
               </p>
@@ -2471,6 +2471,27 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
             <div>
               <p className="text-sm text-gray-500 mb-1">Observaciones</p>
               <p className="text-sm text-gray-700">{orden.observaciones}</p>
+            </div>
+          )}
+
+          {/* Reporte de cierre incompleto (para reclamarle al proveedor) */}
+          {orden.cierre_incompleto?.faltantes?.length > 0 && (
+            <div className="bg-orange-50 border border-orange-300 rounded-lg p-4">
+              <h4 className="font-semibold text-orange-900 mb-2 text-sm flex items-center gap-2">
+                <AlertTriangle size={16} />
+                Cerrada incompleta · {orden.cierre_incompleto.cerrado_por} · {new Date(orden.cierre_incompleto.fecha).toLocaleString('es-MX')}
+              </h4>
+              <ul className="space-y-1 text-sm text-orange-900">
+                {orden.cierre_incompleto.faltantes.map((f, i) => (
+                  <li key={i}>
+                    <span className="font-medium">{f.nombre}</span>: llegaron {f.recibido} de {f.solicitado} {f.unidad}
+                    {' '}(faltaron {f.faltante}) — <span className="italic">{f.motivo_texto}</span>
+                  </li>
+                ))}
+              </ul>
+              {orden.cierre_incompleto.comentario && (
+                <p className="text-sm text-orange-800 mt-2">Comentario: {orden.cierre_incompleto.comentario}</p>
+              )}
             </div>
           )}
 

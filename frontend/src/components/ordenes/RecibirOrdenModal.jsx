@@ -8,6 +8,15 @@ const formatCantidad = (n) => {
   return Number.isInteger(v) ? v : parseFloat(v.toFixed(2));
 };
 
+// Mismas claves que MOTIVOS_FALTANTE del backend
+const MOTIVOS_FALTANTE = [
+  { valor: 'incompleto', texto: 'Llegó incompleto (el proveedor no surtió todo)' },
+  { valor: 'calidad', texto: 'Se regresó por calidad' },
+  { valor: 'danado', texto: 'Llegó dañado' },
+  { valor: 'equivocado', texto: 'Llegó otro producto / equivocado' },
+  { valor: 'otro', texto: 'Otro' }
+];
+
 const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
   const [articulos, setArticulos] = useState([]);
   const [observacionesGenerales, setObservacionesGenerales] = useState('');
@@ -15,6 +24,8 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
   const [errores, setErrores] = useState({});
   const [mostrarModalCompletar, setMostrarModalCompletar] = useState(false);
   const [motivoCompletar, setMotivoCompletar] = useState('');
+  // Motivo por SKU que quedó corto: { [detalle_id]: 'incompleto' | 'calidad' | ... }
+  const [motivosFaltante, setMotivosFaltante] = useState({});
   const [completando, setCompletando] = useState(false);
   const inputsCantidad = useRef({});
 
@@ -208,29 +219,93 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
     };
   };
 
+  // Lo que se capturó en pantalla (paloma u otra cantidad), listo para mandar
+  const articulosCapturados = () => articulos.filter(art =>
+    art.modo !== 'pendiente' && parseFloat(art.cantidad_recibida) > 0
+  );
+
+  // Cómo queda cada renglón si se cierra ahora con lo capturado
+  const faltantesAlCerrar = articulos
+    .map(art => {
+      const ahora = art.modo !== 'pendiente' ? (parseFloat(art.cantidad_recibida) || 0) : 0;
+      const recibido = art.cantidad_ya_recibida + ahora;
+      return { ...art, recibido_total: recibido, faltante: Math.max(0, art.cantidad_solicitada - recibido) };
+    })
+    .filter(art => art.faltante > 0);
+
+  const abrirCerrarIncompleta = () => {
+    if (Object.keys(errores).length > 0) {
+      toast.error('Corrige las cantidades antes de cerrar');
+      return;
+    }
+    // Por defecto: llegó incompleto
+    const iniciales = {};
+    faltantesAlCerrar.forEach(f => { iniciales[f.detalle_id] = motivosFaltante[f.detalle_id] || 'incompleto'; });
+    setMotivosFaltante(iniciales);
+    setMostrarModalCompletar(true);
+  };
+
   const handleCompletarManualmente = async () => {
-    if (!motivoCompletar.trim()) {
-      toast.error('Debe proporcionar un motivo para completar la orden');
+    const requiereComentario = faltantesAlCerrar.some(f => motivosFaltante[f.detalle_id] === 'otro');
+    if (requiereComentario && motivoCompletar.trim().length < 5) {
+      toast.error('Explica en el comentario qué pasó con lo marcado como "Otro"');
       return;
     }
 
     try {
       setCompletando(true);
 
-      const response = await ordenesCompraService.completarManualmente(orden.id, motivoCompletar);
+      // 1) Registrar lo que sí llegó (entra al stock)
+      const capturados = articulosCapturados();
+      let respuestaRecepcion = null;
+      if (capturados.length > 0) {
+        respuestaRecepcion = await ordenesCompraService.recibirMercancia(orden.id, {
+          articulos: capturados.map(art => ({
+            detalle_id: art.detalle_id,
+            cantidad_recibida: parseFloat(art.cantidad_recibida),
+            observaciones: art.observaciones || null
+          })),
+          observaciones_generales: observacionesGenerales || null,
+          origen: 'manual'
+        });
+      }
 
-      toast.success(response.message || 'Orden completada manualmente');
+      // Si con eso ya se completó todo, no hay nada que cerrar
+      if (faltantesAlCerrar.length === 0) {
+        toast.success('Recepción registrada: la orden quedó completa');
+        if (onSuccess) onSuccess(respuestaRecepcion?.data);
+        setMostrarModalCompletar(false);
+        onClose();
+        return;
+      }
 
-      if (onSuccess) {
-        onSuccess(response.data);
+      // 2) Cerrar con el motivo de cada faltante
+      try {
+        const faltantes = {};
+        faltantesAlCerrar.forEach(f => { faltantes[f.detalle_id] = motivosFaltante[f.detalle_id]; });
+        const response = await ordenesCompraService.completarManualmente(orden.id, {
+          faltantes,
+          comentario: motivoCompletar.trim() || null
+        });
+        toast.success(response.message || 'Orden cerrada', { duration: 5000 });
+        if (onSuccess) onSuccess(response.data);
+      } catch (error) {
+        // La recepción ya quedó guardada; solo falta cerrar (se puede reintentar)
+        if (capturados.length > 0 && onSuccess) onSuccess(respuestaRecepcion?.data);
+        toast.error(`${capturados.length > 0 ? 'La recepción se guardó, pero la orden no se cerró: ' : ''}${error.response?.data?.message || 'Error al cerrar la orden'}`, { duration: 6000 });
+        return;
       }
 
       setMostrarModalCompletar(false);
       setMotivoCompletar('');
       onClose();
     } catch (error) {
-      console.error('Error al completar orden:', error);
-      toast.error(error.response?.data?.message || 'Error al completar la orden');
+      console.error('Error al cerrar orden:', error);
+      if (error.response?.data?.errores) {
+        error.response.data.errores.forEach(err => toast.error(err));
+      } else {
+        toast.error(error.response?.data?.message || 'Error al registrar la recepción');
+      }
     } finally {
       setCompletando(false);
     }
@@ -532,12 +607,13 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
               {hayArticulosPendientes && (
                 <button
                   type="button"
-                  onClick={() => setMostrarModalCompletar(true)}
+                  onClick={abrirCerrarIncompleta}
                   disabled={guardando}
+                  title="Registra lo que capturaste y cierra la orden aunque no haya llegado todo"
                   className="px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 flex items-center gap-2 font-medium text-sm"
                 >
                   <CheckCircle size={18} />
-                  Completar Orden
+                  Cerrar orden incompleta
                 </button>
               )}
             </div>
@@ -587,7 +663,7 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
                 <div className="flex items-center gap-3">
                   <CheckCircle className="text-orange-600" size={28} />
                   <h2 className="text-xl font-bold text-gray-900">
-                    Completar Orden Manualmente
+                    Cerrar orden incompleta
                   </h2>
                 </div>
                 <button
@@ -604,29 +680,52 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
             </div>
 
             {/* Contenido */}
-            <div className="p-6">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 flex items-start gap-3">
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-3">
                 <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
-                <div className="text-sm text-yellow-800">
-                  <p className="font-medium mb-1">⚠️ Atención</p>
-                  <p>Esta acción marcará la orden como completada aunque haya artículos pendientes. Use esta opción solo si:</p>
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>El proveedor confirmó que no enviará el resto</li>
-                    <li>Se decidió no recibir los artículos pendientes</li>
-                    <li>Hay un acuerdo especial con el proveedor</li>
-                  </ul>
-                </div>
+                <p className="text-sm text-yellow-800">
+                  Se guarda lo que capturaste como recibido y la orden se cierra. Lo que faltó
+                  queda en <strong>Solicitudes</strong> para la siguiente orden de compra, y el
+                  motivo queda registrado para reportarlo al proveedor.
+                </p>
               </div>
+
+              {faltantesAlCerrar.length === 0 ? (
+                <p className="text-sm text-green-700 font-medium">Con lo capturado ya llegó todo: la orden quedará completa.</p>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-gray-700">¿Por qué no llegó completo?</p>
+                  {faltantesAlCerrar.map(f => (
+                    <div key={f.detalle_id} className="border border-gray-200 rounded-lg p-3">
+                      <p className="font-medium text-gray-900 text-sm">{f.nombre}</p>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        Llegaron {formatCantidad(f.recibido_total)} de {formatCantidad(f.cantidad_solicitada)} {f.unidad} ·{' '}
+                        <span className="text-red-600 font-medium">faltan {formatCantidad(f.faltante)}</span>
+                      </p>
+                      <select
+                        value={motivosFaltante[f.detalle_id] || 'incompleto'}
+                        onChange={(e) => setMotivosFaltante(prev => ({ ...prev, [f.detalle_id]: e.target.value }))}
+                        disabled={completando}
+                        className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      >
+                        {MOTIVOS_FALTANTE.map(m => (
+                          <option key={m.valor} value={m.valor}>{m.texto}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Motivo para completar la orden <span className="text-red-500">*</span>
+                  Comentario para el proveedor {faltantesAlCerrar.some(f => motivosFaltante[f.detalle_id] === 'otro') && <span className="text-red-500">*</span>}
                 </label>
                 <textarea
                   value={motivoCompletar}
                   onChange={(e) => setMotivoCompletar(e.target.value)}
-                  placeholder="Ej: El proveedor informó que no enviará el resto del pedido..."
-                  rows={4}
+                  placeholder="Ej: Dijo que ya no tiene existencia; 3 piezas venían golpeadas..."
+                  rows={3}
                   disabled={completando}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
                 />
@@ -649,18 +748,18 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
               <button
                 type="button"
                 onClick={handleCompletarManualmente}
-                disabled={completando || !motivoCompletar.trim()}
+                disabled={completando}
                 className="px-6 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
               >
                 {completando ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Completando...
+                    Cerrando...
                   </>
                 ) : (
                   <>
                     <CheckCircle size={20} />
-                    Completar Orden
+                    Guardar y cerrar
                   </>
                 )}
               </button>

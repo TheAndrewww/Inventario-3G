@@ -64,7 +64,14 @@ const RecepcionMercanciaPage = () => {
     setOrdenARecibir(null);
   };
 
-  const handleRecepcionExitosa = (ordenActualizada) => {
+  const handleRecepcionExitosa = (respuesta) => {
+    // El backend responde { orden, ... }; se acepta también la orden sola
+    const ordenActualizada = respuesta?.orden || respuesta;
+    if (!ordenActualizada?.id) {
+      handleCerrarModalRecibir();
+      cargarOrdenesPendientes();
+      return;
+    }
     // Actualizar la orden en la lista
     setOrdenes(prevOrdenes => {
       const nuevasOrdenes = prevOrdenes.map(o =>

@@ -39,7 +39,7 @@ const costoDePartida = async (articulo, proveedorId, transaction = undefined) =>
 import admin from '../config/firebase-admin.js'; // Importar Firebase Admin
 import { enviarEmailAprobacion, enviarEmailEstadoOrden, enviarEmailOrdenCancelada, verificarTokenAprobacion } from '../services/email.service.js';
 import { pedirAutorizacionOrden } from '../services/whatsapp.service.js';
-import { programarBarridoCompras, consumoDiarioPorArticulo, stockProyectado } from '../services/barridoCompras.service.js';
+import { programarBarridoCompras, consumoDiarioPorArticulo, stockProyectado, siguienteTicket } from '../services/barridoCompras.service.js';
 import { migrarArticuloIndividual } from '../utils/autoMigrate.js';
 
 /**
@@ -3005,70 +3005,155 @@ export const obtenerProgresoRecepcion = async (req, res) => {
  * - Para casos donde no llegará toda la mercancía
  * - Cambia estado a 'recibida' aunque no esté 100% completado
  */
+// Por qué no llegó un SKU al cerrar una orden incompleta (se le reporta al proveedor)
+export const MOTIVOS_FALTANTE = {
+  incompleto: 'Llegó incompleto (el proveedor no surtió todo)',
+  calidad: 'Se regresó por calidad',
+  danado: 'Llegó dañado',
+  equivocado: 'Llegó otro producto / equivocado',
+  otro: 'Otro'
+};
+
+/**
+ * Cerrar una orden aunque no haya llegado todo.
+ *
+ * Almacén primero registra lo que sí llegó (POST /recibir) y luego cierra aquí con el
+ * motivo de cada SKU que quedó corto. El reporte se guarda en `cierre_incompleto` para
+ * reclamarle al proveedor, y lo que faltó vuelve a Solicitudes para la siguiente orden.
+ *
+ * Body: { faltantes: { [detalle_id]: 'incompleto'|'calidad'|... }, comentario }
+ *   (compatibilidad: { motivo } de texto libre, como antes)
+ */
 export const completarOrdenManualmente = async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
     const { id } = req.params;
-    const { motivo } = req.body;
+    const { motivo, faltantes: motivosPorDetalle = {}, comentario } = req.body;
+    const comentarioLimpio = (comentario || motivo || '').trim();
 
-    if (!motivo || motivo.trim().length < 10) {
-      return res.status(400).json({
-        success: false,
-        message: 'Debe proporcionar un motivo de al menos 10 caracteres'
-      });
-    }
-
-    const orden = await OrdenCompra.findByPk(id);
-
-    if (!orden) {
-      return res.status(404).json({
-        success: false,
-        message: 'Orden de compra no encontrada'
-      });
-    }
-
-    if (orden.estado === 'recibida') {
-      return res.status(400).json({
-        success: false,
-        message: 'Esta orden ya está completada'
-      });
-    }
-
-    if (!['enviada', 'parcial'].includes(orden.estado)) {
-      return res.status(400).json({
-        success: false,
-        message: `No se puede completar una orden en estado '${orden.estado}'`
-      });
-    }
-
-    // Actualizar orden
-    await orden.update({
-      estado: 'recibida',
-      fecha_recepcion: new Date(),
-      observaciones: orden.observaciones
-        ? `${orden.observaciones}\n\n[COMPLETADA MANUALMENTE] ${new Date().toLocaleString('es-MX')}: ${motivo}`
-        : `[COMPLETADA MANUALMENTE] ${new Date().toLocaleString('es-MX')}: ${motivo}`
+    const orden = await OrdenCompra.findByPk(id, {
+      include: [
+        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] },
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalles',
+          include: [{ model: Articulo, as: 'articulo', attributes: ['id', 'nombre', 'unidad', 'activo', 'proveedor_id'] }]
+        }
+      ],
+      transaction
     });
 
+    if (!orden) {
+      await transaction.rollback();
+      return res.status(404).json({ success: false, message: 'Orden de compra no encontrada' });
+    }
+    if (orden.estado === 'recibida') {
+      await transaction.rollback();
+      return res.status(400).json({ success: false, message: 'Esta orden ya está completada' });
+    }
+    if (!['enviada', 'parcial'].includes(orden.estado)) {
+      await transaction.rollback();
+      return res.status(400).json({ success: false, message: `No se puede cerrar una orden en estado '${orden.estado}'` });
+    }
+
+    // Lo que quedó corto, renglón por renglón
+    const faltantes = orden.detalles
+      .map(det => {
+        const solicitado = parseFloat(det.cantidad_solicitada) || 0;
+        const recibido = parseFloat(det.cantidad_recibida) || 0;
+        const tipo = motivosPorDetalle[det.id] || (motivo ? 'otro' : null);
+        return {
+          detalle_id: det.id,
+          articulo_id: det.articulo_id,
+          nombre: det.articulo?.nombre,
+          unidad: det.articulo?.unidad,
+          solicitado,
+          recibido,
+          faltante: Math.max(0, solicitado - recibido),
+          motivo: tipo,
+          motivo_texto: MOTIVOS_FALTANTE[tipo] || null
+        };
+      })
+      .filter(f => f.faltante > 0);
+
+    const sinMotivo = faltantes.filter(f => !MOTIVOS_FALTANTE[f.motivo]);
+    if (sinMotivo.length > 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Falta decir por qué no llegó: ${sinMotivo.map(f => f.nombre).join(', ')}`
+      });
+    }
+    if (faltantes.some(f => f.motivo === 'otro') && comentarioLimpio.length < 5) {
+      await transaction.rollback();
+      return res.status(400).json({ success: false, message: 'Si el motivo es "Otro", explica qué pasó en el comentario' });
+    }
+
+    const fecha = new Date();
+    const cierre = {
+      fecha: fecha.toISOString(),
+      cerrado_por: req.usuario.nombre,
+      cerrado_por_id: req.usuario.id,
+      comentario: comentarioLimpio || null,
+      faltantes: faltantes.map(({ detalle_id, ...f }) => f)
+    };
+
+    const resumen = faltantes.length > 0
+      ? faltantes.map(f => `${f.nombre}: llegaron ${f.recibido} de ${f.solicitado} ${f.unidad || ''} (${f.motivo_texto})`).join('; ')
+      : 'Sin faltantes';
+    const nota = `[CERRADA INCOMPLETA] ${fecha.toLocaleString('es-MX')} por ${req.usuario.nombre}: ${resumen}${comentarioLimpio ? `. ${comentarioLimpio}` : ''}`;
+
+    await orden.update({
+      estado: 'recibida',
+      fecha_recepcion: fecha,
+      cierre_incompleto: cierre,
+      observaciones: orden.observaciones ? `${orden.observaciones}\n\n${nota}` : nota
+    }, { transaction });
+
     // Cerrar el ciclo de las solicitudes de esta orden (en_orden -> completada)
-    // para que el artículo pueda volver a solicitarse si baja de stock otra vez.
     await SolicitudCompra.update(
       { estado: 'completada' },
-      { where: { orden_compra_id: orden.id, estado: 'en_orden' } }
+      { where: { orden_compra_id: orden.id, estado: 'en_orden' }, transaction }
     );
 
-    // Notificar
+    // Lo que faltó vuelve a Solicitudes para armar la siguiente orden. Si el artículo
+    // ya tiene una pendiente (p. ej. del barrido) no se duplica.
+    const solicitudesNuevas = [];
+    for (const f of faltantes) {
+      const pendiente = await SolicitudCompra.findOne({
+        where: { articulo_id: f.articulo_id, estado: 'pendiente' },
+        transaction
+      });
+      if (pendiente) continue;
+      const sol = await SolicitudCompra.create({
+        ticket_id: await siguienteTicket(transaction),
+        articulo_id: f.articulo_id,
+        cantidad_solicitada: f.faltante,
+        motivo: `[Faltante ${orden.ticket_id}] ${f.motivo_texto}. Llegaron ${f.recibido} de ${f.solicitado}.`,
+        usuario_solicitante_id: req.usuario.id,
+        proveedor_id: orden.proveedor_id || null,
+        prioridad: 'alta',
+        estado: 'pendiente'
+      }, { transaction });
+      solicitudesNuevas.push(sol.ticket_id);
+    }
+
+    await transaction.commit();
+
+    if (solicitudesNuevas.length > 0) programarBarridoCompras({ usuarioId: req.usuario.id });
+
     try {
       await notificarPorRol({
         roles: ['compras', 'administrador'],
         tipo: 'orden_completada_manual',
-        titulo: 'Orden completada manualmente',
-        mensaje: `La orden ${orden.ticket_id} fue completada manualmente por ${req.usuario.nombre}. Motivo: ${motivo}`,
-        url: `/ordenes-compra`,
+        titulo: `Orden ${orden.ticket_id} cerrada incompleta`,
+        mensaje: `${req.usuario.nombre} cerró la orden de ${orden.proveedor?.nombre || 'sin proveedor'}. ${resumen}`,
+        url: '/ordenes-compra',
         datos_adicionales: {
           orden_id: orden.id,
           ticket_id: orden.ticket_id,
           completado_por: req.usuario.nombre,
-          motivo
+          cierre_incompleto: cierre
         }
       });
     } catch (notifError) {
@@ -3077,15 +3162,17 @@ export const completarOrdenManualmente = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Orden completada exitosamente',
-      data: { orden }
+      message: solicitudesNuevas.length > 0
+        ? `Orden cerrada. Lo que faltó quedó en Solicitudes (${solicitudesNuevas.length}) para la siguiente orden`
+        : 'Orden cerrada',
+      data: { orden, cierre_incompleto: cierre, solicitudes_creadas: solicitudesNuevas }
     });
-
   } catch (error) {
+    if (transaction && !transaction.finished) await transaction.rollback();
     console.error('Error al completar orden:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al completar la orden',
+      message: 'Error al cerrar la orden',
       error: error.message
     });
   }

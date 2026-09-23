@@ -1193,6 +1193,9 @@ const startServer = async () => {
             await sequelize.query(
                 "ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS conteo_cerrado BOOLEAN NOT NULL DEFAULT false"
             );
+            await sequelize.query(
+                "ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS cierre_incompleto JSONB"
+            );
             console.log('✅ Columnas de ventana de conteo verificadas en ordenes_compra');
         } catch (conteoErr) {
             console.error('⚠️ Error verificando columnas de conteo:', conteoErr.message);
