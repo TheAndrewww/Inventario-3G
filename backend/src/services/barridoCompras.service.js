@@ -39,7 +39,7 @@ const MARCA_BARRIDO = '[Barrido]';
 
 // FRONTEND_URL también alimenta CORS y en local apunta a localhost: solo se usa
 // para la liga si es una dirección pública.
-const urlSolicitudes = () => {
+export const urlSolicitudes = () => {
     const env = process.env.FRONTEND_URL || '';
     const base = (/^https:\/\//.test(env) && !/localhost|127\.0\.0\.1/.test(env) ? env : 'https://inventario-3-g.vercel.app').replace(/\/+$/, '');
     return `${base}/ordenes-compra?vista=solicitudes`;
@@ -206,6 +206,9 @@ export const ejecutarBarridoCompras = async ({ usuarioId = null } = {}) => {
             if (cantidad > actual) {
                 await existente.update({
                     cantidad_solicitada: cantidad,
+                    // Deja de ser un rebote: el stock se movió de verdad, así que vuelve a
+                    // avisarse. Solo se borra la marca del rebote, nunca una nota de alguien.
+                    ...(esRebote(existente) ? { observaciones: null } : {}),
                     ...(existente.proveedor_id ? {} : { proveedor_id: proveedorDe(art) }),
                     motivo: `${existente.motivo || ''}\n\n${motivo} Cantidad ajustada de ${fmt(actual)} a ${cantidad}.`.trim()
                 });
@@ -242,6 +245,13 @@ const MARGEN_SIN_HISTORIAL_MS = 12 * 60 * 60 * 1000;
 
 const fechaCambio = (s) => new Date(s.updatedAt || s.updated_at || s.createdAt || s.created_at || 0);
 
+// Una solicitud vuelve a "pendiente" cuando su orden se rechaza, se cancela o se borra.
+// Eso NO es material nuevo: es el mismo que se acaba de ver en la orden. Se anunciaba otra
+// vez minutos después del rechazo —la misma lista de FERREMAG que el jefe acababa de
+// rechazar— y por eso el aviso se volvió ruido. El rechazo ya se avisa por su cuenta.
+const REVERTIDA = /^\s*\[Revertida automáticamente\]/;
+const esRebote = (s) => REVERTIDA.test(String(s.observaciones || ''));
+
 /**
  * Lista las solicitudes pendientes que nacieron o cambiaron desde el último
  * aviso —vengan del barrido, de una salida o capturadas a mano— agrupadas
@@ -256,7 +266,7 @@ const armarAviso = async (desde) => {
         ],
         order: [['prioridad', 'DESC'], ['id', 'ASC']]
     });
-    const recientes = pendientes.filter(s => fechaCambio(s) >= desde);
+    const recientes = pendientes.filter(s => fechaCambio(s) >= desde && !esRebote(s));
     if (recientes.length === 0) return null;
 
     const proveedores = new Set(pendientes.map(s => s.proveedor?.nombre || 'Sin proveedor'));

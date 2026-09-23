@@ -2087,7 +2087,10 @@ export const anularOrdenCompra = async (req, res) => {
       await SolicitudCompra.update(
         {
           estado: 'pendiente',
-          orden_compra_id: null
+          orden_compra_id: null,
+          // La marca evita que el aviso de Compras las anuncie como material nuevo: es el
+          // mismo que ya se vio en la orden que se acaba de cancelar.
+          observaciones: `[Revertida automáticamente] La orden ${orden.ticket_id} fue cancelada. Solicitud vuelve a estado pendiente.`
         },
         {
           where: {

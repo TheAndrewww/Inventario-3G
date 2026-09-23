@@ -8,7 +8,8 @@
 import express from 'express';
 import { Op } from 'sequelize';
 import { proyectosAbiertos, resolverFechasInstalacion, leerCitasCercanas, resumenProduccion } from '../services/fechaInstalacion.service.js';
-import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor, ProduccionProyecto } from '../models/index.js';
+import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor, ProduccionProyecto, SolicitudCompra } from '../models/index.js';
+import { urlSolicitudes } from '../services/barridoCompras.service.js';
 import { crearNotificacion } from '../controllers/notificaciones.controller.js';
 import { enviarEmailEstadoOrden } from '../services/email.service.js';
 
@@ -192,6 +193,17 @@ router.post('/:id/decision', async (req, res) => {
                 fecha_aprobacion: new Date(),
                 motivo_rechazo: motivo || `Rechazada por ${autorizador.nombre} desde WhatsApp`
             });
+            // Igual que al rechazar desde el sistema: el material vuelve a la lista de
+            // solicitudes para corregirlo. La marca [Revertida automáticamente] es la que
+            // evita que el aviso de Compras lo anuncie de nuevo como si fuera material nuevo.
+            await SolicitudCompra.update(
+                {
+                    estado: 'pendiente',
+                    orden_compra_id: null,
+                    observaciones: `[Revertida automáticamente] La orden ${orden.ticket_id} fue rechazada desde WhatsApp. Solicitud vuelve a estado pendiente.`
+                },
+                { where: { orden_compra_id: orden.id, estado: { [Op.in]: ['cancelada', 'en_orden'] } } }
+            ).catch(e => console.error('No se pudieron revertir las solicitudes:', e.message));
         }
 
         // Avisos al creador; que fallen no debe deshacer la autorización
@@ -221,7 +233,9 @@ router.post('/:id/decision', async (req, res) => {
             success: true,
             message: aprobado
                 ? `Orden ${orden.ticket_id} autorizada por ${autorizador.nombre}. Ya puede enviarse al proveedor.`
-                : `Orden ${orden.ticket_id} rechazada por ${autorizador.nombre}.`
+                // Con el rechazo a secas nadie sabía qué seguía: la orden queda ahí y el
+                // material se vuelve a listar solo. Se dice dónde corregirla.
+                : `Orden ${orden.ticket_id} rechazada por ${autorizador.nombre}.\nEl material vuelve a la lista para corregirlo:\n${urlSolicitudes()}`
         });
 
     } catch (error) {
