@@ -238,6 +238,36 @@ const fechaEnPalabras = (iso) => {
 };
 
 /**
+ * ¿Este cambio de fecha hay que avisarlo, y de qué tipo es? Solo los dos que le mueven el
+ * trabajo al grupo:
+ *  · 'adelanto': se vino encima, a hoy o mañana.
+ *  · 'cambio': se recorrió (o se quedó sin fecha) una instalación que YA se había avisado, es
+ *    decir que caía dentro de lo que alcanzan a decir los recordatorios (mañana a las 7:00,
+ *    los dos días siguientes a las 16:00). Una fecha que nadie oyó nunca no hay que corregirla.
+ *
+ * @returns {'adelanto'|'cambio'|null}
+ */
+export const clasificarCambio = ({ anterior, nueva, hoy }) => {
+    if (!anterior || nueva === anterior) return null;
+    const manana = sumarDias(hoy, 1);
+    if (nueva && nueva < anterior && nueva >= hoy && nueva <= manana) return 'adelanto';
+    const yaLoSabian = anterior >= sumarDias(hoy, -1) && anterior <= sumarDias(hoy, 2);
+    if (yaLoSabian && (!nueva || nueva > anterior)) return 'cambio';
+    return null;
+};
+
+/**
+ * El día en que producción tiene que entregar: el anterior a la instalación; si cae en
+ * domingo, el sábado (que es cuando de verdad se puede entregar).
+ */
+const diaDeEntrega = (iso) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    const f = new Date(Date.UTC(y, m - 1, d - 1));
+    if (f.getUTCDay() === 0) f.setUTCDate(f.getUTCDate() - 1);
+    return f.toISOString().slice(0, 10);
+};
+
+/**
  * Última fecha de instalación vista por proyecto, guardada en `configuracion` para que un
  * reinicio del servidor (cada deploy) no deje ciega la comparación: con la foto solo en
  * memoria, un adelanto hecho en esos minutos no se avisaba nunca.
@@ -268,10 +298,13 @@ const guardarFoto = async (mapa) => {
 };
 
 /**
- * Compara la fecha de instalación de cada proyecto contra la pasada anterior y, si alguno se
- * ADELANTÓ a hoy o a mañana con producción abierta, lo avisa al grupo de PRODUCCIÓN. Los
- * recordatorios de siempre (7:00, 14:00, 16:00) ya pasaron o miran otro día: sin esto, un
- * adelanto a media tarde nadie lo sabía hasta que el camión se iba sin la pieza.
+ * Compara la fecha de instalación de cada proyecto contra la pasada anterior y avisa al grupo
+ * de PRODUCCIÓN los dos cambios que le mueven el trabajo:
+ *  · Se ADELANTÓ a hoy o a mañana. Los recordatorios de siempre (7:00, 14:00, 16:00) ya
+ *    pasaron o miran otro día: sin esto, un adelanto a media tarde nadie lo sabía hasta que
+ *    el camión se iba sin la pieza.
+ *  · SE RECORRIÓ una fecha que ya se había avisado (PATRICIA RODRIGUEZ ANDA pasó del 23 al 29
+ *    y el grupo se quedó con la fecha vieja), o se quedó sin fecha en el calendario.
  *
  * Los proyectos sin planos (MTO) no se avisan, igual que en los recordatorios del bot.
  * Una sola pasada a la vez: la sincronización de cada 5 min y la que pide el bot antes de
@@ -279,11 +312,11 @@ const guardarFoto = async (mapa) => {
  */
 let pasadaEnCurso = null;
 export const revisarAdelantos = () => {
-    pasadaEnCurso ||= revisarAdelantosUnaVez().finally(() => { pasadaEnCurso = null; });
+    pasadaEnCurso ||= revisarCambiosUnaVez().finally(() => { pasadaEnCurso = null; });
     return pasadaEnCurso;
 };
 
-const revisarAdelantosUnaVez = async () => {
+const revisarCambiosUnaVez = async () => {
     const proyectos = await proyectosAbiertos();
     const citas = await leerCitasCercanas();
     const fechas = resolverFechasInstalacion(proyectos, citas);
@@ -299,32 +332,53 @@ const revisarAdelantosUnaVez = async () => {
         const nueva = fechas.get(p.id)?.fecha || null;
         const anterior = foto.get(p.id);
         vistos.set(p.id, nueva);
-        if (primeraPasada || !nueva || !anterior || nueva >= anterior) continue;
-        if (nueva < hoy || nueva > manana) continue;
+        if (primeraPasada || !anterior || nueva === anterior) continue;
 
         const r = resumenProduccion(p);
         if (r.sin_planos || r.produccion_cerrada) continue;
         if (!isWhatsAppEnabled()) continue;
 
+        const cambio = clasificarCambio({ anterior, nueva, hoy });
+        if (!cambio) continue;
+        const seAdelanta = cambio === 'adelanto';
+
         // Dos pasadas (la de cada 5 min y la que pide el bot antes de avisar) pueden ver el
         // mismo cambio: se avisa una vez por proyecto y fecha.
-        const marca = `Nueva fecha: ${nueva}`;
+        const tipo = seAdelanta ? 'adelanto_instalacion' : 'cambio_instalacion';
+        const marca = `Nueva fecha: ${nueva || 'sin fecha'}`;
         const yaAvisado = await AvisoWhatsApp.findOne({
-            where: { tipo: 'adelanto_instalacion', referencia_id: p.id, mensaje: { [Op.like]: `%${marca}%` } }
+            where: { tipo, referencia_id: p.id, mensaje: { [Op.like]: `%${marca}%` } }
         });
         if (yaAvisado) continue;
 
-        const cuando = nueva === hoy ? '*HOY*' : '*MAÑANA*';
         const falta = r.pendientes.length
             ? `falta ${r.pendientes.map(a => AREAS[a] || a).join(' y ')}`
             : `va en ${p.etapa_actual}`;
-        const mensaje =
-            `📅 *Se adelantó una instalación*\n\n` +
-            `*${p.nombre}* ahora se instala ${cuando} (${fechaEnPalabras(nueva)}); ` +
-            `antes estaba para el ${fechaEnPalabras(anterior)}.\n\n` +
-            `Producción: ${falta}.\n\n_${marca}_`;
-        await AvisoWhatsApp.create({ destino: 'produccion', tipo: 'adelanto_instalacion', referencia_id: p.id, mensaje });
-        console.log(`📅 Adelanto de instalación avisado: "${p.nombre}" ${anterior} → ${nueva}`);
+
+        let mensaje;
+        if (seAdelanta) {
+            const cuando = nueva === hoy ? '*HOY*' : '*MAÑANA*';
+            mensaje =
+                `📅 *Se adelantó una instalación*\n\n` +
+                `*${p.nombre}* ahora se instala ${cuando} (${fechaEnPalabras(nueva)}); ` +
+                `antes estaba para el ${fechaEnPalabras(anterior)}.\n\n` +
+                `Producción: ${falta}.\n\n_${marca}_`;
+        } else if (nueva) {
+            mensaje =
+                `📅 *Cambió una instalación*\n\n` +
+                `*${p.nombre}* ya no se instala el ${fechaEnPalabras(anterior)}: ahora es el ` +
+                `${fechaEnPalabras(nueva)} (hay que entregarlo el ${fechaEnPalabras(diaDeEntrega(nueva))}).\n\n` +
+                `Producción: ${falta}.\n\n_${marca}_`;
+        } else {
+            mensaje =
+                `📅 *Cambió una instalación*\n\n` +
+                `*${p.nombre}* ya no se instala el ${fechaEnPalabras(anterior)} y no tiene otra fecha ` +
+                `en el calendario.\n\n` +
+                `Producción: ${falta}.\n\n_${marca}_`;
+        }
+
+        await AvisoWhatsApp.create({ destino: 'produccion', tipo, referencia_id: p.id, mensaje });
+        console.log(`📅 Cambio de instalación avisado (${tipo}): "${p.nombre}" ${anterior} → ${nueva || 'sin fecha'}`);
         avisados++;
     }
     // La foto se queda solo con los proyectos abiertos: los cerrados salen solos.
