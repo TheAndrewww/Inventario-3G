@@ -238,21 +238,27 @@ const fechaEnPalabras = (iso) => {
 };
 
 /**
- * ¿Este cambio de fecha hay que avisarlo, y de qué tipo es? Solo los dos que le mueven el
- * trabajo al grupo:
+ * ¿Este cambio de fecha hay que avisarlo, y de qué tipo es?
  *  · 'adelanto': se vino encima, a hoy o mañana.
- *  · 'cambio': se recorrió (o se quedó sin fecha) una instalación que YA se había avisado, es
- *    decir que caía dentro de lo que alcanzan a decir los recordatorios (mañana a las 7:00,
- *    los dos días siguientes a las 16:00). Una fecha que nadie oyó nunca no hay que corregirla.
+ *  · 'cambio': se movió (o se quedó sin fecha) una instalación de la semana que viene, que es
+ *    de lo que el grupo ya está pendiente. PATRICIA RODRIGUEZ ANDA pasó del 23 al 29 y el
+ *    grupo se quedó con la fecha vieja; EMMANUEL GARCIA pasó del viernes 25 al jueves 24
+ *    horas después de avisarlo y tampoco se dijo.
+ *
+ * Un movimiento entre fechas lejanas no se avisa: el calendario se acomoda todo el tiempo y
+ * eso no le cambia el trabajo a nadie todavía.
  *
  * @returns {'adelanto'|'cambio'|null}
  */
+const DIAS_VENTANA = 7;
 export const clasificarCambio = ({ anterior, nueva, hoy }) => {
     if (!anterior || nueva === anterior) return null;
     const manana = sumarDias(hoy, 1);
     if (nueva && nueva < anterior && nueva >= hoy && nueva <= manana) return 'adelanto';
-    const yaLoSabian = anterior >= sumarDias(hoy, -1) && anterior <= sumarDias(hoy, 2);
-    if (yaLoSabian && (!nueva || nueva > anterior)) return 'cambio';
+    // Desde ayer (una instalación de ayer que se mueve sigue importando) hasta la semana.
+    const cerca = (f) => !!f && f >= sumarDias(hoy, -1) && f <= sumarDias(hoy, DIAS_VENTANA);
+    if (cerca(anterior)) return 'cambio';
+    if (cerca(nueva) && nueva < anterior) return 'cambio';
     return null;
 };
 
