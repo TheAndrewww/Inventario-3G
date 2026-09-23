@@ -401,4 +401,48 @@ router.get('/produccion/agenda', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/avisos-whatsapp/produccion/citas?fecha=YYYY-MM-DD
+ * Las citas del calendario de ese día, tal como están escritas, con su horario.
+ *
+ * El bot contable lo usa para la confirmación del calendario: a Susana se le pregunta por
+ * TODAS las citas del día siguiente (instalaciones, MTO, garantías, retiros), no solo por lo
+ * que pasa por producción, porque el calendario se confirma completo.
+ *
+ * Solo lectura: no cambia nada.
+ */
+router.get('/produccion/citas', async (req, res) => {
+    try {
+        const { fecha } = req.query;
+        if (!fecha) return res.status(400).json({ success: false, message: 'Falta la fecha' });
+
+        const citas = (await leerCitasCercanas())
+            .filter(c => c.fecha === fecha && c.nombre)
+            .map(c => ({
+                nombre: String(c.nombre).trim(),
+                cliente: c.cliente || null,
+                hora: c.hora || null,
+                // El calendario escribe la clase de cita dentro del nombre.
+                tipo: /retiro/i.test(c.nombre) ? 'RETIRO'
+                    : /gtia|garant/i.test(c.nombre) ? 'GTIA'
+                        : /mto|mantenim/i.test(c.nombre) ? 'MTO' : 'INSTALACION',
+                falla: c.equipoHora === 'FALLA'
+            }));
+
+        // El mismo proyecto puede aparecer en varias celdas del día (equipos distintos).
+        const vistas = new Set();
+        const unicas = citas.filter(c => {
+            const k = `${c.nombre}|${c.hora || ''}`;
+            if (vistas.has(k)) return false;
+            vistas.add(k);
+            return true;
+        });
+
+        res.json({ success: true, data: { fecha, citas: unicas } });
+    } catch (error) {
+        console.error('Error al listar las citas del día:', error);
+        res.status(500).json({ success: false, message: 'Error al listar las citas', error: error.message });
+    }
+});
+
 export default router;
