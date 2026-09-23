@@ -19,7 +19,7 @@
 import { Op, fn, col } from 'sequelize';
 import {
     Articulo, SolicitudCompra, OrdenCompra, DetalleOrdenCompra,
-    DetalleMovimiento, Movimiento, Proveedor, Usuario
+    DetalleMovimiento, Movimiento, Proveedor, Usuario, AvisoWhatsApp
 } from '../models/index.js';
 import { enviarWhatsApp } from './whatsapp.service.js';
 
@@ -240,8 +240,34 @@ export const ejecutarBarridoCompras = async ({ usuarioId = null } = {}) => {
 
 let ultimoAviso = 0;
 let timerAviso = null;
-// Tras un reinicio no se sabe cuándo fue el último aviso: se toma este margen
+// Solo si NUNCA se ha mandado un aviso (base recién estrenada).
 const MARGEN_SIN_HISTORIAL_MS = 12 * 60 * 60 * 1000;
+
+// El encabezado sirve de marca para reconocer estos avisos en la cola.
+const ENCABEZADO_AVISO = '🧾 *Solicitudes de compra por revisar*';
+
+/**
+ * Cuándo salió el último aviso, leído de la COLA de avisos.
+ *
+ * Vivía solo en memoria, y Railway reinicia el backend en cada despliegue: al
+ * arrancar se creía que no había avisado nunca, tomaba el margen de 12 horas y
+ * el siguiente aviso salía con TODA la cola —26, 35 pendientes— en vez de con
+ * lo que acababa de cambiar. Eso es lo que lo volvía redundante. Con la fecha
+ * en la base, un reinicio ya no borra la memoria.
+ */
+const ultimoAvisoEnLaCola = async () => {
+    try {
+        const fila = await AvisoWhatsApp.findOne({
+            where: { destino: 'compras', mensaje: { [Op.like]: `${ENCABEZADO_AVISO}%` } },
+            order: [['id', 'DESC']]
+        });
+        const f = fila && (fila.created_at || fila.createdAt);
+        return f ? new Date(f).getTime() : 0;
+    } catch (e) {
+        console.error('⚠️ [barridoCompras] No pude leer el último aviso:', e.message);
+        return 0;
+    }
+};
 
 const fechaCambio = (s) => new Date(s.updatedAt || s.updated_at || s.createdAt || s.created_at || 0);
 
@@ -279,7 +305,7 @@ const armarAviso = async (desde) => {
     }
 
     const lineas = [
-        '🧾 *Solicitudes de compra por revisar*',
+        ENCABEZADO_AVISO,
         `Stock mínimo + salidas previstas de los próximos ${DIAS_PROYECCION} días.`,
         ''
     ];
@@ -304,6 +330,11 @@ const armarAviso = async (desde) => {
 
 const enviarAvisoPendiente = async () => {
     timerAviso = null;
+    if (!ultimoAviso) ultimoAviso = await ultimoAvisoEnLaCola();
+    // Con la fecha recién recuperada puede que el aviso anterior sea de hace un rato:
+    // se respeta el espacio entre avisos en vez de mandar dos casi pegados.
+    const falta = ultimoAviso + MIN_ENTRE_AVISOS_MS - Date.now();
+    if (falta > 0) { timerAviso = setTimeout(enviarAvisoPendiente, falta); return; }
     const desde = new Date(ultimoAviso || (Date.now() - MARGEN_SIN_HISTORIAL_MS));
     const marca = Date.now();
     try {
