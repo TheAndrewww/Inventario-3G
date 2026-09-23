@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check, Inbox, Eye, EyeOff, AlertTriangle, ArrowUpDown } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Package, ShoppingCart, History, User, Menu, BarChart3, ClipboardList, Truck, CheckSquare, Users, UserCog, FileText, Wrench, PackageCheck, Calendar, Wand2, Factory, Flag, ClipboardCheck, PackageOpen, Layers, Briefcase, GripVertical, RotateCcw, Check, Inbox, Eye, EyeOff, AlertTriangle, ArrowUpDown, ShoppingBag, ChevronDown, ChevronRight } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 // Definir todas las opciones del menú con sus roles permitidos.
 // El array es el ORDEN POR DEFECTO. El usuario puede reordenar en la UI.
 export const ALL_MENU_ITEMS = [
   { path: '/inventario', icon: Package, label: 'Inventario', roles: ['administrador', 'diseñador', 'almacen', 'ventas'] },
-  { path: '/recepcion-mercancia', icon: PackageCheck, label: 'Recepción Mercancía', roles: ['administrador', 'almacen'] },
+  { path: '/recepcion-mercancia', icon: PackageCheck, label: 'Recepción de Mercancía', roles: ['administrador', 'almacen'], grupo: 'compras' },
   { path: '/entradas-salidas', icon: ArrowUpDown, label: 'Entradas y Salidas', roles: ['administrador', 'almacen'] },
   { path: '/procesamiento-masivo', icon: Wand2, label: 'Procesamiento IA', roles: ['administrador'] },
   { path: '/pedido', icon: ShoppingCart, label: 'Orden de Salida', roles: ['administrador', 'diseñador'] },
@@ -15,21 +15,59 @@ export const ALL_MENU_ITEMS = [
   { path: '/camionetas', icon: Briefcase, label: 'Equipos', roles: ['administrador'] },
   { path: '/usuarios', icon: UserCog, label: 'Usuarios', roles: ['administrador'] },
   { path: '/solicitudes-cambio', icon: Inbox, label: 'Solicitudes', roles: ['administrador', 'almacen', 'compras'] },
-  { path: '/ordenes-compra', icon: FileText, label: 'Órdenes de Compra', roles: ['administrador', 'diseñador', 'ventas', 'compras'] },
+  { path: '/ordenes-compra', icon: FileText, label: 'Órdenes de Compra', roles: ['administrador', 'diseñador', 'ventas', 'compras'], grupo: 'compras' },
   { path: '/calendario', icon: Calendar, label: 'Calendario', roles: ['administrador', 'diseñador', 'ventas', 'encargado', 'almacen'] },
   { path: '/mi-equipo', icon: User, label: 'Mi Equipo', roles: ['administrador', 'diseñador', 'ventas', 'encargado', 'operador'] },
   { path: '/produccion', icon: Factory, label: 'Dashboard Producción', roles: ['administrador', 'diseñador', 'almacen'] },
   { path: '/avance-produccion', icon: ClipboardCheck, label: 'Avance Producción', roles: ['administrador', 'almacen'] },
   { path: '/historial', icon: History, label: 'Historial', roles: ['administrador', 'diseñador'] },
-  { path: '/proveedores', icon: Truck, label: 'Proveedores', roles: ['administrador', 'compras'] },
+  { path: '/proveedores', icon: Truck, label: 'Proveedores', roles: ['administrador', 'compras'], grupo: 'compras' },
   { path: '/control-campana', icon: Flag, label: 'Control Campaña', roles: ['administrador', 'diseñador', 'encargado', 'compras'] },
   { path: '/conteo-ciclico', icon: ClipboardCheck, label: 'Conteo Cíclico', roles: ['administrador', 'almacen'] },
   { path: '/descontar-almacen', icon: PackageOpen, label: 'Descuento Almacén', roles: ['administrador'] },
   { path: '/rollos-membrana', icon: Layers, label: 'Rollos Membrana', roles: ['administrador'] },
   { path: '/renta-herramientas', icon: Wrench, label: 'Renta Herramientas', roles: ['administrador'] },
   { path: '/reportes', icon: BarChart3, label: 'Reportes', roles: ['administrador'] },
-  { path: '/stock-bajo', icon: AlertTriangle, label: 'Stock Bajo', roles: ['administrador'] },
+  { path: '/stock-bajo', icon: AlertTriangle, label: 'Stock Bajo', roles: ['administrador'], grupo: 'compras' },
 ];
+
+// Menús grandes que agrupan varias pantallas como sub-pestañas. Las rutas de cada
+// pantalla NO cambian (las ligas de los avisos siguen sirviendo); solo se juntan
+// bajo un solo renglón del menú. El orden de las sub-pestañas es este:
+export const MENU_GRUPOS = {
+  compras: {
+    path: '/compras',
+    icon: ShoppingBag,
+    label: 'Compras',
+    orden: ['/ordenes-compra', '/recepcion-mercancia', '/stock-bajo', '/proveedores']
+  }
+};
+
+// Sub-pestañas del grupo que puede ver el rol, en su orden
+export const subPestanasGrupo = (grupoId, rol) => {
+  const grupo = MENU_GRUPOS[grupoId];
+  if (!grupo) return [];
+  return grupo.orden
+    .map(path => ALL_MENU_ITEMS.find(i => i.path === path))
+    .filter(item => item && item.roles.includes(rol));
+};
+
+// Grupo al que pertenece una ruta (o null)
+export const grupoDeRuta = (path) => ALL_MENU_ITEMS.find(i => i.path === path)?.grupo || null;
+
+// Junta los items de un grupo en un solo renglón, en el lugar del primero que aparezca
+const agruparItems = (items, rol) => {
+  const vistos = new Set();
+  const resultado = [];
+  for (const item of items) {
+    if (!item.grupo) { resultado.push(item); continue; }
+    if (vistos.has(item.grupo)) continue;
+    vistos.add(item.grupo);
+    const grupo = MENU_GRUPOS[item.grupo];
+    resultado.push({ ...grupo, grupoId: item.grupo, children: subPestanasGrupo(item.grupo, rol) });
+  }
+  return resultado;
+};
 
 // ¿El rol puede entrar a esta ruta del menú? Rutas fuera del menú: sí.
 export const rolPuedeVer = (rol, path) => {
@@ -55,7 +93,11 @@ const aplicarOrdenGuardado = (defaultItems, savedPaths) => {
   if (!Array.isArray(savedPaths) || savedPaths.length === 0) return defaultItems;
   const byPath = new Map(defaultItems.map(i => [i.path, i]));
   const ordenados = [];
-  for (const p of savedPaths) {
+  // Órdenes guardados antes de existir los grupos traen la ruta de una sub-pestaña:
+  // el grupo toma el lugar de la primera que aparezca.
+  const deGrupo = new Map(defaultItems.filter(i => i.children).flatMap(g => g.children.map(c => [c.path, g.path])));
+  for (const guardado of savedPaths) {
+    const p = deGrupo.get(guardado) || guardado;
     if (byPath.has(p)) {
       ordenados.push(byPath.get(p));
       byPath.delete(p);
@@ -72,9 +114,17 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
 
   // Filtrar por rol primero, y aplicar orden guardado
   const itemsFiltrados = useMemo(
-    () => ALL_MENU_ITEMS.filter(item => item.roles.includes(user?.rol)),
+    () => agruparItems(ALL_MENU_ITEMS.filter(item => item.roles.includes(user?.rol)), user?.rol),
     [user?.rol]
   );
+  const navigate = useNavigate();
+  // Grupos desplegados a mano (el del panel activo siempre se ve abierto)
+  const [gruposAbiertos, setGruposAbiertos] = useState(new Set());
+  const toggleGrupo = (path) => setGruposAbiertos(prev => {
+    const next = new Set(prev);
+    if (next.has(path)) next.delete(path); else next.add(path);
+    return next;
+  });
 
   const [menuItems, setMenuItems] = useState(itemsFiltrados);
   const [editMode, setEditMode] = useState(false);
@@ -250,7 +300,8 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {itemsParaRender.map((item, index) => {
           const Icon = item.icon;
-          const isActive = location.pathname === item.path;
+          const grupoActivo = !!item.children?.some(c => c.path === location.pathname);
+          const isActive = location.pathname === item.path || grupoActivo;
           const isDragOver = editMode && dragOverIndex === index;
           const isHidden = hiddenPaths.has(item.path);
 
@@ -294,6 +345,52 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
                 className={commonClasses}
               >
                 {content}
+              </div>
+            );
+          }
+
+          if (item.children) {
+            const abierto = grupoActivo || gruposAbiertos.has(item.path);
+            return (
+              <div key={item.path}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Colapsado no hay dónde desplegar: se va directo a la primera sub-pestaña
+                    if (!isOpen) {
+                      if (item.children[0]) navigate(item.children[0].path);
+                      return;
+                    }
+                    toggleGrupo(item.path);
+                  }}
+                  className={commonClasses}
+                  title={isOpen ? undefined : item.label}
+                >
+                  {content}
+                  {isOpen && (abierto ? <ChevronDown size={16} /> : <ChevronRight size={16} />)}
+                </button>
+                {isOpen && abierto && (
+                  <div className="mt-1 ml-5 pl-3 border-l-2 border-red-100 space-y-1">
+                    {item.children.map(child => {
+                      const ChildIcon = child.icon;
+                      const childActive = location.pathname === child.path;
+                      return (
+                        <Link
+                          key={child.path}
+                          to={child.path}
+                          onClick={onNavigate}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${childActive
+                            ? 'bg-red-50 text-red-700 font-semibold'
+                            : 'text-gray-600 hover:bg-gray-100'
+                            }`}
+                        >
+                          <ChildIcon size={16} />
+                          <span>{child.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           }

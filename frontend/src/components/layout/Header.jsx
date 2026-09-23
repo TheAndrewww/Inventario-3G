@@ -17,9 +17,11 @@ const Header = ({ toggleSidebar, isMobile }) => {
       '/solicitudes-cambio': 'Solicitudes de cambio',
       '/historial': 'Historial de Movimientos',
       '/perfil': 'Mi Perfil',
-      '/proveedores': 'Proveedores',
+      '/proveedores': 'Compras',
       '/reportes': 'Reportes',
-      '/ordenes-compra': 'Órdenes de Compra',
+      '/ordenes-compra': 'Compras',
+      '/recepcion-mercancia': 'Compras',
+      '/stock-bajo': 'Compras',
       '/entrada-inventario': 'Entrada Inventario',
       '/recibir-pedidos': 'Recibir Pedidos',
       '/renta-herramientas': 'Renta Herramientas'

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import SubPestanasGrupo from './SubPestanasGrupo';
 import { Outlet } from 'react-router-dom';
 import { useCalendario } from '../../context/CalendarioContext';
 
@@ -65,6 +66,7 @@ const DashboardLayout = () => {
       {/* Contenido principal */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header toggleSidebar={toggleSidebar} isMobile={isMobile} />
+        <SubPestanasGrupo />
 
         <main className="flex-1 overflow-auto">
           <Outlet />
