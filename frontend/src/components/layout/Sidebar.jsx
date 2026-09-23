@@ -34,21 +34,48 @@ export const ALL_MENU_ITEMS = [
 
 // Menús grandes que agrupan varias pantallas como sub-pestañas. Las rutas de cada
 // pantalla NO cambian (las ligas de los avisos siguen sirviendo); solo se juntan
-// bajo un solo renglón del menú. El orden de las sub-pestañas es este:
+// bajo un solo renglón del menú. Este es el orden por defecto de las sub-pestañas;
+// cada usuario lo puede cambiar arrastrando en "Personalizar".
 export const MENU_GRUPOS = {
   compras: {
     path: '/compras',
     icon: ShoppingBag,
     label: 'Compras',
-    orden: ['/ordenes-compra', '/solicitudes-compra', '/recepcion-mercancia', '/stock-bajo', '/proveedores']
+    orden: ['/solicitudes-compra', '/ordenes-compra', '/recepcion-mercancia', '/stock-bajo', '/proveedores']
   }
 };
 
-// Sub-pestañas del grupo que puede ver el rol, en su orden
-export const subPestanasGrupo = (grupoId, rol) => {
+// Orden de sub-pestañas guardado por usuario (localStorage, igual que el menú)
+const storageKeySub = (userId, grupoId) => `sidebar-suborder:${userId ?? 'anon'}:${grupoId}`;
+// Aviso para que la barra de sub-pestañas se reacomode al instante
+export const EVENTO_SUBORDEN = 'sidebar-suborden-cambio';
+
+const leerSubOrden = (userId, grupoId) => {
+  try {
+    const raw = localStorage.getItem(storageKeySub(userId, grupoId));
+    const saved = raw ? JSON.parse(raw) : null;
+    return Array.isArray(saved) ? saved : null;
+  } catch {
+    return null;
+  }
+};
+
+export const guardarSubOrden = (userId, grupoId, paths) => {
+  try {
+    if (paths) localStorage.setItem(storageKeySub(userId, grupoId), JSON.stringify(paths));
+    else localStorage.removeItem(storageKeySub(userId, grupoId));
+  } catch { /* storage lleno o bloqueado — ignorar */ }
+  window.dispatchEvent(new Event(EVENTO_SUBORDEN));
+};
+
+// Sub-pestañas del grupo que puede ver el rol, en el orden del usuario (o el de fábrica)
+export const subPestanasGrupo = (grupoId, rol, userId) => {
   const grupo = MENU_GRUPOS[grupoId];
   if (!grupo) return [];
-  return grupo.orden
+  const saved = leerSubOrden(userId, grupoId) || [];
+  // Primero lo guardado, luego lo que falte (sub-pestañas nuevas) en su orden de fábrica
+  const orden = [...saved.filter(p => grupo.orden.includes(p)), ...grupo.orden.filter(p => !saved.includes(p))];
+  return orden
     .map(path => ALL_MENU_ITEMS.find(i => i.path === path))
     .filter(item => item && item.roles.includes(rol));
 };
@@ -57,7 +84,7 @@ export const subPestanasGrupo = (grupoId, rol) => {
 export const grupoDeRuta = (path) => ALL_MENU_ITEMS.find(i => i.path === path)?.grupo || null;
 
 // Junta los items de un grupo en un solo renglón, en el lugar del primero que aparezca
-const agruparItems = (items, rol) => {
+const agruparItems = (items, rol, userId) => {
   const vistos = new Set();
   const resultado = [];
   for (const item of items) {
@@ -65,7 +92,7 @@ const agruparItems = (items, rol) => {
     if (vistos.has(item.grupo)) continue;
     vistos.add(item.grupo);
     const grupo = MENU_GRUPOS[item.grupo];
-    resultado.push({ ...grupo, grupoId: item.grupo, children: subPestanasGrupo(item.grupo, rol) });
+    resultado.push({ ...grupo, grupoId: item.grupo, children: subPestanasGrupo(item.grupo, rol, userId) });
   }
   return resultado;
 };
@@ -115,10 +142,37 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
   const { user } = useAuth();
 
   // Filtrar por rol primero, y aplicar orden guardado
+  // Sube cada vez que alguien reordena sub-pestañas, para recalcular el menú
+  const [versionSubOrden, setVersionSubOrden] = useState(0);
+  useEffect(() => {
+    const alCambiar = () => setVersionSubOrden(v => v + 1);
+    window.addEventListener(EVENTO_SUBORDEN, alCambiar);
+    return () => window.removeEventListener(EVENTO_SUBORDEN, alCambiar);
+  }, []);
+
   const itemsFiltrados = useMemo(
-    () => agruparItems(ALL_MENU_ITEMS.filter(item => item.roles.includes(user?.rol)), user?.rol),
-    [user?.rol]
+    () => agruparItems(ALL_MENU_ITEMS.filter(item => item.roles.includes(user?.rol)), user?.rol, user?.id),
+    [user?.rol, user?.id, versionSubOrden]
   );
+
+  // Arrastre de sub-pestañas dentro de su grupo (independiente del de los renglones)
+  const subDragRef = useRef(null); // { grupoId, index }
+  const [subDragOver, setSubDragOver] = useState(null); // `${grupoId}:${index}`
+
+  const handleSubDrop = (e, grupo, dropIndex) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const origen = subDragRef.current;
+    subDragRef.current = null;
+    setSubDragOver(null);
+    if (!origen || origen.grupoId !== grupo.grupoId || origen.index === dropIndex) return;
+    const paths = grupo.children.map(c => c.path);
+    const [movido] = paths.splice(origen.index, 1);
+    paths.splice(dropIndex, 0, movido);
+    // Se guardan también las que este rol no ve, al final, para no perderlas
+    const resto = MENU_GRUPOS[grupo.grupoId].orden.filter(p => !paths.includes(p));
+    guardarSubOrden(user?.id, grupo.grupoId, [...paths, ...resto]);
+  };
   const navigate = useNavigate();
   // Grupos desplegados a mano (el del panel activo siempre se ve abierto)
   const [gruposAbiertos, setGruposAbiertos] = useState(new Set());
@@ -181,6 +235,7 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
 
   const resetOrden = () => {
     try { localStorage.removeItem(storageKey(user?.id)); } catch {}
+    Object.keys(MENU_GRUPOS).forEach(grupoId => guardarSubOrden(user?.id, grupoId, null));
     setMenuItems(itemsFiltrados);
   };
 
@@ -336,7 +391,7 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
 
           // En modo edición renderizamos un div arrastrable (no navegable)
           if (editMode) {
-            return (
+            const renglon = (
               <div
                 key={item.path}
                 draggable
@@ -347,6 +402,44 @@ const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
                 className={commonClasses}
               >
                 {content}
+              </div>
+            );
+            if (!item.children || !isOpen) return renglon;
+
+            // Grupo: además del renglón, sus sub-pestañas se reordenan arrastrando
+            return (
+              <div key={item.path}>
+                {renglon}
+                <div className="mt-1 ml-5 pl-3 border-l-2 border-red-100 space-y-1">
+                  {item.children.map((child, subIndex) => {
+                    const ChildIcon = child.icon;
+                    const marca = `${item.grupoId}:${subIndex}`;
+                    return (
+                      <div
+                        key={child.path}
+                        draggable
+                        onDragStart={(e) => {
+                          e.stopPropagation();
+                          subDragRef.current = { grupoId: item.grupoId, index: subIndex };
+                          e.dataTransfer.effectAllowed = 'move';
+                          try { e.dataTransfer.setData('text/plain', child.path); } catch {}
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (subDragOver !== marca) setSubDragOver(marca);
+                        }}
+                        onDrop={(e) => handleSubDrop(e, item, subIndex)}
+                        onDragEnd={(e) => { e.stopPropagation(); subDragRef.current = null; setSubDragOver(null); }}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 cursor-grab active:cursor-grabbing border border-dashed border-gray-300 ${subDragOver === marca ? 'ring-2 ring-red-300' : ''}`}
+                      >
+                        <GripVertical size={14} className="text-gray-400 shrink-0" />
+                        <ChildIcon size={16} />
+                        <span>{child.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           }

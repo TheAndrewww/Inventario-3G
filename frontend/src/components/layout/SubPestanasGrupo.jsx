@@ -1,17 +1,24 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { grupoDeRuta, subPestanasGrupo } from './Sidebar';
+import { grupoDeRuta, subPestanasGrupo, EVENTO_SUBORDEN } from './Sidebar';
 
 // Barra de sub-pestañas arriba de las pantallas que viven dentro de un menú grande
 // (p. ej. Compras). Si el rol solo ve una pantalla del grupo, no se muestra.
 const SubPestanasGrupo = () => {
   const location = useLocation();
   const { user } = useAuth();
+  // Se reacomoda en cuanto el usuario reordena las sub-pestañas en el menú
+  const [, setVersion] = useState(0);
+  useEffect(() => {
+    const alCambiar = () => setVersion(v => v + 1);
+    window.addEventListener(EVENTO_SUBORDEN, alCambiar);
+    return () => window.removeEventListener(EVENTO_SUBORDEN, alCambiar);
+  }, []);
   const grupo = grupoDeRuta(location.pathname);
   if (!grupo) return null;
 
-  const pestanas = subPestanasGrupo(grupo, user?.rol);
+  const pestanas = subPestanasGrupo(grupo, user?.rol, user?.id);
   if (pestanas.length < 2) return null;
 
   return (
