@@ -46,13 +46,15 @@ const ordenesCompraService = {
   },
 
   // Crear orden de compra desde solicitudes pendientes
-  crearOrdenDesdeSolicitudes: async (solicitudes_ids, proveedor_id, observaciones, cantidades_custom = null, fecha_llegada_estimada = null) => {
+  crearOrdenDesdeSolicitudes: async (solicitudes_ids, proveedor_id, observaciones, cantidades_custom = null, fecha_llegada_estimada = null, articulos_extra = [], herramientas_ids = []) => {
     const response = await api.post('/ordenes-compra/desde-solicitudes', {
       solicitudes_ids,
       proveedor_id,
       observaciones,
       cantidades_custom,
-      fecha_llegada_estimada
+      fecha_llegada_estimada,
+      articulos_extra,
+      herramientas_ids
     });
     return response.data;
   },

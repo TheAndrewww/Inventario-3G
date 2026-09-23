@@ -2716,6 +2716,12 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
   const [loading, setLoading] = useState(false);
   const [cantidadesEditadas, setCantidadesEditadas] = useState({});
   const [articulosEliminados, setArticulosEliminados] = useState(new Set());
+  // Productos agregados con el buscador (solo del mismo proveedor de la orden)
+  const [articulosExtra, setArticulosExtra] = useState([]);
+  const [catalogo, setCatalogo] = useState([]);
+  const [busqueda, setBusqueda] = useState('');
+  // Artículos que se darán de alta como herramienta al crear la orden
+  const [marcadosHerramienta, setMarcadosHerramienta] = useState(new Set());
 
   // Helper: Obtener el proveedor correcto (de artículo o herramienta)
   const obtenerProveedorSolicitud = (solicitud) => {
@@ -2745,6 +2751,34 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
   useEffect(() => {
     fetchProveedores();
   }, []);
+
+  // Catálogo para el buscador: se carga una vez al abrir el modal
+  useEffect(() => {
+    if (!isOpen || catalogo.length > 0) return;
+    articulosService.buscar({ activo: true, limit: 99999 })
+      .then(arts => setCatalogo(Array.isArray(arts) ? arts : []))
+      .catch(() => toast.error('Error al cargar artículos para el buscador'));
+  }, [isOpen]);
+
+  // ¿El artículo lo surte este proveedor? (relación many-to-many o FK legacy)
+  const esDelProveedor = (articulo, provId) => {
+    if (!provId || !articulo) return false;
+    const id = parseInt(provId);
+    return articulo.proveedor_id === id ||
+      articulo.proveedor?.id === id ||
+      (articulo.proveedores || []).some(p => p.id === id);
+  };
+
+  // Si cambian de proveedor, se quitan los agregados que no son de él
+  useEffect(() => {
+    setArticulosExtra(prev => {
+      const siguen = prev.filter(e => esDelProveedor(e.articulo, proveedorId));
+      if (siguen.length !== prev.length) {
+        toast(`Se quitaron ${prev.length - siguen.length} producto(s) agregado(s) que no son de este proveedor`, { icon: '⚠️' });
+      }
+      return siguen;
+    });
+  }, [proveedorId]);
 
   // Inicializar cantidades editadas cuando cambien las solicitudes
   useEffect(() => {
@@ -2805,11 +2839,43 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
   };
 
   const calcularTotal = () => {
-    return articulosAgrupados.reduce((total, item) => {
+    const deSolicitudes = articulosAgrupados.reduce((total, item) => {
       const cantidad = item.articulo?.id in cantidadesEditadas ? cantidadesEditadas[item.articulo?.id] : item.cantidad_total;
       const costo = parseFloat(item.articulo?.costo_unitario || 0);
       return total + (cantidad * costo);
     }, 0);
+    const deAgregados = articulosExtra.reduce((total, e) =>
+      total + (parseFloat(e.cantidad) || 0) * parseFloat(e.articulo?.costo_unitario || 0), 0);
+    return deSolicitudes + deAgregados;
+  };
+
+  const handleAgregarArticulo = (articulo) => {
+    setArticulosExtra(prev => [...prev, { articulo, cantidad: 1 }]);
+    setBusqueda('');
+  };
+
+  const handleCantidadExtraChange = (articuloId, valor) => {
+    if (valor !== '' && (isNaN(parseFloat(valor)) || parseFloat(valor) < 0)) return;
+    setArticulosExtra(prev => prev.map(e =>
+      e.articulo.id === articuloId ? { ...e, cantidad: valor === '' ? '' : parseFloat(valor) } : e
+    ));
+  };
+
+  const handleQuitarExtra = (articuloId) => {
+    setArticulosExtra(prev => prev.filter(e => e.articulo.id !== articuloId));
+    setMarcadosHerramienta(prev => {
+      const s = new Set(prev);
+      s.delete(articuloId);
+      return s;
+    });
+  };
+
+  const toggleHerramienta = (articuloId) => {
+    setMarcadosHerramienta(prev => {
+      const s = new Set(prev);
+      if (s.has(articuloId)) s.delete(articuloId); else s.add(articuloId);
+      return s;
+    });
   };
 
   const handleCantidadChange = (articuloId, nuevaCantidad) => {
@@ -2843,7 +2909,12 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
 
     // Validar que queden artículos después de eliminar
     if (articulosAgrupados.length === 0) {
-      toast.error('Debes tener al menos un artículo en la orden');
+      toast.error('Debes tener al menos un artículo de las solicitudes en la orden');
+      return;
+    }
+
+    if (articulosExtra.some(e => !(parseFloat(e.cantidad) > 0))) {
+      toast.error('Captura la cantidad de los productos agregados');
       return;
     }
 
@@ -2875,7 +2946,9 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
         proveedorId ? parseInt(proveedorId) : null,
         observaciones.trim() || null,
         huboEdiciones ? cantidades_custom : null,
-        fechaLlegadaEstimada || null
+        fechaLlegadaEstimada || null,
+        articulosExtra.map(e => ({ articulo_id: e.articulo.id, cantidad: parseFloat(e.cantidad) })),
+        Array.from(marcadosHerramienta)
       );
 
       toast.success(`Orden creada exitosamente con ${solicitudesValidas.length} solicitud(es)`);
@@ -2918,6 +2991,41 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
     return Array.from(mapa.values());
   }, [solicitudes, articulosEliminados]);
 
+  // Resultados del buscador: activos, del proveedor elegido y que no estén ya en la orden
+  const resultadosBusqueda = React.useMemo(() => {
+    const termino = busqueda.trim().toLowerCase();
+    if (termino.length < 2 || !proveedorId) return [];
+    const enOrden = new Set([
+      ...articulosAgrupados.map(i => i.articulo?.id),
+      ...articulosExtra.map(e => e.articulo.id)
+    ]);
+    return catalogo
+      .filter(art => art.activo !== false && !enOrden.has(art.id) && esDelProveedor(art, proveedorId))
+      .filter(art =>
+        art.nombre?.toLowerCase().includes(termino) ||
+        art.codigo_ean13?.includes(termino) ||
+        art.categoria?.nombre?.toLowerCase().includes(termino)
+      )
+      .slice(0, 30);
+  }, [busqueda, catalogo, proveedorId, articulosAgrupados, articulosExtra]);
+
+  // Casilla "Herramienta": ya marcada (y fija) si el artículo ya es herramienta
+  const celdaHerramienta = (articulo) => {
+    const yaEs = !!articulo?.es_herramienta;
+    return (
+      <td className="px-4 py-2 text-sm text-center">
+        <input
+          type="checkbox"
+          checked={yaEs || marcadosHerramienta.has(articulo?.id)}
+          disabled={yaEs}
+          onChange={() => toggleHerramienta(articulo?.id)}
+          className="h-4 w-4 accent-red-700 cursor-pointer disabled:cursor-not-allowed"
+          title={yaEs ? 'Ya está dado de alta como herramienta' : 'Marcar este artículo como herramienta en el inventario'}
+        />
+      </td>
+    );
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Crear Orden desde Solicitudes" size="xl">
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -2928,6 +3036,7 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
           </h3>
           <p className="text-sm text-blue-800">
             {solicitudes.length} solicitud{solicitudes.length !== 1 ? 'es' : ''} • {articulosAgrupados.length} artículo{articulosAgrupados.length !== 1 ? 's' : ''} único{articulosAgrupados.length !== 1 ? 's' : ''}
+            {articulosExtra.length > 0 && ` • ${articulosExtra.length} agregado${articulosExtra.length !== 1 ? 's' : ''}`}
           </p>
         </div>
 
@@ -2984,6 +3093,45 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
           />
         </div>
 
+        {/* Buscador para agregar productos del mismo proveedor */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Agregar productos
+          </label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              disabled={!proveedorId}
+              placeholder={proveedorId ? 'Buscar por nombre, código o categoría...' : 'Primero selecciona el proveedor'}
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 disabled:bg-gray-100"
+            />
+          </div>
+          {proveedorId && busqueda.trim().length >= 2 && (
+            <div className="mt-1 max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+              {resultadosBusqueda.length === 0 ? (
+                <p className="p-3 text-sm text-gray-500">No hay productos de este proveedor con esa búsqueda</p>
+              ) : resultadosBusqueda.map(art => (
+                <button
+                  key={art.id}
+                  type="button"
+                  onClick={() => handleAgregarArticulo(art)}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-red-50"
+                >
+                  <span>
+                    <span className="font-medium text-gray-900">{art.nombre}</span>
+                    <span className="ml-2 text-xs text-gray-500">Stock: {parseFloat(art.stock_actual || 0)} {art.unidad}</span>
+                  </span>
+                  <Plus size={16} className="text-red-700 shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="mt-1 text-xs text-gray-500">Solo aparecen productos que surte el proveedor seleccionado.</p>
+        </div>
+
         {/* Lista de artículos */}
         <div>
           <h4 className="text-sm font-medium text-gray-700 mb-2">
@@ -3006,6 +3154,7 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Cantidad</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Costo Unit.</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Subtotal</th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">Herramienta</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Acciones</th>
                   </tr>
                 </thead>
@@ -3042,12 +3191,50 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
                         <td className="px-4 py-2 text-sm font-medium">
                           ${subtotal.toFixed(2)}
                         </td>
+                        {celdaHerramienta(item.articulo)}
                         <td className="px-4 py-2 text-sm">
                           <button
                             type="button"
                             onClick={() => handleEliminarArticulo(item.articulo?.id)}
                             className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 rounded transition-colors"
                             title="Eliminar artículo de la orden"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {articulosExtra.map(({ articulo, cantidad }) => {
+                    const costo = parseFloat(articulo?.costo_unitario || 0);
+                    return (
+                      <tr key={`extra-${articulo.id}`} className="bg-green-50/40">
+                        <td className="px-4 py-2 text-sm">
+                          <div className="font-medium text-gray-900">{articulo.nombre}</div>
+                          <div className="text-xs text-green-700">Agregado</div>
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={cantidad}
+                              onChange={(e) => handleCantidadExtraChange(articulo.id, e.target.value)}
+                              className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-center"
+                            />
+                            <span className="text-gray-600">{articulo.unidad}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-sm">${costo.toFixed(2)}</td>
+                        <td className="px-4 py-2 text-sm font-medium">${((parseFloat(cantidad) || 0) * costo).toFixed(2)}</td>
+                        {celdaHerramienta(articulo)}
+                        <td className="px-4 py-2 text-sm">
+                          <button
+                            type="button"
+                            onClick={() => handleQuitarExtra(articulo.id)}
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 rounded transition-colors"
+                            title="Quitar producto de la orden"
                           >
                             <Trash2 size={16} />
                           </button>

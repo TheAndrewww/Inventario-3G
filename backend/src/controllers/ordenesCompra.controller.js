@@ -40,6 +40,7 @@ import admin from '../config/firebase-admin.js'; // Importar Firebase Admin
 import { enviarEmailAprobacion, enviarEmailEstadoOrden, enviarEmailOrdenCancelada, verificarTokenAprobacion } from '../services/email.service.js';
 import { pedirAutorizacionOrden } from '../services/whatsapp.service.js';
 import { programarBarridoCompras, consumoDiarioPorArticulo, stockProyectado } from '../services/barridoCompras.service.js';
+import { migrarArticuloIndividual } from '../utils/autoMigrate.js';
 
 /**
  * Crear una nueva orden de compra
@@ -1200,9 +1201,10 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { solicitudes_ids, proveedor_id, observaciones, cantidades_custom, fecha_llegada_estimada } = req.body;
+    const { solicitudes_ids, proveedor_id, observaciones, cantidades_custom, fecha_llegada_estimada, articulos_extra, herramientas_ids } = req.body;
     const usuario_id = req.usuario.id;
     const usuario_rol = req.usuario.rol;
+    const extras = Array.isArray(articulos_extra) ? articulos_extra : [];
 
     // Validaciones
     if (!solicitudes_ids || !Array.isArray(solicitudes_ids) || solicitudes_ids.length === 0) {
@@ -1246,6 +1248,56 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
         success: false,
         message: 'Algunas solicitudes no están disponibles o ya fueron procesadas'
       });
+    }
+
+    // Artículos agregados a mano desde el buscador del modal: solo se aceptan los que
+    // surte el MISMO proveedor de la orden (relación articulos_proveedores o FK legacy).
+    const articulosExtra = [];
+    if (extras.length > 0) {
+      if (!proveedor_id) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Selecciona el proveedor antes de agregar productos a la orden'
+        });
+      }
+
+      const idsExtra = extras.map(e => parseInt(e.articulo_id));
+      const articulosDB = await Articulo.findAll({
+        where: { id: idsExtra, activo: true },
+        include: [{ model: Proveedor, as: 'proveedores', attributes: ['id'], through: { attributes: [] }, required: false }],
+        transaction
+      });
+      const porId = new Map(articulosDB.map(a => [a.id, a]));
+
+      for (const extra of extras) {
+        const articulo = porId.get(parseInt(extra.articulo_id));
+        const cantidad = parseFloat(extra.cantidad);
+        if (!articulo) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `El artículo ${extra.articulo_id} no existe o está desactivado`
+          });
+        }
+        const delProveedor = articulo.proveedor_id === parseInt(proveedor_id) ||
+          (articulo.proveedores || []).some(p => p.id === parseInt(proveedor_id));
+        if (!delProveedor) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `"${articulo.nombre}" no es de este proveedor`
+          });
+        }
+        if (!(cantidad > 0)) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `La cantidad de "${articulo.nombre}" debe ser mayor a 0`
+          });
+        }
+        articulosExtra.push({ articulo, cantidad });
+      }
     }
 
     // Generar ticket_id único para la orden
@@ -1309,6 +1361,24 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
       }
     }
 
+    // Partidas agregadas desde el buscador (si el artículo ya venía por solicitud, se suma)
+    for (const { articulo, cantidad } of articulosExtra) {
+      const costo = await costoDePartida(articulo, proveedor_id, transaction);
+      if (articulosMap.has(articulo.id)) {
+        const itemExistente = articulosMap.get(articulo.id);
+        itemExistente.cantidad += cantidad;
+        itemExistente.subtotal = itemExistente.cantidad * itemExistente.costo_unitario;
+      } else {
+        articulosMap.set(articulo.id, {
+          articulo_id: articulo.id,
+          cantidad,
+          costo_unitario: costo,
+          subtotal: cantidad * costo,
+          observaciones: 'Agregado al crear la orden'
+        });
+      }
+    }
+
     // Calcular total estimado
     for (const [_, detalle] of articulosMap) {
       totalEstimado += detalle.subtotal;
@@ -1365,7 +1435,37 @@ export const crearOrdenDesdeSolicitudes = async (req, res) => {
     const articulos_ids = Array.from(articulosMap.keys());
     await cancelarSolicitudesPorOrdenCreada(articulos_ids, ordenCompra.id, ticket_id, transaction);
 
+    // Casilla "Herramienta" del modal: da de alta el artículo como herramienta en el
+    // inventario, igual que al editarlo. Solo se aceptan artículos de esta orden.
+    const idsHerramienta = (Array.isArray(herramientas_ids) ? herramientas_ids : [])
+      .map(id => parseInt(id))
+      .filter(id => articulosMap.has(id));
+    let nuevasHerramientas = [];
+    if (idsHerramienta.length > 0) {
+      nuevasHerramientas = await Articulo.findAll({
+        where: { id: idsHerramienta, es_herramienta: false },
+        attributes: ['id'],
+        transaction
+      });
+      if (nuevasHerramientas.length > 0) {
+        await Articulo.update(
+          { es_herramienta: true },
+          { where: { id: nuevasHerramientas.map(a => a.id) }, transaction }
+        );
+      }
+    }
+
     await transaction.commit();
+
+    // Crear el tipo de herramienta y sus unidades (mismo camino que al editar el artículo)
+    for (const { id } of nuevasHerramientas) {
+      try {
+        const resultado = await migrarArticuloIndividual(id);
+        console.log(`✅ [crearOrdenDesdeSolicitudes] Artículo ${id} marcado como herramienta: ${resultado.tipo?.prefijo_codigo}`);
+      } catch (e) {
+        console.error(`⚠️ [crearOrdenDesdeSolicitudes] No se pudo migrar el artículo ${id} a herramienta:`, e.message);
+      }
+    }
 
     // Obtener la orden completa con sus relaciones
     const ordenCompleta = await OrdenCompra.findByPk(ordenCompra.id, {
