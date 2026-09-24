@@ -298,40 +298,21 @@ const CalendarioPage = () => {
         </div>
       )}
 
-      {/* Botón flotante para salir de pantalla completa */}
+      {/* Controles de pantalla completa (arriba a la izquierda): salir + zoom */}
       {modoPantallaCompleta && (
-        <button
-          onClick={togglePantallaCompleta}
-          className={`fixed top-4 right-4 z-50 p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 shadow-lg transition-all duration-300 ${
-            mostrarControles ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
-          }`}
-          title="Salir de pantalla completa"
-        >
-          <Minimize2 className="w-6 h-6" />
-        </button>
-      )}
-
-      {/* Controles de zoom en pantalla completa */}
-      {modoPantallaCompleta && (
-        <div className={`fixed bottom-4 right-4 z-50 flex flex-col gap-2 transition-all duration-300 ${
-          mostrarControles ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+        <div className={`fixed top-4 left-4 z-50 flex items-center gap-2 transition-all duration-300 ${
+          mostrarControles ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
         }`}>
-          {/* Indicador de escala */}
-          <div className="bg-gray-800 bg-opacity-70 text-white px-3 py-2 rounded-lg text-center font-bold">
-            {escala}%
-          </div>
-
-          {/* Botón aumentar zoom */}
+          {/* Salir de pantalla completa */}
           <button
-            onClick={aumentarEscala}
-            disabled={escala >= 150}
-            className="p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 transition-all shadow-lg disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Aumentar zoom"
+            onClick={togglePantallaCompleta}
+            className="p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 shadow-lg transition-all"
+            title="Salir de pantalla completa"
           >
-            <ZoomIn className="w-6 h-6" />
+            <Minimize2 className="w-6 h-6" />
           </button>
 
-          {/* Botón reducir zoom */}
+          {/* Reducir zoom */}
           <button
             onClick={reducirEscala}
             disabled={escala <= 30}
@@ -339,6 +320,21 @@ const CalendarioPage = () => {
             title="Reducir zoom"
           >
             <ZoomOut className="w-6 h-6" />
+          </button>
+
+          {/* Indicador de escala */}
+          <div className="bg-gray-800 bg-opacity-70 text-white px-3 py-2 rounded-lg text-center font-bold tabular-nums">
+            {escala}%
+          </div>
+
+          {/* Aumentar zoom */}
+          <button
+            onClick={aumentarEscala}
+            disabled={escala >= 150}
+            className="p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 transition-all shadow-lg disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Aumentar zoom"
+          >
+            <ZoomIn className="w-6 h-6" />
           </button>
         </div>
       )}
