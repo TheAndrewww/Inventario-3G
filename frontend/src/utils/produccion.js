@@ -626,24 +626,19 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
 
         const fechaIndice = p.fecha_limite_original || p.fecha_limite;
 
-        // Los MTO se rigen SOLO por el calendario: su cita manda siempre,
-        // aunque sea posterior a la fecha del Índice (col D).
+        // Los MTO se rigen SOLO por el calendario, también con citas de meses futuros.
         const soloCalendario = esProyectoMTO(p);
 
-        // 1) Citas del mes actual (+ cola cruzada del mes siguiente).
-        //    Regla de negocio:
-        //    - Si la cita es ANTERIOR (o igual) a la fecha de entrega del índice
-        //      (columna D), MANDA el calendario.
-        //    - Si la cita es POSTERIOR, se respeta la fecha del índice (salvo MTO).
+        // 1) Citas del mes actual (+ cola cruzada del mes siguiente): si el proyecto
+        //    tiene cita, MANDA el calendario, sea antes o después de la fecha del
+        //    Índice (col D). Antes, una cita posterior dejaba la fecha del Índice y
+        //    el pizarrón mostraba fechas viejas y fuera de orden (sep-2026: GUERECA
+        //    con cita el 2-oct salía con 4-sep y hasta arriba en Herrería/Manufactura).
         const match = buscarFechaInstalacion(nombreProd, fechasPorNombre, nombresCalendario, porNumeroActual.get(clave(p)));
         if (match) {
             const { fechaInstalacionStr, nombreCal } = match;
-            if (!soloCalendario && fechaIndice && fechaInstalacionStr > fechaIndice) {
-                console.log(`   ⏩ ÍNDICE MANDA: prod="${nombreProd}" cal=${fechaInstalacionStr} es posterior a entrega=${fechaIndice} → se respeta el índice`);
-                return { ...p, ...metaCierre };
-            }
             const nuevaFechaLimite = fechaLimiteDesdeInstalacion(fechaInstalacionStr);
-            console.log(`   ✅ CALENDARIO MANDA: prod="${nombreProd}" ↔ cal="${nombreCal}" → instalación=${fechaInstalacionStr} (antes de entrega=${fechaIndice || 'N/A'}) → fecha_limite=${nuevaFechaLimite}`);
+            console.log(`   ✅ CALENDARIO MANDA: prod="${nombreProd}" ↔ cal="${nombreCal}" → instalación=${fechaInstalacionStr} (índice=${fechaIndice || 'N/A'}) → fecha_limite=${nuevaFechaLimite}`);
             return { ...p, ...metaCierre, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
         }
 
