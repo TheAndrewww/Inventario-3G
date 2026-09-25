@@ -437,12 +437,18 @@ router.get('/produccion/citas', async (req, res) => {
         const MESES_TAB = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
             'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
         const responsables = new Map();
+        const porColor = new Map();
+        const claveColor = (c) => (c ? `${c.red},${c.green},${c.blue}` : '');
         const mesIdx = Number(String(fecha).slice(5, 7)) - 1;
         for (const mes of [MESES_TAB[mesIdx], MESES_TAB[(mesIdx + 1) % 12]]) {
             try {
                 const d = await obtenerDistribucionEquipos(mes);
                 for (const e of d?.data?.equipos || []) {
                     if (e.nombre && e.responsable && !responsables.has(e.nombre)) responsables.set(e.nombre, e.responsable);
+                    // La tabla es la fuente: si un mes cambia el tono de un equipo, el color
+                    // pintado ahí sigue siendo el mismo que el de sus citas.
+                    const k = claveColor(e.color);
+                    if (k && e.nombre && !porColor.has(k)) porColor.set(k, e.nombre);
                 }
                 if (responsables.size) break;
             } catch (e) {
@@ -460,6 +466,7 @@ router.get('/produccion/citas', async (req, res) => {
                 // La celda del calendario trae el cliente en el segundo renglón, y ahí es donde
                 // suele decir de qué es la cita: "MARCO ANTONIO ZAVALA" + "MTO".
                 const completo = cliente ? `${nombre} / ${cliente}` : nombre;
+                const equipo = c.equipoHora || porColor.get(claveColor(c.colorHora)) || null;
                 return {
                     nombre,
                     cliente: cliente || null,
@@ -467,8 +474,8 @@ router.get('/produccion/citas', async (req, res) => {
                     hora: c.hora || null,
                     // El equipo sale del color de la hora; sin color asignado todavía no se
                     // sabe quién va, y entonces no hay a quién nombrar.
-                    equipo: c.equipoHora || null,
-                    responsable: (c.equipoHora && responsables.get(c.equipoHora)) || null,
+                    equipo: equipo || null,
+                    responsable: (equipo && responsables.get(equipo)) || null,
                     tipo: /retiro/i.test(completo) ? 'RETIRO'
                         : /gtia|garant/i.test(completo) ? 'GTIA'
                             : /\bmto\b|mantenim/i.test(completo) ? 'MTO' : 'INSTALACION',

@@ -88,9 +88,12 @@ const getEquipoFromColor = (backgroundColor) => {
     return 'EQUIPO II';
   }
 
-  // Gris claro - EQUIPO III (R:0.851 G:0.851 B:0.851)
-  // Gris tiene todos los componentes RGB similares (± 0.01)
-  if (red > 0.84 && red < 0.87 && green > 0.84 && green < 0.87 && blue > 0.84 && blue < 0.87) {
+  // Gris - EQUIPO III. El calendario usa dos tonos de gris según el mes: 204,204,204 (0.80)
+  // y 217,217,217 (0.851). El apartado de DISTRIBUCIÓN DE EQUIPOS manda: ahí EQUIPO III está
+  // pintado de 204 y así están pintadas sus citas. Con el rango corto, las de MIGUEL salían
+  // sin equipo (caso EMMANUEL GARCIA, 25-sep-2026). El gris del ALMACÉN (183 = 0.718) queda
+  // fuera del rango a propósito.
+  if (red > 0.78 && red < 0.87 && green > 0.78 && green < 0.87 && blue > 0.78 && blue < 0.87) {
     const diff = Math.abs(red - green) + Math.abs(green - blue) + Math.abs(red - blue);
     if (diff < 0.05) { // Solo si los valores son muy similares (gris)
       return 'EQUIPO III';
