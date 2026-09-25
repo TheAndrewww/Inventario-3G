@@ -451,7 +451,9 @@ router.get('/produccion/citas', async (req, res) => {
         }
 
         const citas = (await leerCitasCercanas())
-            .filter(c => c.fecha === fecha && c.nombre)
+            // Sin horario no es una cita: son las notas del calendario (ASUETO, "27 CUMPLE
+            // VICENTE", "CONTROL - C1"). Confirmar eso con el cliente no tiene sentido.
+            .filter(c => c.fecha === fecha && c.nombre && c.hora)
             .map(c => {
                 const nombre = String(c.nombre).trim();
                 const cliente = (c.cliente || '').trim();
