@@ -8,6 +8,7 @@
 import express from 'express';
 import { Op } from 'sequelize';
 import { proyectosAbiertos, resolverFechasInstalacion, leerCitasCercanas, resumenProduccion } from '../services/fechaInstalacion.service.js';
+import { obtenerDistribucionEquipos } from '../services/googleSheets.service.js';
 import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor, ProduccionProyecto, SolicitudCompra } from '../models/index.js';
 import { urlSolicitudes } from '../services/barridoCompras.service.js';
 import { crearNotificacion } from '../controllers/notificaciones.controller.js';
@@ -430,6 +431,25 @@ router.get('/produccion/citas', async (req, res) => {
         const { fecha } = req.query;
         if (!fecha) return res.status(400).json({ success: false, message: 'Falta la fecha' });
 
+        // Quién encabeza cada equipo, del apartado de DISTRIBUCIÓN DE EQUIPOS de la pestaña
+        // del mes (GERAS, MIGUEL, MANE…). El color de la celda de la hora dice de qué equipo
+        // es la cita; aquí se le pone nombre y apellido a ese color.
+        const MESES_TAB = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+            'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+        const responsables = new Map();
+        const mesIdx = Number(String(fecha).slice(5, 7)) - 1;
+        for (const mes of [MESES_TAB[mesIdx], MESES_TAB[(mesIdx + 1) % 12]]) {
+            try {
+                const d = await obtenerDistribucionEquipos(mes);
+                for (const e of d?.data?.equipos || []) {
+                    if (e.nombre && e.responsable && !responsables.has(e.nombre)) responsables.set(e.nombre, e.responsable);
+                }
+                if (responsables.size) break;
+            } catch (e) {
+                console.error(`No se pudo leer la distribución de equipos de ${mes}:`, e.message);
+            }
+        }
+
         const citas = (await leerCitasCercanas())
             .filter(c => c.fecha === fecha && c.nombre)
             .map(c => {
@@ -443,6 +463,10 @@ router.get('/produccion/citas', async (req, res) => {
                     cliente: cliente || null,
                     etiqueta: completo,
                     hora: c.hora || null,
+                    // El equipo sale del color de la hora; sin color asignado todavía no se
+                    // sabe quién va, y entonces no hay a quién nombrar.
+                    equipo: c.equipoHora || null,
+                    responsable: (c.equipoHora && responsables.get(c.equipoHora)) || null,
                     tipo: /retiro/i.test(completo) ? 'RETIRO'
                         : /gtia|garant/i.test(completo) ? 'GTIA'
                             : /\bmto\b|mantenim/i.test(completo) ? 'MTO' : 'INSTALACION',
