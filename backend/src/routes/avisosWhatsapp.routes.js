@@ -66,6 +66,40 @@ router.get('/pendientes', async (req, res) => {
  * POST /api/avisos-whatsapp/:id/resultado
  * El bot reporta si pudo publicarlo. Body: { ok: boolean, error?: string }
  */
+/**
+ * POST /api/avisos-whatsapp/reintentar
+ * Devuelve a la cola los avisos que se dieron por perdidos (estado 'error').
+ *
+ * Un aviso se rinde a los 5 intentos para no reintentar por siempre un mensaje roto. Pero si
+ * lo que falló fue WhatsApp —el 28-sep-2026 la sesión pasó 5 horas sin arrancar—, el mensaje
+ * estaba bien y lo que se perdió fue el reporte de producción que alguien sí subió.
+ *
+ * Body opcional: { horas = 24, destino }.
+ */
+router.post('/reintentar', async (req, res) => {
+    try {
+        const horas = Math.min(Number(req.body?.horas) || 24, 24 * 7);
+        const desde = new Date(Date.now() - horas * 60 * 60 * 1000);
+        const where = { estado: 'error', created_at: { [Op.gte]: desde } };
+        if (req.body?.destino) where.destino = req.body.destino;
+
+        const avisos = await AvisoWhatsApp.findAll({ where, order: [['id', 'ASC']] });
+        for (const a of avisos) await a.update({ estado: 'pendiente', intentos: 0, error: null });
+
+        console.log(`🔁 ${avisos.length} aviso(s) devueltos a la cola`);
+        res.json({
+            success: true,
+            data: {
+                reencolados: avisos.length,
+                avisos: avisos.map(a => ({ id: a.id, destino: a.destino, mensaje: a.mensaje.slice(0, 80) }))
+            }
+        });
+    } catch (error) {
+        console.error('Error al reencolar avisos:', error);
+        res.status(500).json({ success: false, message: 'Error al reencolar', error: error.message });
+    }
+});
+
 router.post('/:id/resultado', async (req, res) => {
     try {
         const aviso = await AvisoWhatsApp.findByPk(req.params.id);
