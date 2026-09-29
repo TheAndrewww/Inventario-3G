@@ -130,10 +130,30 @@ export const leerCitasCercanas = async (hoy = hoyMexico()) => {
     const mesIdx = Number(hoy.slice(5, 7)) - 1;
     const citas = [];
     for (const mes of [MESES[mesIdx], MESES[(mesIdx + 1) % 12]]) {
-        const r = await leerCalendarioMes(mes);
+        const r = await conReintento(() => leerCalendarioMes(mes), mes);
         citas.push(...(r?.data?.proyectos || []));
     }
     return citas;
+};
+
+/**
+ * Sheets falla de vez en cuando por cuota, y ahí el calendario se cae entero: la agenda
+ * contesta con la fecha del Índice y un proyecto que hoy se instala parece haberse recorrido.
+ * El 29-sep-2026 eso cerró sola la pregunta de ELENA RIVERA ("cambió su fecha en el
+ * calendario"). Un tropiezo no puede costar eso: se reintenta antes de rendirse.
+ */
+const conReintento = async (fn, etiqueta, intentos = 3) => {
+    let ultimo;
+    for (let i = 1; i <= intentos; i++) {
+        try { return await fn(); } catch (e) {
+            ultimo = e;
+            if (i < intentos) {
+                console.warn(`⏳ Calendario ${etiqueta}: ${e.message} — reintento ${i}/${intentos - 1}`);
+                await new Promise((r) => setTimeout(r, i * 2000));
+            }
+        }
+    }
+    throw ultimo;
 };
 
 /**
