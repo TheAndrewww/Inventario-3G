@@ -142,7 +142,19 @@ const getEquipoFromColor = (backgroundColor) => {
 /**
  * Leer calendario del mes actual desde Google Sheets
  */
+// Leer una pestaña del calendario cuesta caro (todo el formato de las celdas) y se pide
+// desde muchos lados a la vez: el panel de cada navegador cada 2 min, la sincronización cada
+// 5, la agenda del bot, las citas de Susana. El 29-sep-2026 eso agotó la cuota de lecturas
+// por minuto de Sheets, el calendario se cayó y la agenda contestó con las fechas del Índice
+// (una pregunta a Charly se cerró sola). Una caché de un minuto no envejece nada —el
+// calendario no cambia tan rápido— y corta las lecturas repetidas.
+const CACHE_CAL_MS = Number(process.env.CALENDARIO_CACHE_MS || 60 * 1000);
+const cacheCalendario = new Map();
+
 export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
+  const claveCache = String(mes).toUpperCase();
+  const guardado = cacheCalendario.get(claveCache);
+  if (guardado && Date.now() - guardado.t < CACHE_CAL_MS) return guardado.valor;
   try {
     const sheets = await authenticate();
 
@@ -380,11 +392,13 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
       });
     });
 
-    return {
+    const resultado = {
       success: true,
       data: calendario,
       ultimaActualizacion: new Date().toISOString()
     };
+    cacheCalendario.set(claveCache, { t: Date.now(), valor: resultado });
+    return resultado;
 
   } catch (error) {
     console.error('❌ Error al leer calendario:', error);
