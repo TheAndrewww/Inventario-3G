@@ -493,9 +493,68 @@ const ligarPorNumero = (proyectos, nombresCalendario) => {
     return res;
 };
 
-const buscarFechaInstalacion = (nombreProd, citasPorNombre, nombresCalendario, porNumero = null) => {
+/**
+ * Lo que el calendario le agrega a una cita para decir DÓNDE o DE QUÉ es el trabajo. No es
+ * parte del nombre del cliente, así que no tiene por qué estar en el nombre del proyecto:
+ * "LA TOSCANA / COCINA" sigue siendo el proyecto de LA TOSCANA.
+ */
+const PALABRAS_DE_OBRA = new Set([
+    'garantia', 'almacen', 'bodega', 'cocina', 'jardin', 'terraza', 'patio', 'alberca',
+    'oficina', 'oficinas', 'salon', 'local', 'sucursal', 'estacionamiento', 'techo', 'domo',
+    'membrana', 'membranas', 'toldo', 'toldos', 'lona', 'lonas', 'velaria', 'velarias',
+    'cubierta', 'cubiertas', 'porton', 'barandal', 'escalera', 'fachada', 'piezas', 'extra',
+    'extras', 'seccion', 'etapa', 'frente', 'area', 'zona'
+]);
+
+/** Pedazos del nombre de una cita con los que se puede reconocer a un cliente. */
+const trozosDistintivos = (nombreCita) => normalizarNombre(nombreCita)
+    .split(' ')
+    .filter(t => t.length >= 4 && !PALABRAS_DE_CITA.has(t) && !PALABRAS_DE_OBRA.has(t) && !NUMERALES.has(t));
+
+/**
+ * Ligado por TROZO DEL NOMBRE, de la cita hacia los proyectos. En el calendario la celda es
+ * chica y solo cabe un pedazo del nombre ("LA TOSCANA / COCINA" por "LA TOSCANA | RICARDO
+ * HERBERT - ALE MOTULL / ALMACÉN / MTO", "FELIX MALPICA" por "JUAN FELIX MALPICA LAGUNES"), y
+ * ese pedazo no se parece al nombre largo: la cita quedaba huérfana y el proyecto se quedaba
+ * con una cita vieja. Como en el calendario solo hay proyectos abiertos, se busca al revés.
+ *
+ * TODOS los pedazos tienen que estar en el proyecto y alguno ser largo: con un apellido suelto,
+ * "SAÚL GARCÍA" se pegaba al proyecto de "EMILIA ALEJO GARCÍA". Con dos candidatos no se
+ * adivina. Misma regla que el backend (backend/src/services/fechaInstalacion.service.js).
+ *
+ * @returns {Map<string, string[]>} clave del proyecto → nombres del calendario
+ */
+const ligarPorTrozo = (proyectos, nombresCalendario) => {
+    const reclamados = new Set();
+    for (const p of proyectos) {
+        const nombreProd = normalizarNombre(p.nombre);
+        if (!nombreProd) continue;
+        elegirNombres(nombreProd, nombresCalendario).forEach(n => reclamados.add(n));
+    }
+    const normalizados = proyectos
+        .map(p => ({ clave: clave(p), norm: normalizarNombre(p.nombre) }))
+        .filter(x => x.norm);
+
+    const res = new Map();
+    for (const n of nombresCalendario) {
+        if (reclamados.has(n)) continue;
+        const trozos = trozosDistintivos(n);
+        if (!trozos.length || !trozos.some(t => t.length >= 5)) continue;
+        const dueños = normalizados.filter(({ norm }) => trozos.every(t => norm.includes(t)));
+        if (dueños.length !== 1) continue;
+        const previas = res.get(dueños[0].clave) || [];
+        previas.push(n);
+        res.set(dueños[0].clave, previas);
+    }
+    return res;
+};
+
+const buscarFechaInstalacion = (nombreProd, citasPorNombre, nombresCalendario, porNumero = null, porTrozo = null) => {
     let nombres = elegirNombres(nombreProd, nombresCalendario);
     if (nombres.length === 0 && porNumero) nombres = porNumero;
+    // Las ligadas por trozo se SUMAN a las que ya tenía: así la cita nueva entra en el
+    // último bloque contiguo y es la que manda.
+    if (porTrozo?.length) nombres = [...new Set([...nombres, ...porTrozo])];
     if (nombres.length === 0) return null;
 
     const porFecha = new Map();
@@ -611,13 +670,17 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
     const porNumeroFuturo = ligarPorNumero(proyectos, nombresFuturos);
     const porNumeroCierre = ligarPorNumero(proyectos, nombresCierre);
 
+    const porTrozoActual = ligarPorTrozo(proyectos, nombresCalendario);
+    const porTrozoFuturo = ligarPorTrozo(proyectos, nombresFuturos);
+    const porTrozoCierre = ligarPorTrozo(proyectos, nombresCierre);
+
     return proyectos.map(p => {
         const nombreProd = normalizarNombre(p.nombre);
         if (!nombreProd) return p;
 
         // Metadata de cierre: último bloque de días que el calendario le dio a
         // este proyecto, y si esa última cita quedó marcada como FALLA.
-        const cierre = buscarFechaInstalacion(nombreProd, citasCierre, nombresCierre, porNumeroCierre.get(clave(p)));
+        const cierre = buscarFechaInstalacion(nombreProd, citasCierre, nombresCierre, porNumeroCierre.get(clave(p)), porTrozoCierre.get(clave(p)));
         const metaCierre = cierre ? {
             _fechaFinInstalacion: cierre.fechaFinInstalacionStr,
             _fallaInstalacion: cierre.falla,
@@ -634,7 +697,7 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
         //    Índice (col D). Antes, una cita posterior dejaba la fecha del Índice y
         //    el pizarrón mostraba fechas viejas y fuera de orden (sep-2026: GUERECA
         //    con cita el 2-oct salía con 4-sep y hasta arriba en Herrería/Manufactura).
-        const match = buscarFechaInstalacion(nombreProd, fechasPorNombre, nombresCalendario, porNumeroActual.get(clave(p)));
+        const match = buscarFechaInstalacion(nombreProd, fechasPorNombre, nombresCalendario, porNumeroActual.get(clave(p)), porTrozoActual.get(clave(p)));
         if (match) {
             const { fechaInstalacionStr, nombreCal } = match;
             const nuevaFechaLimite = fechaLimiteDesdeInstalacion(fechaInstalacionStr);
@@ -647,7 +710,7 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
         //    Evita que un MTO/GTIA sin fecha en la hoja (col D = "-") pero con cita
         //    real en un mes posterior quede mostrando un residuo viejo de la base.
         if ((!fechaIndice || soloCalendario) && nombresFuturos.length) {
-            const matchFut = buscarFechaInstalacion(nombreProd, fechasFuturasPorNombre, nombresFuturos, porNumeroFuturo.get(clave(p)));
+            const matchFut = buscarFechaInstalacion(nombreProd, fechasFuturasPorNombre, nombresFuturos, porNumeroFuturo.get(clave(p)), porTrozoFuturo.get(clave(p)));
             if (matchFut) {
                 const { fechaInstalacionStr, nombreCal } = matchFut;
                 const nuevaFechaLimite = fechaLimiteDesdeInstalacion(fechaInstalacionStr);
