@@ -59,6 +59,18 @@ const levenshtein = (a, b) => {
 };
 
 const PALABRAS_DE_CITA = new Set(['mto', 'gtia', 'retiro', 'reinst', 'reinstalacion', 'instalacion', 'extensivo', 'falla']);
+/**
+ * Lo que el calendario le agrega a una cita para decir DÓNDE o DE QUÉ es el trabajo. No es
+ * parte del nombre del cliente, así que no tiene por qué aparecer en el nombre del proyecto:
+ * "LA TOSCANA / COCINA" sigue siendo el proyecto de LA TOSCANA.
+ */
+const PALABRAS_DE_OBRA = new Set([
+    'garantia', 'almacen', 'bodega', 'cocina', 'jardin', 'terraza', 'patio', 'alberca',
+    'oficina', 'oficinas', 'salon', 'local', 'sucursal', 'estacionamiento', 'techo', 'domo',
+    'membrana', 'membranas', 'toldo', 'toldos', 'lona', 'lonas', 'velaria', 'velarias',
+    'cubierta', 'cubiertas', 'porton', 'barandal', 'escalera', 'fachada', 'piezas', 'extra',
+    'extras', 'seccion', 'etapa', 'frente', 'area', 'zona'
+]);
 const NUMERALES = new Set(['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
 const numeralesDe = (n) => n.split(' ').filter(t => NUMERALES.has(t)).sort().join(' ');
 const nombreBase = (n) => n.split(' ').filter(t => t && !PALABRAS_DE_CITA.has(t)).join(' ');
@@ -114,11 +126,26 @@ const buscarFechaInstalacion = (nombreProyecto, mapa) => {
         }
     }
     if (nombres.length === 0) return null;
-    const fechas = new Set();
-    for (const n of nombres) for (const c of mapa[n]) if (!c.retiro) fechas.add(c.fecha);
-    const fecha = inicioUltimoBloque([...fechas].sort());
-    return fecha ? { fecha, nombres } : null;
+    return { nombres, fechas: fechasDe(nombres, mapa) };
 };
+
+/** Fechas de instalación de esas citas (los RETIROS no son entrega). */
+const fechasDe = (nombres, mapa) => {
+    const fechas = new Set();
+    for (const n of nombres) for (const c of mapa[n] || []) if (!c.retiro) fechas.add(c.fecha);
+    return fechas;
+};
+
+/**
+ * Pedazos del nombre de una cita con los que se puede reconocer a un cliente. En el
+ * calendario la celda es chica y el nombre completo no cabe, así que escriben un trozo:
+ * "FELIX MALPICA" por "JUAN FELIX MALPICA LAGUNES", "LA TOSCANA" por
+ * "LA TOSCANA | RICARDO HERBERT - ALE MOTULL / ALMACÉN". Se ignoran las palabras de la cita
+ * y las cortas, que no distinguen a nadie ("LA", "DE", "MTO").
+ */
+const trozosDistintivos = (nombreCita) => normalizarNombre(nombreCita)
+    .split(' ')
+    .filter(t => t.length >= 4 && !PALABRAS_DE_CITA.has(t) && !PALABRAS_DE_OBRA.has(t) && !NUMERALES.has(t));
 
 // ---------- API ----------
 
@@ -164,11 +191,11 @@ export const resolverFechasInstalacion = (proyectos, citas) => {
     const mapa = citasPorNombre(citas);
 
     // 1) Cruce normal, el mismo del dashboard.
-    const citaDe = new Map();
+    const fechasDeProyecto = new Map();   // id → Set(fechas)
     const reclamados = new Set();
     for (const p of proyectos) {
         const r = buscarFechaInstalacion(p.nombre, mapa);
-        if (r) { citaDe.set(p.id, r.fecha); r.nombres.forEach(n => reclamados.add(n)); }
+        if (r) { fechasDeProyecto.set(p.id, r.fechas); r.nombres.forEach(n => reclamados.add(n)); }
     }
 
     // 2) Respaldo por número. El cruce normal nunca liga "X / SECCIÓN 3" con "X" (el número
@@ -179,7 +206,7 @@ export const resolverFechasInstalacion = (proyectos, citas) => {
     const libres = Object.keys(mapa).filter(n => !reclamados.has(n) && !numeralesDe(n));
     const candidatos = new Map();
     for (const p of proyectos) {
-        if (citaDe.has(p.id)) continue;
+        if (fechasDeProyecto.has(p.id)) continue;
         const prod = normalizarNombre(p.nombre);
         if (!numeralesDe(prod)) continue;
         const prodSinNumero = prod.split(' ').filter(t => !NUMERALES.has(t)).join(' ');
@@ -190,9 +217,40 @@ export const resolverFechasInstalacion = (proyectos, citas) => {
         }
     }
     for (const [n, ids] of candidatos) {
-        if (ids.length !== 1 || citaDe.has(ids[0])) continue;
-        const fecha = inicioUltimoBloque(mapa[n].filter(c => !c.retiro).map(c => c.fecha).sort());
-        if (fecha) citaDe.set(ids[0], fecha);
+        if (ids.length !== 1 || fechasDeProyecto.has(ids[0])) continue;
+        fechasDeProyecto.set(ids[0], fechasDe([n], mapa));
+        reclamados.add(n);
+    }
+
+    // 3) Respaldo por TROZO DEL NOMBRE, de la cita hacia los proyectos. En el calendario solo
+    //    cabe un pedazo del nombre ("LA TOSCANA / MTO" por "LA TOSCANA | RICARDO HERBERT -
+    //    ALE MOTULL / ALMACÉN / MTO"), y ese pedazo corto no se parece al nombre largo: la
+    //    cita del 1-oct quedaba huérfana y el proyecto se quedaba con una cita de septiembre.
+    //    Como en el calendario solo hay proyectos ABIERTOS, se busca al revés: si todos los
+    //    trozos distintivos de la cita están en UN SOLO proyecto abierto, es de ese. Con dos
+    //    candidatos no se adivina: mejor sin fecha que avisarle al proyecto equivocado.
+    const nombresProyecto = proyectos.map(p => ({ id: p.id, norm: normalizarNombre(p.nombre) }));
+    for (const n of Object.keys(mapa)) {
+        if (reclamados.has(n)) continue;
+        const trozos = trozosDistintivos(n);
+        // TODOS los trozos tienen que estar en el proyecto, y alguno tiene que ser largo: con
+        // uno solo y corto, "SAÚL GARCÍA" se pegaba al proyecto de "EMILIA ALEJO GARCÍA" por
+        // el apellido. Si la cita trae un nombre que el proyecto no tiene, no es ese proyecto.
+        if (!trozos.length || !trozos.some(t => t.length >= 5)) continue;
+        const dueños = nombresProyecto.filter(({ norm }) => trozos.every(t => norm.includes(t)));
+        if (dueños.length !== 1) continue;
+        const id = dueños[0].id;
+        // Se SUMAN a las que ya tenía: así la cita nueva entra en el último bloque contiguo.
+        const previas = fechasDeProyecto.get(id) || new Set();
+        for (const f of fechasDe([n], mapa)) previas.add(f);
+        fechasDeProyecto.set(id, previas);
+        reclamados.add(n);
+    }
+
+    const citaDe = new Map();
+    for (const [id, fechas] of fechasDeProyecto) {
+        const fecha = inicioUltimoBloque([...fechas].sort());
+        if (fecha) citaDe.set(id, fecha);
     }
 
     const res = new Map();
