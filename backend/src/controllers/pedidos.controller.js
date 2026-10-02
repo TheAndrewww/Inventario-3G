@@ -22,7 +22,7 @@ const SEPARADORES_PROYECTO = [' / ', ' /', '/ ', '/', ' - ', ' -', '- ', '-'];
 
 // True si dos nombres de proyecto representan el mismo (match bidireccional con sufijos).
 // p.ej.: "THELMA PADILLA / MTO" ≈ "THELMA PADILLA", y al revés también.
-function mismosProyectos(a, b) {
+export function mismosProyectos(a, b) {
   const an = normalizarNombreProyecto(a);
   const bn = normalizarNombreProyecto(b);
   if (!an || !bn) return false;

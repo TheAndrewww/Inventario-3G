@@ -12,7 +12,7 @@ import { obtenerDistribucionEquipos } from '../services/googleSheets.service.js'
 import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor, ProduccionProyecto, SolicitudCompra, Movimiento, DetalleMovimiento, Equipo } from '../models/index.js';
 import { urlSolicitudes } from '../services/barridoCompras.service.js';
 import { crearNotificacion } from '../controllers/notificaciones.controller.js';
-import { getNombresProyectosAbiertos, pedidoEsDeProyectoAbierto } from '../controllers/pedidos.controller.js';
+import { getNombresProyectosAbiertos, pedidoEsDeProyectoAbierto, mismosProyectos } from '../controllers/pedidos.controller.js';
 import { enviarEmailEstadoOrden } from '../services/email.service.js';
 
 const router = express.Router();
@@ -535,22 +535,20 @@ router.get('/produccion/citas', async (req, res) => {
 });
 
 /**
- * GET /api/avisos-whatsapp/produccion/tickets-abiertos
+ * GET /api/avisos-whatsapp/produccion/tickets-abiertos?proyectos=A|B
  *
- * Los tickets que almacén (Charly) no ha cerrado: los mismos que salen en Tickets
- * Pendientes (pendiente/aprobado, solo de proyectos abiertos), creados ANTES de hoy —
- * los del día todavía se están surtiendo. El bot contable los suma al aviso de las 16:00.
+ * Los tickets que almacén (Charly) no ha cerrado (pendiente/aprobado, de proyectos
+ * abiertos). Con `proyectos` (separados por |) solo los de esos proyectos: el bot
+ * contable pregunta a las 16:00 por los que se instalan mañana.
  *
  * Solo lectura: no cambia nada.
  */
 router.get('/produccion/tickets-abiertos', async (req, res) => {
     try {
-        // "Hoy" en hora de México: el servidor corre en UTC.
-        const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
-        const inicioHoy = new Date(`${hoyMx}T00:00:00-06:00`);
+        const filtro = String(req.query.proyectos || '').split('|').map(x => x.trim()).filter(Boolean);
 
         const pedidos = await Movimiento.findAll({
-            where: { tipo: 'pedido', estado: { [Op.in]: ['pendiente', 'aprobado'] }, fecha_hora: { [Op.lt]: inicioHoy } },
+            where: { tipo: 'pedido', estado: { [Op.in]: ['pendiente', 'aprobado'] } },
             attributes: ['id', 'ticket_id', 'proyecto', 'estado', 'fecha_hora'],
             include: [
                 { model: Equipo, as: 'equipo', attributes: ['nombre'] },
@@ -568,12 +566,14 @@ router.get('/produccion/tickets-abiertos', async (req, res) => {
                 return {
                     ticket_id: p.ticket_id,
                     proyecto: p.proyecto || p.equipo?.nombre || 'Sin proyecto',
+                    // El nombre del proyecto de la agenda con el que se cruzó (si se pidió filtro)
+                    proyecto_agenda: filtro.find(f => p.proyecto && mismosProyectos(p.proyecto, f)) || null,
                     estado: p.estado,
                     fecha: new Date(p.fecha_hora).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }),
-                    dias: Math.floor((Date.now() - new Date(p.fecha_hora)) / 86400000),
                     progreso: total ? Math.round((surtidos / total) * 100) : 0
                 };
-            });
+            })
+            .filter(t => !filtro.length || t.proyecto_agenda);
 
         res.json({ success: true, data: { total: tickets.length, tickets } });
     } catch (error) {
