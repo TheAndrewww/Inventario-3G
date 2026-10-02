@@ -72,7 +72,13 @@ export const useProduccionData = ({
                     const MESES_NOMBRES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
                     const mesIdx0 = mexicoTime.getMonth();
                     const prevResp = await obtenerCalendarioMesPublico(MESES_NOMBRES[(mesIdx0 + 11) % 12]);
-                    citasPasadas = (prevResp?.data?.proyectos || []).filter(cp => cp.mesIndex !== mesIdx0);
+                    const proysPrev = prevResp?.data?.proyectos || [];
+                    citasPasadas = proysPrev.filter(cp => cp.mesIndex !== mesIdx0);
+                    // La semana que cruza de mes también puede vivir en la pestaña del mes
+                    // ANTERIOR (27-sep → 3-oct está en SEPTIEMBRE): esas citas son del mes
+                    // actual y cuentan como cualquier otra.
+                    const colaPrevia = proysPrev.filter(cp => cp.mesIndex === mesIdx0);
+                    if (colaPrevia.length) citas = citas.concat(colaPrevia);
                 } catch (e) {
                     console.warn('⚠️ No se pudo cargar el calendario del mes anterior:', e.message);
                 }

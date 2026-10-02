@@ -9,9 +9,12 @@
  * nunca se enteró.
  *
  * Aquí vive la MISMA regla que el dashboard, para que los dos digan lo mismo:
- *  · Cita del calendario ANTERIOR o igual a la col D → manda el calendario.
- *  · Cita POSTERIOR → se respeta la col D (salvo MTO, que se rigen solo por el calendario).
- *  · Col D vacía → manda la cita, aunque sea del mes siguiente.
+ *  · Cita del calendario en el MES EN CURSO → manda el calendario, siempre (regla del
+ *    usuario del 23-sep-2026, la misma del dashboard). Antes una cita posterior a la col D
+ *    se ignoraba: JOSE LUIS GUERECA (col D 21-sep, cita 2-oct) se quedó con el 21-sep y el
+ *    aviso de las 16:00 del 1-oct no lo vio.
+ *  · Cita de un mes posterior → solo si la col D va después o está vacía (o es MTO, que se
+ *    rige solo por el calendario).
  *  · Varios días seguidos = una sola instalación: cuenta el primer día del último bloque.
  *  · Los RETIROS no son entrega. Dos nombres con distinto número (II, 2) no se cruzan.
  */
@@ -150,8 +153,10 @@ const trozosDistintivos = (nombreCita) => normalizarNombre(nombreCita)
 // ---------- API ----------
 
 /**
- * Citas del calendario del mes en curso y del siguiente (la última semana de un mes vive en
- * la pestaña del siguiente). Cada cita ya trae su fecha real resuelta por leerCalendarioMes.
+ * Citas del calendario del mes anterior, el en curso y el siguiente. La semana que cruza de
+ * mes puede vivir en cualquiera de las dos pestañas: 27-sep → 3-oct está en SEPTIEMBRE, así
+ * que el 1-oct, leyendo solo OCTUBRE y NOVIEMBRE, la cita del 2-oct de JOSE LUIS GUERECA no
+ * existía. Cada cita ya trae su fecha real resuelta por leerCalendarioMes.
  */
 export const leerCitasCercanas = async (hoy = hoyMexico()) => {
     const mesIdx = Number(hoy.slice(5, 7)) - 1;
@@ -160,6 +165,11 @@ export const leerCitasCercanas = async (hoy = hoyMexico()) => {
         const r = await conReintento(() => leerCalendarioMes(mes), mes);
         citas.push(...(r?.data?.proyectos || []));
     }
+    // Del mes anterior solo la cola que ya es de este mes: sus citas viejas cambiarían la
+    // fecha de proyectos que se quedaron abiertos y dispararían avisos de "cambió".
+    const anterior = MESES[(mesIdx + 11) % 12];
+    const r = await conReintento(() => leerCalendarioMes(anterior), anterior);
+    citas.push(...(r?.data?.proyectos || []).filter(c => c.mesIndex === mesIdx));
     return citas;
 };
 
@@ -187,7 +197,8 @@ const conReintento = async (fn, etiqueta, intentos = 3) => {
  * Fecha de instalación que manda para cada proyecto, con la regla del dashboard.
  * @returns {Map<number, {fecha: string|null, fuente: 'calendario'|'indice'}>}
  */
-export const resolverFechasInstalacion = (proyectos, citas) => {
+export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico()) => {
+    const mesEnCurso = hoy.slice(0, 7);
     const mapa = citasPorNombre(citas);
 
     // 1) Cruce normal, el mismo del dashboard.
@@ -258,7 +269,7 @@ export const resolverFechasInstalacion = (proyectos, citas) => {
         const indice = p.fecha_limite || null;
         const cita = citaDe.get(p.id) || null;
         const soloCalendario = String(p.tipo_proyecto || '').toUpperCase() === 'MTO';
-        if (cita && (soloCalendario || !indice || cita <= indice)) {
+        if (cita && (soloCalendario || !indice || cita <= indice || cita.slice(0, 7) <= mesEnCurso)) {
             res.set(p.id, { fecha: cita, fuente: 'calendario' });
         } else {
             res.set(p.id, { fecha: indice, fuente: 'indice' });
