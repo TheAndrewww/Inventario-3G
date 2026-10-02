@@ -2817,3 +2817,110 @@ export const uploadTicketToDrive = async (req, res) => {
     });
   }
 };
+
+// ───────────────────────────────────────────────────────────────────────────
+// Borrón y cuenta nueva de tickets abiertos (solo admin).
+// Anula los tickets que siguen abiertos SIN mover el inventario: el stock de
+// los SKUs se queda como está. Solo se cancelan las solicitudes de compra que
+// aún no entran a una orden (las que ya están en orden o recibidas no se tocan).
+// ───────────────────────────────────────────────────────────────────────────
+const ESTADOS_TICKET_ABIERTO = ['pendiente', 'pendiente_aprobacion', 'aprobado', 'listo_para_entrega'];
+
+const buscarTicketsAbiertos = (where = {}, transaction = undefined) => Movimiento.findAll({
+  where: { tipo: 'pedido', estado: { [Op.in]: ESTADOS_TICKET_ABIERTO }, ...where },
+  attributes: ['id', 'ticket_id', 'proyecto', 'estado', 'fecha_hora', 'observaciones'],
+  include: [
+    { model: Usuario, as: 'usuario', attributes: ['id', 'nombre'] },
+    { model: Equipo, as: 'equipo', attributes: ['id', 'nombre'] },
+    { model: SolicitudCompra, as: 'solicitudes_compra', attributes: ['id', 'estado'], required: false }
+  ],
+  order: [['fecha_hora', 'ASC']],
+  transaction
+});
+
+/**
+ * GET /api/pedidos/anulacion-masiva/preview
+ * Lista los tickets abiertos que se anularían.
+ */
+export const previewAnulacionMasiva = async (req, res) => {
+  try {
+    const tickets = await buscarTicketsAbiertos();
+    res.json({
+      success: true,
+      data: {
+        total: tickets.length,
+        solicitudes_a_cancelar: tickets.reduce((n, t) =>
+          n + (t.solicitudes_compra || []).filter(s => s.estado === 'pendiente').length, 0),
+        tickets: tickets.map(t => ({
+          id: t.id,
+          ticket_id: t.ticket_id,
+          proyecto: t.proyecto || t.equipo?.nombre || 'Sin proyecto',
+          estado: t.estado,
+          fecha_hora: t.fecha_hora,
+          creado_por: t.usuario?.nombre || null
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error en preview de anulación masiva:', error);
+    res.status(500).json({ success: false, message: 'Error al obtener los tickets abiertos', error: error.message });
+  }
+};
+
+/**
+ * POST /api/pedidos/anulacion-masiva  { ids: [..] }
+ * Anula exactamente los tickets confirmados en la vista previa (si alguno ya
+ * cambió de estado, se salta). No toca stock_actual de ningún artículo.
+ */
+export const ejecutarAnulacionMasiva = async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Boolean) : [];
+  if (ids.length === 0) {
+    return res.status(400).json({ success: false, message: 'No se indicaron tickets a anular' });
+  }
+
+  const transaction = await sequelize.transaction();
+  try {
+    const usuario = req.usuario;
+    const ahora = new Date();
+    const motivo = 'Borrón y cuenta nueva: ticket anterior anulado sin mover inventario';
+    const tickets = await buscarTicketsAbiertos({ id: { [Op.in]: ids } }, transaction);
+
+    let solicitudesCanceladas = 0;
+    for (const t of tickets) {
+      const pendientes = (t.solicitudes_compra || []).filter(s => s.estado === 'pendiente').map(s => s.id);
+      if (pendientes.length > 0) {
+        const [n] = await SolicitudCompra.update(
+          { estado: 'cancelada', observaciones: `Cancelada por anulación masiva del ticket ${t.ticket_id} (${usuario.nombre}).` },
+          { where: { id: { [Op.in]: pendientes }, estado: 'pendiente' }, transaction }
+        );
+        solicitudesCanceladas += n;
+      }
+
+      await Movimiento.update({
+        estado: 'cancelado',
+        observaciones: `${t.observaciones || ''}\n\n[ANULADO por ${usuario.nombre} - ${ahora.toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}]\nMotivo: ${motivo}\n- Stock NO revertido (el inventario no se movió)`.trim(),
+        aprobado_por_id: usuario.id,
+        fecha_aprobacion: ahora,
+        motivo_rechazo: motivo
+      }, { where: { id: t.id }, transaction });
+    }
+
+    await transaction.commit();
+    console.log(`🧹 [Anulación masiva] ${usuario.nombre} anuló ${tickets.length} ticket(s) sin mover stock; ${solicitudesCanceladas} solicitud(es) de compra canceladas`);
+
+    res.json({
+      success: true,
+      message: `${tickets.length} ticket(s) anulados. El inventario no se movió.`,
+      data: {
+        anulados: tickets.length,
+        omitidos: ids.length - tickets.length,
+        solicitudes_canceladas: solicitudesCanceladas,
+        ticket_ids: tickets.map(t => t.ticket_id)
+      }
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error en anulación masiva:', error);
+    res.status(500).json({ success: false, message: 'Error al anular los tickets', error: error.message });
+  }
+};

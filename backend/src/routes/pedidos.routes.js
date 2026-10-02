@@ -20,7 +20,9 @@ import {
   rechazarPedidoListoParaEntrega,
   listarSupervisores,
   marcarPedidoEntregadoDirecto,
-  uploadTicketToDrive
+  uploadTicketToDrive,
+  previewAnulacionMasiva,
+  ejecutarAnulacionMasiva
 } from '../controllers/pedidos.controller.js';
 import {
   verificarToken,
@@ -77,6 +79,30 @@ router.get(
   verificarToken,
   accesoInventario, // almacen, supervisor, admin
   listarPedidosPendientes
+);
+
+/**
+ * @route   GET /api/pedidos/anulacion-masiva/preview
+ * @desc    Tickets abiertos que se anularían (borrón y cuenta nueva)
+ * @access  Administrador
+ */
+router.get(
+  '/anulacion-masiva/preview',
+  verificarToken,
+  verificarRol('administrador'),
+  previewAnulacionMasiva
+);
+
+/**
+ * @route   POST /api/pedidos/anulacion-masiva
+ * @desc    Anula los tickets confirmados SIN mover el inventario
+ * @access  Administrador
+ */
+router.post(
+  '/anulacion-masiva',
+  verificarToken,
+  verificarRol('administrador'),
+  ejecutarAnulacionMasiva
 );
 
 /**

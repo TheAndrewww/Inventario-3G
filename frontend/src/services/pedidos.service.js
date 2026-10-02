@@ -18,6 +18,19 @@ const pedidosService = {
   },
 
   /**
+   * Anulación masiva (admin): vista previa y ejecución. No mueve inventario.
+   */
+  previewAnulacionMasiva: async () => {
+    const response = await api.get('/pedidos/anulacion-masiva/preview');
+    return response.data;
+  },
+
+  ejecutarAnulacionMasiva: async (ids) => {
+    const response = await api.post('/pedidos/anulacion-masiva', { ids });
+    return response.data;
+  },
+
+  /**
    * Listar pedidos pendientes
    */
   listarPendientes: async () => {

@@ -28,6 +28,39 @@ const PedidosPendientesPage = () => {
   const [procesando, setProcesando] = useState(false);
   const [editandoCantidad, setEditandoCantidad] = useState(null);
   const [eliminandoId, setEliminandoId] = useState(null);
+  // Borrón y cuenta nueva (admin): { total, solicitudes_a_cancelar, tickets } o null
+  const [anulacionMasiva, setAnulacionMasiva] = useState(null);
+  const [anulandoTodo, setAnulandoTodo] = useState(false);
+
+  const abrirAnulacionMasiva = async () => {
+    try {
+      setAnulandoTodo(true);
+      const res = await pedidosService.previewAnulacionMasiva();
+      if (!res.data?.total) {
+        toast('No hay tickets abiertos que anular');
+        return;
+      }
+      setAnulacionMasiva(res.data);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Error al obtener los tickets abiertos');
+    } finally {
+      setAnulandoTodo(false);
+    }
+  };
+
+  const confirmarAnulacionMasiva = async () => {
+    try {
+      setAnulandoTodo(true);
+      const res = await pedidosService.ejecutarAnulacionMasiva(anulacionMasiva.tickets.map(t => t.id));
+      toast.success(res.message || 'Tickets anulados');
+      setAnulacionMasiva(null);
+      await cargarDatos();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Error al anular los tickets');
+    } finally {
+      setAnulandoTodo(false);
+    }
+  };
 
   const handleEliminarTicket = async (pedido, e) => {
     if (e) e.stopPropagation();
@@ -220,9 +253,21 @@ const PedidosPendientesPage = () => {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Tickets Pendientes</h1>
-        <p className="text-gray-500 mt-1">Gestiona y prepara los tickets de materiales</p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Tickets Pendientes</h1>
+          <p className="text-gray-500 mt-1">Gestiona y prepara los tickets de materiales</p>
+        </div>
+        {esAdmin && (
+          <button
+            onClick={abrirAnulacionMasiva}
+            disabled={anulandoTodo}
+            className="px-3 py-2 text-sm font-medium text-red-700 border border-red-300 rounded-lg hover:bg-red-50 disabled:opacity-50"
+            title="Anula todos los tickets abiertos sin mover el inventario"
+          >
+            Anular tickets anteriores
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -627,6 +672,56 @@ const PedidosPendientesPage = () => {
               </div>
             )}
 
+          </div>
+        )}
+      </Modal>
+
+      {/* Borrón y cuenta nueva: confirma la lista exacta antes de anular */}
+      <Modal
+        isOpen={!!anulacionMasiva}
+        onClose={() => !anulandoTodo && setAnulacionMasiva(null)}
+        title="Anular tickets anteriores"
+        size="lg"
+      >
+        {anulacionMasiva && (
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-900">
+              Se anularán <strong>{anulacionMasiva.total}</strong> ticket(s) abiertos.
+              {' '}<strong>El inventario NO se mueve</strong>: el stock de los SKUs se queda como está.
+              {anulacionMasiva.solicitudes_a_cancelar > 0 && (
+                <> También se cancelan <strong>{anulacionMasiva.solicitudes_a_cancelar}</strong> solicitud(es) de compra de estos tickets que aún no entraban a una orden.</>
+              )}
+              {' '}No se puede deshacer.
+            </div>
+            <div className="max-h-80 overflow-y-auto border rounded-lg divide-y">
+              {anulacionMasiva.tickets.map(t => (
+                <div key={t.id} className="px-3 py-2 text-sm flex justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-gray-900 truncate">{t.proyecto}</div>
+                    <div className="text-xs text-gray-500">{t.ticket_id}{t.creado_por ? ` · ${t.creado_por}` : ''}</div>
+                  </div>
+                  <div className="text-xs text-gray-500 text-right flex-shrink-0">
+                    {new Date(t.fecha_hora).toLocaleDateString('es-MX')}<br />{t.estado}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setAnulacionMasiva(null)}
+                disabled={anulandoTodo}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarAnulacionMasiva}
+                disabled={anulandoTodo}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-700 text-white hover:bg-red-800 disabled:opacity-50"
+              >
+                {anulandoTodo ? 'Anulando…' : `Anular ${anulacionMasiva.total} ticket(s)`}
+              </button>
+            </div>
           </div>
         )}
       </Modal>
