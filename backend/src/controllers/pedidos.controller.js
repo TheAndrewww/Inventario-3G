@@ -33,19 +33,33 @@ function mismosProyectos(a, b) {
   return false;
 }
 
-// Devuelve un array con los nombres (originales) de ProduccionProyecto cuya
-// etapa_actual = 'completado'. El consumidor compara con `mismosProyectos`.
-async function getNombresProyectosCerrados() {
+// Áreas fijas que se eligen como "proyecto" al crear un ticket: nunca cierran.
+const AREAS_FIJAS = ['manufactura', 'herreria'];
+
+// Nombres de los proyectos ABIERTOS de producción: activos (siguen en el sheet),
+// sin cerrar (etapa_actual != 'completado') y no cancelados.
+async function getNombresProyectosAbiertos() {
   const proyectos = await ProduccionProyecto.findAll({
-    where: { etapa_actual: 'completado' },
+    where: {
+      activo: true,
+      etapa_actual: { [Op.ne]: 'completado' },
+      [Op.or]: [
+        { tipo_proyecto: null },
+        { tipo_proyecto: { [Op.notILike]: 'CANCELADO%' } }
+      ]
+    },
     attributes: ['nombre']
   });
   return proyectos.map(p => p.nombre).filter(Boolean);
 }
 
-function pedidoEsDeProyectoCerrado(pedidoProyecto, nombresCerrados) {
-  if (!pedidoProyecto) return false;
-  return nombresCerrados.some(n => mismosProyectos(pedidoProyecto, n));
+// Un ticket de proyecto solo se muestra mientras su proyecto siga abierto; al
+// cerrarse (completado, cancelado o dado de baja del sheet) desaparece.
+// Los tickets sin proyecto (de equipo/ubicación) y las áreas fijas siempre se ven.
+function pedidoEsDeProyectoAbierto(pedidoProyecto, nombresAbiertos) {
+  if (!pedidoProyecto) return true;
+  if (AREAS_FIJAS.includes(normalizarNombreProyecto(pedidoProyecto))) return true;
+  return nombresAbiertos.some(n => mismosProyectos(pedidoProyecto, n));
 }
 
 /**
@@ -738,9 +752,9 @@ export const listarPedidos = async (req, res) => {
       offset
     });
 
-    // Filtrar tickets cuyo proyecto está cerrado (etapa_actual='completado')
-    const nombresCerrados = await getNombresProyectosCerrados();
-    const pedidosVisibles = pedidos.filter(p => !pedidoEsDeProyectoCerrado(p.proyecto, nombresCerrados));
+    // Solo tickets de proyectos abiertos: cerrado/cancelado/dado de baja = desaparece
+    const nombresAbiertos = await getNombresProyectosAbiertos();
+    const pedidosVisibles = pedidos.filter(p => pedidoEsDeProyectoAbierto(p.proyecto, nombresAbiertos));
 
     // Calcular progreso de dispersión para cada pedido
     const pedidosConProgreso = pedidosVisibles.map(pedido => {
@@ -985,9 +999,9 @@ export const listarPedidosPendientes = async (req, res) => {
       order: [['fecha_hora', 'ASC']] // Más antiguos primero
     });
 
-    // Filtrar tickets cuyo proyecto está cerrado (etapa_actual='completado')
-    const nombresCerrados = await getNombresProyectosCerrados();
-    const pedidosVisibles = pedidos.filter(p => !pedidoEsDeProyectoCerrado(p.proyecto, nombresCerrados));
+    // Solo tickets de proyectos abiertos: cerrado/cancelado/dado de baja = desaparece
+    const nombresAbiertos = await getNombresProyectosAbiertos();
+    const pedidosVisibles = pedidos.filter(p => pedidoEsDeProyectoAbierto(p.proyecto, nombresAbiertos));
 
     // Calcular progreso para cada pedido
     const pedidosConProgreso = pedidosVisibles.map(pedido => {
