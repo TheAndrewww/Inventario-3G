@@ -88,7 +88,14 @@ const CalendarioPage = () => {
       setCalendario(calendarioData.data);
       setCalendarioSiguienteMes(calendarioSiguienteData.data);
       setCalendarioMesAnterior(calendarioAnteriorData.data);
-      setDistribucionEquipos(distribucionData.data);
+      // Al arrancar el mes la pestaña aún no trae la tabla de equipos: se usa la
+      // del mes anterior, que sigue vigente hasta que la capturen.
+      let distribucion = distribucionData.data;
+      if (!distribucion?.equipos?.length) {
+        const anterior = await obtenerDistribucionEquipos(mesAnterior).catch(() => null);
+        if (anterior?.data?.equipos?.length) distribucion = anterior.data;
+      }
+      setDistribucionEquipos(distribucion);
       setUltimaActualizacion(new Date());
 
       if (mostrarToast) {
@@ -351,7 +358,8 @@ const CalendarioPage = () => {
           : { zoom: escalaNormal / 100 }}
       >
         {/* Distribución de Equipos y Reloj */}
-        {distribucionEquipos && distribucionEquipos.equipos && distribucionEquipos.equipos.length > 0 && (
+        {/* Logo, fecha y equipos se muestran siempre, aunque el mes aún no tenga distribución */}
+        {(
           <div className={`${modoPantallaCompleta ? 'mb-2 grid-cols-6 gap-2' : 'mb-4 grid-cols-1 lg:grid-cols-3 gap-4'} grid`}>
           {modoPantallaCompleta ? (
             <>
@@ -445,7 +453,7 @@ const CalendarioPage = () => {
                     className="flex flex-wrap content-start"
                     style={{ gap: `calc(0.25rem * var(--escala, 1))` }}
                   >
-                    {distribucionEquipos.equipos.map((equipo, index) => {
+                    {(distribucionEquipos?.equipos || []).map((equipo, index) => {
                       const colores = COLORES_EQUIPO[equipo.tipoEquipo];
 
                       const estiloPersonalizado = !colores && equipo.color ? {
@@ -516,7 +524,7 @@ const CalendarioPage = () => {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {distribucionEquipos.equipos.map((equipo, index) => {
+                  {(distribucionEquipos?.equipos || []).map((equipo, index) => {
                     const colores = COLORES_EQUIPO[equipo.tipoEquipo];
 
                     const estiloPersonalizado = !colores && equipo.color ? {
