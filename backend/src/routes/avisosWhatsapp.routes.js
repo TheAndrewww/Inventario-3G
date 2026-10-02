@@ -9,9 +9,10 @@ import express from 'express';
 import { Op } from 'sequelize';
 import { proyectosAbiertos, resolverFechasInstalacion, leerCitasCercanas, resumenProduccion } from '../services/fechaInstalacion.service.js';
 import { obtenerDistribucionEquipos } from '../services/googleSheets.service.js';
-import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor, ProduccionProyecto, SolicitudCompra } from '../models/index.js';
+import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor, ProduccionProyecto, SolicitudCompra, Movimiento, DetalleMovimiento, Equipo } from '../models/index.js';
 import { urlSolicitudes } from '../services/barridoCompras.service.js';
 import { crearNotificacion } from '../controllers/notificaciones.controller.js';
+import { getNombresProyectosAbiertos, pedidoEsDeProyectoAbierto } from '../controllers/pedidos.controller.js';
 import { enviarEmailEstadoOrden } from '../services/email.service.js';
 
 const router = express.Router();
@@ -530,6 +531,54 @@ router.get('/produccion/citas', async (req, res) => {
     } catch (error) {
         console.error('Error al listar las citas del día:', error);
         res.status(500).json({ success: false, message: 'Error al listar las citas', error: error.message });
+    }
+});
+
+/**
+ * GET /api/avisos-whatsapp/produccion/tickets-abiertos
+ *
+ * Los tickets que almacén (Charly) no ha cerrado: los mismos que salen en Tickets
+ * Pendientes (pendiente/aprobado, solo de proyectos abiertos), creados ANTES de hoy —
+ * los del día todavía se están surtiendo. El bot contable los suma al aviso de las 16:00.
+ *
+ * Solo lectura: no cambia nada.
+ */
+router.get('/produccion/tickets-abiertos', async (req, res) => {
+    try {
+        // "Hoy" en hora de México: el servidor corre en UTC.
+        const hoyMx = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+        const inicioHoy = new Date(`${hoyMx}T00:00:00-06:00`);
+
+        const pedidos = await Movimiento.findAll({
+            where: { tipo: 'pedido', estado: { [Op.in]: ['pendiente', 'aprobado'] }, fecha_hora: { [Op.lt]: inicioHoy } },
+            attributes: ['id', 'ticket_id', 'proyecto', 'estado', 'fecha_hora'],
+            include: [
+                { model: Equipo, as: 'equipo', attributes: ['nombre'] },
+                { model: DetalleMovimiento, as: 'detalles', attributes: ['dispersado'] }
+            ],
+            order: [['fecha_hora', 'ASC']]
+        });
+
+        const nombresAbiertos = await getNombresProyectosAbiertos();
+        const tickets = pedidos
+            .filter(p => pedidoEsDeProyectoAbierto(p.proyecto, nombresAbiertos))
+            .map(p => {
+                const total = p.detalles?.length || 0;
+                const surtidos = (p.detalles || []).filter(d => d.dispersado).length;
+                return {
+                    ticket_id: p.ticket_id,
+                    proyecto: p.proyecto || p.equipo?.nombre || 'Sin proyecto',
+                    estado: p.estado,
+                    fecha: new Date(p.fecha_hora).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }),
+                    dias: Math.floor((Date.now() - new Date(p.fecha_hora)) / 86400000),
+                    progreso: total ? Math.round((surtidos / total) * 100) : 0
+                };
+            });
+
+        res.json({ success: true, data: { total: tickets.length, tickets } });
+    } catch (error) {
+        console.error('Error al listar tickets abiertos para el aviso:', error);
+        res.status(500).json({ success: false, message: 'Error al listar los tickets abiertos', error: error.message });
     }
 });
 

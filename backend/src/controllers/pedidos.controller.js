@@ -38,7 +38,7 @@ const AREAS_FIJAS = ['manufactura', 'herreria'];
 
 // Nombres de los proyectos ABIERTOS de producción: activos (siguen en el sheet),
 // sin cerrar (etapa_actual != 'completado') y no cancelados.
-async function getNombresProyectosAbiertos() {
+export async function getNombresProyectosAbiertos() {
   const proyectos = await ProduccionProyecto.findAll({
     where: {
       activo: true,
@@ -56,7 +56,7 @@ async function getNombresProyectosAbiertos() {
 // Un ticket de proyecto solo se muestra mientras su proyecto siga abierto; al
 // cerrarse (completado, cancelado o dado de baja del sheet) desaparece.
 // Los tickets sin proyecto (de equipo/ubicación) y las áreas fijas siempre se ven.
-function pedidoEsDeProyectoAbierto(pedidoProyecto, nombresAbiertos) {
+export function pedidoEsDeProyectoAbierto(pedidoProyecto, nombresAbiertos) {
   if (!pedidoProyecto) return true;
   if (AREAS_FIJAS.includes(normalizarNombreProyecto(pedidoProyecto))) return true;
   return nombresAbiertos.some(n => mismosProyectos(pedidoProyecto, n));
