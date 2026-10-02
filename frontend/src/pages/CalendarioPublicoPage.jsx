@@ -42,6 +42,7 @@ const CalendarioPublicoPage = () => {
   const [mesActual, setMesActual] = useState(MESES[new Date().getMonth()]);
   const [calendario, setCalendario] = useState(null);
   const [calendarioSiguienteMes, setCalendarioSiguienteMes] = useState(null);
+  const [calendarioMesAnterior, setCalendarioMesAnterior] = useState(null);
   const [distribucionEquipos, setDistribucionEquipos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [ultimaActualizacion, setUltimaActualizacion] = useState(null);
@@ -69,19 +70,22 @@ const CalendarioPublicoPage = () => {
     try {
       setLoading(true);
 
-      // Obtener mes siguiente
+      // Mes anterior y siguiente: la semana que cruza de mes (ej. 27-sep → 3-oct)
+      // puede vivir en la pestaña del mes anterior, y la pantalla completa la necesita.
       const indiceActual = MESES.indexOf(mesActual);
-      const indiceSiguiente = indiceActual === 11 ? 0 : indiceActual + 1;
-      const mesSiguiente = MESES[indiceSiguiente];
+      const mesAnterior = MESES[indiceActual === 0 ? 11 : indiceActual - 1];
+      const mesSiguiente = MESES[indiceActual === 11 ? 0 : indiceActual + 1];
 
-      const [calendarioData, calendarioSiguienteData, distribucionData] = await Promise.all([
+      const [calendarioData, calendarioSiguienteData, calendarioAnteriorData, distribucionData] = await Promise.all([
         obtenerCalendarioMesPublico(mesActual),
         obtenerCalendarioMesPublico(mesSiguiente),
+        obtenerCalendarioMesPublico(mesAnterior).catch(() => ({ data: null })),
         obtenerDistribucionEquiposPublico(mesActual)
       ]);
 
       setCalendario(calendarioData.data);
       setCalendarioSiguienteMes(calendarioSiguienteData.data);
+      setCalendarioMesAnterior(calendarioAnteriorData.data);
       setDistribucionEquipos(distribucionData.data);
       setUltimaActualizacion(new Date());
 
@@ -579,17 +583,38 @@ const CalendarioPublicoPage = () => {
                 (() => {
                   const hoy = new Date();
                   const diaHoy = hoy.getDate();
+                  const mesHoy = hoy.getMonth();
 
-                  // Combinar semanas del mes actual y el siguiente
+                  // Combinar semanas del mes anterior, el actual y el siguiente.
+                  // Mes real de cada día: la primera semana de una pestaña puede traer
+                  // la cola del mes anterior (30, 31) y la última el arranque del
+                  // siguiente (1, 2, 3).
+                  const indiceMesActual = MESES.indexOf(mesActual);
+                  const etiquetar = (semanas, indiceMes) => (semanas || []).map((s, i) => ({
+                    ...s,
+                    mes: MESES[indiceMes],
+                    dias: s.dias.map(d => {
+                      let mesReal = indiceMes;
+                      if (d.numero && i === 0 && d.numero > 20) mesReal = (indiceMes + 11) % 12;
+                      if (d.numero && i > 0 && d.numero < 8) mesReal = (indiceMes + 1) % 12;
+                      return { ...d, mesReal };
+                    })
+                  }));
                   const todasLasSemanas = [
-                    ...(calendario?.semanas || []),
-                    ...(calendarioSiguienteMes?.semanas || [])
+                    ...etiquetar(calendarioMesAnterior?.semanas, (indiceMesActual + 11) % 12),
+                    ...etiquetar(calendario?.semanas, indiceMesActual),
+                    ...etiquetar(calendarioSiguienteMes?.semanas, (indiceMesActual + 1) % 12)
                   ];
 
-                  // Encontrar la semana actual
+                  // Encontrar la semana actual por fecha real (día + mes), no solo por
+                  // el número: el 1-oct no debe caer en la semana del 1-nov.
                   let semanaActualIndex = todasLasSemanas.findIndex(semana =>
-                    semana.dias.some(dia => dia.numero === diaHoy)
+                    semana.dias.some(dia => dia.numero === diaHoy && dia.mesReal === mesHoy)
                   );
+                  if (semanaActualIndex === -1) {
+                    // Viendo otro mes: arrancar en su primera semana.
+                    semanaActualIndex = todasLasSemanas.findIndex(s => s.mes === mesActual);
+                  }
 
                   // Si no encontramos la semana actual, usar la primera
                   if (semanaActualIndex === -1) semanaActualIndex = 0;
@@ -601,14 +626,11 @@ const CalendarioPublicoPage = () => {
                   const renderSemana = (semana, esGrande = false) => {
                     if (!semana) return null;
 
-                    const hoy = new Date();
-                    const diaHoy = hoy.getDate();
-
                     return (
                       <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col h-full">
                         <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200">
                           {semana.dias.map((dia, diaIndex) => {
-                            const esDiaActual = esGrande && dia.numero === diaHoy;
+                            const esDiaActual = esGrande && dia.numero === diaHoy && dia.mesReal === mesHoy;
                             const esAsueto = dia.proyectos.some(p => p.nombre.toUpperCase().includes('ASUETO'));
 
                             return (
