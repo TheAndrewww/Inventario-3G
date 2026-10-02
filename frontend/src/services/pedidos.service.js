@@ -30,6 +30,16 @@ const pedidosService = {
     return response.data;
   },
 
+  previewReabrirAnulacion: async () => {
+    const response = await api.get('/pedidos/anulacion-masiva/reabrir/preview');
+    return response.data;
+  },
+
+  reabrirAnulacion: async (ids) => {
+    const response = await api.post('/pedidos/anulacion-masiva/reabrir', { ids });
+    return response.data;
+  },
+
   /**
    * Listar pedidos pendientes
    */

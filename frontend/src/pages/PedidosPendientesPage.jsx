@@ -32,15 +32,17 @@ const PedidosPendientesPage = () => {
   const [anulacionMasiva, setAnulacionMasiva] = useState(null);
   const [anulandoTodo, setAnulandoTodo] = useState(false);
 
-  const abrirAnulacionMasiva = async () => {
+  const abrirAnulacionMasiva = async (reabrir = false) => {
     try {
       setAnulandoTodo(true);
-      const res = await pedidosService.previewAnulacionMasiva();
+      const res = reabrir
+        ? await pedidosService.previewReabrirAnulacion()
+        : await pedidosService.previewAnulacionMasiva();
       if (!res.data?.total) {
-        toast('No hay tickets abiertos que anular');
+        toast(reabrir ? 'No hay tickets anulados de proyectos abiertos' : 'No hay tickets abiertos que anular');
         return;
       }
-      setAnulacionMasiva(res.data);
+      setAnulacionMasiva({ ...res.data, reabrir });
     } catch (error) {
       toast.error(error.response?.data?.message || 'Error al obtener los tickets abiertos');
     } finally {
@@ -51,12 +53,15 @@ const PedidosPendientesPage = () => {
   const confirmarAnulacionMasiva = async () => {
     try {
       setAnulandoTodo(true);
-      const res = await pedidosService.ejecutarAnulacionMasiva(anulacionMasiva.tickets.map(t => t.id));
-      toast.success(res.message || 'Tickets anulados');
+      const ids = anulacionMasiva.tickets.map(t => t.id);
+      const res = anulacionMasiva.reabrir
+        ? await pedidosService.reabrirAnulacion(ids)
+        : await pedidosService.ejecutarAnulacionMasiva(ids);
+      toast.success(res.message || 'Listo');
       setAnulacionMasiva(null);
       await cargarDatos();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Error al anular los tickets');
+      toast.error(error.response?.data?.message || 'Error al procesar los tickets');
     } finally {
       setAnulandoTodo(false);
     }
@@ -259,14 +264,24 @@ const PedidosPendientesPage = () => {
           <p className="text-gray-500 mt-1">Gestiona y prepara los tickets de materiales</p>
         </div>
         {esAdmin && (
+          <div className="flex gap-2">
           <button
-            onClick={abrirAnulacionMasiva}
+            onClick={() => abrirAnulacionMasiva(true)}
+            disabled={anulandoTodo}
+            className="px-3 py-2 text-sm font-medium text-green-700 border border-green-300 rounded-lg hover:bg-green-50 disabled:opacity-50"
+            title="Reabre los tickets anulados de proyectos que siguen abiertos"
+          >
+            Reabrir tickets anulados
+          </button>
+          <button
+            onClick={() => abrirAnulacionMasiva(false)}
             disabled={anulandoTodo}
             className="px-3 py-2 text-sm font-medium text-red-700 border border-red-300 rounded-lg hover:bg-red-50 disabled:opacity-50"
             title="Anula todos los tickets abiertos sin mover el inventario"
           >
             Anular tickets anteriores
           </button>
+          </div>
         )}
       </div>
 
@@ -680,11 +695,21 @@ const PedidosPendientesPage = () => {
       <Modal
         isOpen={!!anulacionMasiva}
         onClose={() => !anulandoTodo && setAnulacionMasiva(null)}
-        title="Anular tickets anteriores"
+        title={anulacionMasiva?.reabrir ? 'Reabrir tickets anulados' : 'Anular tickets anteriores'}
         size="lg"
       >
         {anulacionMasiva && (
           <div className="space-y-4">
+            {anulacionMasiva.reabrir ? (
+            <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-900">
+              Se reabrirán <strong>{anulacionMasiva.total}</strong> ticket(s) de proyectos que siguen abiertos.
+              Vuelven a Pendientes con lo que ya tenían surtido; el inventario no se mueve.
+              {anulacionMasiva.solicitudes_a_reabrir > 0 && (
+                <> También vuelven <strong>{anulacionMasiva.solicitudes_a_reabrir}</strong> solicitud(es) de compra.</>
+              )}
+              {' '}Los de proyectos cerrados se quedan anulados.
+            </div>
+            ) : (
             <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-900">
               Se anularán <strong>{anulacionMasiva.total}</strong> ticket(s) abiertos.
               {' '}<strong>El inventario NO se mueve</strong>: el stock de los SKUs se queda como está.
@@ -693,6 +718,7 @@ const PedidosPendientesPage = () => {
               )}
               {' '}No se puede deshacer.
             </div>
+            )}
             <div className="max-h-80 overflow-y-auto border rounded-lg divide-y">
               {anulacionMasiva.tickets.map(t => (
                 <div key={t.id} className="px-3 py-2 text-sm flex justify-between gap-3">
@@ -717,9 +743,11 @@ const PedidosPendientesPage = () => {
               <button
                 onClick={confirmarAnulacionMasiva}
                 disabled={anulandoTodo}
-                className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-700 text-white hover:bg-red-800 disabled:opacity-50"
+                className={`px-4 py-2 text-sm font-semibold rounded-lg text-white disabled:opacity-50 ${anulacionMasiva.reabrir ? 'bg-green-700 hover:bg-green-800' : 'bg-red-700 hover:bg-red-800'}`}
               >
-                {anulandoTodo ? 'Anulando…' : `Anular ${anulacionMasiva.total} ticket(s)`}
+                {anulandoTodo
+                  ? 'Procesando…'
+                  : `${anulacionMasiva.reabrir ? 'Reabrir' : 'Anular'} ${anulacionMasiva.total} ticket(s)`}
               </button>
             </div>
           </div>

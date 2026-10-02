@@ -22,7 +22,9 @@ import {
   marcarPedidoEntregadoDirecto,
   uploadTicketToDrive,
   previewAnulacionMasiva,
-  ejecutarAnulacionMasiva
+  ejecutarAnulacionMasiva,
+  previewReabrirAnulacionMasiva,
+  reabrirAnulacionMasiva
 } from '../controllers/pedidos.controller.js';
 import {
   verificarToken,
@@ -103,6 +105,26 @@ router.post(
   verificarToken,
   verificarRol('administrador'),
   ejecutarAnulacionMasiva
+);
+
+/**
+ * @route   GET /api/pedidos/anulacion-masiva/reabrir/preview
+ * @route   POST /api/pedidos/anulacion-masiva/reabrir
+ * @desc    Deshacer la anulación masiva (reabre los tickets)
+ * @access  Administrador
+ */
+router.get(
+  '/anulacion-masiva/reabrir/preview',
+  verificarToken,
+  verificarRol('administrador'),
+  previewReabrirAnulacionMasiva
+);
+
+router.post(
+  '/anulacion-masiva/reabrir',
+  verificarToken,
+  verificarRol('administrador'),
+  reabrirAnulacionMasiva
 );
 
 /**

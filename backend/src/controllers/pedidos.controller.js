@@ -2882,7 +2882,7 @@ export const ejecutarAnulacionMasiva = async (req, res) => {
   try {
     const usuario = req.usuario;
     const ahora = new Date();
-    const motivo = 'Borrón y cuenta nueva: ticket anterior anulado sin mover inventario';
+    const motivo = MOTIVO_ANULACION_MASIVA;
     const tickets = await buscarTicketsAbiertos({ id: { [Op.in]: ids } }, transaction);
 
     let solicitudesCanceladas = 0;
@@ -2890,7 +2890,7 @@ export const ejecutarAnulacionMasiva = async (req, res) => {
       const pendientes = (t.solicitudes_compra || []).filter(s => s.estado === 'pendiente').map(s => s.id);
       if (pendientes.length > 0) {
         const [n] = await SolicitudCompra.update(
-          { estado: 'cancelada', observaciones: `Cancelada por anulación masiva del ticket ${t.ticket_id} (${usuario.nombre}).` },
+          { estado: 'cancelada', observaciones: `${PREFIJO_SOLICITUD_ANULADA} ${t.ticket_id} (${usuario.nombre}).` },
           { where: { id: { [Op.in]: pendientes }, estado: 'pendiente' }, transaction }
         );
         solicitudesCanceladas += n;
@@ -2922,5 +2922,126 @@ export const ejecutarAnulacionMasiva = async (req, res) => {
     await transaction.rollback();
     console.error('Error en anulación masiva:', error);
     res.status(500).json({ success: false, message: 'Error al anular los tickets', error: error.message });
+  }
+};
+
+// ───────────────────────────────────────────────────────────────────────────
+// Reabrir los tickets de la anulación masiva.
+// La anulación no guardó el estado previo; los tickets de proyecto nacen en
+// 'pendiente' y ahí vuelven (lo surtido del checklist se conserva). Los que
+// estaban 'listo_para_entrega' se cierran con "Completar Ticket".
+// Las solicitudes de compra canceladas por la anulación vuelven a 'pendiente'.
+// ───────────────────────────────────────────────────────────────────────────
+const MOTIVO_ANULACION_MASIVA = 'Borrón y cuenta nueva: ticket anterior anulado sin mover inventario';
+const PREFIJO_SOLICITUD_ANULADA = 'Cancelada por anulación masiva del ticket';
+
+// Solo se reabren los tickets cuyo proyecto sigue abierto en producción; los
+// de proyectos cerrados, de equipo y de áreas fijas se quedan anulados.
+const buscarTicketsAnuladosMasivo = async (where = {}, transaction = undefined) => {
+  const tickets = await buscarTicketsAnuladosMasivoTodos(where, transaction);
+  const nombresAbiertos = await getNombresProyectosAbiertos();
+  return tickets.filter(t => t.proyecto && nombresAbiertos.some(n => mismosProyectos(t.proyecto, n)));
+};
+
+const buscarTicketsAnuladosMasivoTodos = (where = {}, transaction = undefined) => Movimiento.findAll({
+  where: { tipo: 'pedido', estado: 'cancelado', motivo_rechazo: MOTIVO_ANULACION_MASIVA, ...where },
+  attributes: ['id', 'ticket_id', 'proyecto', 'equipo_id', 'fecha_hora', 'observaciones'],
+  include: [
+    { model: Usuario, as: 'usuario', attributes: ['id', 'nombre'] },
+    { model: Equipo, as: 'equipo', attributes: ['id', 'nombre'] },
+    { model: DetalleMovimiento, as: 'detalles', attributes: ['id', 'dispersado'] },
+    { model: SolicitudCompra, as: 'solicitudes_compra', attributes: ['id', 'estado', 'observaciones'], required: false }
+  ],
+  order: [['fecha_hora', 'ASC']],
+  transaction
+});
+
+// Los tickets de proyecto nacen en 'pendiente' (los de equipo no se reabren).
+const estadoAlReabrir = () => 'pendiente';
+
+const solicitudesAReabrir = (t) => (t.solicitudes_compra || [])
+  .filter(s => s.estado === 'cancelada' && (s.observaciones || '').startsWith(PREFIJO_SOLICITUD_ANULADA));
+
+/**
+ * GET /api/pedidos/anulacion-masiva/reabrir/preview
+ */
+export const previewReabrirAnulacionMasiva = async (req, res) => {
+  try {
+    const tickets = await buscarTicketsAnuladosMasivo();
+    res.json({
+      success: true,
+      data: {
+        total: tickets.length,
+        solicitudes_a_reabrir: tickets.reduce((n, t) => n + solicitudesAReabrir(t).length, 0),
+        tickets: tickets.map(t => ({
+          id: t.id,
+          ticket_id: t.ticket_id,
+          proyecto: t.proyecto || t.equipo?.nombre || 'Sin proyecto',
+          estado: estadoAlReabrir(t),
+          fecha_hora: t.fecha_hora,
+          creado_por: t.usuario?.nombre || null
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error en preview de reapertura:', error);
+    res.status(500).json({ success: false, message: 'Error al obtener los tickets anulados', error: error.message });
+  }
+};
+
+/**
+ * POST /api/pedidos/anulacion-masiva/reabrir  { ids: [..] }
+ */
+export const reabrirAnulacionMasiva = async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Boolean) : [];
+  if (ids.length === 0) {
+    return res.status(400).json({ success: false, message: 'No se indicaron tickets a reabrir' });
+  }
+
+  const transaction = await sequelize.transaction();
+  try {
+    const usuario = req.usuario;
+    const tickets = await buscarTicketsAnuladosMasivo({ id: { [Op.in]: ids } }, transaction);
+
+    let solicitudesReabiertas = 0;
+    for (const t of tickets) {
+      const sols = solicitudesAReabrir(t).map(s => s.id);
+      if (sols.length > 0) {
+        const [n] = await SolicitudCompra.update(
+          { estado: 'pendiente', observaciones: `Reabierta: se deshizo la anulación masiva del ticket ${t.ticket_id} (${usuario.nombre}).` },
+          { where: { id: { [Op.in]: sols }, estado: 'cancelada' }, transaction }
+        );
+        solicitudesReabiertas += n;
+      }
+
+      // Quitar la anotación [ANULADO ...] que agregó la anulación masiva
+      const obs = (t.observaciones || '').replace(/\s*\[ANULADO por [^\]]*\]\nMotivo: Borrón y cuenta nueva[\s\S]*?Stock NO revertido \(el inventario no se movió\)/, '').trim();
+
+      await Movimiento.update({
+        estado: estadoAlReabrir(t),
+        observaciones: obs || null,
+        aprobado_por_id: null,
+        fecha_aprobacion: null,
+        motivo_rechazo: null
+      }, { where: { id: t.id }, transaction });
+    }
+
+    await transaction.commit();
+    console.log(`♻️ [Reapertura] ${usuario.nombre} reabrió ${tickets.length} ticket(s) de la anulación masiva; ${solicitudesReabiertas} solicitud(es) de compra reabiertas`);
+
+    res.json({
+      success: true,
+      message: `${tickets.length} ticket(s) reabiertos.`,
+      data: {
+        reabiertos: tickets.length,
+        omitidos: ids.length - tickets.length,
+        solicitudes_reabiertas: solicitudesReabiertas,
+        ticket_ids: tickets.map(t => t.ticket_id)
+      }
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error al reabrir tickets:', error);
+    res.status(500).json({ success: false, message: 'Error al reabrir los tickets', error: error.message });
   }
 };
