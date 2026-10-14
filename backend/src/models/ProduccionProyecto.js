@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
+import { esFestivoUTC } from '../utils/calendarioLaboral.js';
 
 /**
  * Modelo: ProduccionProyecto
@@ -615,7 +616,8 @@ ProduccionProyecto.prototype.getPorcentajeAvance = function () {
 
 /**
  * Helper: Calcula días hábiles (Lunes a Sábado) entre dos fechas
- * Excluye los domingos.
+ * Excluye los domingos y los festivos (C9 · PLA-07: oficiales calculados y, si Operación los da, los del negocio;
+ * los mismos que usa la pantalla en frontend/src/utils/produccion.js).
  * Retorna negativo si fechaInicio > fechaFin.
  */
 function calcularDiasHabiles(timestampInicio, timestampFin) {
@@ -630,7 +632,7 @@ function calcularDiasHabiles(timestampInicio, timestampFin) {
     while (current.getTime() < end.getTime()) {
         current.setUTCDate(current.getUTCDate() + 1);
         const day = current.getUTCDay();
-        if (day !== 0) { // 0 = Domingo. Excluir Domingo.
+        if (day !== 0 && !esFestivoUTC(current)) { // 0 = Domingo. Excluir Domingo y festivos.
             diasHabiles++;
         }
     }

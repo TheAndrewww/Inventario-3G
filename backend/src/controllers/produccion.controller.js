@@ -1,6 +1,7 @@
 import { ProduccionProyecto, Usuario, sequelize } from '../models/index.js';
 import { Op } from 'sequelize';
 import produccionSheetsService from '../services/produccionSheets.service.js';
+import { festivosNegocio } from '../utils/calendarioLaboral.js';
 import {
     avisarArchivosNuevos,
     avisarTicketSubido,
@@ -74,12 +75,17 @@ export const obtenerDashboard = async (req, res) => {
             };
         });
 
+        // C9 · PLA-07: los festivos del negocio (de Operación) para que la pantalla cuente los mismos días que el
+        // servidor. Solo cuando hay: sin ellos la respuesta queda igual que antes.
+        const negocio = festivosNegocio();
+
         res.json({
             success: true,
             data: {
                 resumen: resumenConColores,
                 estadisticas: resultado.estadisticas,
-                coloresAreas: COLORES_AREAS
+                coloresAreas: COLORES_AREAS,
+                ...(negocio.length ? { calendarioLaboral: { festivosNegocio: negocio } } : {})
             }
         });
     } catch (error) {

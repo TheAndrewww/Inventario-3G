@@ -66,31 +66,48 @@ export const flattenProyectos = (resumen) => {
 export const s = (val) => `calc(${val}rem * var(--escala, 1))`;
 export const px = (val) => `calc(${val}px * var(--escala, 1))`;
 
-// Días de asueto oficiales en México y días de asueto de la empresa (formato MM-DD)
-// Se omitió el año para que aplique siempre anualmente a menos que sea una fecha móvil, 
-// en este caso dejaremos las fechas fijas que siempre caen en los mismos días.
-const DIAS_ASUETO = [
-    '01-01', // Año nuevo
-    '02-05', // Día de la Constitución (se recorre al lunes, pero dejaremos fijo o los exactos del año si se desea)
-    '03-21', // Natalicio Benito Juárez
-    '05-01', // Día del Trabajo
-    '09-16', // Día de la Independencia
-    '11-20', // Revolución Mexicana
-    '12-25', // Navidad
-    // Agregamos fechas específicas de 2026 que sabemos son puente
-    '2026-02-02', // Puente constitución
-    '2026-03-16', // Puente natalicio Juárez
-    '2026-11-16'  // Puente Revolución
-];
+// C9 · PLA-07 — Días festivos calculados (antes una lista fija que en 2026 marcaba el 20-nov y no el lunes 16).
+// Copia del cálculo `festivosOficiales` de Operación (src/services/diasHabiles.ts) y del servidor de Planta
+// (backend/src/utils/calendarioLaboral.js), con los mismos casos: Ley Federal del Trabajo, art. 74. Los movibles se
+// calculan: primer lunes de febrero, tercer lunes de marzo y de noviembre; el 1 de diciembre solo cada seis años.
+const isoFecha = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+const lunesNumero = (y, m, n) => {
+    let dia = 1;
+    while (new Date(Date.UTC(y, m - 1, dia, 12)).getUTCDay() !== 1) dia++;
+    return dia + (n - 1) * 7;
+};
+const oficialesPorAnio = new Map();
+export const festivosOficiales = (y) => {
+    if (oficialesPorAnio.has(y)) return oficialesPorAnio.get(y);
+    const dias = [
+        isoFecha(y, 1, 1),                       // Año Nuevo
+        isoFecha(y, 2, lunesNumero(y, 2, 1)),    // Día de la Constitución
+        isoFecha(y, 3, lunesNumero(y, 3, 3)),    // Natalicio de Benito Juárez
+        isoFecha(y, 5, 1),                       // Día del Trabajo
+        isoFecha(y, 9, 16),                      // Independencia
+        isoFecha(y, 11, lunesNumero(y, 11, 3)),  // Revolución
+        isoFecha(y, 12, 25),                     // Navidad
+    ];
+    if ((y - 2024) % 6 === 0 && y >= 2024) dias.push(isoFecha(y, 12, 1)); // transmisión del Poder Ejecutivo
+    const lista = dias.sort();
+    oficialesPorAnio.set(y, lista);
+    return lista;
+};
+
+// Festivos del negocio (los captura Operación › Días festivos; el servidor de Planta los guarda 24 h y los manda en
+// el tablero de producción). "YYYY-MM-DD" (un día) o "MM-DD" (todos los años). Sin ellos, solo los oficiales.
+let festivosNegocioPlanta = new Set();
+export const ponerFestivosNegocio = (lista) => {
+    festivosNegocioPlanta = new Set((Array.isArray(lista) ? lista : []).map(String).filter((f) => /^(\d{4}-)?\d{2}-\d{2}$/.test(f)));
+};
 
 /**
- * Verifica si una fecha es día de asueto
+ * Verifica si una fecha es día de asueto (festivo oficial o del negocio)
  */
 const esDiaAsueto = (date) => {
     const y = date.getUTCFullYear();
-    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const d = String(date.getUTCDate()).padStart(2, '0');
-    return DIAS_ASUETO.includes(`${m}-${d}`) || DIAS_ASUETO.includes(`${y}-${m}-${d}`);
+    const fecha = isoFecha(y, date.getUTCMonth() + 1, date.getUTCDate());
+    return festivosOficiales(y).includes(fecha) || festivosNegocioPlanta.has(fecha) || festivosNegocioPlanta.has(fecha.slice(5));
 };
 
 

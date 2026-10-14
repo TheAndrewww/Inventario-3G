@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import produccionService from '../services/produccion.service';
 import { obtenerCalendarioActualPublico, obtenerCalendarioMesPublico } from '../services/calendario.service';
-import { flattenProyectos, aplicarFechasCalendario, calcularDiasHabiles, getHoyStr } from '../utils/produccion';
+import { flattenProyectos, aplicarFechasCalendario, calcularDiasHabiles, getHoyStr, ponerFestivosNegocio } from '../utils/produccion';
 import toast from 'react-hot-toast';
 
 /**
@@ -123,6 +123,8 @@ export const useProduccionData = ({
                 : await produccionService.obtenerDashboard();
 
             if (response.success && mountedRef.current) {
+                // C9 · PLA-07: festivos del negocio que manda el servidor (si no manda, solo los oficiales)
+                ponerFestivosNegocio(response.data.calendarioLaboral?.festivosNegocio);
                 let proys = flattenProyectos(response.data.resumen);
 
                 // Integrar fechas del calendario (silencioso, no bloquea si falla)
