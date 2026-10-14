@@ -23,7 +23,7 @@ export const ALL_MENU_ITEMS = [
   { path: '/avance-produccion', icon: ClipboardCheck, label: 'Avance Producción', roles: ['administrador', 'almacen'] },
   { path: '/historial', icon: History, label: 'Historial', roles: ['administrador', 'diseñador'] },
   { path: '/proveedores', icon: Truck, label: 'Proveedores', roles: ['administrador', 'compras'], grupo: 'compras' },
-  { path: '/control-campana', icon: Flag, label: 'Control Campaña', roles: ['administrador', 'diseñador', 'encargado', 'compras'] },
+  { path: '/control-campana', icon: Flag, label: 'Control Campaña', roles: ['administrador', 'diseñador', 'encargado', 'compras', 'almacen'] },
   { path: '/conteo-ciclico', icon: ClipboardCheck, label: 'Conteo Cíclico', roles: ['administrador', 'almacen'] },
   { path: '/descontar-almacen', icon: PackageOpen, label: 'Descuento Almacén', roles: ['administrador'] },
   { path: '/rollos-membrana', icon: Layers, label: 'Rollos Membrana', roles: ['administrador'] },
