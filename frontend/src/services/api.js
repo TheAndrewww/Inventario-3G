@@ -28,6 +28,10 @@ api.interceptors.request.use(
   }
 );
 
+// Las rutas de la terminal de producción (tabletas y pantallas) no usan la sesión del navegador: un error ahí
+// (código equivocado, 401 de un servidor viejo o 403 de la fase C) nunca la cierra ni manda a /login (A4 · PLA-04, error 30).
+const esRutaDeTerminal = (url = '') => /\/produccion\/(validar-codigo|terminal\/)/.test(url);
+
 // Interceptor para manejar errores de respuesta y decodificación UTF-8
 api.interceptors.response.use(
   (response) => {
@@ -44,7 +48,7 @@ api.interceptors.response.use(
   },
   (error) => {
     // Manejar errores de autenticación (token expirado o inválido)
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !esRutaDeTerminal(error.config?.url)) {
       console.log('Error 401: Token inválido o expirado - Cerrando sesión');
 
       // Limpiar el localStorage
