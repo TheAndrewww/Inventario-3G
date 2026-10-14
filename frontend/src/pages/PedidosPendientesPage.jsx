@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ClipboardList, CheckSquare, Square, Package, User, Calendar, AlertCircle, Edit2, Plus, Minus, Trash2, Save, X, CheckCircle } from 'lucide-react';
 import pedidosService from '../services/pedidos.service';
 import { Loader, Modal } from '../components/common';
@@ -136,6 +137,27 @@ const PedidosPendientesPage = () => {
       toast.error('Error al cargar tickets completados');
     }
   };
+
+  // Liga directa a un ticket (D2 · PLA-13): /pedidos-pendientes?ticket=141026-0900-01 abre su detalle. Se busca por
+  // folio (o por id) entre los pendientes y los completados ya cargados; el parámetro se quita de la dirección.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ligaTicketAtendida = useRef(null);
+  useEffect(() => {
+    const folio = (searchParams.get('ticket') || '').trim();
+    if (loading || !folio || ligaTicketAtendida.current === folio) return;
+    ligaTicketAtendida.current = folio;
+    const igual = (p) => String(p.ticket_id || '').toUpperCase() === folio.toUpperCase() || String(p.id) === folio;
+    const pedido = pedidos.find(igual) || pedidosCompletados.find(igual);
+    const resto = new URLSearchParams(searchParams);
+    resto.delete('ticket');
+    if (!pedido) {
+      toast.error(`No se encontró el ticket ${folio} entre los pendientes`);
+      setSearchParams(resto, { replace: true });
+      return;
+    }
+    handleVerDetalle(pedido).finally(() => setSearchParams(resto, { replace: true }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading, pedidos, pedidosCompletados]);
 
   const handleVerDetalle = async (pedido) => {
     try {

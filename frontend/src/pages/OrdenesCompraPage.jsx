@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, AlertTriangle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit, Clock, User, Check } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import articulosService from '../services/articulos.service';
@@ -78,6 +79,42 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     fetchData();
     fetchEstadisticas();
   }, [vistaActual]);
+
+  // Liga directa a una orden (D2 · PLA-13): /ordenes-compra?orden=OC-0836 abre su detalle (lo usan el Inicio 3G y el
+  // correo de resumen). Se busca por folio (o por id) en la lista ya cargada; la pestaña se cambia a la de su estado
+  // y el parámetro se quita de la dirección para que al cerrar no se vuelva a abrir.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ligaOrdenAtendida = useRef(null);
+  useEffect(() => {
+    const folio = (searchParams.get('orden') || '').trim();
+    if (vistaActual !== 'ordenes' || loading || !folio || ligaOrdenAtendida.current === folio) return;
+    ligaOrdenAtendida.current = folio;
+    const quitarParametro = () => {
+      const resto = new URLSearchParams(searchParams);
+      resto.delete('orden');
+      setSearchParams(resto, { replace: true });
+    };
+    (async () => {
+      const igual = (o) => String(o.ticket_id || '').toUpperCase() === folio.toUpperCase() || String(o.id) === folio;
+      let orden = ordenes.find(igual);
+      if (!orden) {
+        // La lista trae las 50 más recientes: si no está ahí, se busca en una lista más larga una sola vez.
+        try {
+          const data = await ordenesCompraService.listarOrdenes({ limit: 1000 });
+          orden = (data.data?.ordenes || []).find(igual);
+        } catch { /* abajo se avisa */ }
+      }
+      if (!orden) {
+        toast.error(`No se encontró la orden ${folio}`);
+        quitarParametro();
+        return;
+      }
+      setVistaOrdenes(orden.estado === 'cancelada' ? 'canceladas' : orden.estado === 'recibida' ? 'completadas' : 'activas');
+      await handleVerDetalle(orden);
+      quitarParametro();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading, ordenes, vistaActual]);
 
   const fetchData = async () => {
     try {

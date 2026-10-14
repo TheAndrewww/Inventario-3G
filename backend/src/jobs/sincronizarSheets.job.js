@@ -7,12 +7,14 @@
 
 import produccionSheetsService from '../services/produccionSheets.service.js';
 import { revisarAdelantos } from '../services/fechaInstalacion.service.js';
+import { anotarCorrida } from '../utils/agendaPlanta.js';
 
 /**
  * Sincronizar proyectos desde Google Sheets a la base de datos
  */
 export const sincronizarSheetsAutomatico = async () => {
     console.log('📊 [Sheets Job] Sincronizando con Google Sheets...');
+    anotarCorrida('pla-calendario-5min'); // D3 · PLA-13: la agenda dice cuándo corrió
 
     try {
         const resultado = await produccionSheetsService.sincronizarConDB();

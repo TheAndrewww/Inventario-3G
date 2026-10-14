@@ -7,6 +7,7 @@ import { ProduccionProyecto } from '../models/index.js';
 import { Op } from 'sequelize';
 import googleDriveService from '../services/googleDrive.service.js';
 import { avisarArchivosNuevos, avisarTicketSubido } from '../services/avisosProduccion.service.js';
+import { anotarCorrida } from '../utils/agendaPlanta.js';
 
 /**
  * Sincronizar proyectos activos con Google Drive
@@ -161,6 +162,7 @@ export const iniciarJobSincronizacion = (intervaloMinutos = 10) => {
             return;
         }
         corriendo = true;
+        anotarCorrida('pla-drive-10min'); // D3 · PLA-13: la agenda dice cuándo corrió
         console.log('\n⏰ Ejecutando sincronización programada de Drive...');
         try {
             await sincronizarProyectosConDrive({ soloSinCarpeta: false, limite: 50 });

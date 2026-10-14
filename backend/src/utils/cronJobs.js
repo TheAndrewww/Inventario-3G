@@ -5,6 +5,9 @@ import { crearNotificacion } from '../controllers/notificaciones.controller.js';
 import { iniciarJobAnuncios } from '../jobs/generarAnunciosDiarios.js';
 import { iniciarJobSincronizacion } from '../jobs/sincronizarDrive.job.js';
 import { iniciarJobSincronizacionSheets } from '../jobs/sincronizarSheets.job.js';
+// D3 · PLA-13: la hora de cada tarea que manda avisos sale de la agenda (la misma que publica /agenda) y cada tarea
+// anota cuándo corrió. Las expresiones no cambian.
+import { cronDe, anotarCorrida } from './agendaPlanta.js';
 
 /**
  * Verificar órdenes de compra vencidas y enviar notificaciones
@@ -106,7 +109,8 @@ export const verificarOrdenesVencidas = () => {
  * Se ejecuta todos los días a las 8:00 AM.
  */
 export const cerrarVentanasDeConteo = () => {
-  cron.schedule('0 8 * * *', async () => {
+  cron.schedule(cronDe('pla-cierre-conteos'), async () => {
+    anotarCorrida('pla-cierre-conteos');
     try {
       const vencidas = await OrdenCompra.findAll({
         where: {
@@ -172,7 +176,8 @@ const formatoDia = (fecha) =>
  * como "completado" lo que quedó pendiente de días anteriores.
  */
 export const reportarConteosCiclicosSemana = () => {
-  cron.schedule('0 9 * * 6', async () => {
+  cron.schedule(cronDe('pla-corte-conteos'), async () => {
+    anotarCorrida('pla-corte-conteos');
     try {
       const { ConteoCiclico, ConteoArticulo } = await import('../models/index.js');
       const { avisarConteosCiclicosSemana } = await import('../services/whatsapp.service.js');
@@ -226,7 +231,8 @@ export const reportarConteosCiclicosSemana = () => {
  * grupo de Compras si encontró algo nuevo. Además del disparo por solicitud.
  */
 export const barridoComprasDiario = () => {
-  cron.schedule('30 8 * * 1-6', async () => {
+  cron.schedule(cronDe('pla-barrido-0830'), async () => {
+    anotarCorrida('pla-barrido-0830');
     const { barridoComprasProgramado } = await import('../services/barridoCompras.service.js');
     await barridoComprasProgramado();
   }, { timezone: 'America/Mexico_City' });
@@ -238,10 +244,11 @@ export const barridoComprasDiario = () => {
  * (por omisión «aprobar»: un correo por orden, como hoy) y solo si hay órdenes por autorizar.
  */
 export const resumenCorreoOrdenes = () => {
-  cron.schedule('0 8 * * 1-6', async () => {
+  cron.schedule(cronDe('pla-resumen-ordenes-0800'), async () => {
     try {
       const { modoCorreoOrdenes, enviarResumenOrdenesPorAutorizar } = await import('../services/email.service.js');
       if (modoCorreoOrdenes() !== 'resumen') return;
+      anotarCorrida('pla-resumen-ordenes-0800');
       const { cancelacionProgramadaEncendida, cancelacionProgramadaOrdenes, siguienteCorridaCancelacion } = await import('../controllers/ordenesCompra.controller.js');
       // Las que la tarea de las 8:15 cancelaría hoy (ensayo con la hora de esa corrida), para marcarlas en el resumen.
       const plan = cancelacionProgramadaEncendida()
@@ -261,10 +268,11 @@ export const resumenCorreoOrdenes = () => {
  * antes y solo cancela lo ya avisado (ver cancelacionProgramadaOrdenes en ordenesCompra.controller.js).
  */
 export const cancelacionProgramadaDiaria = () => {
-  cron.schedule('15 8 * * 1-6', async () => {
+  cron.schedule(cronDe('pla-cancelacion-0815'), async () => {
     try {
       const { cancelacionProgramadaEncendida, cancelacionProgramadaOrdenes } = await import('../controllers/ordenesCompra.controller.js');
       if (!cancelacionProgramadaEncendida()) return;
+      anotarCorrida('pla-cancelacion-0815');
       await cancelacionProgramadaOrdenes();
     } catch (error) {
       console.error('❌ Error en la cancelación programada de órdenes:', error.message);

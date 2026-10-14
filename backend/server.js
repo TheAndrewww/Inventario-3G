@@ -16,6 +16,7 @@ import { iniciarCronJobs } from './src/utils/cronJobs.js';
 import { ejecutarAutoMigracion } from './src/utils/autoMigrate.js';
 import { verificarToken, esAdministrador, verificarTokenOpcional } from './src/middleware/auth.middleware.js';
 import { avisarConfigAlArrancar, cerrarSiFalta, cerrarTerminalSiFalta, cuerpoSalud } from './src/utils/revisarConfig.js';
+import crearPuertas from './src/routes/sistemas/index.js';
 
 // Cargar variables de entorno solo en desarrollo
 // En producción (Railway, Heroku), las variables están en process.env directamente
@@ -113,6 +114,11 @@ app.use((req, res, next) => {
 app.use('/api/auth/login', cerrarSiFalta('sesion'));
 app.use('/api/produccion', cerrarTerminalSiFalta);
 app.use(['/api/ordenes-compra/aprobar-email', '/api/ordenes-compra/rechazar-email'], cerrarSiFalta('correo', { html: true }));
+
+// Puertas entre sistemas (D2, D3, B8 · PLA-13): /api/inicio3g/v1 y /api/sistemas/v1, con su propia llave por origen
+// (huella SHA-256 y alcances en variables). Van antes de todas las rutas con sesión: ninguna pasa por verificarToken.
+// Sin llaves configuradas responden 503 «puerta sin configurar»; lo demás de Planta no cambia.
+app.use(crearPuertas());
 
 // Importar rutas
 import authRoutes from './src/routes/auth.routes.js';
@@ -1268,6 +1274,17 @@ const startServer = async () => {
             console.log('✅ Tabla avisos_whatsapp verificada');
         } catch (avisosErr) {
             console.error('⚠️ Error verificando tabla avisos_whatsapp:', avisosErr.message);
+        }
+
+        // Puertas entre sistemas (PLA-13): tablas nuevas, cada una con su propio sync (crea si no existe; nunca alter).
+        try {
+            const { default: LlaveSistema } = await import('./src/models/LlaveSistema.js');
+            const { default: Idempotencia } = await import('./src/models/Idempotencia.js');
+            await LlaveSistema.sync();
+            await Idempotencia.sync();
+            console.log('✅ Tablas de las puertas entre sistemas verificadas (llaves_sistemas, idempotencia_sistemas)');
+        } catch (puertasErr) {
+            console.error('⚠️ Error verificando las tablas de las puertas entre sistemas:', puertasErr.message);
         }
 
         // Tickets de salida ya vistos en la carpeta del proyecto — aplica en dev y prod.
