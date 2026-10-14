@@ -184,7 +184,8 @@ export const obtenerPorArea = async (req, res) => {
 export const completarEtapa = async (req, res) => {
     try {
         const { id } = req.params;
-        const { observaciones, codigo_area } = req.body;
+        // La terminal manda este POST sin cuerpo y Express 5 deja req.body en undefined.
+        const { observaciones, codigo_area } = req.body || {};
 
         // Si hay código de área, validarlo
         let usuarioId = null;
@@ -198,6 +199,16 @@ export const completarEtapa = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: 'Proyecto no encontrado'
+            });
+        }
+
+        // Terminal de Instalación (sin sesión): la obra no se cierra desde aquí. «completado» es solo para las
+        // obras cerradas en el Índice (casilla Entregado): la sincronización con el Excel la regresaría a Diseño
+        // y, al cerrarla, el gancho de ProduccionProyecto anula sus tickets abiertos.
+        if (!req.usuario && proyecto.etapa_actual === 'instalacion') {
+            return res.status(409).json({
+                success: false,
+                message: 'La obra se cierra en el Índice (casilla «Entregado»), no desde la terminal.'
             });
         }
 
