@@ -232,7 +232,8 @@ const generarEmailAprobacion = (orden, tokenAprobar, frontendUrl) => {
 export const enviarEmailAprobacion = async (orden) => {
     try {
         console.log('📧 [RESEND] Iniciando envío de email de aprobación para orden:', orden?.ticket_id);
-        console.log('📧 [RESEND] RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'configurado (' + process.env.RESEND_API_KEY.substring(0, 10) + '...)' : 'NO configurado');
+        // A15 · PLA-08: el registro solo dice si está configurada, nunca una parte de la llave.
+        console.log('📧 [RESEND] RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'configurado' : 'NO configurado');
 
         if (!resend) {
             console.log('⚠️ RESEND_API_KEY no configurado, no se puede enviar email');

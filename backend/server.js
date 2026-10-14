@@ -14,7 +14,8 @@ import { registrarError, ultimosErrores } from './src/utils/diagnostico.js';
 import './src/models/index.js'; // Importar modelos y relaciones
 import { iniciarCronJobs } from './src/utils/cronJobs.js';
 import { ejecutarAutoMigracion } from './src/utils/autoMigrate.js';
-import { verificarToken, esAdministrador } from './src/middleware/auth.middleware.js';
+import { verificarToken, esAdministrador, verificarTokenOpcional } from './src/middleware/auth.middleware.js';
+import { avisarConfigAlArrancar, cerrarSiFalta, cerrarTerminalSiFalta, cuerpoSalud } from './src/utils/revisarConfig.js';
 
 // Cargar variables de entorno solo en desarrollo
 // En producción (Railway, Heroku), las variables están en process.env directamente
@@ -105,6 +106,14 @@ app.use((req, res, next) => {
     next();
 });
 
+// A15 · PLA-08: con FALLA_CERRADA=1, cada llave que falta cierra SOLO lo que protege (503 «configuración
+// incompleta»); el proceso no se apaga. Sin la bandera todo sigue como hoy (ver src/utils/revisarConfig.js).
+// JWT_SECRET: la entrada (aquí) y todo lo que pide sesión (en verificarToken). TERMINAL_CODIGOS: la terminal.
+// OC_CORREO_SECRETO: las ligas del correo de órdenes. WHATSAPP_PUENTE_TOKEN: el puente ya responde 503 sin ella.
+app.use('/api/auth/login', cerrarSiFalta('sesion'));
+app.use('/api/produccion', cerrarTerminalSiFalta);
+app.use(['/api/ordenes-compra/aprobar-email', '/api/ordenes-compra/rechazar-email'], cerrarSiFalta('correo', { html: true }));
+
 // Importar rutas
 import authRoutes from './src/routes/auth.routes.js';
 import articulosRoutes from './src/routes/articulos.routes.js';
@@ -180,6 +189,21 @@ app.get('/', (req, res) => {
  */
 app.get('/api/estado-sistema', (req, res) => {
     res.json({ ok: true });
+});
+
+/**
+ * Salud de Planta (A15 · PLA-08), forma del contrato del Inicio v2 (§2.1 y plan §7.3).
+ * Sin sesión: solo sistema, versión, estado (ok · aviso · mal), mensaje y hora; basta para un vigilante.
+ * Con sesión de administración: además config { completa, faltan } (solo nombres), banderas [{ nombre, encendida }],
+ * piezas y los conteos de la terminal (A4). Nunca un valor, una llave ni un código.
+ */
+app.get('/salud', verificarTokenOpcional, async (req, res) => {
+    try {
+        const detalle = !!(req.usuario && req.usuario.activo && req.usuario.rol === 'administrador');
+        res.json(await cuerpoSalud({ detalle }));
+    } catch (error) {
+        res.status(500).json({ sistema: 'planta', estado: 'mal', mensaje: 'No se pudo revisar la salud' });
+    }
 });
 
 /**
@@ -440,6 +464,8 @@ app.use((err, req, res, next) => {
 
 // Función para iniciar el servidor
 const startServer = async () => {
+    // A15 · PLA-08: qué llaves faltan (solo nombres) y qué queda cerrado con FALLA_CERRADA. Nunca apaga el proceso.
+    await avisarConfigAlArrancar();
     try {
         // Verificar conexión a base de datos con reintentos
         let retries = 5;

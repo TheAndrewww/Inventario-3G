@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { Usuario } from '../models/index.js';
+import { piezaCerrada, TEXTO_INCOMPLETA } from '../utils/revisarConfig.js';
 
 /**
  * Middleware para verificar el token JWT
@@ -7,6 +8,11 @@ import { Usuario } from '../models/index.js';
  */
 export const verificarToken = async (req, res, next) => {
     try {
+        // A15 · PLA-08: sin JWT_SECRET y con FALLA_CERRADA=1, lo que pide sesión responde 503 (no 401 ni 500).
+        if (await piezaCerrada('sesion')) {
+            return res.status(503).json({ success: false, codigo: 'CONFIGURACION_INCOMPLETA', message: TEXTO_INCOMPLETA });
+        }
+
         // Obtener token del header
         let token = req.headers.authorization;
 
