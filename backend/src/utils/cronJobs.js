@@ -8,45 +8,66 @@ import { iniciarJobSincronizacionSheets } from '../jobs/sincronizarSheets.job.js
 // D3 · PLA-13: la hora de cada tarea que manda avisos sale de la agenda (la misma que publica /agenda) y cada tarea
 // anota cuándo corrió. Las expresiones no cambian.
 import { cronDe, anotarCorrida } from './agendaPlanta.js';
+// C4 paso 2 · PLA-16: con VENCIDAS_USA_JULIA, la fecha estimada de Julia si es más nueva que la de la orden
+import { vencidasUsaJulia, fechaLlegadaEfectiva } from '../models/OrdenSeguimiento.js';
 
 /**
  * Verificar órdenes de compra vencidas y enviar notificaciones
  * Se ejecuta todos los días a las 9:00 AM y a las 2:00 PM
+ *
+ * C4 paso 2 · PLA-16 (VENCIDAS_USA_JULIA, apagada = como hoy): la fecha que decide si una orden ya venció es la de
+ * Julia (orden_seguimiento, la manda Finanzas con FIN-10) cuando es más nueva que la de la orden, o si la orden no
+ * tiene. Con la orden pagada tarde, Julia la recorre y ya no sale «vencida» antes de tiempo. El texto no cambia.
  */
-export const verificarOrdenesVencidas = () => {
-  // Ejecutar todos los días a las 9:00 AM y 2:00 PM
-  cron.schedule('0 9,14 * * *', async () => {
+export const revisarOrdenesVencidas = async () => {
     try {
       console.log('🔍 Verificando órdenes de compra vencidas...');
 
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
 
-      // Buscar órdenes que:
-      // 1. Estén en estado 'enviada' (esperando entrega)
-      // 2. Tengan fecha_llegada_estimada menor o igual a hoy
-      // 3. No hayan sido recibidas (fecha_recepcion es null)
-      const ordenesVencidas = await OrdenCompra.findAll({
-        where: {
-          estado: 'enviada',
-          fecha_llegada_estimada: {
-            [Op.lte]: hoy
-          },
-          fecha_recepcion: null
+      const include = [
+        {
+          model: Proveedor,
+          as: 'proveedor',
+          attributes: ['id', 'nombre', 'telefono', 'email']
         },
-        include: [
-          {
-            model: Proveedor,
-            as: 'proveedor',
-            attributes: ['id', 'nombre', 'telefono', 'email']
+        {
+          model: Usuario,
+          as: 'creador',
+          attributes: ['id', 'nombre', 'email']
+        }
+      ];
+
+      // [{ orden, fecha, deJulia }]: la fecha con la que se cuenta el retraso
+      let ordenesVencidas;
+      if (!vencidasUsaJulia()) {
+        // Buscar órdenes que:
+        // 1. Estén en estado 'enviada' (esperando entrega)
+        // 2. Tengan fecha_llegada_estimada menor o igual a hoy
+        // 3. No hayan sido recibidas (fecha_recepcion es null)
+        const ordenes = await OrdenCompra.findAll({
+          where: {
+            estado: 'enviada',
+            fecha_llegada_estimada: {
+              [Op.lte]: hoy
+            },
+            fecha_recepcion: null
           },
-          {
-            model: Usuario,
-            as: 'creador',
-            attributes: ['id', 'nombre', 'email']
-          }
-        ]
-      });
+          include
+        });
+        ordenesVencidas = ordenes.map(orden => ({ orden, fecha: orden.fecha_llegada_estimada, deJulia: false }));
+      } else {
+        const candidatas = await OrdenCompra.findAll({
+          where: { estado: 'enviada', fecha_recepcion: null },
+          include
+        });
+        const { default: OrdenSeguimiento } = await import('../models/OrdenSeguimiento.js');
+        const deJulia = await OrdenSeguimiento.fechasEstimadasJulia(candidatas.map(o => o.id));
+        ordenesVencidas = candidatas
+          .map(orden => ({ orden, ...(fechaLlegadaEfectiva(orden.fecha_llegada_estimada, deJulia.get(orden.id)) || { fecha: null }) }))
+          .filter(v => v.fecha && new Date(v.fecha) <= hoy);
+      }
 
       console.log(`📦 Se encontraron ${ordenesVencidas.length} órdenes vencidas`);
 
@@ -60,9 +81,9 @@ export const verificarOrdenesVencidas = () => {
         }
       });
 
-      for (const orden of ordenesVencidas) {
+      for (const { orden, fecha, deJulia } of ordenesVencidas) {
         const diasRetraso = Math.floor(
-          (hoy - new Date(orden.fecha_llegada_estimada)) / (1000 * 60 * 60 * 24)
+          (hoy - new Date(fecha)) / (1000 * 60 * 60 * 24)
         );
 
         const mensaje = diasRetraso === 0
@@ -81,7 +102,8 @@ export const verificarOrdenesVencidas = () => {
               ticket_id: orden.ticket_id,
               proveedor: orden.proveedor?.nombre,
               dias_retraso: diasRetraso,
-              fecha_llegada_estimada: orden.fecha_llegada_estimada
+              fecha_llegada_estimada: orden.fecha_llegada_estimada,
+              ...(deJulia ? { fecha_estimada_julia: fecha } : {})
             }
           });
         }
@@ -98,7 +120,11 @@ export const verificarOrdenesVencidas = () => {
     } catch (error) {
       console.error('❌ Error al verificar órdenes vencidas:', error);
     }
-  }, { timezone: 'America/Mexico_City' }); // D6 · PLA-03: hora de México (el servidor corre en UTC)
+};
+
+export const verificarOrdenesVencidas = () => {
+  // Ejecutar todos los días a las 9:00 AM y 2:00 PM
+  cron.schedule('0 9,14 * * *', revisarOrdenesVencidas, { timezone: 'America/Mexico_City' }); // D6 · PLA-03: hora de México (el servidor corre en UTC)
 
   console.log('⏰ Cron job iniciado: Verificación de órdenes vencidas (9:00 AM y 2:00 PM)');
 };

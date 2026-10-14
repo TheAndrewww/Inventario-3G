@@ -33,7 +33,7 @@ const AvisoWhatsApp = sequelize.define('AvisoWhatsApp', {
         type: DataTypes.STRING(30),
         allowNull: false,
         defaultValue: 'informativo',
-        comment: 'informativo | aprobacion_orden. Los de aprobación esperan una reacción'
+        comment: 'informativo | aprobacion_orden | orden_aprobada | llegada (C4 paso 3). Los de aprobación esperan una reacción'
     },
     referencia_id: {
         type: DataTypes.INTEGER,
@@ -70,6 +70,11 @@ const AvisoWhatsApp = sequelize.define('AvisoWhatsApp', {
         allowNull: false,
         defaultValue: false,
         comment: 'D7 · PLA-18: con HORARIO_AVISOS, solo los urgentes salen de noche y en domingo. Se marca al encolar con AVISOS_URGENTES (vacía = ninguno)'
+    },
+    datos: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+        comment: 'C4 paso 3 · PLA-16 (LLEGADA_CON_DATOS): datos del aviso «Llegó material» (tipo llegada): { orden, folioFactura, fotos }. El texto no cambia'
     }
 }, {
     tableName: 'avisos_whatsapp',

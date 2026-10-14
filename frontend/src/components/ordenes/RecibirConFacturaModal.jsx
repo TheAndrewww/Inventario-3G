@@ -137,7 +137,9 @@ const RecibirConFacturaModal = ({ isOpen, onClose, orden, onSuccess }) => {
                 // Solo esta vía abre la ventana de 7 días para contar y reclamar
                 origen: 'factura',
                 folio_factura: lectura?.factura?.folio || null,
-                renglones_sin_identificar: renglones.filter(r => !r.detalle_id).length
+                renglones_sin_identificar: renglones.filter(r => !r.detalle_id).length,
+                // C4 paso 3 · PLA-16: la foto que guardó la lectura (solo con LLEGADA_CON_DATOS en el servidor)
+                ...(lectura?.factura?.fotos?.length ? { fotos_factura: lectura.factura.fotos } : {})
             });
 
             toast.success(respuesta.message || 'Recepción registrada');

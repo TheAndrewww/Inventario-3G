@@ -3016,10 +3016,27 @@ export const recibirMercancia = async (req, res) => {
       console.error('Error al enviar notificación:', notifError);
     }
 
+    // C4 paso 3 · PLA-16 (LLEGADA_CON_DATOS): la llegada queda en la historia de la orden, con el folio de la factura y
+    // la foto (que subió la lectura de la factura). Apagada, nada de esto pasa.
+    let conDatos = false;
+    let fotosFactura = [];
+    try {
+      const { llegadaConDatos } = await import('../models/OrdenSeguimiento.js');
+      conDatos = llegadaConDatos();
+      if (conDatos) {
+        const { anotarLlegadaPlanta, RE_FOTO } = await import('../routes/sistemas/ordenes.js');
+        fotosFactura = (Array.isArray(req.body?.fotos_factura) ? req.body.fotos_factura : []).filter(u => typeof u === 'string' && RE_FOTO.test(u)).slice(0, 5);
+        await anotarLlegadaPlanta({ orden, folioFactura: req.body?.folio_factura || null, fotos: fotosFactura, movimiento: movimiento.ticket_id });
+      }
+    } catch (historiaError) {
+      console.error('No se pudo anotar la llegada en la historia de la orden:', historiaError.message);
+    }
+
     // Aviso al grupo de Requisiciones (almacén) por WhatsApp (si el bot está configurado)
     try {
       const { avisarLlegoMaterial } = await import('../services/whatsapp.service.js');
       await avisarLlegoMaterial({
+        ...(conDatos ? { ordenId: orden.id, fotos: fotosFactura } : {}),
         proveedor: orden.proveedor?.nombre,
         ticketOrden: orden.ticket_id,
         folioFactura: req.body?.folio_factura || null,

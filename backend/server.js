@@ -1271,6 +1271,8 @@ const startServer = async () => {
             await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS reemplazado_por_id INTEGER");
             // D7 · PLA-18: los avisos que pasan de noche y en domingo con HORARIO_AVISOS (AVISOS_URGENTES vacía = ninguno)
             await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS urgente BOOLEAN NOT NULL DEFAULT FALSE");
+            // C4 paso 3 · PLA-16: datos del aviso «Llegó material» (orden, folio de la factura y foto) con LLEGADA_CON_DATOS
+            await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS datos JSONB");
             console.log('✅ Tabla avisos_whatsapp verificada');
         } catch (avisosErr) {
             console.error('⚠️ Error verificando tabla avisos_whatsapp:', avisosErr.message);
@@ -1294,6 +1296,15 @@ const startServer = async () => {
             console.log('✅ Tabla bitacora_avisos verificada');
         } catch (bitacoraErr) {
             console.error('⚠️ Error verificando la tabla bitacora_avisos:', bitacoraErr.message);
+        }
+
+        // C4 · PLA-16: la historia de la orden de compra (su propio sync: crea si no existe; nunca alter)
+        try {
+            const { default: OrdenSeguimiento } = await import('./src/models/OrdenSeguimiento.js');
+            await OrdenSeguimiento.sync();
+            console.log('✅ Tabla orden_seguimiento verificada');
+        } catch (seguimientoErr) {
+            console.error('⚠️ Error verificando la tabla orden_seguimiento:', seguimientoErr.message);
         }
 
         // D1 · PLA-15: último latido de la línea del contable (su propio sync: crea si no existe; nunca alter)

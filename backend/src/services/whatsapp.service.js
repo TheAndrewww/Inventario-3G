@@ -11,6 +11,7 @@
  */
 
 import { AvisoWhatsApp } from '../models/index.js';
+import { llegadaConDatos } from '../models/OrdenSeguimiento.js';
 
 // 'requisiciones' = grupo de ALMACÉN/CALIDAD. Ahí no puede salir ni un precio: está
 // separado de Compras justo para que quien recibe el material no vea cotizaciones ni
@@ -131,6 +132,29 @@ export const construirAvisoLlegoMaterial = ({
  */
 export const avisarLlegoMaterial = async (datos) => {
     const mensaje = construirAvisoLlegoMaterial(datos);
+    // C4 paso 3 · PLA-16 (LLEGADA_CON_DATOS, apagada = como hoy): el MISMO texto, pero el aviso viaja como tipo
+    // 'llegada', con la orden en referencia_id y sus datos (folio de la factura y foto) para que Julia no tenga que
+    // leerlos del texto. Una Julia que no conoce el tipo lo publica igual que siempre.
+    if (llegadaConDatos() && datos?.ordenId) {
+        if (!isWhatsAppEnabled()) {
+            console.log('ℹ️ Puente de WhatsApp no configurado, se omite el aviso');
+            return false;
+        }
+        try {
+            await AvisoWhatsApp.create({
+                destino: 'requisiciones',
+                tipo: 'llegada',
+                referencia_id: datos.ordenId,
+                datos: { orden: datos.ticketOrden || null, folioFactura: datos.folioFactura || null, fotos: Array.isArray(datos.fotos) ? datos.fotos.slice(0, 5) : [] },
+                mensaje: String(mensaje).slice(0, 4000)
+            });
+            console.log('📨 Aviso de WhatsApp encolado (requisiciones, llegada)');
+            return true;
+        } catch (error) {
+            console.error('⚠️ No se pudo encolar el aviso de WhatsApp:', error.message);
+            return false;
+        }
+    }
     return enviarWhatsApp(mensaje, 'requisiciones');
 };
 

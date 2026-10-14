@@ -2490,6 +2490,61 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
 };
 
 // Modal para ver detalle de orden con trazabilidad
+// C4 · PLA-16: franja «Pago y pedido (Julia)» del detalle (solo con Diseño 3G). La historia la manda Finanzas por la
+// puerta /api/sistemas/v1/ordenes/:folio/seguimiento (FIN-10) y, con LLEGADA_CON_DATOS, la recepción de Planta. Sin
+// historia no se muestra nada.
+const HORA_MX = new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+const DIA_CORTO = new Intl.DateTimeFormat('es-MX', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' });
+const diaDe = (aaaammdd) => DIA_CORTO.format(new Date(`${aaaammdd}T12:00:00Z`)).replace(/\./g, '');
+const horaDe = (iso) => HORA_MX.format(new Date(iso)).replace(/\./g, '');
+const FranjaPagoPedido = ({ ordenId }) => {
+  const [datos, setDatos] = useState(null);
+  useEffect(() => {
+    let vigente = true;
+    ordenesCompraService.obtenerSeguimiento(ordenId)
+      .then((d) => { if (vigente) setDatos(d || null); })
+      .catch(() => { if (vigente) setDatos(null); });
+    return () => { vigente = false; };
+  }, [ordenId]);
+  if (!datos?.seguimiento?.length) return null;
+  const actual = datos.actual;
+  return (
+    <section className="g3-tarjeta" aria-label="Pago y pedido (Julia)" style={{ borderLeft: `4px solid var(--g3-${actual?.tono || 'linea-fuerte'})` }}>
+      <div className="g3-tarjeta-cab">
+        <h3>Pago y pedido (Julia)</h3>
+        {actual ? <span className={`g3-estado g3-estado--${actual.tono}`}>{actual.texto}</span> : null}
+      </div>
+      {actual?.fechaEstimada ? (
+        <p className="g3-chico" style={{ margin: '6px 0 0' }}>Llegada estimada según Julia: <b>{diaDe(actual.fechaEstimada)}</b></p>
+      ) : null}
+      <ol className="g3-linea-tiempo" style={{ marginTop: 12 }}>
+        {datos.seguimiento.map((s) => (
+          <li key={s.id} className="g3-evento">
+            <div>
+              <span>{s.texto}</span>
+              <small>
+                {horaDe(s.fecha)}
+                {s.fechaEstimada ? ` · llega aprox. ${diaDe(s.fechaEstimada)}` : ''}
+                {s.folioFactura ? ` · factura ${s.folioFactura}` : ''}
+              </small>
+              {s.nota ? <small>{s.nota}</small> : null}
+              {s.fotos?.length ? (
+                <small>
+                  {s.fotos.map((u, i) => (
+                    <a key={u} href={u} target="_blank" rel="noopener noreferrer" style={{ marginRight: 12, textDecoration: 'underline' }}>
+                      {s.fotos.length > 1 ? `Ver foto ${i + 1} de la factura` : 'Ver la foto de la factura'}
+                    </a>
+                  ))}
+                </small>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+};
+
 const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, puedeReabrirOrdenes, onAbrirModalAnular, onEnviarOrden, onEditarOrden, esAdmin, onAprobar, onRechazar, onEliminar, loadingAprobacion }) => {
   const [tabActual, setTabActual] = React.useState('detalle'); // 'detalle' o 'historial'
   const esPendienteAprobacion = orden && orden.estado === 'pendiente_aprobacion';
@@ -2550,6 +2605,8 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
               <p className="font-medium">{orden.creador?.nombre}</p>
             </div>
           </div>
+
+          {g3 && <FranjaPagoPedido ordenId={orden.id} />}
 
           {orden.observaciones && (
             <div>

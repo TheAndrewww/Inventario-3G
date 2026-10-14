@@ -74,6 +74,19 @@ router.post('/ordenes-compra/desde-solicitudes', crearOrdenDesdeSolicitudes);
 router.get('/ordenes-compra', listarOrdenesCompra);
 router.get('/ordenes-compra/:id', obtenerOrdenCompra);
 router.get('/ordenes-compra/:id/historial', obtenerHistorialTrazabilidad);
+// C4 · PLA-16: la historia de la orden según Julia (franja «Pago y pedido (Julia)» del detalle, con Diseño 3G).
+// Solo lectura; sin importes. Mismo acceso que el detalle.
+router.get('/ordenes-compra/:id/seguimiento', async (req, res) => {
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ success: false, message: 'Orden no válida' });
+    const { seguimientoDeOrden } = await import('./sistemas/ordenes.js');
+    res.json({ success: true, data: { orden_id: id, ...(await seguimientoDeOrden(id)) } });
+  } catch (error) {
+    console.error('Error al leer la historia de la orden:', error.message);
+    res.status(500).json({ success: false, message: 'No se pudo leer la historia de la orden' });
+  }
+});
 router.put(
   '/ordenes-compra/:id',
   verificarRol('compras', 'almacen', 'administrador'),

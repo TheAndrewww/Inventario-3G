@@ -19,6 +19,7 @@ import { ventanaAvisos, dentroDeHorario } from '../utils/horarioAvisos.js';
 import BitacoraAviso from '../models/BitacoraAviso.js';
 import { ORIGENES_BITACORA } from './sistemas/bitacora.js';
 import { anotarLatido } from './sistemas/latidos.js';
+import { llegadaConDatos } from '../models/OrdenSeguimiento.js';
 
 const router = express.Router();
 
@@ -199,14 +200,24 @@ router.get('/pendientes', async (req, res) => {
             if (!dentroDeHorario(new Date(), ventana)) where.urgente = true;
         }
 
+        // C4 paso 3 · PLA-16 (LLEGADA_CON_DATOS): los avisos «Llegó material» (tipo 'llegada') llevan además `datos`
+        // ({ orden, folioFactura, fotos }); los demás salen igual que siempre. Apagada, la consulta es la de hoy.
+        const conDatos = llegadaConDatos();
         const avisos = await AvisoWhatsApp.findAll({
             where,
             order: [['id', 'ASC']], // el id autoincremental ya da el orden cronológico
             limit: limite,
-            attributes: ['id', 'destino', 'mensaje', 'intentos', 'tipo', 'referencia_id']
+            attributes: ['id', 'destino', 'mensaje', 'intentos', 'tipo', 'referencia_id', ...(conDatos ? ['datos'] : [])]
         });
 
-        res.json({ success: true, data: { avisos } });
+        res.json({
+            success: true,
+            data: {
+                avisos: conDatos
+                    ? avisos.map(a => { const j = a.toJSON(); if (j.tipo !== 'llegada') delete j.datos; return j; })
+                    : avisos
+            }
+        });
     } catch (error) {
         console.error('Error al listar avisos pendientes:', error);
         // El detalle sí se devuelve: esta ruta solo la ve el bot (va con token),

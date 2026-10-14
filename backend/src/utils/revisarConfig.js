@@ -136,6 +136,7 @@ export const banderasPlanta = async () => {
     const { ventanaAvisos, avisosUrgentes } = await import('./horarioAvisos.js');
     const { modoCorreoOrdenes } = await import('../services/email.service.js');
     const { cancelacionProgramadaEncendida } = await import('../controllers/ordenesCompra.controller.js');
+    const { vencidasUsaJulia, llegadaConDatos } = await import('../models/OrdenSeguimiento.js');
     const terminal = Object.fromEntries(configTerminal().banderas.map((b) => [b.nombre, b.encendida]));
     return [
         { nombre: 'FALLA_CERRADA', encendida: fallaCerradaEncendida() },
@@ -151,7 +152,10 @@ export const banderasPlanta = async () => {
         { nombre: 'HORARIO_AVISOS', encendida: !!ventanaAvisos() },
         { nombre: 'AVISOS_URGENTES', encendida: avisosUrgentes().length > 0 },
         { nombre: 'OC_CORREO_MODO', encendida: modoCorreoOrdenes() !== 'aprobar' },
-        { nombre: 'CANCELACION_PROGRAMADA', encendida: cancelacionProgramadaEncendida() }
+        { nombre: 'CANCELACION_PROGRAMADA', encendida: cancelacionProgramadaEncendida() },
+        // PLA-16 (C4 pasos 2 y 3)
+        { nombre: 'VENCIDAS_USA_JULIA', encendida: vencidasUsaJulia() },
+        { nombre: 'LLEGADA_CON_DATOS', encendida: llegadaConDatos() }
     ];
 };
 
