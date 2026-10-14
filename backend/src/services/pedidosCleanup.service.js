@@ -69,14 +69,19 @@ export const quedaPorRevisar = (entregado) => entregado.dispersados > 0 || entre
  * Con CIERRE_OBRA_RESPETA_ENTREGADO, los que ya tienen material entregado o compras recibidas
  * no se anulan: quedan «Por revisar · cierre de obra» (A6).
  *
+ * C1 · PLA-19 (EMPATE_POR_OBRA): con el id del proyecto, se busca primero por ID 3G: un ticket que trae ID se empata
+ * solo por ID (los de OTRA obra con el mismo nombre ya no se anulan) y uno sin ID, por nombre como siempre.
+ * Apagada (o sin proyectoId), todo por nombre como hoy.
+ *
  * @param {Object} params
  * @param {string} params.proyectoNombre - Nombre del proyecto (Movimiento.proyecto)
+ * @param {number|null} [params.proyectoId] - Id del ProduccionProyecto que se cierra (para buscar por su ID 3G)
  * @param {string} [params.motivo] - Motivo registrado en la anulación
  * @param {import('sequelize').Transaction|null} [params.transaction]
  * @param {number|null} [params.usuarioId]
  * @returns {Promise<{anulados: number, ticketIds: string[], porRevisar: number, ticketIdsPorRevisar: string[]}>}
  */
-export async function anularPedidosDeProyecto({ proyectoNombre, motivo = 'Proyecto cerrado', transaction = null, usuarioId = null }) {
+export async function anularPedidosDeProyecto({ proyectoNombre, proyectoId = null, motivo = 'Proyecto cerrado', transaction = null, usuarioId = null }) {
     if (!proyectoNombre) return { anulados: 0, ticketIds: [], porRevisar: 0, ticketIdsPorRevisar: [] };
 
     // Match flexible: traer TODOS los pedidos activos y filtrar en JS, ya que
@@ -94,7 +99,7 @@ export async function anularPedidosDeProyecto({ proyectoNombre, motivo = 'Proyec
         transaction
     });
 
-    const pedidos = candidatos.filter(p => mismosProyectos(p.proyecto, proyectoNombre));
+    const pedidos = await deLaObra(candidatos, { proyectoNombre, proyectoId, transaction });
     const respetaEntregado = cierreRespetaEntregado();
 
     const ticketIds = [];
@@ -111,6 +116,25 @@ export async function anularPedidosDeProyecto({ proyectoNombre, motivo = 'Proyec
     }
 
     return { anulados: ticketIds.length, ticketIds, porRevisar: ticketIdsPorRevisar.length, ticketIdsPorRevisar };
+}
+
+// Los tickets de la obra que se cierra. Sin EMPATE_POR_OBRA (o sin proyectoId): por nombre, la regla de siempre.
+// Con la bandera: primero por ID 3G (un ticket con ID es de la obra solo si es el mismo ID) y, si el ticket no lo trae,
+// por nombre. Si leer los ID falla, por nombre como hoy.
+async function deLaObra(candidatos, { proyectoNombre, proyectoId, transaction }) {
+    const porNombre = () => candidatos.filter(p => mismosProyectos(p.proyecto, proyectoNombre));
+    const { empatePorObra, obraIdDeProyecto, obraIdsDeTickets, ticketEsDeLaObra } = await import('./obraId.service.js');
+    if (!empatePorObra() || !proyectoId) return porNombre();
+    try {
+        const obraId = await obraIdDeProyecto(proyectoId, transaction);
+        const ids = await obraIdsDeTickets(candidatos.map(p => p.id), transaction);
+        return candidatos.filter(p => ticketEsDeLaObra({
+            ticketObraId: ids.get(p.id), ticketProyecto: p.proyecto, obraId, proyectoNombre, mismosProyectos
+        }));
+    } catch (err) {
+        console.error('[ID 3G] no se pudo empatar por ID; se anula por nombre como siempre:', err.message);
+        return porNombre();
+    }
 }
 
 // El ticket se queda como está (estado, stock y solicitudes); solo se marca con su motivo.

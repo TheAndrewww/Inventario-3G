@@ -7,6 +7,7 @@ import { avisarTicketSubido, avisarTicketCerrado } from '../services/avisosProdu
 import { registrarError } from '../utils/diagnostico.js';
 import admin from 'firebase-admin';
 import { programarBarridoCompras } from '../services/barridoCompras.service.js';
+import { copiarObraIdAlTicket } from '../services/obraId.service.js';
 
 // Normalización: minúsculas, sin acentos, espacios colapsados.
 function normalizarNombreProyecto(s) {
@@ -482,6 +483,10 @@ export const crearPedido = async (req, res) => {
     }
 
     await transaction.commit();
+
+    // C1 · PLA-19 (EMPATE_POR_OBRA): el ticket nuevo copia el ID 3G de su obra. Ya guardado el ticket y sin lanzar
+    // nunca: si no se puede, queda sin ID y al cerrar la obra se busca por nombre, como hoy. Apagada no hace nada.
+    if (proyecto) await copiarObraIdAlTicket(pedido.id, proyecto);
 
     // Enviar notificaciones según el tipo de pedido y estado
     try {

@@ -3,6 +3,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ProduccionProyecto } from '../models/index.js';
 import { Op } from 'sequelize';
+import {
+    empatePorObra, columnaId3G, ultimaColumnaConEncabezado, letraColumna, renglonesBK, idsPorRenglon, guardarObraIdProyecto,
+    obraIdsDeMes
+} from './obraId.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -124,7 +128,7 @@ const parsearFecha = (fechaStr) => {
  * Leer proyectos de producción del mes actual
  * @param {string} mes - Nombre del mes (ENERO, FEBRERO, etc.)
  */
-export const leerProyectosProduccion = async (mes = null) => {
+export const leerProyectosProduccion = async (mes = null, opciones = {}) => {
     try {
         const sheets = await authenticate();
 
@@ -145,14 +149,12 @@ export const leerProyectosProduccion = async (mes = null) => {
         // Columna K: Tipo de proyecto
         // Datos desde fila 6
 
-        const range = `${mes}!B6:K200`; // Leer un rango amplio
-
-        const response = await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: range,
-        });
-
-        const rows = response.data.values || [];
+        // C1 · PLA-19: con EMPATE_POR_OBRA la lectura llega hasta la última columna con encabezado (Sheets corta lo
+        // vacío) y «ID 3G» se busca por su nombre; B a K se arman tal cual los manda Sheets con B6:K200. Apagada, la
+        // lectura de siempre.
+        const conId = opciones.conId ?? empatePorObra();
+        const lectura = await leerPestana(sheets, mes, conId);
+        const rows = lectura.rows;
 
         if (rows.length === 0) {
             console.log(`⚠️ No se encontraron proyectos en el mes: ${mes}`);
@@ -160,10 +162,82 @@ export const leerProyectosProduccion = async (mes = null) => {
                 success: true,
                 data: [],
                 mes,
-                total: 0
+                total: 0,
+                ...(conId ? { id3g: lectura.id3g } : {})
             };
         }
 
+        const proyectos = interpretarRenglones(rows, mes, conId ? lectura.ids : null);
+
+        console.log(`✅ Proyectos encontrados: ${proyectos.length}`);
+
+        return {
+            success: true,
+            data: proyectos,
+            mes,
+            total: proyectos.length,
+            ...(conId ? { id3g: lectura.id3g } : {})
+        };
+
+    } catch (error) {
+        console.error('❌ Error al leer proyectos de producción:', error);
+
+        if (error.message?.includes('Unable to parse range')) {
+            throw new Error(`La pestaña "${mes}" no existe en el Google Sheet de producción`);
+        }
+
+        throw new Error(`Error al leer proyectos: ${error.message}`);
+    }
+};
+
+/**
+ * Una pestaña del libro. Sin ID (lo de siempre): `B6:K200`. Con ID (EMPATE_POR_OBRA): una sola lectura desde A1 hasta
+ * la última columna con datos (incluye la última con encabezado), la columna «ID 3G» por su encabezado y los renglones
+ * B..K recortados igual que los manda Sheets con `B6:K200`.
+ */
+const leerPestana = async (sheets, mes, conId) => {
+    if (!conId) {
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${mes}!B6:K200`, // Leer un rango amplio
+        });
+        return { rows: response.data.values || [] };
+    }
+    const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${mes}!A1:ZZ200`,
+    });
+    const valores = response.data.values || [];
+    const col = columnaId3G(valores);
+    const { ids, invalidas, repetidos } = idsPorRenglon(valores, col.col);
+    const ultima = ultimaColumnaConEncabezado(valores);
+    avisarColumnaId3G(mes, col, repetidos);
+    return {
+        rows: renglonesBK(valores),
+        ids,
+        invalidas,
+        repetidos,
+        hastaColumna: ultima >= 0 ? letraColumna(ultima) : null,
+        id3g: col.col === null ? { columna: null, motivo: col.motivo, ...(col.letras ? { columnas: col.letras } : {}) } : { columna: col.letra }
+    };
+};
+
+// Un aviso en el registro cuando cambia el estado de la columna «ID 3G» de una pestaña (no cada 5 minutos).
+const estadoColumnaId3G = new Map();
+const avisarColumnaId3G = (mes, col, repetidos) => {
+    const estado = col.col === null ? col.motivo : `ok:${col.letra}:${repetidos.length}`;
+    if (estadoColumnaId3G.get(mes) === estado) return;
+    estadoColumnaId3G.set(mes, estado);
+    if (col.motivo === 'sin-columna') console.log(`🏷️ [ID 3G] La pestaña ${mes} no tiene la columna «ID 3G» (DUE-14): sus proyectos quedan sin ID.`);
+    else if (col.motivo === 'varias') console.warn(`⚠️ [ID 3G] La pestaña ${mes} tiene más de una columna «ID 3G» (${col.letras.join(', ')}): no se lee ninguna.`);
+    else console.log(`🏷️ [ID 3G] ${mes}: columna ${col.letra}${repetidos.length ? `; ${repetidos.length} ID repetido(s) no se toman` : ''}.`);
+};
+
+/**
+ * Renglones (B..K, desde el renglón 6) → proyectos. Es la interpretación de siempre; con `ids` (EMPATE_POR_OBRA) cada
+ * proyecto suma `obraId` (el ID 3G de su renglón o null).
+ */
+const interpretarRenglones = (rows, mes, ids) => {
         const proyectos = [];
 
         for (let i = 0; i < rows.length; i++) {
@@ -211,28 +285,16 @@ export const leerProyectosProduccion = async (mes = null) => {
                 spreadsheetRowId: `${mes}_${i + 6}` // ID único para sincronización
             };
 
+            // C1 · PLA-19: el ID 3G es un dato más; la llave sigue siendo «MES_fila» (A3)
+            if (ids) proyecto.obraId = ids[i] || null;
+
             proyectos.push(proyecto);
         }
 
-        console.log(`✅ Proyectos encontrados: ${proyectos.length}`);
-
-        return {
-            success: true,
-            data: proyectos,
-            mes,
-            total: proyectos.length
-        };
-
-    } catch (error) {
-        console.error('❌ Error al leer proyectos de producción:', error);
-
-        if (error.message?.includes('Unable to parse range')) {
-            throw new Error(`La pestaña "${mes}" no existe en el Google Sheet de producción`);
-        }
-
-        throw new Error(`Error al leer proyectos: ${error.message}`);
-    }
+        return proyectos;
 };
+
+const conflictosAvisados = new Set();
 
 /**
  * Sincronizar proyectos de un solo mes con la base de datos.
@@ -241,7 +303,9 @@ export const leerProyectosProduccion = async (mes = null) => {
  * @returns {{ creados: number, actualizados: number, total: number }}
  */
 const sincronizarMes = async (mes) => {
-    const resultado = await leerProyectosProduccion(mes);
+    // C1 · PLA-19 (EMPATE_POR_OBRA): el ID 3G de cada renglón se guarda en el proyecto (dato; nunca pisa uno distinto)
+    const conId = empatePorObra();
+    const resultado = await leerProyectosProduccion(mes, { conId });
 
     if (!resultado.success || resultado.data.length === 0) {
         return { creados: 0, actualizados: 0, total: 0 };
@@ -249,6 +313,25 @@ const sincronizarMes = async (mes) => {
 
     let creados = 0;
     let actualizados = 0;
+    const id3g = { guardados: 0, conflictos: 0 };
+    const yaGuardados = conId ? await obraIdsDeMes(mes).catch(() => new Map()) : new Map();
+    const guardarId = async (proyectoId, p) => {
+        if (!conId || !p.obraId || yaGuardados.get(p.spreadsheetRowId) === p.obraId) return;
+        try {
+            const r = await guardarObraIdProyecto(proyectoId, p.obraId);
+            if (r === 'guardado') id3g.guardados++;
+            else if (r === 'conflicto' || r === 'repetido') {
+                id3g.conflictos++;
+                // Una vez por proyecto e ID mientras el servidor esté arriba (la sincronización corre cada 5 minutos)
+                const clave = `${proyectoId}|${p.obraId}|${r}`;
+                if (conflictosAvisados.has(clave)) return;
+                conflictosAvisados.add(clave);
+                console.warn(`⚠️ [ID 3G] "${p.nombre}" (${mes}, fila ${p.filaOriginal}): la hoja dice ${p.obraId}; no se guardó (${r === 'conflicto' ? 'el proyecto ya tiene otro ID' : 'otro proyecto activo ya tiene ese ID'}).`);
+            }
+        } catch (e) {
+            console.error(`⚠️ [ID 3G] No se pudo guardar el ID de "${p.nombre}":`, e.message);
+        }
+    };
 
     for (const proyecto of resultado.data) {
         const existente = await ProduccionProyecto.findOne({
@@ -326,8 +409,9 @@ const sincronizarMes = async (mes) => {
                 actualizados++;
                 console.log(`📝 Actualizado: "${proyecto.nombre}" (${mes}) - Cambios: ${Object.keys(cambios).join(', ')}`);
             }
+            await guardarId(existente.id, proyecto);
         } else {
-            await ProduccionProyecto.create({
+            const nuevo = await ProduccionProyecto.create({
                 nombre: proyecto.nombre,
                 fecha_entrada: proyecto.fechaIngreso,
                 fecha_limite: proyecto.fechaEntrega,
@@ -341,7 +425,11 @@ const sincronizarMes = async (mes) => {
             });
             creados++;
             console.log(`✨ Creado: "${proyecto.nombre}" (${mes}) - ${proyecto.tipoProyecto || 'sin tipo'}`);
+            await guardarId(nuevo.id, proyecto);
         }
+    }
+    if (conId && id3g.guardados) {
+        console.log(`🏷️ [ID 3G] ${mes}: ${id3g.guardados} ID guardado(s), ${id3g.conflictos} sin guardar por conflicto`);
     }
 
     // Desactivar proyectos de ESTE mes que ya NO están en el sheet (fila borrada o
@@ -363,7 +451,7 @@ const sincronizarMes = async (mes) => {
         console.log(`🚫 Desactivado (ya no está en el sheet): "${orf.nombre}" (${mes})`);
     }
 
-    return { creados, actualizados, desactivados, total: resultado.data.length };
+    return { creados, actualizados, desactivados, total: resultado.data.length, ...(conId ? { id3g } : {}) };
 };
 
 /**
@@ -440,6 +528,42 @@ export const sincronizarConDB = async (mes = null) => {
         throw error;
     }
 };
+
+/**
+ * C1 · PLA-19 — Para el ensayo del ID 3G (solo lectura): una pestaña leída como hoy (B6:K200) y como la leería la
+ * sincronización con EMPATE_POR_OBRA, y si lo de B a K salió igual. No guarda nada.
+ */
+export const leerMesParaEnsayoId3g = async (mes) => {
+    const sheets = await authenticate();
+    let hoy, ancha;
+    try {
+        hoy = await leerPestana(sheets, mes, false);
+        ancha = await leerPestana(sheets, mes, true);
+    } catch (error) {
+        if (error.message?.includes('Unable to parse range')) throw new Error(`La pestaña "${mes}" no existe en el Google Sheet de producción`);
+        throw error;
+    }
+    const deHoy = interpretarRenglones(hoy.rows, mes, null);
+    const conId = interpretarRenglones(ancha.rows, mes, ancha.ids);
+    const sinId = conId.map(({ obraId, ...resto }) => resto);
+    const diferenciasBK = [];
+    const n = Math.max(deHoy.length, sinId.length);
+    for (let i = 0; i < n; i++) {
+        if (JSON.stringify(deHoy[i]) !== JSON.stringify(sinId[i])) diferenciasBK.push({ renglon: (deHoy[i] || sinId[i])?.filaOriginal ?? null });
+    }
+    return {
+        proyectos: conId,
+        id3g: ancha.id3g,
+        invalidas: ancha.invalidas,
+        repetidos: ancha.repetidos,
+        hastaColumna: ancha.hastaColumna,
+        bkIgual: diferenciasBK.length === 0,
+        diferenciasBK: diferenciasBK.slice(0, 20)
+    };
+};
+
+/** Los meses que recorre la sincronización sin mes (de enero al mes actual). */
+export const mesesDeLaSincronizacion = () => MESES.slice(0, new Date().getMonth() + 1);
 
 /**
  * Obtener lista de meses disponibles en el spreadsheet

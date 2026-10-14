@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import produccionSheetsService from '../services/produccionSheets.service.js';
 import { festivosNegocio } from '../utils/calendarioLaboral.js';
 import { pronosticoParaTablero } from '../routes/sistemas/pronostico.js';
+import { obraIdsDeProyectos } from '../services/obraId.service.js';
 import { clasificarCodigo, contarTerminal, revisarAreaDeEtapa } from '../middleware/codigoTerminal.middleware.js';
 import {
     avisarArchivosNuevos,
@@ -60,6 +61,8 @@ export const obtenerDashboard = async (req, res) => {
         // suman `pronostico_whatsapp`; sin respuestas, la respuesta queda igual que antes.
         const pronosticos = await ProduccionProyecto.pronosticosVigentes(resultado.proyectos.map(p => p.id));
         const ahora = new Date();
+        // C1 · PLA-19: el ID 3G de la obra, solo en los proyectos que ya lo tienen (sin ID, la respuesta de siempre)
+        const obras = await obraIdsDeProyectos(resultado.proyectos.map(p => p.id));
 
         // Agregar información de colores y sub-etapas
         const resumenConColores = {};
@@ -71,7 +74,8 @@ export const obtenerDashboard = async (req, res) => {
                     porcentaje: p.getPorcentajeAvance(),
                     estadoSubEtapas: p.getEstadoSubEtapas(),
                     estadoRetraso: p.getEstadoRetraso(),
-                    ...(pronosticos.has(p.id) ? { pronostico_whatsapp: pronosticoParaTablero(pronosticos.get(p.id), ahora) } : {})
+                    ...(pronosticos.has(p.id) ? { pronostico_whatsapp: pronosticoParaTablero(pronosticos.get(p.id), ahora) } : {}),
+                    ...(obras.has(p.id) ? { obra_id: obras.get(p.id) } : {})
                 })),
                 info: COLORES_AREAS[etapa] || { nombre: etapa, color: '#6B7280' }
             };

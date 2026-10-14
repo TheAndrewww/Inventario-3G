@@ -312,6 +312,7 @@ ProduccionProyecto.addHook('afterUpdate', async (proyecto, options) => {
         const { anularPedidosDeProyecto } = await import('../services/pedidosCleanup.service.js');
         const resultado = await anularPedidosDeProyecto({
             proyectoNombre: proyecto.nombre,
+            proyectoId: proyecto.id, // C1 · PLA-19: con EMPATE_POR_OBRA busca primero por el ID 3G de la obra
             motivo: `Proyecto "${proyecto.nombre}" marcado como completado`,
             transaction: options?.transaction || null
         });

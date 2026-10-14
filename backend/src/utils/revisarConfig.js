@@ -137,6 +137,7 @@ export const banderasPlanta = async () => {
     const { modoCorreoOrdenes } = await import('../services/email.service.js');
     const { cancelacionProgramadaEncendida } = await import('../controllers/ordenesCompra.controller.js');
     const { vencidasUsaJulia, llegadaConDatos } = await import('../models/OrdenSeguimiento.js');
+    const { empatePorObra } = await import('../services/obraId.service.js');
     const terminal = Object.fromEntries(configTerminal().banderas.map((b) => [b.nombre, b.encendida]));
     return [
         { nombre: 'FALLA_CERRADA', encendida: fallaCerradaEncendida() },
@@ -155,7 +156,9 @@ export const banderasPlanta = async () => {
         { nombre: 'CANCELACION_PROGRAMADA', encendida: cancelacionProgramadaEncendida() },
         // PLA-16 (C4 pasos 2 y 3)
         { nombre: 'VENCIDAS_USA_JULIA', encendida: vencidasUsaJulia() },
-        { nombre: 'LLEGADA_CON_DATOS', encendida: llegadaConDatos() }
+        { nombre: 'LLEGADA_CON_DATOS', encendida: llegadaConDatos() },
+        // PLA-19 (C1)
+        { nombre: 'EMPATE_POR_OBRA', encendida: empatePorObra() }
     ];
 };
 

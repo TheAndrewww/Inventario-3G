@@ -471,6 +471,22 @@ app.get('/api/admin/ensayo-cancelacion-ordenes', verificarToken, esAdministrador
     }
 });
 
+// ===== Ensayo del ID 3G (C1 · PLA-19) =====
+// Solo lectura y solo administración: lee el libro de obras como lo haría la sincronización con EMPATE_POR_OBRA
+// (columna «ID 3G» por su encabezado), comprueba que lo de B a K sale igual que hoy y dice qué guardaría, qué ID
+// copiaría un ticket nuevo y qué cambiaría al cerrar cada obra. No escribe nada. `limpio: true` = se puede encender.
+app.get('/api/admin/ensayo-id3g', verificarToken, esAdministrador, async (req, res) => {
+    try {
+        const { ensayoId3g } = await import('./src/services/obraId.service.js');
+        const { leerMesParaEnsayoId3g, mesesDeLaSincronizacion } = await import('./src/services/produccionSheets.service.js');
+        const data = await ensayoId3g({ leerHoja: leerMesParaEnsayoId3g, meses: mesesDeLaSincronizacion() });
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error en el ensayo del ID 3G:', error);
+        res.status(500).json({ success: false, message: 'Error al armar el ensayo del ID 3G' });
+    }
+});
+
 // Manejo de errores
 app.use((err, req, res, next) => {
     console.error(err.stack);
@@ -1336,6 +1352,17 @@ const startServer = async () => {
             console.log('✅ Columna pronostico_whatsapp verificada en produccion_proyectos');
         } catch (pronosticoErr) {
             console.error('⚠️ Error verificando pronostico_whatsapp:', pronosticoErr.message);
+        }
+
+        // C1 · PLA-19: el ID 3G de la obra (dato, nunca llave) en el proyecto y en sus tickets. Fuera de los modelos: el
+        // JSON de proyectos y tickets no cambia. Sin EMPATE_POR_OBRA quedan vacías.
+        try {
+            await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS obra_id VARCHAR(16)");
+            await sequelize.query("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS obra_id VARCHAR(16)");
+            const { empatePorObra } = await import('./src/services/obraId.service.js');
+            console.log(`✅ Columnas obra_id (ID 3G) verificadas en produccion_proyectos y movimientos (EMPATE_POR_OBRA ${empatePorObra() ? 'encendida' : 'apagada'})`);
+        } catch (obraIdErr) {
+            console.error('⚠️ Error verificando las columnas obra_id:', obraIdErr.message);
         }
 
         // Ventana de conteo de 7 días en órdenes de compra — aplica en dev y prod

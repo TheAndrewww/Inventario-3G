@@ -20,6 +20,7 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
     const g3 = useDiseno3G();
     const tv = useTvG3();
     const nuevo = g3 || !!tv; // textos sin siglas ni emojis (apagado, lo de siempre)
+    const conObraId = g3 && !tv && !!proyecto.obra_id; // C1 · PLA-19: el ID 3G solo con Diseño 3G, fuera de las TV
     const diasRestantes = proyecto.diasRestantes;
     const esGarantia = proyecto.tipo_proyecto?.toUpperCase() === 'GTIA';
     const esMTO = proyecto.tipo_proyecto?.toUpperCase() === 'MTO';
@@ -71,8 +72,8 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
             style={{ padding: `${px(8)} ${px(12)}` }}
         >
             <div className="flex-1" style={{ minWidth: 0 }}>
-                {/* Badges */}
-                <div className="flex items-center mb-1" style={{ gap: px(4) }}>
+                {/* Badges (con el ID 3G pueden pasar a dos renglones en el celular) */}
+                <div className="flex items-center mb-1" style={{ gap: px(4), ...(conObraId ? { flexWrap: 'wrap' } : {}) }}>
                     {colorTipo.label && (nuevo ? (() => {
                         const t = tipoTv(proyecto.tipo_proyecto);
                         return (
@@ -124,6 +125,21 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
                             ? (nuevo ? ETAPAS_CONFIG.instalacion.nombre : ETAPAS_CONFIG.instalacion.nombre.toUpperCase())
                             : ETAPAS_CONFIG[proyecto.etapa_actual]?.nombre}
                     </span>
+                    {/* C1 · PLA-19: el ID 3G de la obra (lo genera Operación en el libro de obras). Solo con Diseño 3G y fuera
+                        de las TV; con el diseño de siempre no se monta nada. */}
+                    {conObraId && (
+                        <span
+                            className="inline-flex items-center font-semibold rounded-full"
+                            title="ID 3G de la obra (libro de obras)"
+                            style={{
+                                fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, gap: px(4), whiteSpace: 'nowrap',
+                                fontFamily: 'var(--g3-f-mono)', background: 'var(--g3-neutro-suave)', color: 'var(--g3-tinta-2)',
+                                border: '1px solid var(--g3-linea)'
+                            }}
+                        >
+                            {proyecto.obra_id}
+                        </span>
+                    )}
                 </div>
 
                 {/* Nombre y cliente. Con onAbrirCarpeta, abren la carpeta de Drive. */}
