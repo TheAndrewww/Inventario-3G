@@ -2,6 +2,7 @@ import { ProduccionProyecto, Usuario, sequelize } from '../models/index.js';
 import { Op } from 'sequelize';
 import produccionSheetsService from '../services/produccionSheets.service.js';
 import { festivosNegocio } from '../utils/calendarioLaboral.js';
+import { pronosticoParaTablero } from '../routes/sistemas/pronostico.js';
 import { clasificarCodigo, contarTerminal, revisarAreaDeEtapa } from '../middleware/codigoTerminal.middleware.js';
 import {
     avisarArchivosNuevos,
@@ -55,6 +56,11 @@ export const obtenerDashboard = async (req, res) => {
     try {
         const resultado = await ProduccionProyecto.obtenerResumenDashboard();
 
+        // C7 · PLA-17: el sí o el no de Producción por WhatsApp (de los últimos días). Solo los proyectos que lo tienen
+        // suman `pronostico_whatsapp`; sin respuestas, la respuesta queda igual que antes.
+        const pronosticos = await ProduccionProyecto.pronosticosVigentes(resultado.proyectos.map(p => p.id));
+        const ahora = new Date();
+
         // Agregar información de colores y sub-etapas
         const resumenConColores = {};
         Object.keys(resultado.resumen).forEach(etapa => {
@@ -64,7 +70,8 @@ export const obtenerDashboard = async (req, res) => {
                     diasRestantes: p.getDiasRestantes(),
                     porcentaje: p.getPorcentajeAvance(),
                     estadoSubEtapas: p.getEstadoSubEtapas(),
-                    estadoRetraso: p.getEstadoRetraso()
+                    estadoRetraso: p.getEstadoRetraso(),
+                    ...(pronosticos.has(p.id) ? { pronostico_whatsapp: pronosticoParaTablero(pronosticos.get(p.id), ahora) } : {})
                 })),
                 info: COLORES_AREAS[etapa] || { nombre: etapa, color: '#6B7280' }
             };

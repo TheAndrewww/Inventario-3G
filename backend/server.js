@@ -1327,6 +1327,17 @@ const startServer = async () => {
             console.error('⚠️ Error verificando archivos_ticket:', ticketColErr.message);
         }
 
+        // C7 · PLA-17: el sí o el no de Producción por WhatsApp (la manda Finanzas). Fuera del modelo: el JSON de los
+        // proyectos no cambia; solo el tablero lo suma cuando hay uno vigente.
+        try {
+            await sequelize.query(
+                "ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS pronostico_whatsapp JSONB"
+            );
+            console.log('✅ Columna pronostico_whatsapp verificada en produccion_proyectos');
+        } catch (pronosticoErr) {
+            console.error('⚠️ Error verificando pronostico_whatsapp:', pronosticoErr.message);
+        }
+
         // Ventana de conteo de 7 días en órdenes de compra — aplica en dev y prod
         try {
             await sequelize.query(

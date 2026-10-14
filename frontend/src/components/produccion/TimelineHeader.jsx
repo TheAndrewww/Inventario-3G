@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { User, Clock, Calendar, AlertTriangle } from 'lucide-react';
+import { User, Clock, Calendar, AlertTriangle, CheckCircle2, CalendarClock } from 'lucide-react';
 import { s, px, calcularDiasPorEtapa, esUrgenteMTO } from '../../utils/produccion';
 import { ETAPAS_CONFIG, getColorPorTipo, calcularPorcentaje, usaTimelineSimplificado } from './constants';
 import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
@@ -160,6 +160,26 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
                         )}
                     </>
                 )}
+
+                {/* C7 · PLA-17: el sí o el no de Producción por WhatsApp (lo manda Julia). Solo Diseño 3G o TV con ?diseno=3g;
+                    con el diseño de siempre no se monta nada. Solo informa: no cierra ni mueve la etapa. */}
+                {nuevo && proyecto.pronostico_whatsapp?.texto && (() => {
+                    const si = proyecto.pronostico_whatsapp.respuesta === 'si';
+                    const Icono = si ? CheckCircle2 : CalendarClock;
+                    return (
+                        <p
+                            className="inline-flex items-center font-semibold rounded-xl"
+                            style={{
+                                marginTop: px(8), fontSize: s(1.05), padding: `${px(3)} ${px(10)}`, gap: px(6), maxWidth: '100%', lineHeight: 1.3,
+                                background: si ? 'var(--g3-ok-suave)' : 'var(--g3-aviso-suave)',
+                                color: si ? 'var(--g3-ok)' : 'var(--g3-aviso)'
+                            }}
+                        >
+                            <Icono style={{ width: s(1.1), height: s(1.1), flex: 'none' }} aria-hidden="true" />
+                            <span style={{ minWidth: 0 }}>{proyecto.pronostico_whatsapp.texto}</span>
+                        </p>
+                    );
+                })()}
             </div>
 
             {/* Círculo de progreso + días restantes */}
