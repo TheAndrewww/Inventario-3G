@@ -8,6 +8,10 @@ import ConfigurarStockMinimoModal from '../components/camionetas/ConfigurarStock
 import ChecklistManager from '../components/equipos/ChecklistManager';
 import ChecklistEquipoModal from '../components/equipos/ChecklistEquipoModal';
 import toast from 'react-hot-toast';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
+import MasAcciones from '../diseno-3g/MasAcciones';
+import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
 
 const CamionetasPage = () => {
   const [camionetas, setCamionetas] = useState([]);
@@ -22,6 +26,7 @@ const CamionetasPage = () => {
   const [camionetaConfiguracion, setCamionetaConfiguracion] = useState(null);
   const [mostrarChecklistManager, setMostrarChecklistManager] = useState(false);
   const [equipoChecklist, setEquipoChecklist] = useState(null);
+  const g3 = useDiseno3G(); // Diseño 3G: encabezado, un botón principal por equipo y confirmación del paquete (apagado, lo de siempre)
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
@@ -167,7 +172,16 @@ const CamionetasPage = () => {
   };
 
   const handleEliminar = async (camionetaId) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar este equipo?')) {
+    if (g3Activo()) {
+      // Vista previa con los datos del equipo que ya están en pantalla; la petición de después es la misma
+      const eq = camionetas.find(c => c.id === camionetaId);
+      if (!(await confirmarG3({
+        titulo: '¿Eliminar este equipo?',
+        datos: eq ? [['Equipo', eq.nombre], ['Encargado', eq.encargado?.nombre || 'Sin asignar']] : [],
+        pasa: ['El equipo se marca como inactivo; no se borra de la base de datos.'],
+        confirmar: 'Eliminar equipo', cancelar: 'No eliminar', peligro: true,
+      }))) return;
+    } else if (!confirm('¿Estás seguro de que deseas eliminar este equipo?')) {
       return;
     }
 
@@ -208,6 +222,16 @@ const CamionetasPage = () => {
   return (
     <div className="p-6">
       {/* Header */}
+      {g3 ? (
+        <CabG3 titulo="Equipos" descripcion="Los equipos y áreas de la empresa, con su inventario, sus mínimos y su checklist.">
+          <button type="button" onClick={() => setMostrarChecklistManager(true)} className="g3-btn g3-btn--ch">
+            <ClipboardList size={16} aria-hidden="true" /> Catálogo del checklist
+          </button>
+          <button type="button" onClick={abrirModalNuevo} className="g3-btn g3-btn--primario">
+            <Plus size={18} aria-hidden="true" /> Nuevo equipo
+          </button>
+        </CabG3>
+      ) : (
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gestión de Equipos</h1>
@@ -232,6 +256,7 @@ const CamionetasPage = () => {
           </button>
         </div>
       </div>
+      )}
 
       {/* Lista de equipos */}
       {camionetas.length === 0 ? (
@@ -255,12 +280,12 @@ const CamionetasPage = () => {
           {camionetas.map((camioneta) => (
             <div
               key={camioneta.id}
-              className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:border-red-300 transition-colors"
+              className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:border-red-300 transition-colors g3:hover:!border-g3-linea-fuerte"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                    <Briefcase size={24} className="text-red-700" />
+                  <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center g3:!bg-g3-primario-suave">
+                    <Briefcase size={24} className="text-red-700 g3:!text-g3-sobre-primario-suave" />
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-900">{camioneta.nombre}</h3>
@@ -287,7 +312,7 @@ const CamionetasPage = () => {
 
                 {camioneta.almacenBase && (
                   <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-xs text-blue-600 mb-1">Almacén Base</p>
+                    <p className="text-xs text-blue-600 mb-1">{g3 ? 'Almacén base' : 'Almacén Base'}</p>
                     <p className="font-medium text-blue-900">
                       {camioneta.almacenBase.nombre}
                     </p>
@@ -295,6 +320,20 @@ const CamionetasPage = () => {
                 )}
               </div>
 
+              {g3 ? (
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => abrirInventario(camioneta)} className="g3-btn g3-btn--tonal g3-btn--ch flex-1">
+                    <Package size={16} aria-hidden="true" /> Inventario
+                  </button>
+                  <MasAcciones titulo={camioneta.nombre} acciones={[
+                    { texto: 'Configurar mínimos', icono: Settings, onClick: () => abrirConfiguracion(camioneta) },
+                    { texto: 'Checklist', icono: ClipboardCheck, onClick: () => setEquipoChecklist(camioneta) },
+                    { texto: 'Editar equipo', icono: Edit, onClick: () => abrirModalEditar(camioneta) },
+                    '-',
+                    { texto: 'Eliminar equipo', icono: Trash2, peligro: true, onClick: () => handleEliminar(camioneta.id) },
+                  ]} />
+                </div>
+              ) : (
               <div className="flex flex-col gap-2">
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -337,6 +376,7 @@ const CamionetasPage = () => {
                   </button>
                 </div>
               </div>
+              )}
             </div>
           ))}
         </div>

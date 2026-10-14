@@ -26,9 +26,12 @@ import { Loader, Modal, Button } from '../components/common';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { getImageUrl } from '../utils/imageUtils';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
 
 const RentaHerramientasPage = () => {
     const navigate = useNavigate();
+    const g3 = useDiseno3G(); // Diseño 3G: encabezado y estados con texto, sin emojis (apagado, lo de siempre)
     const [tipos, setTipos] = useState([]);
     const [tiposExpandidos, setTiposExpandidos] = useState({});
     const [unidadesPorTipo, setUnidadesPorTipo] = useState({});
@@ -143,6 +146,10 @@ const RentaHerramientasPage = () => {
         };
         const badge = badges[condicion] || badges.bueno;
         const Icon = badge.icon;
+        if (g3) {
+            const g3c = { bueno: ['ok', 'Bueno'], regular: ['aviso', 'Regular'], malo: ['mal', 'Malo'], perdido: ['neutro', 'Perdido'], baja: ['neutro', 'Baja'] }[condicion] || ['ok', 'Bueno'];
+            return <span className={`g3-estado g3-estado--${g3c[0]}`}>{g3c[1]}</span>;
+        }
         return (
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${badge.color}`}>
                 <Icon size={10} />
@@ -162,6 +169,10 @@ const RentaHerramientasPage = () => {
             en_transito: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', texto: 'En tránsito' }
         };
         const badge = badges[estatus] || badges.disponible;
+        if (g3) {
+            const tono = { disponible: 'ok', asignado: 'info', en_reparacion: 'aviso', en_transito: 'info' }[estatus] || 'ok';
+            return <span className={`g3-estado g3-estado--${tono}`}>{badge.texto}</span>;
+        }
         return (
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${badge.color}`}>
                 {badge.texto}
@@ -205,12 +216,16 @@ const RentaHerramientasPage = () => {
     return (
         <div className="p-6">
             {/* Header */}
+            {g3 ? (
+                <CabG3 titulo="Herramientas de renta" descripcion="Gestiona las herramientas de renta con seguimiento individual de cada unidad." />
+            ) : (
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Herramientas de Renta</h1>
                 <p className="text-gray-600">
                     Gestiona las herramientas de renta con seguimiento individual de cada unidad
                 </p>
             </div>
+            )}
 
             {/* Barra de acciones */}
             <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
@@ -231,12 +246,20 @@ const RentaHerramientasPage = () => {
                         className="bg-red-700 hover:bg-red-800 text-white"
                     >
                         <Plus size={20} />
-                        Nuevo Tipo de Herramienta
+                        {g3 ? 'Nuevo tipo de herramienta' : 'Nuevo Tipo de Herramienta'}
                     </Button>
                 )}
             </div>
 
             {/* Estadísticas globales */}
+            {g3 ? (
+                <div className="g3-rejilla g3-rejilla--4 g3p-cab">
+                    <div className="g3-kpi"><span className="g3-kpi-valor">{tipos.length}</span><span className="g3-kpi-texto">Tipos de herramienta</span></div>
+                    <div className="g3-kpi"><span className="g3-kpi-valor">{stats.totalUnidades}</span><span className="g3-kpi-texto">Total de unidades</span></div>
+                    <div className="g3-kpi"><span className="g3-kpi-valor">{stats.disponibles}</span><span className="g3-kpi-texto">Disponibles</span></div>
+                    <div className="g3-kpi"><span className="g3-kpi-valor">{stats.asignadas}</span><span className="g3-kpi-texto">Asignadas</span></div>
+                </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
                     <div className="flex items-center justify-between">
@@ -278,6 +301,7 @@ const RentaHerramientasPage = () => {
                     </div>
                 </div>
             </div>
+            )}
 
             {/* Lista de tipos */}
             {tiposFiltrados.length === 0 ? (
@@ -1144,6 +1168,7 @@ const ModalNuevoTipo = ({ isOpen, onClose, onSuccess }) => {
 // Modal para cambiar estado de una unidad
 const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
+    const g3 = useDiseno3G(); // Diseño 3G: opciones sin emojis
     const [nuevaCondicion, setNuevaCondicion] = useState('');
     const [motivo, setMotivo] = useState('');
 
@@ -1198,7 +1223,9 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
                 condicion: nuevaCondicion,
                 motivo: motivo.trim()
             });
-            toast.success(`Condición cambiada a "${condicionesDisponibles.find(c => c.value === nuevaCondicion)?.label}"`);
+            toast.success(g3
+                ? `Condición cambiada a «${(condicionesDisponibles.find(c => c.value === nuevaCondicion)?.label || '').replace(/^[^\p{L}\p{N}]+/u, '')}»`
+                : `Condición cambiada a "${condicionesDisponibles.find(c => c.value === nuevaCondicion)?.label}"`);
             onSuccess();
         } catch (error) {
             console.error('Error al cambiar condición:', error);
@@ -1251,7 +1278,7 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
                                 className={`
                                     px-4 py-3 rounded-lg border-2 text-left transition-all
                                     ${nuevaCondicion === condicion.value
-                                        ? 'border-red-600 bg-red-50'
+                                        ? 'border-red-600 bg-red-50 g3:!border-g3-primario g3:!bg-g3-primario-tinte'
                                         : 'border-gray-200 bg-white hover:border-gray-300'
                                     }
                                     ${condicionActual === condicion.value ? 'opacity-50' : ''}
@@ -1259,7 +1286,7 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
                                 disabled={condicionActual === condicion.value}
                             >
                                 <span className={`text-sm font-medium ${condicion.color}`}>
-                                    {condicion.label}
+                                    {g3 ? condicion.label.replace(/^[^\p{L}\p{N}]+/u, '') : condicion.label}
                                 </span>
                                 <span className="block text-xs text-gray-500 mt-1">
                                     {condicion.desc}

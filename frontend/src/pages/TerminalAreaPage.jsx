@@ -20,6 +20,8 @@ import {
 import produccionService from '../services/produccion.service';
 import { esProyectoMTO, esUrgenteMTO } from '../utils/produccion';
 import toast, { Toaster } from 'react-hot-toast';
+import { useTvG3 } from '../diseno-3g/tvG3';
+import { BarraTv, VivoTv, CargandoTv } from '../diseno-3g/PiezasTv';
 
 // Configuración de áreas
 const AREAS_CONFIG = {
@@ -64,6 +66,7 @@ const AREAS_CONFIG = {
 
 // Pantalla de login con código de área
 const LoginArea = ({ onLogin }) => {
+    const tv = useTvG3(); // Diseño 3G para TV (solo con ?diseno=3g en la liga de la terminal)
     const [codigo, setCodigo] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -84,6 +87,37 @@ const LoginArea = ({ onLogin }) => {
             setLoading(false);
         }
     };
+
+    if (tv) {
+        // Mismo formulario y mismo manejador; solo cambia cómo se ve.
+        return (
+            <div className="g3tv-acceso">
+                <div className="g3tv-acceso-tarjeta">
+                    <span className="g3tv-marca" aria-hidden="true">3G</span>
+                    <h1>Terminal de producción</h1>
+                    <p>Ingresa el código de tu área</p>
+                    <form onSubmit={handleSubmit}>
+                        <label htmlFor="g3tv-codigo">Código del área</label>
+                        <input
+                            id="g3tv-codigo"
+                            type="text"
+                            value={codigo}
+                            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+                            className="g3tv-codigo"
+                            placeholder="XXX-0000"
+                            maxLength={8}
+                            autoComplete="off"
+                            autoFocus
+                        />
+                        <button type="submit" disabled={loading || !codigo.trim()} className="g3tv-btn g3tv-btn--primario g3tv-btn--grande">
+                            {loading ? 'Validando…' : 'Entrar'}
+                        </button>
+                    </form>
+                    <p className="g3tv-pie-texto">3G Velarias · Sistema de producción</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-8">
@@ -129,12 +163,29 @@ const LoginArea = ({ onLogin }) => {
 
 // Modal para visualizar PDFs
 const PDFViewerModal = ({ archivo, onClose }) => {
+    const tv = useTvG3();
     if (!archivo) return null;
 
     // Generar link de embed para Google Drive
     const embedLink = archivo.link
         ? archivo.link.replace('/view', '/preview')
         : `https://drive.google.com/file/d/${archivo.id}/preview`;
+
+    if (tv) {
+        return (
+            <div className="g3tv-visor" role="dialog" aria-modal="true" aria-label={archivo.nombre}>
+                <div className="g3tv-visor-hoja">
+                    <div className="g3tv-visor-cab">
+                        <h3><FileText size={24} aria-hidden="true" />{archivo.nombre}</h3>
+                        <button type="button" onClick={onClose} className="g3tv-btn g3tv-btn--contorno">
+                            <X aria-hidden="true" />Cerrar plano
+                        </button>
+                    </div>
+                    <iframe src={embedLink} title={archivo.nombre} allow="autoplay" />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-75">
@@ -169,6 +220,7 @@ const PDFViewerModal = ({ archivo, onClose }) => {
 
 // Tarjeta de proyecto para terminal (grande y simple)
 const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: globalLoading, area }) => {
+    const tv = useTvG3();
     const [loading, setLoading] = useState(false);
     const [archivosLoading, setArchivosLoading] = useState(false);
     const [archivos, setArchivos] = useState(null);
@@ -213,6 +265,79 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
     // Obtener archivos relevantes para esta área
     const archivosRelevantes = archivos?.archivos?.[area] || [];
     const tieneArchivos = archivosRelevantes.length > 0;
+
+    if (tv) {
+        // Mismos datos, mismos planos y el mismo botón (mismo manejador); sin emojis y con el azul de acción.
+        const plazoMal = diasRestantes !== null && diasRestantes <= 3;
+        return (
+            <article className={`g3tv-obra${esUrgente ? ' g3tv-obra--urgente' : ''}`}>
+                {pdfAbierto && (
+                    <PDFViewerModal
+                        archivo={pdfAbierto}
+                        onClose={() => setPdfAbierto(null)}
+                    />
+                )}
+                <div className="g3tv-obra-cab">
+                    <div className="g3tv-pila" style={{ gap: 8 }}>
+                        {esUrgente && (
+                            <span className="g3tv-etq g3tv-etq--mal" style={{ justifySelf: 'start' }}><AlertTriangle aria-hidden="true" />Urgente</span>
+                        )}
+                        <h2>{proyecto.nombre}</h2>
+                        {proyecto.cliente && <p className="g3tv-cliente">{proyecto.cliente}</p>}
+                    </div>
+                    <span className="g3tv-num">#{proyecto.id}</span>
+                </div>
+                {proyecto.fecha_limite && (
+                    <p className={`g3tv-obra-plazo${plazoMal ? ' g3tv-obra-plazo--mal' : ''}`}>
+                        <Clock aria-hidden="true" />
+                        {diasRestantes !== null && diasRestantes < 0
+                            ? `Vencido hace ${Math.abs(diasRestantes)} días`
+                            : diasRestantes === 0
+                                ? 'Vence hoy'
+                                : diasRestantes !== null
+                                    ? `${diasRestantes} días restantes`
+                                    : new Date(proyecto.fecha_limite).toLocaleDateString('es-MX', {
+                                        weekday: 'short',
+                                        day: 'numeric',
+                                        month: 'short'
+                                    })}
+                    </p>
+                )}
+                {(area === 'manufactura' || area === 'herreria') && (
+                    archivosLoading ? (
+                        <p className="g3tv-nota"><RefreshCw size={18} className="g3tv-gira" aria-hidden="true" /> Cargando planos…</p>
+                    ) : tieneArchivos ? (
+                        <div className="g3tv-planos">
+                            <p>{archivosRelevantes.length} plano{archivosRelevantes.length !== 1 ? 's' : ''} disponible{archivosRelevantes.length !== 1 ? 's' : ''}</p>
+                            {archivosRelevantes.map((archivo, index) => (
+                                <button
+                                    key={archivo.id || index}
+                                    type="button"
+                                    onClick={() => setPdfAbierto(archivo)}
+                                    className="g3tv-btn g3tv-btn--tonal g3tv-btn--bloque"
+                                >
+                                    <Eye aria-hidden="true" />
+                                    Ver: {archivo.nombre}
+                                </button>
+                            ))}
+                        </div>
+                    ) : archivos && !tieneArchivos ? (
+                        <p className="g3tv-nota">Sin planos en Drive para este proyecto</p>
+                    ) : null
+                )}
+                <button
+                    type="button"
+                    onClick={handleCompletar}
+                    disabled={loading || globalLoading}
+                    className="g3tv-btn g3tv-btn--primario g3tv-btn--grande"
+                >
+                    {loading
+                        ? <><RefreshCw className="g3tv-gira" aria-hidden="true" />Procesando…</>
+                        : <><CheckCircle2 aria-hidden="true" />Marcar como completado</>}
+                </button>
+            </article>
+        );
+    }
 
     return (
         <div className={`bg-white rounded-2xl shadow-xl p-6 border-4 ${esUrgente ? 'border-red-500 ring-4 ring-red-200' : 'border-white'
@@ -330,6 +455,7 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
 
 // Pantalla principal del terminal
 const TerminalView = ({ area, onLogout }) => {
+    const tv = useTvG3(); // Diseño 3G para TV: mismos datos, misma actualización cada 15 s
     const areaConfig = AREAS_CONFIG[area];
     const Icon = areaConfig?.icon || Package;
 
@@ -379,7 +505,20 @@ const TerminalView = ({ area, onLogout }) => {
                         ? `${areaConfig.nombre} completada ✅ ¡Listo para Instalación!`
                         : `${areaConfig.nombre} completada ✅`;
 
-                    toast.success(
+                    if (tv) {
+                        // Mismo aviso, sin emojis
+                        toast.success(
+                            <div className="g3tv-aviso">
+                                <div>{response.data.puedeAvanzarAInstalacion ? `${areaConfig.nombre} completada. ¡Listo para instalación!` : `${areaConfig.nombre} completada.`}</div>
+                                {!response.data.puedeAvanzarAInstalacion && (
+                                    <div style={{ fontSize: '1rem', fontWeight: 500, opacity: 0.85, marginTop: 4 }}>
+                                        Esperando {areaConfig.subEtapa === 'manufactura' ? 'Herrería' : 'Manufactura'}
+                                    </div>
+                                )}
+                            </div>,
+                            { duration: 4000 }
+                        );
+                    } else toast.success(
                         <div className="text-center">
                             <div className="text-2xl mb-1">✅</div>
                             <div className="font-bold">{mensaje}</div>
@@ -398,10 +537,14 @@ const TerminalView = ({ area, onLogout }) => {
 
                 if (response.success) {
                     toast.success(
-                        <div className="text-center">
-                            <div className="text-2xl mb-1">✅</div>
-                            <div className="font-bold">{response.message}</div>
-                        </div>,
+                        tv
+                            ? <div className="g3tv-aviso">{response.message}</div>
+                            : (
+                                <div className="text-center">
+                                    <div className="text-2xl mb-1">✅</div>
+                                    <div className="font-bold">{response.message}</div>
+                                </div>
+                            ),
                         { duration: 3000 }
                     );
                 }
@@ -414,12 +557,70 @@ const TerminalView = ({ area, onLogout }) => {
         }
     };
 
+    if (loading && tv) return <CargandoTv>Cargando proyectos…</CargandoTv>;
     if (loading) {
         return (
             <div className={`min-h-screen bg-gradient-to-br ${areaConfig?.bgGradient || 'from-gray-600 to-gray-800'} flex items-center justify-center`}>
                 <div className="text-center text-white">
                     <RefreshCw size={64} className="animate-spin mx-auto mb-4" />
                     <p className="text-2xl">Cargando proyectos...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (tv) {
+        return (
+            <div className="g3tv" style={{ minHeight: '100vh' }}>
+                <div className="g3tv-desplaza" style={{ height: 'auto' }}>
+                    <div className="g3tv-pila">
+                        <BarraTv
+                            titulo={areaConfig?.nombre}
+                            icono={Icon}
+                            subtitulo={<><b>{proyectos.length}</b> proyecto{proyectos.length !== 1 ? 's' : ''} pendiente{proyectos.length !== 1 ? 's' : ''}</>}
+                            derecha={(
+                                <>
+                                    <VivoTv>En vivo · cada 15 segundos</VivoTv>
+                                    <button
+                                        type="button"
+                                        onClick={() => cargarProyectos(false)}
+                                        disabled={actualizando}
+                                        className="g3tv-btn g3tv-btn--contorno"
+                                    >
+                                        <RefreshCw className={actualizando ? 'g3tv-gira' : ''} aria-hidden="true" />
+                                        Actualizar
+                                    </button>
+                                    <button type="button" onClick={onLogout} className="g3tv-btn g3tv-btn--contorno">
+                                        <LogOut aria-hidden="true" />
+                                        Salir
+                                    </button>
+                                </>
+                            )}
+                        />
+                        {proyectos.length === 0 ? (
+                            <div className="g3tv-vacio">
+                                <CheckCircle2 aria-hidden="true" />
+                                <b>¡Todo completado!</b>
+                                <p>No hay proyectos pendientes en esta área</p>
+                            </div>
+                        ) : (
+                            <div className="g3tv-rejilla">
+                                {proyectos.map(proyecto => (
+                                    <ProyectoCardTerminal
+                                        key={proyecto.id}
+                                        proyecto={proyecto}
+                                        onCompletar={handleCompletar}
+                                        areaConfig={areaConfig}
+                                        loading={actualizando}
+                                        area={area}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="g3tv-pie-fijo">
+                    <span>3G Velarias · Terminal de {areaConfig?.nombre}{actualizando && ' · Actualizando…'}</span>
                 </div>
             </div>
         );
@@ -495,6 +696,9 @@ const TerminalView = ({ area, onLogout }) => {
 const TerminalAreaPage = () => {
     const { area: areaParam } = useParams();
     const navigate = useNavigate();
+    const tv = useTvG3();
+    // Diseño 3G para TV: la liga conserva ?diseno=3g al entrar y salir del área, para que la tableta siga igual si se recarga.
+    const sufijoTv = tv ? `?diseno=3g${tv === 'oscuro' ? '&tema=oscuro' : ''}` : '';
     const [area, setArea] = useState(areaParam || null);
 
     // Si llega con área en la URL, usarla directamente
@@ -506,12 +710,12 @@ const TerminalAreaPage = () => {
 
     const handleLogin = (areaValidada) => {
         setArea(areaValidada);
-        navigate(`/terminal/${areaValidada}`, { replace: true });
+        navigate(`/terminal/${areaValidada}${sufijoTv}`, { replace: true });
     };
 
     const handleLogout = () => {
         setArea(null);
-        navigate('/terminal', { replace: true });
+        navigate(`/terminal${sufijoTv}`, { replace: true });
     };
 
     return (

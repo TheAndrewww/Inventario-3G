@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Warehouse, Search, Package, Minus, ArrowLeft, X, CheckCircle2, AlertTriangle, Layers, Ruler } from 'lucide-react';
+import { Warehouse, Search, Package, Minus, ArrowLeft, X, CheckCircle2, AlertTriangle, Layers, Ruler, Palette } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
 
 const API = '/descontar-almacen';
 const API_ROLLOS = '/rollos-membrana';
@@ -33,6 +35,7 @@ const DescontarAlmacenPage = () => {
     const cantidadRef = useRef(null);
     const cantidadRolloRef = useRef(null);
     const searchRef = useRef(null);
+    const g3 = useDiseno3G(); // Diseño 3G: encabezado, botones de acción y textos sin emojis (apagado, lo de siempre)
 
     useEffect(() => {
         cargarAlmacenes();
@@ -113,7 +116,7 @@ const DescontarAlmacenPage = () => {
                 observaciones: observaciones || null
             });
 
-            toast.success(`-${cantidadNum} ${articuloDescuento.unidad} descontados`, { icon: '✅' });
+            toast.success(`-${cantidadNum} ${articuloDescuento.unidad} descontados`, g3 ? undefined : { icon: '✅' });
 
             setArticulos(prev => prev.map(a => {
                 if (a.id === articuloDescuento.id) {
@@ -176,7 +179,7 @@ const DescontarAlmacenPage = () => {
                 observaciones: obsRollo || null
             });
 
-            toast.success(`-${amount}m de "${rolloSeleccionado.identificador}"`, { icon: '✅' });
+            toast.success(`-${amount}m de "${rolloSeleccionado.identificador}"`, g3 ? undefined : { icon: '✅' });
 
             // Refrescar rollos
             setRolloSeleccionado(null);
@@ -225,6 +228,30 @@ const DescontarAlmacenPage = () => {
     return (
         <div className="p-4 md:p-6 max-w-2xl mx-auto">
             {/* Header */}
+            {g3 ? (
+                <CabG3
+                    titulo={rollosArticulo ? rollosArticulo.nombre : almacenSeleccionado || 'Descuento de almacén'}
+                    descripcion={rollosArticulo
+                        ? 'Elige un rollo para descontar metraje.'
+                        : almacenSeleccionado
+                            ? (esMembranas ? 'Elige un artículo para ver sus rollos.' : 'Elige un artículo para descontarlo.')
+                            : 'Elige el almacén del que vas a descontar material.'}
+                    miga={almacenSeleccionado && (
+                        <nav className="g3-miga" aria-label="Ruta">
+                            <span>Descuento de almacén</span>
+                            <span aria-hidden="true">›</span>
+                            <span aria-current={rollosArticulo ? undefined : 'page'}>{almacenSeleccionado}</span>
+                            {rollosArticulo && <><span aria-hidden="true">›</span><span aria-current="page">{rollosArticulo.nombre}</span></>}
+                        </nav>
+                    )}
+                >
+                    {almacenSeleccionado && (
+                        <button type="button" onClick={rollosArticulo ? cerrarRollos : volverAAlmacenes} className="g3-btn g3-btn--ch">
+                            <ArrowLeft size={16} aria-hidden="true" /> {rollosArticulo ? 'Regresar a los artículos' : 'Cambiar almacén'}
+                        </button>
+                    )}
+                </CabG3>
+            ) : (
             <div className="flex items-center gap-3 mb-5">
                 {almacenSeleccionado && (
                     <button
@@ -259,6 +286,7 @@ const DescontarAlmacenPage = () => {
                     </div>
                 </div>
             </div>
+            )}
 
             {/* ===== VISTA: SELECTOR DE ALMACÉN ===== */}
             {!almacenSeleccionado && (
@@ -368,7 +396,7 @@ const DescontarAlmacenPage = () => {
                                 <button
                                     onClick={confirmarDescuento}
                                     disabled={descontando || !cantidad || parseFloat(cantidad) <= 0 || parseFloat(cantidad) > parseFloat(articuloDescuento.stock_actual)}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium active:scale-[0.98]"
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium active:scale-[0.98] g3:!bg-g3-primario g3:hover:!bg-g3-primario-hover g3:!text-g3-sobre-primario"
                                 >
                                     {descontando ? (
                                         <>
@@ -378,7 +406,7 @@ const DescontarAlmacenPage = () => {
                                     ) : (
                                         <>
                                             <Minus size={18} />
-                                            Confirmar Descuento
+                                            {g3 ? 'Confirmar descuento' : 'Confirmar Descuento'}
                                         </>
                                     )}
                                 </button>
@@ -522,7 +550,7 @@ const DescontarAlmacenPage = () => {
                                 <button
                                     onClick={confirmarDescuentoRollo}
                                     disabled={descontandoRollo || !cantidadRollo || parseFloat(cantidadRollo) <= 0 || parseFloat(cantidadRollo) > parseFloat(rolloSeleccionado.metraje_restante)}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium active:scale-[0.98]"
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium active:scale-[0.98] g3:!bg-g3-primario g3:hover:!bg-g3-primario-hover g3:!text-g3-sobre-primario"
                                 >
                                     {descontandoRollo ? (
                                         <>
@@ -532,7 +560,7 @@ const DescontarAlmacenPage = () => {
                                     ) : (
                                         <>
                                             <Minus size={18} />
-                                            Confirmar Descuento
+                                            {g3 ? 'Confirmar descuento' : 'Confirmar Descuento'}
                                         </>
                                     )}
                                 </button>
@@ -570,7 +598,7 @@ const DescontarAlmacenPage = () => {
                                             <div className="flex items-center gap-2">
                                                 <span className="font-bold text-gray-900 text-sm">{rollo.identificador}</span>
                                                 {rollo.color && (
-                                                    <span className="text-xs text-gray-400">🎨 {rollo.color}</span>
+                                                    <span className="text-xs text-gray-400">{g3 ? <Palette size={12} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '🎨 '}{rollo.color}</span>
                                                 )}
                                             </div>
                                             <div className="text-right">

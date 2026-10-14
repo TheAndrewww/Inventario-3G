@@ -4,6 +4,8 @@ import pedidosService from '../services/pedidos.service';
 import { Loader, Modal } from '../components/common';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
 
 // Devuelve solo las observaciones originales del ticket (recorta anotaciones
 // auto-añadidas: [ANULADO], [CANCELADO], [RECHAZADO]... y el placeholder
@@ -18,6 +20,7 @@ const obsOriginales = (texto) => {
 
 const PedidosPendientesPage = () => {
   const { user } = useAuth();
+  const g3 = useDiseno3G(); // Diseño 3G: solo textos e íconos (apagado, el DOM de siempre)
   const esAdmin = user?.rol === 'administrador';
 
   const [pedidos, setPedidos] = useState([]);
@@ -69,7 +72,16 @@ const PedidosPendientesPage = () => {
 
   const handleEliminarTicket = async (pedido, e) => {
     if (e) e.stopPropagation();
-    if (!window.confirm(`¿Eliminar el ticket ${pedido.ticket_id}? Se revertirá el stock de sus artículos y no se puede deshacer.`)) return;
+    // Diseño 3G encendido: vista previa del paquete; apagado, el confirm() de siempre. Misma petición después.
+    if (g3Activo()) {
+      if (!(await confirmarG3({
+        titulo: `¿Eliminar el ticket ${pedido.ticket_id}?`,
+        aviso: 'No se puede deshacer.',
+        datos: [['Ticket', pedido.ticket_id], ['Destino', pedido.ubicacionDestino?.almacen || pedido.proyecto || 'Sin especificar'], ['Artículos', String(pedido.detalles?.length || 0)]],
+        pasa: ['Se revertirá el stock de sus artículos.'],
+        confirmar: 'Eliminar ticket', cancelar: 'No eliminar', peligro: true,
+      }))) return;
+    } else if (!window.confirm(`¿Eliminar el ticket ${pedido.ticket_id}? Se revertirá el stock de sus artículos y no se puede deshacer.`)) return;
     try {
       setEliminandoId(pedido.id);
       const res = await pedidosService.eliminar(pedido.id);
@@ -183,7 +195,14 @@ const PedidosPendientesPage = () => {
   };
 
   const handleEliminarArticulo = async (pedidoId, detalleId) => {
-    if (!confirm('¿Estás seguro de eliminar este artículo del ticket?')) {
+    if (g3Activo()) {
+      const detalle = pedidoSeleccionado?.detalles?.find((d) => d.id === detalleId);
+      if (!(await confirmarG3({
+        titulo: '¿Quitar este artículo del ticket?',
+        datos: [['Ticket', pedidoSeleccionado?.ticket_id || ''], ['Artículo', detalle?.articulo?.nombre || '']],
+        confirmar: 'Quitar artículo', cancelar: 'No quitar', peligro: true,
+      }))) return;
+    } else if (!confirm('¿Estás seguro de eliminar este artículo del ticket?')) {
       return;
     }
 
@@ -215,7 +234,14 @@ const PedidosPendientesPage = () => {
       toast.error('Faltan artículos por palomear');
       return;
     }
-    if (!confirm('¿Marcar este ticket como COMPLETADO? Pasará a la columna de Completados.')) return;
+    if (g3Activo()) {
+      if (!(await confirmarG3({
+        titulo: `¿Marcar el ticket ${pedidoSeleccionado.ticket_id} como completado?`,
+        datos: [['Ticket', pedidoSeleccionado.ticket_id], ['Destino', pedidoSeleccionado.ubicacionDestino?.almacen || pedidoSeleccionado.proyecto || 'Sin especificar'], ['Artículos', String(pedidoSeleccionado.detalles?.length || 0)]],
+        pasa: ['Pasará a la columna de Completados.'],
+        confirmar: 'Marcar como completado', cancelar: 'Regresar',
+      }))) return;
+    } else if (!confirm('¿Marcar este ticket como COMPLETADO? Pasará a la columna de Completados.')) return;
     try {
       setProcesando(true);
       await pedidosService.entregarDirecto(pedidoSeleccionado.id);
@@ -260,7 +286,7 @@ const PedidosPendientesPage = () => {
     <div className="p-6">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tickets Pendientes</h1>
+          <h1 className="text-2xl font-bold text-gray-900 g3:hidden">Tickets Pendientes</h1>
           <p className="text-gray-500 mt-1">Gestiona y prepara los tickets de materiales</p>
         </div>
         {esAdmin && (
@@ -268,7 +294,7 @@ const PedidosPendientesPage = () => {
           <button
             onClick={() => abrirAnulacionMasiva(true)}
             disabled={anulandoTodo}
-            className="px-3 py-2 text-sm font-medium text-green-700 border border-green-300 rounded-lg hover:bg-green-50 disabled:opacity-50"
+            className="px-3 py-2 text-sm font-medium text-green-700 border border-green-300 rounded-lg hover:bg-green-50 disabled:opacity-50 g3:!text-g3-tinta g3:!border-g3-linea-fuerte g3:hover:!bg-g3-hover"
             title="Reabre los tickets anulados de proyectos que siguen abiertos"
           >
             Reabrir tickets anulados
@@ -316,7 +342,7 @@ const PedidosPendientesPage = () => {
                         <h3 className="text-base font-bold text-gray-900 truncate">
                           {pedido.ubicacionDestino ? (
                             <>
-                              {pedido.ubicacionDestino.almacen.includes('Camioneta') ? '🚛' : '📦'} {pedido.ubicacionDestino.almacen}
+                              {g3 ? null : (pedido.ubicacionDestino.almacen.includes('Camioneta') ? '🚛' : '📦')}{g3 ? null : ' '}{pedido.ubicacionDestino.almacen}
                             </>
                           ) : (
                             pedido.proyecto || 'Sin especificar'
@@ -367,15 +393,15 @@ const PedidosPendientesPage = () => {
                         <button
                           onClick={(e) => handleEliminarTicket(pedido, e)}
                           disabled={eliminandoId === pedido.id}
-                          className="inline-flex items-center gap-1 text-gray-500 hover:text-red-700 text-sm font-medium disabled:opacity-50"
+                          className="inline-flex items-center gap-1 text-gray-500 hover:text-red-700 text-sm font-medium disabled:opacity-50 g3:!text-g3-mal"
                           title="Eliminar ticket (revierte stock)"
                         >
                           <Trash2 size={15} />
                           {eliminandoId === pedido.id ? 'Eliminando…' : 'Eliminar'}
                         </button>
                       )}
-                      <button className="text-red-700 hover:text-red-900 text-sm font-medium">
-                        Ver Checklist →
+                      <button className="text-red-700 hover:text-red-900 text-sm font-medium g3:!text-g3-primario">
+                        {g3 ? 'Ver checklist →' : 'Ver Checklist →'}
                       </button>
                     </div>
                   </div>
@@ -476,7 +502,7 @@ const PedidosPendientesPage = () => {
                   <p className="font-semibold text-gray-900">
                     {pedidoSeleccionado.ubicacionDestino ? (
                       <>
-                        {pedidoSeleccionado.ubicacionDestino.almacen.includes('Camioneta') ? '🚛' : '📦'} {pedidoSeleccionado.ubicacionDestino.almacen}
+                        {g3 ? null : (pedidoSeleccionado.ubicacionDestino.almacen.includes('Camioneta') ? '🚛' : '📦')}{g3 ? null : ' '}{pedidoSeleccionado.ubicacionDestino.almacen}
                       </>
                     ) : (
                       pedidoSeleccionado.proyecto || 'Sin especificar'
@@ -676,10 +702,10 @@ const PedidosPendientesPage = () => {
                 <button
                   onClick={handleCompletarTicket}
                   disabled={procesando}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition-colors disabled:opacity-50 g3:!bg-g3-primario g3:!text-g3-sobre-primario g3:hover:!bg-g3-primario-hover"
                 >
                   <CheckCircle size={20} />
-                  {procesando ? 'Completando...' : 'Completar Ticket'}
+                  {procesando ? 'Completando...' : (g3 ? 'Completar ticket' : 'Completar Ticket')}
                 </button>
                 <p className="text-xs text-gray-500 text-center mt-2">
                   El ticket pasará a la columna de Completados.
@@ -743,7 +769,7 @@ const PedidosPendientesPage = () => {
               <button
                 onClick={confirmarAnulacionMasiva}
                 disabled={anulandoTodo}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg text-white disabled:opacity-50 ${anulacionMasiva.reabrir ? 'bg-green-700 hover:bg-green-800' : 'bg-red-700 hover:bg-red-800'}`}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg text-white disabled:opacity-50 ${anulacionMasiva.reabrir ? 'bg-green-700 hover:bg-green-800' : 'bg-red-700 hover:bg-red-800 g3:!bg-g3-mal g3:!text-g3-sobre-mal g3:hover:!bg-g3-mal-hover'}`}
               >
                 {anulandoTodo
                   ? 'Procesando…'

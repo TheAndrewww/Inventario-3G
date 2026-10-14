@@ -3,6 +3,9 @@ import { BarChart3, Package, AlertCircle, AlertTriangle, CheckCircle, TrendingUp
 import reportesService from '../services/reportes.service';
 import { Loader } from '../components/common';
 import toast from 'react-hot-toast';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
+import { g3Activo, confirmarG3, cx, etq } from '../diseno-3g/dialogosG3';
 
 const formatCurrency = (n) => `$${(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatNumber = (n) => (n || 0).toLocaleString('es-MX');
@@ -127,6 +130,7 @@ const ReportesPage = () => {
     const [dias, setDias] = useState(90);
     const [seleccion, setSeleccion] = useState(new Set());
     const [aplicando, setAplicando] = useState(false);
+    const g3 = useDiseno3G(); // Diseño 3G: encabezado, números, tabla en tarjetas y vista previa del paquete (apagado, lo de siempre)
     const [filtroAccion, setFiltroAccion] = useState('todos');
     // Mín/máx escritos a mano en la tabla: id → { min, max } (texto del input)
     const [valores, setValores] = useState({});
@@ -219,7 +223,24 @@ const ReportesPage = () => {
         }
         const aCero = ajustes.filter(a => a.stock_minimo === 0).length;
         const avisoCero = aCero > 0 ? `\n\n${aCero} quedará(n) con mínimo 0 y se desactivarán.` : '';
-        if (!window.confirm(`¿Aplicar ${ajustes.length} ajuste(s) de stock? Esta acción modifica los artículos.${avisoCero}`)) return;
+        if (g3Activo()) {
+            // Vista previa antes → después armada con los mismos ajustes que se van a mandar (ya calculados arriba)
+            const nombre = (id) => sugerenciasFiltradas.find(x => x.id === id);
+            const cambios = ajustes.slice(0, 8).map(a => {
+                const s = nombre(a.id) || {};
+                const antes = `mín ${formatNumber(s.stock_minimo)} · máx ${s.stock_maximo !== null && s.stock_maximo !== undefined ? formatNumber(s.stock_maximo) : '-'}`;
+                const despues = `mín ${formatNumber(a.stock_minimo !== undefined ? a.stock_minimo : s.stock_minimo)} · máx ${a.stock_maximo !== undefined ? formatNumber(a.stock_maximo) : (s.stock_maximo !== null && s.stock_maximo !== undefined ? formatNumber(s.stock_maximo) : '-')}`;
+                return { campo: s.nombre || `Artículo ${a.id}`, antes, despues };
+            });
+            if (!(await confirmarG3({
+                titulo: `¿Aplicar ${ajustes.length} ${ajustes.length === 1 ? 'ajuste' : 'ajustes'} de stock?`,
+                aviso: 'Esta acción modifica los artículos.',
+                cambios,
+                datos: ajustes.length > 8 ? [['Además', `${ajustes.length - 8} artículo(s) más`]] : [],
+                pasa: aCero > 0 ? [`${aCero} quedará(n) con mínimo 0 y se desactivarán.`] : [],
+                confirmar: 'Aplicar ajustes', cancelar: 'Regresar', ancho: true,
+            }))) return;
+        } else if (!window.confirm(`¿Aplicar ${ajustes.length} ajuste(s) de stock? Esta acción modifica los artículos.${avisoCero}`)) return;
         try {
             setAplicando(true);
             const res = await reportesService.aplicarSugerencias(ajustes);
@@ -240,6 +261,20 @@ const ReportesPage = () => {
     return (
         <div className="p-6 max-w-7xl mx-auto">
             {/* Header */}
+            {g3 ? (
+                <CabG3 titulo="Reportes de inventario" descripcion={`Análisis de materiales consumibles y sugerencias de ajuste · ${parametros?.dias_analizados ?? dias} días`}>
+                    <select value={dias} onChange={(e) => setDias(parseInt(e.target.value, 10))} className="g3-selector g3p-selector-cab" aria-label="Período del análisis">
+                        <option value={30}>Últimos 30 días</option>
+                        <option value={60}>Últimos 60 días</option>
+                        <option value={90}>Últimos 90 días</option>
+                        <option value={180}>Últimos 180 días</option>
+                        <option value={365}>Últimos 365 días</option>
+                    </select>
+                    <button onClick={cargar} disabled={loading} className="g3-btn g3-btn--ch">
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Actualizar
+                    </button>
+                </CabG3>
+            ) : (
             <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -272,6 +307,7 @@ const ReportesPage = () => {
                     </button>
                 </div>
             </div>
+            )}
 
             {/* KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -286,6 +322,7 @@ const ReportesPage = () => {
                     bg="bg-green-100"
                     label="Valoración total"
                     value={formatCurrency(kpis.valoracion_total)}
+                    dinero
                 />
                 <KpiCard
                     icon={<AlertTriangle size={24} className="text-orange-600" />}
@@ -363,7 +400,7 @@ const ReportesPage = () => {
                         <button
                             onClick={aplicar}
                             disabled={aplicando || seleccion.size === 0}
-                            className="flex items-center gap-2 px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
+                            className={g3 ? 'g3-btn g3-btn--primario g3-btn--ch' : 'flex items-center gap-2 px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50'}
                         >
                             <Check size={16} />
                             Aplicar {seleccion.size > 0 ? `(${seleccion.size})` : ''}
@@ -377,7 +414,7 @@ const ReportesPage = () => {
                         <p>No hay sugerencias pendientes con este filtro.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div className={cx('overflow-x-auto', g3 && 'g3-tabla g3-tabla--tarjetas g3p-tabla-en-tarjeta')}>
                         <table className="min-w-full text-sm">
                             <thead className="bg-gray-50 text-xs uppercase text-gray-600">
                                 <tr>
@@ -392,8 +429,8 @@ const ReportesPage = () => {
                                     <th className="px-3 py-3 text-left">Estado</th>
                                     <th className="px-3 py-3 text-right">Stock actual</th>
                                     <th className="px-3 py-3 text-right">Consumo/mes</th>
-                                    <th className="px-3 py-3 text-right">Mín actual → sugerido</th>
-                                    <th className="px-3 py-3 text-right">Máx actual → sugerido</th>
+                                    <th className="px-3 py-3 text-right">{g3 ? 'Mínimo: actual → sugerido' : 'Mín actual → sugerido'}</th>
+                                    <th className="px-3 py-3 text-right">{g3 ? 'Máximo: actual → sugerido' : 'Máx actual → sugerido'}</th>
                                     <th className="px-3 py-3 text-left">Acción</th>
                                 </tr>
                             </thead>
@@ -407,22 +444,22 @@ const ReportesPage = () => {
                                     const editadoMax = valores[s.id]?.max !== undefined;
                                     return (
                                         <tr key={s.id} className={sel ? 'bg-blue-50' : 'hover:bg-gray-50'}>
-                                            <td className="px-3 py-3">
-                                                <input type="checkbox" checked={sel} onChange={() => toggleSeleccion(s.id)} />
+                                            <td className={cx('px-3 py-3', g3 && 'g3p-celda-casilla')}>
+                                                <input type="checkbox" checked={sel} onChange={() => toggleSeleccion(s.id)} aria-label={g3 ? `Seleccionar ${s.nombre}` : undefined} />
                                             </td>
-                                            <td className="px-3 py-3">
+                                            <td className={cx('px-3 py-3', g3 && 'g3-celda-titulo')}>
                                                 <div className="font-medium text-gray-900">{s.nombre}</div>
                                                 <div className="text-xs text-gray-500">{s.categoria || 'Sin categoría'} · {s.unidad}</div>
                                             </td>
-                                            <td className="px-3 py-3">
+                                            <td className={cx('px-3 py-3', g3 && 'g3-celda-estado')}>
                                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border ${est.color}`}>
                                                     <span className={`w-2 h-2 rounded-full ${est.dot}`}></span>
                                                     {est.texto}
                                                 </span>
                                             </td>
-                                            <td className="px-3 py-3 text-right text-gray-900">{formatNumber(s.stock_actual)}</td>
-                                            <td className="px-3 py-3 text-right text-gray-700">{s.consumo_mensual.toFixed(1)}</td>
-                                            <td className="px-3 py-3 text-right whitespace-nowrap">
+                                            <td className="px-3 py-3 text-right text-gray-900" {...etq(g3, 'Stock actual')}>{formatNumber(s.stock_actual)}</td>
+                                            <td className="px-3 py-3 text-right text-gray-700" {...etq(g3, 'Consumo al mes')}>{s.consumo_mensual.toFixed(1)}</td>
+                                            <td className="px-3 py-3 text-right whitespace-nowrap" {...etq(g3, 'Mínimo: actual → sugerido')}>
                                                 <span className="text-gray-500">{formatNumber(s.stock_minimo)}</span>
                                                 {' → '}
                                                 <input
@@ -435,7 +472,7 @@ const ReportesPage = () => {
                                                     title={`Sugerido: ${formatNumber(s.sugerencia.stock_min_sugerido)}`}
                                                 />
                                             </td>
-                                            <td className="px-3 py-3 text-right whitespace-nowrap">
+                                            <td className="px-3 py-3 text-right whitespace-nowrap" {...etq(g3, 'Máximo: actual → sugerido')}>
                                                 <span className="text-gray-500">{s.stock_maximo !== null ? formatNumber(s.stock_maximo) : '-'}</span>
                                                 {' → '}
                                                 <input
@@ -449,7 +486,7 @@ const ReportesPage = () => {
                                                     title={`Sugerido: ${formatNumber(s.sugerencia.stock_max_sugerido)}`}
                                                 />
                                             </td>
-                                            <td className="px-3 py-3">
+                                            <td className="px-3 py-3" {...etq(g3, 'Acción')}>
                                                 <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded border ${acc.color}`} title={s.sugerencia.razon}>
                                                     {acc.texto}
                                                 </span>
@@ -466,7 +503,17 @@ const ReportesPage = () => {
     );
 };
 
-const KpiCard = ({ icon, bg, label, value, sub }) => (
+const KpiCard = ({ icon, bg, label, value, sub, dinero }) => {
+    const g3 = useDiseno3G(); // Diseño 3G: número con el componente del paquete
+    if (g3) {
+        return (
+            <div className={dinero ? 'g3-kpi g3p-kpi-dinero' : 'g3-kpi'}>
+                <span className="g3-kpi-valor">{value}</span>
+                <span className="g3-kpi-texto">{label}{sub ? ` · ${sub}` : ''}</span>
+            </div>
+        );
+    }
+    return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-gray-500">{label}</p>
@@ -475,6 +522,7 @@ const KpiCard = ({ icon, bg, label, value, sub }) => (
         <p className="text-2xl font-bold text-gray-900">{value}</p>
         {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
     </div>
-);
+    );
+};
 
 export default ReportesPage;

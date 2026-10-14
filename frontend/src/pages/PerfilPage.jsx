@@ -3,10 +3,12 @@ import { Key, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 
 const PerfilPage = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const g3 = useDiseno3G(); // Diseño 3G: textos en oración y colores del paquete (apagado, lo de siempre)
 
   const handleLogout = () => {
     logout();
@@ -26,28 +28,28 @@ const PerfilPage = () => {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="bg-white rounded-xl shadow-sm p-8">
         {/* Información del usuario */}
-        <div className="flex items-center gap-6 mb-8">
-          <div className="w-32 h-32 bg-gradient-to-br from-red-700 to-red-900 rounded-full flex items-center justify-center text-white text-4xl font-bold">
+        <div className="flex items-center gap-6 mb-8 g3:max-sm:gap-4">
+          <div className="w-32 h-32 bg-gradient-to-br from-red-700 to-red-900 rounded-full flex items-center justify-center text-white text-4xl font-bold g3:!bg-none g3:!bg-g3-primario-suave g3:!text-g3-sobre-primario-suave g3:max-sm:!w-20 g3:max-sm:!h-20 g3:max-sm:!text-2xl">
             {getInitials(user?.nombre)}
           </div>
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">{user?.nombre || 'Usuario'}</h2>
-            <p className="text-lg text-gray-600">{user?.rol || 'Empleado'}</p>
+            <h2 className="text-3xl font-bold text-gray-900 g3:font-g3-titulo g3:font-semibold g3:max-sm:!text-2xl g3:break-words">{user?.nombre || 'Usuario'}</h2>
+            <p className="text-lg text-gray-600 g3:capitalize">{user?.rol || 'Empleado'}</p>
             <p className="text-sm text-gray-500 mt-1">{user?.email || 'email@ejemplo.com'}</p>
           </div>
         </div>
 
         {/* Opciones */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <button className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-red-700 hover:bg-red-50 transition-colors">
+          <button className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-red-700 hover:bg-red-50 transition-colors g3:hover:!border-g3-linea-fuerte g3:hover:!bg-g3-hover">
             <Key className="text-red-700" size={24} />
             <div className="text-left">
-              <p className="font-medium text-gray-900">Cambiar Contraseña</p>
+              <p className="font-medium text-gray-900">{g3 ? 'Cambiar contraseña' : 'Cambiar Contraseña'}</p>
               <p className="text-sm text-gray-500">Actualiza tu contraseña</p>
             </div>
           </button>
 
-          <button className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-red-700 hover:bg-red-50 transition-colors">
+          <button className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-red-700 hover:bg-red-50 transition-colors g3:hover:!border-g3-linea-fuerte g3:hover:!bg-g3-hover">
             <Settings className="text-red-700" size={24} />
             <div className="text-left">
               <p className="font-medium text-gray-900">Configuración</p>
@@ -61,7 +63,7 @@ const PerfilPage = () => {
           >
             <LogOut className="text-red-600" size={24} />
             <div className="text-left">
-              <p className="font-medium text-red-600">Cerrar Sesión</p>
+              <p className="font-medium text-red-600">{g3 ? 'Cerrar sesión' : 'Cerrar Sesión'}</p>
               <p className="text-sm text-gray-500">Salir de la cuenta</p>
             </div>
           </button>

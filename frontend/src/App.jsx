@@ -39,6 +39,7 @@ import RentaHerramientasPage from './pages/RentaHerramientasPage';
 import ReportesPage from './pages/ReportesPage';
 import StockBajoPage from './pages/StockBajoPage';
 import EntradasSalidasPage from './pages/EntradasSalidasPage';
+import RutaDiseno3G from './diseno-3g/RutaDiseno3G';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAuth } from './context/AuthContext';
 import { rolPuedeVer, rutaInicialPorRol } from './components/layout/Sidebar';
@@ -72,6 +73,7 @@ function App() {
   useVersionCheck();
   return (
     <Router>
+      <RutaDiseno3G />
       <Routes>
         {/* Rutas 100% públicas - completamente fuera del AuthProvider */}
         <Route path="/anuncios" element={<AnunciosPublicosPage />} />

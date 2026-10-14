@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { obtenerCalendarioMesPublico, obtenerDistribucionEquiposPublico } from '../services/calendario.service';
 import { toast, Toaster } from 'react-hot-toast';
+import { useTvG3 } from '../diseno-3g/tvG3';
 
 const MESES = [
   'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
@@ -39,6 +40,10 @@ const COLORES_EQUIPO = {
 };
 
 const CalendarioPublicoPage = () => {
+  // Diseño 3G para TV: solo si la liga trae ?diseno=3g (ver diseno-3g/tvG3.js). Mismas consultas, misma actualización
+  // (cada 2 minutos) y mismos colores de cada equipo; la letra nunca baja de 12 px.
+  const tv = useTvG3();
+  const fz = (rem) => (tv ? `max(0.75rem, calc(${rem}rem * var(--escala, 1)))` : `calc(${rem}rem * var(--escala, 1))`);
   const [mesActual, setMesActual] = useState(MESES[new Date().getMonth()]);
   const [calendario, setCalendario] = useState(null);
   const [calendarioSiguienteMes, setCalendarioSiguienteMes] = useState(null);
@@ -232,7 +237,7 @@ const CalendarioPublicoPage = () => {
       />
 
       <div
-        className={`h-screen flex flex-col ${modoPantallaCompleta ? 'p-2 bg-gray-900' : 'p-4 bg-gradient-to-br from-red-50 to-orange-100'} overflow-hidden`}
+        className={`h-screen flex flex-col ${modoPantallaCompleta ? 'p-2 bg-gray-900' : 'p-4 bg-gradient-to-br from-red-50 to-orange-100'} overflow-hidden${tv ? ' g3tv-cal' : ''}`}
         style={modoPantallaCompleta && !mostrarControles ? { cursor: 'none' } : undefined}
       >
         {/* Header compacto - Solo en modo normal */}
@@ -289,8 +294,35 @@ const CalendarioPublicoPage = () => {
           </div>
         )}
 
+        {/* Diseño 3G para TV: los mismos botones flotantes (pantalla completa y zoom), con el estilo del paquete */}
+        {modoPantallaCompleta && tv && (
+          <>
+            <button
+              type="button"
+              onClick={togglePantallaCompleta}
+              className="g3tv-cal-boton"
+              style={{ top: 16, right: 16, opacity: mostrarControles ? 1 : 0, pointerEvents: mostrarControles ? 'auto' : 'none', transition: 'opacity 0.3s' }}
+              title="Salir de pantalla completa"
+              aria-label="Salir de pantalla completa"
+            >
+              <Minimize2 className="w-6 h-6" aria-hidden="true" />
+            </button>
+            <div className="g3tv-controles" style={{ opacity: mostrarControles ? 1 : 0, pointerEvents: mostrarControles ? 'auto' : 'none' }}>
+              <div className="g3tv-ctrl">
+                <button type="button" onClick={reducirEscala} disabled={escala <= 30} title="Reducir zoom" aria-label="Reducir zoom">
+                  <ZoomOut className="w-6 h-6" aria-hidden="true" />
+                </button>
+                <span aria-live="polite">{escala}%</span>
+                <button type="button" onClick={aumentarEscala} disabled={escala >= 150} title="Aumentar zoom" aria-label="Aumentar zoom">
+                  <ZoomIn className="w-6 h-6" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Botón flotante para salir de pantalla completa */}
-        {modoPantallaCompleta && (
+        {modoPantallaCompleta && !tv && (
           <button
             onClick={togglePantallaCompleta}
             className={`fixed top-4 right-4 z-50 p-3 bg-gray-800 bg-opacity-70 text-white rounded-full hover:bg-opacity-90 shadow-lg transition-all duration-300 ${mostrarControles ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
@@ -302,7 +334,7 @@ const CalendarioPublicoPage = () => {
         )}
 
         {/* Controles de zoom en pantalla completa */}
-        {modoPantallaCompleta && (
+        {modoPantallaCompleta && !tv && (
           <div className={`fixed bottom-4 right-4 z-50 flex flex-col gap-2 transition-all duration-300 ${mostrarControles ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
             }`}>
             {/* Indicador de escala */}
@@ -341,7 +373,72 @@ const CalendarioPublicoPage = () => {
         >
           {/* Distribución de Equipos y Reloj */}
           {/* Logo, fecha y equipos se muestran siempre, aunque el mes aún no tenga distribución */}
-          {(
+          {tv && modoPantallaCompleta ? (
+            <div className="g3tv-cal-cab">
+              <div className="g3tv-cal-marca">
+                <span className="g3tv-marca" aria-hidden="true">3G</span>
+                <div style={{ minWidth: 0 }}>
+                  <b>Calendario de entregas</b>
+                  <small>{mesActual.charAt(0) + mesActual.slice(1).toLowerCase()}</small>
+                </div>
+              </div>
+              <div className="g3tv-cal-hora">
+                <div style={{ minWidth: 0 }}>
+                  <div className="g3tv-cal-dia">
+                    {horaActual.toLocaleDateString('es-MX', { weekday: 'long', timeZone: 'America/Mexico_City' })}
+                  </div>
+                  <div className="g3tv-cal-fecha">
+                    {horaActual.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Mexico_City' })}
+                  </div>
+                </div>
+                <div className="g3tv-cal-reloj">
+                  <Clock style={{ width: '0.6em', height: '0.6em' }} aria-hidden="true" />
+                  {horaActual.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'America/Mexico_City' })}
+                </div>
+              </div>
+              <div className="g3tv-cal-equipos">
+                <h2><Users style={{ width: '1.1em', height: '1.1em' }} aria-hidden="true" />Distribución de equipos</h2>
+                <div className="flex-1 overflow-y-auto">
+                  <div className="flex flex-wrap content-start" style={{ gap: `calc(0.25rem * var(--escala, 1))` }}>
+                    {(distribucionEquipos?.equipos || []).map((equipo, index) => {
+                      // Mismos colores de cada equipo que hoy (identifican al equipo)
+                      const colores = COLORES_EQUIPO[equipo.tipoEquipo];
+                      const estiloPersonalizado = !colores && equipo.color ? {
+                        backgroundColor: `rgb(${equipo.color.red}, ${equipo.color.green}, ${equipo.color.blue})`,
+                        borderColor: `rgb(${Math.max(0, equipo.color.red - 30)}, ${Math.max(0, equipo.color.green - 30)}, ${Math.max(0, equipo.color.blue - 30)})`,
+                        color: (equipo.color.red + equipo.color.green + equipo.color.blue) / 3 > 180 ? '#1f2937' : '#ffffff'
+                      } : null;
+                      const encargado = equipo.integrantes && equipo.integrantes.length > 0 ? equipo.integrantes[0] : null;
+                      const otrosIntegrantes = equipo.integrantes && equipo.integrantes.length > 1 ? equipo.integrantes.slice(1) : [];
+                      return (
+                        <div
+                          key={index}
+                          className={colores ? `${colores.bg} ${colores.border} border rounded-lg flex flex-col flex-1 min-w-fit` : `border rounded-lg flex flex-col flex-1 min-w-fit`}
+                          style={{ ...estiloPersonalizado, padding: `calc(0.375rem * var(--escala, 1))`, gap: `calc(0.125rem * var(--escala, 1))` }}
+                        >
+                          <div className={`font-bold ${colores ? colores.text : ''}`} style={{ fontSize: `max(0.875rem, calc(0.9375rem * var(--escala, 1)))` }}>
+                            {equipo.nombre}
+                          </div>
+                          {encargado && (
+                            <div className={`font-semibold ${colores ? colores.text : ''} underline`} style={{ fontSize: `max(0.8125rem, calc(0.875rem * var(--escala, 1)))` }}>
+                              {encargado}
+                            </div>
+                          )}
+                          {otrosIntegrantes.length > 0 && (
+                            <div className={`flex flex-col ${colores ? colores.text : ''}`} style={{ opacity: 0.85 }}>
+                              {otrosIntegrantes.map((integrante, idx) => (
+                                <span key={idx} style={{ fontSize: `max(0.75rem, calc(0.8125rem * var(--escala, 1)))` }}>{integrante}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
             <div className={`${modoPantallaCompleta ? 'mb-2 grid-cols-6 gap-2' : 'mb-4 grid-cols-1 lg:grid-cols-3 gap-4'} grid`}>
               {modoPantallaCompleta ? (
                 <>
@@ -366,7 +463,7 @@ const CalendarioPublicoPage = () => {
                       <div
                         className="font-bold capitalize"
                         style={{
-                          fontSize: `calc(1.5rem * var(--escala, 1))`,
+                          fontSize: fz(1.5),
                           marginBottom: `calc(0.25rem * var(--escala, 1))`
                         }}
                       >
@@ -377,7 +474,7 @@ const CalendarioPublicoPage = () => {
                       </div>
                       <div
                         className="font-medium opacity-90 capitalize"
-                        style={{ fontSize: `calc(1.125rem * var(--escala, 1))` }}
+                        style={{ fontSize: fz(1.125) }}
                       >
                         {horaActual.toLocaleDateString('es-MX', {
                           day: 'numeric',
@@ -396,7 +493,7 @@ const CalendarioPublicoPage = () => {
                       <Clock style={{ width: `calc(1.5rem * var(--escala, 1))`, height: `calc(1.5rem * var(--escala, 1))` }} />
                       <div
                         className="font-bold tabular-nums"
-                        style={{ fontSize: `calc(2.25rem * var(--escala, 1))` }}
+                        style={{ fontSize: fz(2.25) }}
                       >
                         {horaActual.toLocaleTimeString('es-MX', {
                           hour: '2-digit',
@@ -424,7 +521,7 @@ const CalendarioPublicoPage = () => {
                       <Users style={{ width: `calc(0.75rem * var(--escala, 1))`, height: `calc(0.75rem * var(--escala, 1))` }} className="text-red-700" />
                       <h3
                         className="font-bold text-gray-800"
-                        style={{ fontSize: `calc(0.625rem * var(--escala, 1))` }}
+                        style={{ fontSize: fz(0.625) }}
                       >
                         Distribución de Equipos
                       </h3>
@@ -461,7 +558,7 @@ const CalendarioPublicoPage = () => {
                               {/* Nombre del equipo */}
                               <div
                                 className={`font-bold ${colores ? colores.text : ''}`}
-                                style={{ fontSize: `calc(0.6875rem * var(--escala, 1))` }}
+                                style={{ fontSize: fz(0.6875) }}
                               >
                                 {equipo.nombre}
                               </div>
@@ -469,7 +566,7 @@ const CalendarioPublicoPage = () => {
                               {encargado && (
                                 <div
                                   className={`font-semibold ${colores ? colores.text : ''} underline uppercase`}
-                                  style={{ fontSize: `calc(0.625rem * var(--escala, 1))` }}
+                                  style={{ fontSize: fz(0.625) }}
                                 >
                                   {encargado}
                                 </div>
@@ -480,7 +577,7 @@ const CalendarioPublicoPage = () => {
                                   {otrosIntegrantes.map((integrante, idx) => (
                                     <span
                                       key={idx}
-                                      style={{ fontSize: `calc(0.5625rem * var(--escala, 1))` }}
+                                      style={{ fontSize: fz(0.5625) }}
                                     >
                                       {integrante}
                                     </span>
@@ -650,13 +747,13 @@ const CalendarioPublicoPage = () => {
                                 >
                                   <div
                                     className="font-bold"
-                                    style={{ fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))` }}
+                                    style={{ fontSize: esGrande ? fz(0.875) : fz(0.375) }}
                                   >
                                     {dia.nombre}
                                   </div>
                                   <div
                                     className="font-bold"
-                                    style={{ fontSize: esGrande ? `calc(1.875rem * var(--escala, 1))` : `calc(0.6875rem * var(--escala, 1))` }}
+                                    style={{ fontSize: esGrande ? fz(1.875) : fz(0.6875) }}
                                   >
                                     {dia.numero || '-'}
                                   </div>
@@ -664,22 +761,22 @@ const CalendarioPublicoPage = () => {
                                     <div
                                       className="font-bold animate-pulse"
                                       style={{
-                                        fontSize: esGrande ? `calc(0.625rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
+                                        fontSize: esGrande ? fz(0.625) : fz(0.4375),
                                         marginTop: `calc(0.25rem * var(--escala, 1))`
                                       }}
                                     >
-                                      HOY
+                                      {tv ? 'Hoy' : 'HOY'}
                                     </div>
                                   )}
                                   {esAsueto && (
                                     <div
                                       className="font-bold animate-pulse"
                                       style={{
-                                        fontSize: esGrande ? `calc(0.625rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
+                                        fontSize: esGrande ? fz(0.625) : fz(0.4375),
                                         marginTop: `calc(0.25rem * var(--escala, 1))`
                                       }}
                                     >
-                                      ASUETO
+                                      {tv ? 'Asueto' : 'ASUETO'}
                                     </div>
                                   )}
                                 </div>
@@ -698,7 +795,7 @@ const CalendarioPublicoPage = () => {
                                     <div
                                       className="text-center text-gray-400"
                                       style={{
-                                        fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))`,
+                                        fontSize: esGrande ? fz(0.875) : fz(0.4375),
                                         marginTop: `calc(0.5rem * var(--escala, 1))`
                                       }}
                                     >
@@ -730,7 +827,7 @@ const CalendarioPublicoPage = () => {
                                           >
                                             <span
                                               className={`font-medium ${coloresProyecto.text} leading-tight break-words w-full`}
-                                              style={{ fontSize: esGrande ? `calc(1rem * var(--escala, 1))` : `calc(0.4375rem * var(--escala, 1))` }}
+                                              style={{ fontSize: esGrande ? fz(1) : fz(0.4375) }}
                                             >
                                               {textoProyecto}
                                             </span>
@@ -741,8 +838,8 @@ const CalendarioPublicoPage = () => {
                                             <div
                                               className={`${coloresHora.bg} ${coloresHora.text} rounded flex items-center justify-center flex-shrink-0 overflow-hidden`}
                                               style={{
-                                                width: esGrande ? `calc(2rem * var(--escala, 1))` : `calc(0.875rem * var(--escala, 1))`,
-                                                maxWidth: esGrande ? `calc(2rem * var(--escala, 1))` : `calc(0.875rem * var(--escala, 1))`,
+                                                width: esGrande ? `calc(2rem * var(--escala, 1))` : (tv ? `max(1.25rem, calc(0.875rem * var(--escala, 1)))` : `calc(0.875rem * var(--escala, 1))`),
+                                                maxWidth: esGrande ? `calc(2rem * var(--escala, 1))` : (tv ? `max(1.25rem, calc(0.875rem * var(--escala, 1)))` : `calc(0.875rem * var(--escala, 1))`),
                                                 padding: esGrande ? `calc(0.625rem * var(--escala, 1)) calc(0.3125rem * var(--escala, 1))` : `calc(0.25rem * var(--escala, 1)) calc(0.125rem * var(--escala, 1))`
                                               }}
                                             >
@@ -754,7 +851,7 @@ const CalendarioPublicoPage = () => {
                                               }}>
                                                 <span
                                                   className="font-bold text-center leading-tight"
-                                                  style={{ fontSize: esGrande ? `calc(0.875rem * var(--escala, 1))` : `calc(0.375rem * var(--escala, 1))` }}
+                                                  style={{ fontSize: esGrande ? fz(0.875) : fz(0.375) }}
                                                 >
                                                   {proyecto.hora}
                                                 </span>

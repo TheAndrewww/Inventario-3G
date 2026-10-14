@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import CarouselAnuncios from '../components/anuncios/CarouselAnuncios';
 import { obtenerAnunciosHoy, incrementarVistaAnuncio, regenerarAnuncio, leerAnunciosCalendario, generarAnuncioIndividual } from '../services/anuncios.service';
 import { toast, Toaster } from 'react-hot-toast';
-import { Maximize2, Minimize2, RefreshCw, Settings, X, RotateCcw, Sparkles, FileText, ImageOff, Check, Loader2 } from 'lucide-react';
+import { Maximize2, Minimize2, RefreshCw, Settings, X, RotateCcw, Sparkles, FileText, ImageOff, Check, Loader2, AlertTriangle } from 'lucide-react';
+import { useTvG3 } from '../diseno-3g/tvG3';
 
 /**
  * Página pública para mostrar anuncios en pantallas
@@ -10,6 +11,9 @@ import { Maximize2, Minimize2, RefreshCw, Settings, X, RotateCcw, Sparkles, File
  * Incluye botón de fullscreen para Android TV y menú de administración
  */
 const AnunciosPublicosPage = () => {
+  // Diseño 3G para TV: solo si la liga trae ?diseno=3g (ver diseno-3g/tvG3.js). Mismos anuncios, mismos botones, misma
+  // actualización (cada hora); el carrusel de imágenes es el de siempre, sobre negro.
+  const tv = useTvG3();
   const [anuncios, setAnuncios] = useState([]);
   const [anunciosCalendario, setAnunciosCalendario] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -381,6 +385,29 @@ const AnunciosPublicosPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (loading && anuncios.length === 0 && tv) {
+    return (
+      <div className="g3tv-anuncios-estado" role="status">
+        <span className="g3tv-marca" aria-hidden="true">3G</span>
+        <b>Cargando anuncios…</b>
+        <p>3G Velarias</p>
+      </div>
+    );
+  }
+  if (error && anuncios.length === 0 && tv) {
+    return (
+      <div className="g3tv-anuncios-estado" role="alert">
+        <AlertTriangle aria-hidden="true" />
+        <b>Error de conexión</b>
+        <p>{error}</p>
+        <button type="button" onClick={() => cargarAnuncios(true)} className="g3tv-btn g3tv-btn--primario">
+          <RefreshCw aria-hidden="true" />
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
   if (loading && anuncios.length === 0) {
     return (
       <div className="h-screen bg-black flex flex-col items-center justify-center">
@@ -419,6 +446,186 @@ const AnunciosPublicosPage = () => {
   const porcentajeProgreso = progresoGeneracion.total > 0
     ? Math.round((progresoGeneracion.completados / progresoGeneracion.total) * 100)
     : 0;
+
+  if (tv) {
+    return (
+      <>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+            success: {
+              iconTheme: {
+                primary: '#10b981',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
+
+        <div className="g3tv-anuncios">
+          {/* En vivo (esquina) */}
+          <div className={`g3tv-esquina${showControls ? '' : ' g3tv-esquina--oculta'}`} style={{ top: 16, right: 16 }}>
+            <span className="g3tv-vivo">En vivo</span>
+          </div>
+
+          {/* Botones de siempre (TV Android): pantalla completa, actualizar y administración */}
+          <div className={`g3tv-esquina${showControls ? '' : ' g3tv-esquina--oculta'}`} style={{ top: 16, left: 16 }}>
+            <div className="g3tv-ctrl">
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+              >
+                {isFullscreen ? <Minimize2 size={26} aria-hidden="true" /> : <Maximize2 size={26} aria-hidden="true" />}
+              </button>
+              <button type="button" onClick={() => cargarAnuncios(true)} title="Actualizar anuncios" aria-label="Actualizar anuncios">
+                <RefreshCw size={26} className={loading ? 'g3tv-gira' : ''} aria-hidden="true" />
+              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowAdminMenu(!showAdminMenu)}
+                  title="Administración de anuncios"
+                  aria-label="Administrar anuncios"
+                  aria-pressed={showAdminMenu}
+                >
+                  <Settings size={26} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Administración (con sesión): mismos botones y manejadores */}
+          {showAdminMenu && isAdmin && (
+            <section className="g3tv-admin" aria-label="Administrar anuncios">
+              <div className="g3tv-admin-cab">
+                <h2>Administrar anuncios</h2>
+                <button type="button" onClick={() => setShowAdminMenu(false)} className="g3tv-btn g3tv-btn--contorno g3tv-btn-icono" aria-label="Cerrar la administración">
+                  <X aria-hidden="true" />
+                </button>
+              </div>
+
+              {progresoGeneracion.activo && (
+                <div className="g3tv-progreso" role="status">
+                  <div>
+                    <span>Generando imágenes…</span>
+                    <span>{progresoGeneracion.completados}/{progresoGeneracion.total}</span>
+                  </div>
+                  <div className="g3tv-barra-progreso"><span style={{ width: `${porcentajeProgreso}%` }} /></div>
+                </div>
+              )}
+
+              <div className="g3tv-pila" style={{ gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={handleSoloSincronizar}
+                  disabled={sincronizando || progresoGeneracion.activo}
+                  className="g3tv-btn g3tv-btn--contorno g3tv-btn--bloque"
+                >
+                  {sincronizando
+                    ? <><RefreshCw className="g3tv-gira" aria-hidden="true" />Leyendo…</>
+                    : <><FileText aria-hidden="true" />Solo leer la lista</>}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSincronizarYGenerar}
+                  disabled={sincronizando || progresoGeneracion.activo}
+                  className="g3tv-btn g3tv-btn--primario g3tv-btn--bloque"
+                >
+                  {progresoGeneracion.activo
+                    ? <><Loader2 className="g3tv-gira" aria-hidden="true" />Generando {progresoGeneracion.completados + 1}/{progresoGeneracion.total}…</>
+                    : <><Sparkles aria-hidden="true" />Sincronizar y generar todo</>}
+                </button>
+              </div>
+
+              <h3>Anuncios ({listaAnuncios.length})</h3>
+              {listaAnuncios.length === 0 ? (
+                <div className="g3tv-vacio" style={{ padding: 24 }}>
+                  <b>No hay anuncios</b>
+                  <p>Presiona «Solo leer la lista» para ver los anuncios del calendario.</p>
+                </div>
+              ) : (
+                <div className="g3tv-pila" style={{ gap: 10 }}>
+                  {listaAnuncios.map((anuncio, index) => {
+                    // Mismo estado de cada anuncio que hoy, con el índice real en la lista
+                    const estadoProgreso = progresoGeneracion.estados[index];
+                    const estaGenerando = estadoProgreso === 'generando';
+                    const estaCompletado = estadoProgreso === 'completado';
+                    const tieneError = estadoProgreso === 'error';
+                    const tono = estaCompletado ? 'ok' : estaGenerando ? 'info' : tieneError ? 'mal' : anuncio.generado ? 'ok' : 'aviso';
+                    const trabajando = regenerandoId === anuncio.id || generandoIndividual === index;
+                    return (
+                      <div key={anuncio.id || index} className={`g3tv-anuncio g3tv-anuncio--${tono}`}>
+                        <div className="g3tv-anuncio-fila">
+                          <div className="g3tv-miniatura">
+                            {anuncio.generado && anuncio.imagen_url ? (
+                              <img src={anuncio.imagen_url} alt={`Anuncio ${index + 1}`} />
+                            ) : estaGenerando ? (
+                              <Loader2 size={30} className="g3tv-gira" aria-hidden="true" />
+                            ) : estaCompletado ? (
+                              <Check size={30} aria-hidden="true" />
+                            ) : (
+                              <ImageOff size={30} aria-hidden="true" />
+                            )}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <p>{anuncio.textoAnuncio || anuncio.frase}</p>
+                            <span className={`g3tv-estado g3tv-estado--${tono}`}>
+                              {estaCompletado ? '¡Generado!' : estaGenerando ? 'Generando…' : tieneError ? 'Error' : anuncio.generado ? 'Generado' : 'Pendiente'}
+                            </span>
+                          </div>
+                        </div>
+                        {!progresoGeneracion.activo && (
+                          <button
+                            type="button"
+                            onClick={() => anuncio.generado
+                              ? handleRegenerar(anuncio.id)
+                              : handleGenerarIndividual(anuncio, index)
+                            }
+                            disabled={trabajando}
+                            className="g3tv-btn g3tv-btn--contorno g3tv-btn--bloque"
+                          >
+                            {trabajando
+                              ? <><RefreshCw className="g3tv-gira" aria-hidden="true" />{anuncio.generado ? 'Regenerando…' : 'Generando…'}</>
+                              : <>{anuncio.generado ? <RotateCcw aria-hidden="true" /> : <Sparkles aria-hidden="true" />}{anuncio.generado ? 'Regenerar imagen' : 'Generar imagen'}</>}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Carrusel de siempre */}
+          <CarouselAnuncios anuncios={anuncios} />
+
+          {/* Última actualización */}
+          <div className={`g3tv-esquina${showControls ? '' : ' g3tv-esquina--oculta'}`} style={{ bottom: 16, left: 16 }}>
+            {(ultimaActualizacion || anuncios.length > 0) && (
+              <span className="g3tv-info">
+                {ultimaActualizacion && <>Última actualización: {ultimaActualizacion.toLocaleTimeString('es-MX')}</>}
+                {anuncios.length > 0 && <>{ultimaActualizacion ? ' · ' : ''}{anuncios.length} anuncio{anuncios.length !== 1 ? 's' : ''}</>}
+              </span>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

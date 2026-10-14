@@ -19,6 +19,8 @@ import {
     Filter,
     X
 } from 'lucide-react';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
 import produccionService from '../services/produccion.service';
 import { flattenProyectos, sortProyectosPorUrgencia, esProyectoMTO, esUrgenteMTO } from '../utils/produccion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -31,6 +33,8 @@ const ETAPAS_FLOW = [
     { key: 'herreria_armado', label: 'Soldadura', icon: Hammer, color: '#EF4444', bgClass: 'bg-red-50', textClass: 'text-red-700', borderClass: 'border-red-200', isSubEtapa: true, parent: 'herreria' },
     { key: 'herreria_pintado', label: 'Pintura', icon: Paintbrush, color: '#B91C1C', bgClass: 'bg-red-50', textClass: 'text-red-700', borderClass: 'border-red-200', isSubEtapa: true, parent: 'herreria' },
 ];
+// Diseño 3G: nombre completo en pantalla (sin abreviaturas)
+const nombreEtapaG3 = (g3, etapa) => (g3 && etapa.key === 'manufactura' ? 'Manufactura' : etapa.label);
 
 // Orden de etapas para determinar si están completadas
 const ETAPAS_ORDEN = ['pendiente', 'diseno', 'compras', 'produccion', 'instalacion', 'completado'];
@@ -102,6 +106,7 @@ const isEtapaVisible = (proyecto, etapaKey) => {
 
 // ─── Modal de confirmación ───
 const ConfirmModal = ({ isOpen, etapa, proyecto, onConfirm, onCancel, loading }) => {
+    const g3 = useDiseno3G(); // Diseño 3G: textos sin emojis (apagado, los de siempre)
     if (!isOpen || !etapa) return null;
 
     return (
@@ -128,10 +133,10 @@ const ConfirmModal = ({ isOpen, etapa, proyecto, onConfirm, onCancel, loading })
                         ¿Marcar como completado?
                     </h3>
                     <p className="text-gray-500 text-sm mb-1">
-                        <span className="font-semibold text-gray-700">{etapa.label}</span> — {proyecto?.nombre}
+                        <span className="font-semibold text-gray-700">{nombreEtapaG3(g3, etapa)}</span> — {proyecto?.nombre}
                     </p>
                     <p className="text-xs text-amber-600 font-medium mb-6">
-                        ⚠️ Esta acción no se puede deshacer
+                        {g3 ? <><AlertTriangle size={12} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" />Esta acción no se puede deshacer</> : '⚠️ Esta acción no se puede deshacer'}
                     </p>
 
                     <div className="flex gap-3">
@@ -151,7 +156,7 @@ const ConfirmModal = ({ isOpen, etapa, proyecto, onConfirm, onCancel, loading })
                             {loading ? (
                                 <RefreshCw size={20} className="animate-spin mx-auto" />
                             ) : (
-                                '✓ Completar'
+                                (g3 ? 'Completar etapa' : '✓ Completar')
                             )}
                         </button>
                     </div>
@@ -164,6 +169,7 @@ const ConfirmModal = ({ isOpen, etapa, proyecto, onConfirm, onCancel, loading })
 // ─── Botón de etapa ───
 const EtapaButton = ({ etapa, completada, activa, onClick }) => {
     const Icon = etapa.icon;
+    const g3 = useDiseno3G(); // Diseño 3G: nombre de la etapa sin abreviar
 
     if (completada) {
         return (
@@ -174,7 +180,7 @@ const EtapaButton = ({ etapa, completada, activa, onClick }) => {
                 <div className="w-11 h-11 rounded-full bg-green-100 border-2 border-green-300 flex items-center justify-center shadow-sm">
                     <CheckCircle2 size={22} className="text-green-600" />
                 </div>
-                <span className="text-[10px] font-semibold text-green-600 leading-tight">{etapa.label}</span>
+                <span className="text-[10px] font-semibold text-green-600 leading-tight">{nombreEtapaG3(g3, etapa)}</span>
             </button>
         );
     }
@@ -191,7 +197,7 @@ const EtapaButton = ({ etapa, completada, activa, onClick }) => {
                 >
                     <Icon size={20} style={{ color: etapa.color }} />
                 </div>
-                <span className="text-[10px] font-bold leading-tight" style={{ color: etapa.color }}>{etapa.label}</span>
+                <span className="text-[10px] font-bold leading-tight" style={{ color: etapa.color }}>{nombreEtapaG3(g3, etapa)}</span>
             </button>
         );
     }
@@ -202,7 +208,7 @@ const EtapaButton = ({ etapa, completada, activa, onClick }) => {
             <div className="w-11 h-11 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
                 <Icon size={20} className="text-gray-400" />
             </div>
-            <span className="text-[10px] font-medium text-gray-400 leading-tight">{etapa.label}</span>
+            <span className="text-[10px] font-medium text-gray-400 leading-tight">{nombreEtapaG3(g3, etapa)}</span>
         </button>
     );
 };
@@ -331,6 +337,7 @@ const AvanceProduccionPage = () => {
     const [confirmModal, setConfirmModal] = useState({ open: false, proyecto: null, etapa: null });
     const [procesando, setProcesando] = useState(false);
     const mountedRef = useRef(true);
+    const g3 = useDiseno3G(); // Diseño 3G: encabezado del paquete y textos sin emojis (apagado, lo de siempre)
 
     useEffect(() => {
         mountedRef.current = true;
@@ -410,7 +417,7 @@ const AvanceProduccionPage = () => {
 
             toast.success(
                 <div className="text-center">
-                    <span className="font-bold">{etapa.label}</span> completado ✅
+                    <span className="font-bold">{nombreEtapaG3(g3, etapa)}</span> completado{g3 ? '' : ' ✅'}
                 </div>,
                 { duration: 2000 }
             );
@@ -438,13 +445,20 @@ const AvanceProduccionPage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 g3:!min-h-0 g3:!bg-transparent">
             <Toaster position="top-center" toastOptions={{ duration: 2000, style: { borderRadius: '12px' } }} />
 
             {/* ─── Header fijo ─── */}
-            <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
-                <div className="px-4 pt-4 pb-3">
+            <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm g3:static g3:!bg-transparent g3:!border-0 g3:!shadow-none g3:!backdrop-blur-none">
+                <div className="px-4 pt-4 pb-3 g3:md:px-6 g3:md:pt-6">
                     {/* Título y refresh */}
+                    {g3 ? (
+                        <CabG3 titulo="Avance por área" descripcion={`${proyectosFiltrados.length} ${proyectosFiltrados.length === 1 ? 'proyecto' : 'proyectos'} en la lista. Toca la etapa activa para marcarla como completada.`}>
+                            <button type="button" onClick={() => cargarProyectos(false)} disabled={refreshing} className="g3-btn g3-btn--ch">
+                                <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" /> Actualizar
+                            </button>
+                        </CabG3>
+                    ) : (
                     <div className="flex items-center justify-between mb-3">
                         <div>
                             <h1 className="text-xl font-bold text-gray-900">Avance Producción</h1>
@@ -460,6 +474,7 @@ const AvanceProduccionPage = () => {
                             <RefreshCw size={20} className={`text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
+                    )}
 
                     {/* Barra de búsqueda */}
                     <div className="relative mb-3">
@@ -484,7 +499,7 @@ const AvanceProduccionPage = () => {
             </div>
 
             {/* ─── Lista de proyectos ─── */}
-            <div className="px-4 py-4 space-y-3 pb-20">
+            <div className="px-4 py-4 space-y-3 pb-20 g3:md:px-6 g3:!pt-0">
                 {proyectosFiltrados.length === 0 ? (
                     <div className="text-center py-16">
                         <CheckCircle2 size={48} className="text-gray-300 mx-auto mb-3" />

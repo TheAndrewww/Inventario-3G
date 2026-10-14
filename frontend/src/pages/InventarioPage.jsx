@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer, Wrench, Save, Check, Lock, Unlock } from 'lucide-react';
+import { Search, Plus, Package, Eye, Barcode, QrCode, Trash2, PackagePlus, PackageMinus, ArrowUpDown, MapPin, Edit2, X, ChevronDown, ChevronUp, Download, Printer, Wrench, Save, Check, Lock, Unlock, Settings, AlertTriangle, Clock, Warehouse, Ban } from 'lucide-react';
 import api from '../services/api';
 import articulosService from '../services/articulos.service';
 import movimientosService from '../services/movimientos.service';
@@ -22,6 +22,10 @@ import { useAuth } from '../context/AuthContext';
 import { getImageUrl } from '../utils/imageUtils';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import BarcodeScannerIndicator from '../components/scanner/BarcodeScannerIndicator';
+import { Link } from 'react-router-dom';
+import { rolPuedeVer } from '../components/layout/Sidebar';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
 
 /**
  * Formatea la cantidad según la unidad de medida
@@ -260,6 +264,8 @@ const InventarioPage = () => {
 
   const { agregarArticulo } = usePedido();
   const { user } = useAuth();
+  const diseno3g = useDiseno3G(); // Diseño 3G: textos, íconos y encabezados nuevos solo se montan encendido
+  const sinEmojiG3 = (t) => (diseno3g && typeof t === 'string' ? t.replace(/^[^\p{L}\p{N}]+/u, '') : t);
 
   // Verificar permisos según el rol
   const puedeCrearArticulos = ['administrador', 'encargado', 'almacen'].includes(user?.rol);
@@ -437,7 +443,17 @@ const InventarioPage = () => {
 
   const togglePermisosAlmacen = async () => {
     const nuevo = !permisosAlmacenAbiertos;
-    if (nuevo && !window.confirm('¿Abrir permisos de almacén? Almacén podrá crear y editar artículos por completo (categoría, ubicación, sección, stock, unidad, proveedor, descripción y foto). Los SKUs nuevos seguirán pasando por Nuevos Registros.')) return;
+    if (nuevo) {
+      // Diseño 3G encendido: vista previa del paquete; apagado, el confirm() de siempre. Misma petición después.
+      if (g3Activo()) {
+        if (!(await confirmarG3({
+          titulo: '¿Abrir permisos de almacén?',
+          aviso: 'Almacén podrá crear y editar artículos por completo: categoría, ubicación, sección, stock, unidad, proveedor, descripción y foto.',
+          pasa: ['Las claves nuevas seguirán pasando por «Nuevos registros».'],
+          confirmar: 'Abrir permisos', cancelar: 'No abrir',
+        }))) return;
+      } else if (!window.confirm('¿Abrir permisos de almacén? Almacén podrá crear y editar artículos por completo (categoría, ubicación, sección, stock, unidad, proveedor, descripción y foto). Los SKUs nuevos seguirán pasando por Nuevos Registros.')) return;
+    }
     try {
       setCambiandoPermisosAlmacen(true);
       const res = await configuracionService.setEdicionAlmacen(nuevo);
@@ -529,6 +545,22 @@ const InventarioPage = () => {
   }, [stocksEditados, articulos]);
 
   const handleCancelarAjusteStock = () => {
+    // Diseño 3G encendido: vista previa con la lista de cambios que se pierden (no manda nada al servidor).
+    if (cambiosStockPendientes.length > 0 && g3Activo()) {
+      const pendientes = cambiosStockPendientes;
+      confirmarG3({
+        titulo: `¿Descartar ${pendientes.length} cambio${pendientes.length !== 1 ? 's' : ''} sin guardar?`,
+        texto: 'Los stocks que escribiste no se guardan; el inventario queda como está.',
+        cambios: pendientes.slice(0, 12).map((c) => ({ campo: c.articulo.nombre, antes: String(parseFloat(c.articulo.stock_actual)), despues: String(c.nuevo) })),
+        datos: pendientes.length > 12 ? [['Y además', `${pendientes.length - 12} cambio${pendientes.length - 12 !== 1 ? 's' : ''} más`]] : undefined,
+        confirmar: 'Descartar cambios', cancelar: 'Seguir editando', peligro: true,
+      }).then((si) => {
+        if (!si) return;
+        setModoAjusteStock(false);
+        setStocksEditados({});
+      });
+      return;
+    }
     if (cambiosStockPendientes.length > 0 &&
       !window.confirm(`Hay ${cambiosStockPendientes.length} cambio(s) sin guardar. ¿Descartar?`)) {
       return;
@@ -1227,8 +1259,8 @@ const InventarioPage = () => {
         setModalDetalleOpen(true);
 
         // Mostrar toast de confirmación
-        toast.success(`✓ ${articuloEncontrado.nombre}`, {
-          icon: '🔍',
+        toast.success(g3Activo() ? articuloEncontrado.nombre : `✓ ${articuloEncontrado.nombre}`, {
+          icon: g3Activo() ? undefined : '🔍',
           duration: 2000,
         });
       } else {
@@ -1238,13 +1270,13 @@ const InventarioPage = () => {
         setModalFormOpen(true);
 
         // Mostrar toast informativo
-        toast.success(`📦 Nuevo artículo - Código: ${codigo}`, {
-          icon: '✨',
+        toast.success(g3Activo() ? `Nuevo artículo · código ${codigo}` : `📦 Nuevo artículo - Código: ${codigo}`, {
+          icon: g3Activo() ? undefined : '✨',
           duration: 3000,
         });
       }
     } catch (error) {
-      toast.error(`❌ Error al buscar artículo`, {
+      toast.error(g3Activo() ? 'Error al buscar el artículo' : `❌ Error al buscar artículo`, {
         duration: 3000,
       });
     }
@@ -1284,7 +1316,14 @@ const InventarioPage = () => {
   const handleEliminar = async (articulo) => {
     // Almacén: solicitar al administrador
     if (esAlmacen) {
-      if (!window.confirm(`Se enviará al administrador una solicitud para desactivar "${articulo.nombre}". ¿Continuar?`)) return;
+      if (g3Activo()) {
+        if (!(await confirmarG3({
+          titulo: 'Pedir que se desactive el artículo',
+          datos: [['Artículo', articulo.nombre], ...(articulo.sku ? [['Clave', articulo.sku]] : [])],
+          pasa: [`Se enviará al administrador una solicitud para desactivar «${articulo.nombre}».`],
+          confirmar: 'Enviar solicitud', cancelar: 'No enviar',
+        }))) return;
+      } else if (!window.confirm(`Se enviará al administrador una solicitud para desactivar "${articulo.nombre}". ¿Continuar?`)) return;
       try {
         await solicitudesCambioService.crear({
           tipo: 'desactivar_articulo',
@@ -1299,7 +1338,14 @@ const InventarioPage = () => {
       return;
     }
 
-    if (!window.confirm(`¿Estás seguro de eliminar "${articulo.nombre}"? Esta acción desactivará el artículo.`)) {
+    if (g3Activo()) {
+      if (!(await confirmarG3({
+        titulo: `¿Desactivar «${articulo.nombre}»?`,
+        datos: [['Artículo', articulo.nombre], ...(articulo.sku ? [['Clave', articulo.sku]] : []), ['Stock', `${articulo.stock_actual ?? '—'} ${articulo.unidad || ''}`.trim()]],
+        pasa: ['Esta acción desactivará el artículo.'],
+        confirmar: 'Desactivar artículo', cancelar: 'No desactivar', peligro: true,
+      }))) return;
+    } else if (!window.confirm(`¿Estás seguro de eliminar "${articulo.nombre}"? Esta acción desactivará el artículo.`)) {
       return;
     }
 
@@ -1317,7 +1363,14 @@ const InventarioPage = () => {
   const handleReactivar = async (articulo) => {
     // Almacén: no puede reactivar directo, envía solicitud (la resuelve admin o compras)
     if (esAlmacen) {
-      if (!window.confirm(`Se enviará una solicitud para reactivar "${articulo.nombre}". ¿Continuar?`)) return;
+      if (g3Activo()) {
+        if (!(await confirmarG3({
+          titulo: 'Pedir que se reactive el artículo',
+          datos: [['Artículo', articulo.nombre], ...(articulo.sku ? [['Clave', articulo.sku]] : [])],
+          pasa: [`Se enviará una solicitud para reactivar «${articulo.nombre}».`],
+          confirmar: 'Enviar solicitud', cancelar: 'No enviar',
+        }))) return;
+      } else if (!window.confirm(`Se enviará una solicitud para reactivar "${articulo.nombre}". ¿Continuar?`)) return;
       try {
         await solicitudesCambioService.crear({
           tipo: 'reactivar_articulo',
@@ -1332,7 +1385,13 @@ const InventarioPage = () => {
       return;
     }
 
-    if (!window.confirm(`¿Deseas reactivar "${articulo.nombre}"?`)) {
+    if (g3Activo()) {
+      if (!(await confirmarG3({
+        titulo: `¿Reactivar «${articulo.nombre}»?`,
+        datos: [['Artículo', articulo.nombre], ...(articulo.sku ? [['Clave', articulo.sku]] : [])],
+        confirmar: 'Reactivar artículo', cancelar: 'No reactivar',
+      }))) return;
+    } else if (!window.confirm(`¿Deseas reactivar "${articulo.nombre}"?`)) {
       return;
     }
 
@@ -1348,13 +1407,23 @@ const InventarioPage = () => {
   };
 
   const handleEliminarPermanente = async (articulo) => {
-    if (!window.confirm(`¿Estás seguro de ELIMINAR PERMANENTEMENTE "${articulo.nombre}"?\n\nEsta acción NO se puede deshacer y borrará el artículo de la base de datos.`)) {
-      return;
-    }
+    if (g3Activo()) {
+      // Las dos confirmaciones de siempre en una sola vista previa que pide escribir ELIMINAR.
+      if (!(await confirmarG3({
+        titulo: `¿Eliminar permanentemente «${articulo.nombre}»?`,
+        aviso: 'Esta acción no se puede deshacer y borrará el artículo de la base de datos.',
+        datos: [['Artículo', articulo.nombre], ...(articulo.sku ? [['Clave', articulo.sku]] : [])],
+        escribir: 'ELIMINAR', confirmar: 'Eliminar permanentemente', cancelar: 'No eliminar', peligro: true,
+      }))) return;
+    } else {
+      if (!window.confirm(`¿Estás seguro de ELIMINAR PERMANENTEMENTE "${articulo.nombre}"?\n\nEsta acción NO se puede deshacer y borrará el artículo de la base de datos.`)) {
+        return;
+      }
 
-    // Segunda confirmación para mayor seguridad
-    if (!window.confirm(`CONFIRMAR: Eliminar permanentemente "${articulo.nombre}"`)) {
-      return;
+      // Segunda confirmación para mayor seguridad
+      if (!window.confirm(`CONFIRMAR: Eliminar permanentemente "${articulo.nombre}"`)) {
+        return;
+      }
     }
 
     try {
@@ -1566,9 +1635,16 @@ const InventarioPage = () => {
 
       // Si requiere confirmación (hay artículos asociados)
       if (error.requiresConfirmation) {
-        const confirmar = window.confirm(
-          `⚠️ ADVERTENCIA\n\n${error.message}\n\n¿Deseas continuar? Los artículos se moverán a la categoría "Sin Categoría".`
-        );
+        const confirmar = g3Activo()
+          ? await confirmarG3({
+            titulo: `¿Eliminar la categoría «${categoria.nombre}»?`,
+            aviso: error.message,
+            pasa: ['Los artículos se moverán a la categoría «Sin Categoría».'],
+            confirmar: 'Eliminar y mover artículos', cancelar: 'No eliminar', peligro: true,
+          })
+          : window.confirm(
+            `⚠️ ADVERTENCIA\n\n${error.message}\n\n¿Deseas continuar? Los artículos se moverán a la categoría "Sin Categoría".`
+          );
 
         if (confirmar) {
           try {
@@ -1683,9 +1759,16 @@ const InventarioPage = () => {
 
       // Si requiere confirmación (hay artículos asociados)
       if (error.requiresConfirmation) {
-        const confirmar = window.confirm(
-          `⚠️ ADVERTENCIA\n\n${error.message}\n\n¿Deseas continuar? Los artículos se moverán a la ubicación "Sin Asignar".`
-        );
+        const confirmar = g3Activo()
+          ? await confirmarG3({
+            titulo: `¿Eliminar la ubicación «${ubicacion.codigo || ubicacion.nombre}»?`,
+            aviso: error.message,
+            pasa: ['Los artículos se moverán a la ubicación «Sin Asignar».'],
+            confirmar: 'Eliminar y mover artículos', cancelar: 'No eliminar', peligro: true,
+          })
+          : window.confirm(
+            `⚠️ ADVERTENCIA\n\n${error.message}\n\n¿Deseas continuar? Los artículos se moverán a la ubicación "Sin Asignar".`
+          );
 
         if (confirmar) {
           try {
@@ -1794,7 +1877,13 @@ const InventarioPage = () => {
       if (seccionSeleccionada === seccion.id) setSeccionSeleccionada(null);
     } catch (error) {
       if (error.requiresConfirmation) {
-        if (window.confirm(`⚠️ ${error.message}\n\n¿Continuar?`)) {
+        if (g3Activo()
+          ? await confirmarG3({
+            titulo: `¿Eliminar la sección «${seccion.nombre}»?`,
+            aviso: error.message,
+            confirmar: 'Eliminar sección', cancelar: 'No eliminar', peligro: true,
+          })
+          : window.confirm(`⚠️ ${error.message}\n\n¿Continuar?`)) {
           try {
             await seccionesService.delete(seccion.id, true);
             toast.success('Sección eliminada');
@@ -1879,7 +1968,13 @@ const InventarioPage = () => {
   };
 
   const handleEliminarAlmacen = async (almacenObj) => {
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar el almacén "${almacenObj.nombre}"?\n\nEsto desvinculará todas las ubicaciones de este almacén.`)) {
+    if (g3Activo()) {
+      if (!(await confirmarG3({
+        titulo: `¿Eliminar el almacén «${almacenObj.nombre}»?`,
+        pasa: ['Esto desvinculará todas las ubicaciones de este almacén.'],
+        confirmar: 'Eliminar almacén', cancelar: 'No eliminar', peligro: true,
+      }))) return;
+    } else if (!window.confirm(`¿Estás seguro de que deseas eliminar el almacén "${almacenObj.nombre}"?\n\nEsto desvinculará todas las ubicaciones de este almacén.`)) {
       return;
     }
 
@@ -2070,14 +2165,82 @@ const InventarioPage = () => {
 
   // Gate: si no hay almacén seleccionado, mostrar selector
   if (almacenSeleccionado === null) {
+    // Diseño 3G: números del inventario, con los mismos datos que ya cargó la pantalla (sin peticiones nuevas).
+    // GET /articulos trae hasta 1000 artículos (límite de siempre): si llegó al tope, la cifra es parcial y se marca con «+».
+    const parcialG3 = articulos.length >= 1000;
+    const activosG3 = articulos.filter(a => a.activo === true);
+    // Mismo filtro que la pantalla Stock bajo (GET /reportes/stock-bajo): activo, sin herramientas, con mínimo y stock ≤ mínimo
+    const bajoMinimoG3 = activosG3.filter(a => a.es_herramienta === false && parseFloat(a.stock_minimo) > 0 && parseFloat(a.stock_actual) <= parseFloat(a.stock_minimo)).length;
+    const cifraG3 = (n) => `${n.toLocaleString('es-MX')}${parcialG3 ? '+' : ''}`;
+    const abrirNuevosRegistros = () => {
+      setAlmacenSeleccionado('nuevos');
+      setTabActivo('consumibles');
+      setSeccionSeleccionada('todos');
+      setCategoriaSeleccionada(null);
+      setUbicacionSeleccionada(null);
+    };
     return (
-      <div className="p-4 md:p-6 min-h-[70vh] flex flex-col items-center justify-center">
-        <div className="max-w-5xl w-full">
-          <div className="text-center mb-8">
+      <div className="p-4 md:p-6 min-h-[70vh] flex flex-col items-center justify-center g3:justify-start g3:min-h-0">
+        <div className="max-w-5xl w-full g3:max-w-none">
+          {/* Diseño 3G: encabezado y números (solo se monta con el interruptor encendido) */}
+          {diseno3g && (
+            <div className="g3-pila g3p-inv-cab">
+              <div className="g3-cab">
+                <div>
+                  <h1>Inventario</h1>
+                  <p>Elige un almacén para ver sus artículos, o busca una clave o un código en todos los almacenes.</p>
+                </div>
+                {esAdministrador && (
+                  <div className="g3-cab-acciones">
+                    {/* «Gestionar almacenes» solo abre dentro de un almacén (aquí la ventana no se pinta: error que ya existe hoy).
+                        Para no hacerlo más fácil de provocar, aquí va desactivado con la explicación. */}
+                    <button type="button" className="g3-btn g3-btn--tonal" disabled aria-describedby="g3p-gestionar-ayuda">
+                      <Settings size={18} aria-hidden="true" /> Gestionar almacenes
+                    </button>
+                    <p id="g3p-gestionar-ayuda" className="g3-chico g3-tenue g3p-ayuda-cab">Entra a cualquier almacén y usa «Gestionar almacenes».</p>
+                  </div>
+                )}
+              </div>
+              <div className="g3-rejilla g3-rejilla--4">
+                <div className="g3-kpi">
+                  <span className="g3-kpi-valor">{cifraG3(activosG3.length)}</span>
+                  <span className="g3-kpi-texto">Artículos activos{parcialG3 ? ' (cuenta parcial)' : ''}</span>
+                </div>
+                {rolPuedeVer(user?.rol, '/stock-bajo') && user?.rol === 'administrador' ? (
+                  <Link to="/stock-bajo" className="g3-kpi">
+                    <span className="g3-kpi-valor" style={bajoMinimoG3 ? { color: 'var(--g3-mal)' } : undefined}>{cifraG3(bajoMinimoG3)}</span>
+                    <span className="g3-kpi-texto">Artículos bajo mínimo · ver stock bajo</span>
+                  </Link>
+                ) : (
+                  <div className="g3-kpi">
+                    <span className="g3-kpi-valor" style={bajoMinimoG3 ? { color: 'var(--g3-mal)' } : undefined}>{cifraG3(bajoMinimoG3)}</span>
+                    <span className="g3-kpi-texto">Artículos bajo mínimo</span>
+                  </div>
+                )}
+                <div className="g3-kpi">
+                  <span className="g3-kpi-valor">{articulosEnConteo.size.toLocaleString('es-MX')}</span>
+                  <span className="g3-kpi-texto">Ya contados en el ciclo actual del conteo cíclico</span>
+                </div>
+                {(esAdministrador || esAlmacen) ? (
+                  <button type="button" className="g3-kpi g3p-kpi-boton" onClick={abrirNuevosRegistros}>
+                    <span className="g3-kpi-valor" style={articulosPendientesRevision.length ? { color: 'var(--g3-aviso)' } : undefined}>{cifraG3(articulosPendientesRevision.length)}</span>
+                    <span className="g3-kpi-texto">Artículos nuevos por autorizar</span>
+                  </button>
+                ) : (
+                  <div className="g3-kpi">
+                    {/* todasCategorias = GET /categorias sin almacén (ya cargado al abrir). «categorias» se queda con las del último almacén visitado. */}
+                    <span className="g3-kpi-valor">{(todasCategorias || []).length.toLocaleString('es-MX')}</span>
+                    <span className="g3-kpi-texto">Categorías en todos los almacenes</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="text-center mb-8 g3:hidden">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">¿Qué deseas consultar?</h1>
             <p className="text-gray-600">Elige un almacén o ve directamente a herramientas</p>
           </div>
-          <div className="relative max-w-2xl mx-auto mb-8">
+          <div className="relative max-w-2xl mx-auto mb-8 g3-busca g3-busca--grande g3:!mx-0 g3:!mb-5">
             <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <input
               type="text"
@@ -2092,7 +2255,8 @@ const InventarioPage = () => {
                   setBusquedaInicio('');
                 }
               }}
-              placeholder="Buscar SKU en todos los almacenes (nombre, SKU o código)"
+              placeholder={diseno3g ? 'Buscar en todos los almacenes: nombre, clave o código' : 'Buscar SKU en todos los almacenes (nombre, SKU o código)'}
+              aria-label={diseno3g ? 'Buscar artículo en todos los almacenes' : undefined}
               className="w-full pl-12 pr-10 py-3 text-base border-2 border-gray-200 rounded-xl focus:outline-none focus:border-red-700"
               autoFocus
             />
@@ -2145,6 +2309,7 @@ const InventarioPage = () => {
               </div>
             )}
           </div>
+          {diseno3g && <h2 className="g3-seccion-titulo g3p-titulo-lista">Almacenes</h2>}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {almacenesDisponibles.map((almacen) => {
               const esHerramientas = almacen.nombre === 'Herramientas';
@@ -2156,14 +2321,14 @@ const InventarioPage = () => {
                     setTabActivo(esHerramientas ? 'herramientas' : 'consumibles');
                     setSeccionSeleccionada(null);
                   }}
-                  className={`group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 ${esHerramientas ? 'hover:border-blue-700' : 'hover:border-red-700'} hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4`}
+                  className={`group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 ${esHerramientas ? 'hover:border-blue-700' : 'hover:border-red-700'} hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4 g3:!border g3:!p-5 g3:items-start g3:text-left g3:gap-3`}
                 >
-                  <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full ${esHerramientas ? 'bg-blue-50 group-hover:bg-blue-700' : 'bg-red-50 group-hover:bg-red-700'} transition-colors flex items-center justify-center`}>
+                  <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full ${esHerramientas ? 'bg-blue-50 group-hover:bg-blue-700' : 'bg-red-50 group-hover:bg-red-700'} transition-colors flex items-center justify-center g3:!w-12 g3:!h-12 g3:!bg-g3-primario-suave g3:group-hover:!bg-g3-primario`}>
                     {esHerramientas
-                      ? <Wrench size={36} className="text-blue-700 group-hover:text-white transition-colors" />
-                      : <Package size={36} className="text-red-700 group-hover:text-white transition-colors" />}
+                      ? <Wrench size={36} className="text-blue-700 group-hover:text-white transition-colors g3:!text-g3-sobre-primario-suave g3:group-hover:!text-g3-sobre-primario g3:!w-6 g3:!h-6" />
+                      : <Package size={36} className="text-red-700 group-hover:text-white transition-colors g3:!text-g3-sobre-primario-suave g3:group-hover:!text-g3-sobre-primario g3:!w-6 g3:!h-6" />}
                   </div>
-                  <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">
+                  <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide g3:normal-case g3:tracking-normal g3:font-semibold g3:!text-lg g3:font-g3-titulo">
                     {almacen.nombre}
                   </span>
                   {typeof almacen.articulos_count === 'number' && (
@@ -2185,18 +2350,18 @@ const InventarioPage = () => {
                   setCategoriaSeleccionada(null);
                   setUbicacionSeleccionada(null);
                 }}
-                className="relative group bg-white border-2 border-amber-200 rounded-2xl p-6 md:p-8 hover:border-amber-500 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4"
+                className="relative group bg-white border-2 border-amber-200 rounded-2xl p-6 md:p-8 hover:border-amber-500 hover:shadow-xl transition-all duration-200 flex flex-col items-center gap-4 g3:!border g3:!p-5 g3:items-start g3:text-left g3:gap-3"
               >
                 {articulosPendientesRevision.length > 0 && (
                   <span className="absolute top-3 right-3 min-w-[24px] h-6 px-1.5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full">
                     {articulosPendientesRevision.length}
                   </span>
                 )}
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-amber-50 group-hover:bg-amber-500 transition-colors flex items-center justify-center">
-                  <PackagePlus size={36} className="text-amber-600 group-hover:text-white transition-colors" />
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-amber-50 group-hover:bg-amber-500 transition-colors flex items-center justify-center g3:!w-12 g3:!h-12">
+                  <PackagePlus size={36} className="text-amber-600 group-hover:text-white transition-colors g3:!w-6 g3:!h-6" />
                 </div>
-                <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide text-center">
-                  Nuevos Registros
+                <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide text-center g3:normal-case g3:tracking-normal g3:font-semibold g3:!text-lg g3:font-g3-titulo g3:text-left">
+                  {diseno3g ? 'Nuevos por autorizar' : 'Nuevos Registros'}
                 </span>
                 <span className="text-sm text-gray-500">
                   {articulosPendientesRevision.length} pendiente{articulosPendientesRevision.length === 1 ? '' : 's'}
@@ -2210,7 +2375,7 @@ const InventarioPage = () => {
             </div>
           )}
           {esAdministrador && (
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center g3:hidden">
               <button
                 onClick={() => setModalAlmacenesOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm text-purple-700 hover:text-purple-900 hover:bg-purple-50 rounded-lg transition-colors"
@@ -2239,9 +2404,33 @@ const InventarioPage = () => {
     const seccionesAlmacen = secciones;
 
     return (
-      <div className="p-4 md:p-6 min-h-[70vh] flex flex-col items-center justify-center">
-        <div className="max-w-3xl w-full">
-          <div className="text-center mb-8">
+      <div className="p-4 md:p-6 min-h-[70vh] flex flex-col items-center justify-center g3:justify-start g3:min-h-0">
+        <div className="max-w-3xl w-full g3:max-w-none">
+          {/* Diseño 3G: miga y encabezado (solo se monta con el interruptor encendido) */}
+          {diseno3g && (
+            <div className="g3-pila g3p-inv-cab">
+              <nav className="g3-miga" aria-label="Ruta">
+                <button type="button" className="g3p-miga-boton" onClick={() => { setAlmacenSeleccionado(null); setSeccionSeleccionada(null); }}>Inventario</button>
+                <span aria-hidden="true">›</span>
+                <span aria-current="page">{nombreAlmacenActual}</span>
+              </nav>
+              <div className="g3-cab">
+                <div>
+                  <h1>{nombreAlmacenActual}</h1>
+                  <p>Elige la sección que quieres consultar o ve todos los artículos del almacén.</p>
+                </div>
+                <div className="g3-cab-acciones">
+                  <button type="button" className="g3-btn g3-btn--primario" onClick={() => setSeccionSeleccionada('todos')}>
+                    <Package size={18} aria-hidden="true" /> Ver todos los artículos
+                  </button>
+                  <button type="button" className="g3-btn" onClick={() => { setAlmacenSeleccionado(null); setSeccionSeleccionada(null); }}>
+                    <ArrowUpDown size={18} aria-hidden="true" /> Cambiar almacén
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="text-center mb-8 g3:hidden">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{nombreAlmacenActual}</h1>
             <p className="text-gray-600">Selecciona la sección que deseas consultar</p>
           </div>
@@ -2264,16 +2453,16 @@ const InventarioPage = () => {
               {seccionesAlmacen.map(s => (
                 <div
                   key={s.id}
-                  className="relative group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-red-600 hover:shadow-xl transition-all duration-200"
+                  className="relative group bg-white border-2 border-gray-200 rounded-2xl p-6 md:p-8 hover:border-red-600 hover:shadow-xl transition-all duration-200 g3:!border g3:!p-5 g3:hover:!border-g3-primario"
                 >
                   <button
                     onClick={() => setSeccionSeleccionada(s.id)}
-                    className="w-full flex flex-col items-center gap-4"
+                    className="w-full flex flex-col items-center gap-4 g3:items-start g3:text-left g3:gap-3"
                   >
-                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-50 group-hover:bg-red-600 transition-colors flex items-center justify-center">
-                      <Package size={36} className="text-red-600 group-hover:text-white transition-colors" />
+                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-red-50 group-hover:bg-red-600 transition-colors flex items-center justify-center g3:!w-12 g3:!h-12 g3:!bg-g3-primario-suave g3:group-hover:!bg-g3-primario">
+                      <Package size={36} className="text-red-600 group-hover:text-white transition-colors g3:!text-g3-sobre-primario-suave g3:group-hover:!text-g3-sobre-primario g3:!w-6 g3:!h-6" />
                     </div>
-                    <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide">{s.nombre}</span>
+                    <span className="text-lg md:text-xl font-bold text-gray-900 uppercase tracking-wide g3:normal-case g3:tracking-normal g3:font-semibold g3:!text-lg g3:font-g3-titulo">{s.nombre}</span>
                     <span className="text-sm text-gray-500">
                       {conteoPorSeccion(s.id)} artículo{conteoPorSeccion(s.id) === 1 ? '' : 's'}
                     </span>
@@ -2290,6 +2479,11 @@ const InventarioPage = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (g3Activo()) {
+                            confirmarG3({ titulo: `¿Eliminar la sección «${s.nombre}»?`, confirmar: 'Eliminar sección', cancelar: 'No eliminar', peligro: true })
+                              .then((si) => { if (si) handleEliminarSeccion(s); });
+                            return;
+                          }
                           if (window.confirm(`¿Eliminar la sección "${s.nombre}"?`)) {
                             handleEliminarSeccion(s);
                           }
@@ -2306,15 +2500,15 @@ const InventarioPage = () => {
               {esAdministrador && (
                 <button
                   onClick={() => handleAbrirModalSeccion()}
-                  className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-6 md:p-8 hover:border-red-600 hover:bg-red-50 transition-colors flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-red-700"
+                  className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-6 md:p-8 hover:border-red-600 hover:bg-red-50 transition-colors flex flex-col items-center justify-center gap-3 text-gray-500 hover:text-red-700 g3:hover:!border-g3-primario g3:hover:!bg-g3-primario-tinte g3:hover:!text-g3-primario"
                 >
                   <Plus size={32} />
-                  <span className="font-semibold uppercase tracking-wide">Nueva sección</span>
+                  <span className="font-semibold uppercase tracking-wide g3:normal-case g3:tracking-normal">Nueva sección</span>
                 </button>
               )}
             </div>
           )}
-          <div className="mt-6 flex justify-center gap-3 flex-wrap">
+          <div className="mt-6 flex justify-center gap-3 flex-wrap g3:hidden">
             <button
               onClick={() => setSeccionSeleccionada('todos')}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors font-medium"
@@ -2381,7 +2575,7 @@ const InventarioPage = () => {
   }
 
   return (
-    <div className="p-4 md:p-6">
+    <div className={`p-4 md:p-6${modoAjusteStock && puedeAjustarStock ? ' g3:pb-[calc(var(--g3-espacio-inferior)+6rem)]' : ''}`}>
       {/* Indicador de escaneo activo */}
       <BarcodeScannerIndicator isScanning={isScanning} />
 
@@ -2401,7 +2595,7 @@ const InventarioPage = () => {
           </div>
           <button
             onClick={() => setShowScanner(true)}
-            className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 bg-red-700 text-white rounded-lg hover:bg-red-800 transition-colors"
+            className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 bg-red-700 text-white rounded-lg hover:bg-red-800 transition-colors g3:!bg-g3-primario-suave g3:!text-g3-sobre-primario-suave"
           >
             <QrCode size={18} />
             <span className="font-medium hidden sm:inline">Escanear</span>
@@ -2423,11 +2617,11 @@ const InventarioPage = () => {
               const nombreAct = almacenesDisponibles.find(a => a.id == almacenSeleccionado)?.nombre || 'Almacén';
               const esHerr = nombreAct === 'Herramientas';
               return (
-                <div className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg ${esHerr ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}`}>
+                <div className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg ${esHerr ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'} g3:!rounded-full g3:!bg-g3-primario-suave g3:!border-transparent`}>
                   {esHerr
-                    ? <Wrench size={18} className="text-blue-700" />
-                    : <Package size={18} className="text-red-700" />}
-                  <span className={`font-semibold uppercase tracking-wide text-sm md:text-base ${esHerr ? 'text-blue-700' : 'text-red-700'}`}>
+                    ? <Wrench size={18} className="text-blue-700 g3:!text-g3-sobre-primario-suave" />
+                    : <Package size={18} className="text-red-700 g3:!text-g3-sobre-primario-suave" />}
+                  <span className={`font-semibold uppercase tracking-wide text-sm md:text-base ${esHerr ? 'text-blue-700' : 'text-red-700'} g3:!text-g3-sobre-primario-suave g3:normal-case g3:tracking-normal`}>
                     {nombreAct}
                   </span>
                 </div>
@@ -2435,9 +2629,9 @@ const InventarioPage = () => {
             })()}
             {/* Indicador de sección activa */}
             {seccionSeleccionada && !modoNuevosRegistros && (
-              <div className="flex items-center gap-2 px-3 py-2.5 border rounded-lg bg-red-50 border-red-200">
-                <Package size={16} className="text-red-700" />
-                <span className="font-semibold uppercase tracking-wide text-xs md:text-sm text-red-700">
+              <div className="flex items-center gap-2 px-3 py-2.5 border rounded-lg bg-red-50 border-red-200 g3:!rounded-full g3:!bg-g3-contenedor g3:!border-transparent">
+                <Package size={16} className="text-red-700 g3:!text-g3-tinta-2" />
+                <span className="font-semibold uppercase tracking-wide text-xs md:text-sm text-red-700 g3:!text-g3-tinta g3:normal-case g3:tracking-normal">
                   {typeof seccionSeleccionada === 'number'
                     ? (todasSecciones.find(s => s.id === seccionSeleccionada)?.nombre || 'Sección')
                     : (seccionSeleccionada === 'extras' ? 'Extras' : 'Stock')}
@@ -2465,11 +2659,11 @@ const InventarioPage = () => {
             {esAdministrador && (
               <button
                 onClick={() => setModalAlmacenesOpen(true)}
-                className="px-3 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                className="px-3 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2 g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto"
                 title="Gestionar almacenes"
               >
-                <Plus size={18} />
-                <span className="hidden md:inline text-sm">Gestionar</span>
+                {diseno3g ? <Settings size={18} aria-hidden="true" /> : <Plus size={18} />}
+                <span className="hidden md:inline text-sm">{diseno3g ? 'Gestionar almacenes' : 'Gestionar'}</span>
               </button>
             )}
           </div>
@@ -2487,7 +2681,7 @@ const InventarioPage = () => {
             >
               <option value="nombre-asc">Nombre (A-Z)</option>
               <option value="nombre-desc">Nombre (Z-A)</option>
-              <option value="stock-bajo">⚠️ Stock Bajo Primero</option>
+              <option value="stock-bajo">{diseno3g ? 'Stock bajo primero' : '⚠️ Stock Bajo Primero'}</option>
               <option value="stock-asc">Stock (Menor a Mayor)</option>
               <option value="stock-desc">Stock (Mayor a Menor)</option>
               <option value="costo-asc">Precio (Menor a Mayor)</option>
@@ -2550,6 +2744,16 @@ const InventarioPage = () => {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                if (g3Activo()) {
+                                  confirmarG3({ titulo: `¿Eliminar la categoría «${cat.nombre}»?`, confirmar: 'Eliminar categoría', cancelar: 'No eliminar', peligro: true })
+                                    .then((si) => {
+                                      if (!si) return;
+                                      setCategoriaDropdownOpen(false);
+                                      setCategoriaEditMode(false);
+                                      handleEliminarCategoria(cat);
+                                    });
+                                  return;
+                                }
                                 if (window.confirm(`¿Eliminar la categoría "${cat.nombre}"?`)) {
                                   setCategoriaDropdownOpen(false);
                                   setCategoriaEditMode(false);
@@ -2658,6 +2862,16 @@ const InventarioPage = () => {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                if (g3Activo()) {
+                                  confirmarG3({ titulo: `¿Eliminar la ubicación «${ub.codigo || ub.nombre}»?`, confirmar: 'Eliminar ubicación', cancelar: 'No eliminar', peligro: true })
+                                    .then((si) => {
+                                      if (!si) return;
+                                      setUbicacionDropdownOpen(false);
+                                      setUbicacionEditMode(false);
+                                      handleEliminarUbicacion(ub);
+                                    });
+                                  return;
+                                }
                                 if (window.confirm(`¿Eliminar la ubicación "${ub.codigo || ub.nombre}"?`)) {
                                   setUbicacionDropdownOpen(false);
                                   setUbicacionEditMode(false);
@@ -2715,28 +2929,28 @@ const InventarioPage = () => {
               <button
                 onClick={() => setMostrarDesactivados(!mostrarDesactivados)}
                 className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base rounded-lg transition-colors ${mostrarDesactivados
-                  ? 'bg-orange-600 text-white hover:bg-orange-700'
+                  ? 'bg-orange-600 text-white hover:bg-orange-700 g3:!bg-g3-primario-suave g3:!text-g3-sobre-primario-suave'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
                 title={mostrarDesactivados ? 'Ver artículos activos' : 'Ver artículos desactivados'}
               >
                 <Trash2 size={18} />
-                <span className="hidden sm:inline">{mostrarDesactivados ? 'Ver Activos' : 'Ver Desactivados'}</span>
+                <span className="hidden sm:inline">{diseno3g ? (mostrarDesactivados ? 'Ver activos' : 'Ver desactivados') : (mostrarDesactivados ? 'Ver Activos' : 'Ver Desactivados')}</span>
               </button>
               <button
                 onClick={handleAbrirModalEtiquetas}
-                className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors g3:!bg-g3-primario-suave g3:!text-g3-sobre-primario-suave"
                 title="Generar etiquetas para imprimir"
               >
                 <Barcode size={18} />
-                <span className="hidden sm:inline">Generar Etiquetas</span>
+                <span className="hidden sm:inline">{diseno3g ? 'Generar etiquetas' : 'Generar Etiquetas'}</span>
               </button>
               <button
                 onClick={handleNuevoArticulo}
                 className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base bg-red-700 text-white rounded-lg hover:bg-red-800"
               >
                 <Plus size={18} />
-                <span className="hidden sm:inline">{esAlmacen ? 'Nuevo SKU' : 'Nuevo Artículo'}</span>
+                <span className="hidden sm:inline">{diseno3g ? (esAlmacen ? 'Nueva clave' : 'Nuevo artículo') : (esAlmacen ? 'Nuevo SKU' : 'Nuevo Artículo')}</span>
               </button>
             </>
           )}
@@ -2747,13 +2961,13 @@ const InventarioPage = () => {
               onClick={() => modoAjusteStock ? handleCancelarAjusteStock() : setModoAjusteStock(true)}
               disabled={guardandoStocks}
               className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base rounded-lg transition-colors disabled:opacity-50 ${modoAjusteStock
-                ? 'bg-amber-500 text-white hover:bg-amber-600 ring-2 ring-amber-300'
-                : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                ? 'bg-amber-500 text-white hover:bg-amber-600 ring-2 ring-amber-300 g3:!bg-g3-primario-suave g3:!text-g3-sobre-primario-suave g3:!ring-g3-primario'
+                : 'bg-amber-100 text-amber-800 hover:bg-amber-200 g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto'
                 }`}
               title={modoAjusteStock ? 'Salir del modo de ajuste de stocks' : 'Editar stocks directamente en la tabla y guardar todo en un solo paso'}
             >
               <Edit2 size={18} />
-              <span className="hidden sm:inline">{modoAjusteStock ? 'Salir de Ajuste' : 'Ajustar Stocks'}</span>
+              <span className="hidden sm:inline">{diseno3g ? (modoAjusteStock ? 'Salir del ajuste' : 'Ajustar stocks') : (modoAjusteStock ? 'Salir de Ajuste' : 'Ajustar Stocks')}</span>
             </button>
           )}
 
@@ -2764,7 +2978,7 @@ const InventarioPage = () => {
               onClick={togglePermisosAlmacen}
               disabled={cambiandoPermisosAlmacen}
               className={`flex items-center gap-2 px-3 md:px-4 py-2 md:py-3 text-sm md:text-base rounded-lg transition-colors disabled:opacity-50 ${permisosAlmacenAbiertos
-                ? 'bg-emerald-500 text-white hover:bg-emerald-600 ring-2 ring-emerald-300'
+                ? 'bg-emerald-500 text-white hover:bg-emerald-600 ring-2 ring-emerald-300 g3:!bg-g3-ok-suave g3:!text-g3-ok g3:!ring-g3-ok'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               title={permisosAlmacenAbiertos
@@ -2772,7 +2986,7 @@ const InventarioPage = () => {
                 : 'Abrir permisos: almacén podrá crear y editar artículos por completo (categoría, ubicación, sección, stock, unidad, proveedor, descripción, foto).'}
             >
               {permisosAlmacenAbiertos ? <Unlock size={18} /> : <Lock size={18} />}
-              <span className="hidden sm:inline">{permisosAlmacenAbiertos ? 'Permisos Almacén: ON' : 'Permisos Almacén'}</span>
+              <span className="hidden sm:inline">{diseno3g ? (permisosAlmacenAbiertos ? 'Permisos de almacén: abiertos' : 'Permisos de almacén') : (permisosAlmacenAbiertos ? 'Permisos Almacén: ON' : 'Permisos Almacén')}</span>
             </button>
           )}
         </div>
@@ -2781,7 +2995,7 @@ const InventarioPage = () => {
 
       {/* Barra flotante de ajuste de stocks: los cambios solo se aplican al presionar Guardar */}
       {modoAjusteStock && puedeAjustarStock && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-white border-2 border-amber-400 rounded-xl shadow-2xl">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-white border-2 border-amber-400 rounded-xl shadow-2xl g3:bottom-[calc(var(--g3-espacio-inferior)+1rem)]">
           <span className="text-sm font-medium text-gray-700">
             {cambiosStockPendientes.length === 0
               ? 'Edita los stocks en la tabla'
@@ -2817,9 +3031,9 @@ const InventarioPage = () => {
 
       {/* Sección Unificada: Artículos (Consumibles + Herramientas) */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-50 to-orange-50 border-b border-gray-200 px-4 md:px-6 py-3">
+        <div className="bg-gradient-to-r from-blue-50 to-orange-50 border-b border-gray-200 px-4 md:px-6 py-3 g3:!bg-none">
           <h2 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
-            📦 Inventario
+            {diseno3g ? 'Artículos' : '📦 Inventario'}
             <span className="text-xs md:text-sm font-normal text-gray-700">
               ({filteredArticulos.length} artículos total)
             </span>
@@ -2837,7 +3051,7 @@ const InventarioPage = () => {
             </div>
             {filteredArticulos.length === 0 ? (
               <div className="text-center py-16 text-gray-500">
-                <div className="text-4xl mb-2">✅</div>
+                <div className="text-4xl mb-2">{diseno3g ? <Check size={36} className="mx-auto text-green-600" aria-hidden="true" /> : '✅'}</div>
                 No hay nuevos registros pendientes de autorizar.
               </div>
             ) : (
@@ -2866,7 +3080,7 @@ const InventarioPage = () => {
                             {imagenUrl ? (
                               <img src={imagenUrl} alt={item.nombre} className="w-9 h-9 object-cover rounded-lg flex-shrink-0" />
                             ) : (
-                              <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center text-lg flex-shrink-0">{item.es_herramienta ? '🔧' : '📦'}</div>
+                              <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center text-lg flex-shrink-0">{diseno3g ? (item.es_herramienta ? <Wrench size={18} className="text-gray-500" aria-hidden="true" /> : <Package size={18} className="text-gray-500" aria-hidden="true" />) : (item.es_herramienta ? '🔧' : '📦')}</div>
                             )}
                             <div className="min-w-0">
                               <div className="font-medium text-gray-900 truncate">{item.nombre}</div>
@@ -3005,7 +3219,7 @@ const InventarioPage = () => {
                   <tr className="bg-blue-50 sticky top-[49px] z-20 border-b border-blue-200 shadow-sm">
                     <td colSpan="7" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-blue-900">
-                        📦 Consumibles
+                        {diseno3g ? 'Consumibles' : '📦 Consumibles'}
                         <span className="text-xs font-normal text-blue-700">
                           ({filteredArticulos.filter(item => !item.es_herramienta).length})
                         </span>
@@ -3040,11 +3254,11 @@ const InventarioPage = () => {
                         className={`transition-colors cursor-pointer ${esRecienActualizado
                           ? 'bg-green-50 hover:bg-green-100 border-l-4 border-green-500'
                           : esPendienteRevision
-                          ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                          ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500 g3p-estado-pendiente'
                           : esSinStockCritico
                             ? 'bg-red-100 hover:bg-red-200 border-l-4 border-red-600'
                             : esUbicacionRevisar
-                              ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                              ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500 g3p-estado-revisar'
                               : esEnConteo
                                 ? 'bg-blue-50 hover:bg-blue-100 border-l-4 border-blue-400'
                                 : 'hover:bg-gray-50'
@@ -3061,7 +3275,7 @@ const InventarioPage = () => {
                               />
                             ) : (
                               <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
-                                📦
+                                {diseno3g ? <Package size={18} className="text-gray-500" aria-hidden="true" /> : '📦'}
                               </div>
                             )}
                             <div className="min-w-0 overflow-hidden">
@@ -3070,14 +3284,17 @@ const InventarioPage = () => {
                                 <div className="text-xs text-gray-400 truncate">{item.descripcion}</div>
                               )}
                               <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                                {diseno3g && esPendienteRevision && (
+                                  <span className="g3-estado g3p-estado-pendiente-texto"><Clock size={12} aria-hidden="true" />Por autorizar</span>
+                                )}
                                 {esDeOtroAlmacen(item) && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 max-w-full truncate">
-                                    🏬 {item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
+                                    {diseno3g ? <Warehouse size={12} aria-hidden="true" /> : '🏬 '}{item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
                                   </span>
                                 )}
                                 {buscandoGlobalActivo && item.activo === false && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-200 text-gray-700">
-                                    🚫 Desactivado
+                                    {diseno3g ? <><Ban size={12} aria-hidden="true" />Desactivado</> : '🚫 Desactivado'}
                                   </span>
                                 )}
                               </div>
@@ -3122,7 +3339,7 @@ const InventarioPage = () => {
                             </select>
                           ) : esUbicacionRevisar ? (
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border-2 border-yellow-400">
-                              ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
+                              {diseno3g ? <AlertTriangle size={14} className="shrink-0" aria-hidden="true" /> : '⚠️ '}{item.ubicacion?.codigo || item.ubicacion?.nombre}
                             </span>
                           ) : (
                             <span className="text-gray-500">{item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}</span>
@@ -3180,7 +3397,7 @@ const InventarioPage = () => {
                             {puedeGestionarInventario && (
                               <button
                                 onClick={() => handleAbrirEntrada(item)}
-                                className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                                className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto g3p-icono-ok"
                                 title="Registrar entrada de inventario"
                               >
                                 <PackagePlus size={16} />
@@ -3190,7 +3407,7 @@ const InventarioPage = () => {
                             {puedeRegistrarSalida && (
                               <button
                                 onClick={() => handleAbrirSalida(item)}
-                                className="inline-flex items-center gap-1 px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700"
+                                className="inline-flex items-center gap-1 px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto g3p-icono-aviso"
                                 title="Registrar salida de inventario"
                               >
                                 <PackageMinus size={16} />
@@ -3211,7 +3428,7 @@ const InventarioPage = () => {
                                 <>
                                   <button
                                     onClick={() => handleReactivar(item)}
-                                    className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                                    className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 g3:!bg-g3-ok-suave g3:!text-g3-ok g3:hover:!bg-g3-contenedor-alto"
                                     title="Reactivar artículo"
                                   >
                                     <Plus size={16} />
@@ -3220,7 +3437,7 @@ const InventarioPage = () => {
                                   {esAdministrador && (
                                     <button
                                       onClick={() => handleEliminarPermanente(item)}
-                                      className="inline-flex items-center gap-1 px-3 py-2 bg-red-800 text-white text-sm rounded-lg hover:bg-red-900"
+                                      className="inline-flex items-center gap-1 px-3 py-2 bg-red-800 text-white text-sm rounded-lg hover:bg-red-900 g3:!bg-transparent g3:!text-g3-mal g3:!border g3:!border-g3-mal g3:hover:!bg-g3-mal-suave"
                                       title="Eliminar permanentemente"
                                     >
                                       <Trash2 size={16} />
@@ -3231,7 +3448,7 @@ const InventarioPage = () => {
                               ) : (
                                 <button
                                   onClick={() => handleEliminar(item)}
-                                  className="inline-flex items-center gap-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 g3:!bg-transparent g3:!text-g3-mal g3:hover:!bg-g3-mal-suave"
                                   title="Desactivar artículo"
                                 >
                                   <Trash2 size={16} />
@@ -3252,7 +3469,7 @@ const InventarioPage = () => {
                   <tr className="bg-orange-50 sticky top-[49px] z-20 border-b border-orange-200 shadow-sm">
                     <td colSpan="7" className="px-6 py-3">
                       <div className="flex items-center gap-2 font-semibold text-orange-900">
-                        🔧 Herramientas
+                        {diseno3g ? 'Herramientas' : '🔧 Herramientas'}
                         <span className="text-xs font-normal text-orange-700">
                           ({filteredArticulos.filter(item => item.es_herramienta).length})
                         </span>
@@ -3287,9 +3504,9 @@ const InventarioPage = () => {
                           className={`transition-colors ${esArticuloEncontrado
                             ? 'bg-green-100 hover:bg-green-200 border-l-4 border-green-600 shadow-lg'
                             : esPendienteRevision
-                              ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                              ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500 g3p-estado-pendiente'
                               : esUbicacionRevisar
-                                ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                                ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500 g3p-estado-revisar'
                                 : esEnConteo
                                   ? 'bg-blue-50 hover:bg-blue-100 border-l-4 border-blue-400'
                                   : 'hover:bg-gray-50'
@@ -3323,7 +3540,7 @@ const InventarioPage = () => {
                                   />
                                 ) : (
                                   <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
-                                    🔧
+                                    {diseno3g ? <Wrench size={18} className="text-gray-500" aria-hidden="true" /> : '🔧'}
                                   </div>
                                 )}
                                 <div className="min-w-0 overflow-hidden">
@@ -3332,14 +3549,17 @@ const InventarioPage = () => {
                                     <div className="text-xs text-gray-400 truncate">{item.descripcion}</div>
                                   )}
                                   <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                                    {diseno3g && esPendienteRevision && (
+                                      <span className="g3-estado g3p-estado-pendiente-texto"><Clock size={12} aria-hidden="true" />Por autorizar</span>
+                                    )}
                                     {esDeOtroAlmacen(item) && (
                                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 max-w-full truncate">
-                                        🏬 {item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
+                                        {diseno3g ? <Warehouse size={12} aria-hidden="true" /> : '🏬 '}{item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
                                       </span>
                                     )}
                                     {buscandoGlobalActivo && item.activo === false && (
                                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-200 text-gray-700">
-                                        🚫 Desactivado
+                                        {diseno3g ? <><Ban size={12} aria-hidden="true" />Desactivado</> : '🚫 Desactivado'}
                                       </span>
                                     )}
                                   </div>
@@ -3385,7 +3605,7 @@ const InventarioPage = () => {
                               </select>
                             ) : esUbicacionRevisar ? (
                               <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-200 text-yellow-900 font-bold rounded border-2 border-yellow-400">
-                                ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
+                                {diseno3g ? <AlertTriangle size={14} className="shrink-0" aria-hidden="true" /> : '⚠️ '}{item.ubicacion?.codigo || item.ubicacion?.nombre}
                               </span>
                             ) : (
                               <span className="text-gray-500">{item.ubicacion?.codigo || item.ubicacion?.nombre || 'N/A'}</span>
@@ -3431,7 +3651,7 @@ const InventarioPage = () => {
                               {puedeGestionarInventario && (
                                 <button
                                   onClick={() => handleAbrirEntrada(item)}
-                                  className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto g3p-icono-ok"
                                   title="Registrar entrada de inventario"
                                 >
                                   <PackagePlus size={16} />
@@ -3441,7 +3661,7 @@ const InventarioPage = () => {
                               {puedeRegistrarSalida && (
                                 <button
                                   onClick={() => handleAbrirSalida(item)}
-                                  className="inline-flex items-center gap-1 px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700"
+                                  className="inline-flex items-center gap-1 px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto g3p-icono-aviso"
                                   title="Registrar salida de inventario"
                                 >
                                   <PackageMinus size={16} />
@@ -3462,7 +3682,7 @@ const InventarioPage = () => {
                                   <>
                                     <button
                                       onClick={() => handleReactivar(item)}
-                                      className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                                      className="inline-flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 g3:!bg-g3-ok-suave g3:!text-g3-ok g3:hover:!bg-g3-contenedor-alto"
                                       title="Reactivar artículo"
                                     >
                                       <Plus size={16} />
@@ -3471,7 +3691,7 @@ const InventarioPage = () => {
                                     {esAdministrador && (
                                       <button
                                         onClick={() => handleEliminarPermanente(item)}
-                                        className="inline-flex items-center gap-1 px-3 py-2 bg-red-800 text-white text-sm rounded-lg hover:bg-red-900"
+                                        className="inline-flex items-center gap-1 px-3 py-2 bg-red-800 text-white text-sm rounded-lg hover:bg-red-900 g3:!bg-transparent g3:!text-g3-mal g3:!border g3:!border-g3-mal g3:hover:!bg-g3-mal-suave"
                                         title="Eliminar permanentemente"
                                       >
                                         <Trash2 size={16} />
@@ -3482,7 +3702,7 @@ const InventarioPage = () => {
                                 ) : (
                                   <button
                                     onClick={() => handleEliminar(item)}
-                                    className="inline-flex items-center gap-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                                    className="inline-flex items-center gap-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 g3:!bg-transparent g3:!text-g3-mal g3:hover:!bg-g3-mal-suave"
                                     title="Desactivar artículo"
                                   >
                                     <Trash2 size={16} />
@@ -3531,14 +3751,14 @@ const InventarioPage = () => {
                                           unidad.estado === 'asignada' ? 'text-blue-600' :
                                             'text-gray-600'
                                       }`}>
-                                      {unidad.estado === 'buen_estado' ? '🟢 Buen estado' :
+                                      {sinEmojiG3(unidad.estado === 'buen_estado' ? '🟢 Buen estado' :
                                         unidad.estado === 'estado_regular' ? '🟡 Estado regular' :
                                           unidad.estado === 'mal_estado' ? '🔴 Mal estado' :
                                             unidad.estado === 'disponible' ? '🟢 Buen estado' :
                                               unidad.estado === 'asignada' ? '📍 Asignada' :
                                                 unidad.estado === 'en_reparacion' ? '🟡 Estado regular' :
                                                   unidad.estado === 'perdida' || unidad.estado === 'baja' ? '🔴 Mal estado' :
-                                                    unidad.estado}
+                                                    unidad.estado)}
                                     </p>
                                   </div>
                                 </div>
@@ -3619,7 +3839,7 @@ const InventarioPage = () => {
             <>
               <div className="bg-blue-50 px-4 py-3 sticky top-0 z-20 border-b border-blue-200 shadow-sm">
                 <div className="flex items-center gap-2 font-semibold text-blue-900">
-                  📦 Consumibles
+                  {diseno3g ? 'Consumibles' : '📦 Consumibles'}
                   <span className="text-xs font-normal text-blue-700">
                     ({filteredArticulos.filter(item => !item.es_herramienta).length})
                   </span>
@@ -3653,11 +3873,11 @@ const InventarioPage = () => {
                     className={`p-3 transition-colors cursor-pointer ${esRecienActualizado
                       ? 'bg-green-50 hover:bg-green-100 border-l-4 border-green-500'
                       : esPendienteRevision
-                      ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                      ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500 g3p-estado-pendiente'
                       : esSinStockCritico
                         ? 'bg-red-100 hover:bg-red-200 border-l-4 border-red-600'
                         : esUbicacionRevisar
-                          ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                          ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500 g3p-estado-revisar'
                           : esEnConteo
                             ? 'bg-blue-50 hover:bg-blue-100 border-l-4 border-blue-400'
                             : 'hover:bg-gray-50'
@@ -3673,7 +3893,7 @@ const InventarioPage = () => {
                         />
                       ) : (
                         <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
-                          📦
+                          {diseno3g ? <Package size={18} className="text-gray-500" aria-hidden="true" /> : '📦'}
                         </div>
                       )}
 
@@ -3684,12 +3904,12 @@ const InventarioPage = () => {
                           <div className="flex flex-wrap items-center gap-1 mb-1">
                             {esDeOtroAlmacen(item) && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 max-w-full truncate">
-                                🏬 {item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
+                                {diseno3g ? <Warehouse size={12} aria-hidden="true" /> : '🏬 '}{item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
                               </span>
                             )}
                             {buscandoGlobalActivo && item.activo === false && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-200 text-gray-700">
-                                🚫 Desactivado
+                                {diseno3g ? <><Ban size={12} aria-hidden="true" />Desactivado</> : '🚫 Desactivado'}
                               </span>
                             )}
                           </div>
@@ -3698,12 +3918,15 @@ const InventarioPage = () => {
 
                         {/* Badges: categoría + sección (no editable para almacén) */}
                         <div className="mb-2 flex flex-wrap gap-1.5">
+                          {diseno3g && esPendienteRevision && (
+                            <span className="g3-estado g3p-estado-pendiente-texto"><Clock size={12} aria-hidden="true" />Por autorizar</span>
+                          )}
                           <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
                             {item.categoria?.nombre || 'Sin categoría'}
                           </span>
                           {esAlmacen ? (
                             <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                              {getSeccionArticulo(item) === 'extras' ? '✨ Extras' : '📦 Stock'}
+                              {getSeccionArticulo(item) === 'extras' ? (diseno3g ? 'Extras' : '✨ Extras') : (diseno3g ? 'Stock' : '📦 Stock')}
                             </span>
                           ) : (
                             <select
@@ -3715,8 +3938,8 @@ const InventarioPage = () => {
                                 : 'bg-emerald-100 text-emerald-800'
                                 }`}
                             >
-                              <option value="stock">📦 Stock</option>
-                              <option value="extras">✨ Extras</option>
+                              <option value="stock">{diseno3g ? 'Stock' : '📦 Stock'}</option>
+                              <option value="extras">{diseno3g ? 'Extras' : '✨ Extras'}</option>
                             </select>
                           )}
                         </div>
@@ -3724,17 +3947,17 @@ const InventarioPage = () => {
                         {/* Ubicación y Stock en una línea */}
                         <div className="flex items-center gap-3 text-xs mb-2">
                           <div className="flex items-center gap-1">
-                            <span className="text-gray-500">📍</span>
+                            {diseno3g ? <MapPin size={14} className="text-gray-500" aria-hidden="true" /> : <span className="text-gray-500">📍</span>}
                             {esUbicacionRevisar ? (
                               <span className="text-yellow-900 font-bold">
-                                ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
+                                {diseno3g ? <AlertTriangle size={13} className="g3:inline g3:align-[-2px] g3:mr-0.5" aria-hidden="true" /> : '⚠️ '}{item.ubicacion?.codigo || item.ubicacion?.nombre}
                               </span>
                             ) : (
                               <span className="text-gray-700 font-medium">{item.ubicacion?.codigo || 'N/A'}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-1" onClick={(e) => modoAjusteStock && e.stopPropagation()}>
-                            <span className="text-gray-500">📦</span>
+                            {diseno3g ? <Package size={14} className="text-gray-500" aria-hidden="true" /> : <span className="text-gray-500">📦</span>}
                             {modoAjusteStock && puedeAjustarStock ? (
                               <input
                                 type="number"
@@ -3761,7 +3984,7 @@ const InventarioPage = () => {
                       {puedeGestionarInventario && (
                         <button
                           onClick={() => handleAbrirEntrada(item)}
-                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
+                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto g3p-icono-ok"
                         >
                           <PackagePlus size={14} />
                           Entrada
@@ -3770,7 +3993,7 @@ const InventarioPage = () => {
                       {puedeRegistrarSalida && (
                         <button
                           onClick={() => handleAbrirSalida(item)}
-                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-700"
+                          className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-700 g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto g3p-icono-aviso"
                         >
                           <PackageMinus size={14} />
                           Salida
@@ -3790,7 +4013,7 @@ const InventarioPage = () => {
                           <>
                             <button
                               onClick={() => handleReactivar(item)}
-                              className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
+                              className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 g3:!bg-g3-ok-suave g3:!text-g3-ok g3:hover:!bg-g3-contenedor-alto"
                             >
                               <Plus size={14} />
                               Reactivar
@@ -3798,7 +4021,7 @@ const InventarioPage = () => {
                             {esAdministrador && (
                               <button
                                 onClick={() => handleEliminarPermanente(item)}
-                                className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-800 text-white text-xs rounded-lg hover:bg-red-900"
+                                className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-800 text-white text-xs rounded-lg hover:bg-red-900 g3:!bg-transparent g3:!text-g3-mal g3:!border g3:!border-g3-mal g3:hover:!bg-g3-mal-suave"
                               >
                                 <Trash2 size={14} />
                                 Eliminar
@@ -3808,7 +4031,7 @@ const InventarioPage = () => {
                         ) : (
                           <button
                             onClick={() => handleEliminar(item)}
-                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700"
+                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 g3:!bg-transparent g3:!text-g3-mal g3:hover:!bg-g3-mal-suave"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -3826,7 +4049,7 @@ const InventarioPage = () => {
             <>
               <div className="bg-orange-50 px-4 py-3 sticky top-0 z-20 border-b border-orange-200 shadow-sm">
                 <div className="flex items-center gap-2 font-semibold text-orange-900">
-                  🔧 Herramientas
+                  {diseno3g ? 'Herramientas' : '🔧 Herramientas'}
                   <span className="text-xs font-normal text-orange-700">
                     ({filteredArticulos.filter(item => item.es_herramienta).length})
                   </span>
@@ -3858,9 +4081,9 @@ const InventarioPage = () => {
                       className={`p-3 transition-colors ${esArticuloEncontrado
                         ? 'bg-green-100 hover:bg-green-200 border-l-4 border-green-600 shadow-lg'
                         : esPendienteRevision
-                          ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                          ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500 g3p-estado-pendiente'
                           : esUbicacionRevisar
-                            ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                            ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500 g3p-estado-revisar'
                             : 'hover:bg-gray-50'
                         }`}
                     >
@@ -3891,12 +4114,12 @@ const InventarioPage = () => {
                         <div className="flex flex-wrap items-center gap-1 mb-2 ml-7">
                           {esDeOtroAlmacen(item) && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 max-w-full truncate">
-                              🏬 {item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
+                              {diseno3g ? <Warehouse size={12} aria-hidden="true" /> : '🏬 '}{item.ubicacion?.almacen_ref?.nombre || 'Otro almacén'}
                             </span>
                           )}
                           {buscandoGlobalActivo && item.activo === false && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-200 text-gray-700">
-                              🚫 Desactivado
+                              {diseno3g ? <><Ban size={12} aria-hidden="true" />Desactivado</> : '🚫 Desactivado'}
                             </span>
                           )}
                         </div>
@@ -3912,7 +4135,7 @@ const InventarioPage = () => {
                           />
                         ) : (
                           <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
-                            🔧
+                            {diseno3g ? <Wrench size={18} className="text-gray-500" aria-hidden="true" /> : '🔧'}
                           </div>
                         )}
 
@@ -3922,12 +4145,15 @@ const InventarioPage = () => {
 
                           {/* Badges: categoría + sección (no editable para almacén) */}
                           <div className="mb-2 flex flex-wrap gap-1.5">
+                            {diseno3g && esPendienteRevision && (
+                              <span className="g3-estado g3p-estado-pendiente-texto"><Clock size={12} aria-hidden="true" />Por autorizar</span>
+                            )}
                             <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
                               {item.categoria?.nombre || 'Sin categoría'}
                             </span>
                             {esAlmacen ? (
                               <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getSeccionArticulo(item) === 'extras' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                                {getSeccionArticulo(item) === 'extras' ? '✨ Extras' : '📦 Stock'}
+                                {getSeccionArticulo(item) === 'extras' ? (diseno3g ? 'Extras' : '✨ Extras') : (diseno3g ? 'Stock' : '📦 Stock')}
                               </span>
                             ) : (
                               <button
@@ -3937,7 +4163,7 @@ const InventarioPage = () => {
                                   : 'bg-emerald-100 text-emerald-800 border-emerald-300'
                                   }`}
                               >
-                                {getSeccionArticulo(item) === 'extras' ? '✨ Extras' : '📦 Stock'}
+                                {getSeccionArticulo(item) === 'extras' ? (diseno3g ? 'Extras' : '✨ Extras') : (diseno3g ? 'Stock' : '📦 Stock')}
                               </button>
                             )}
                           </div>
@@ -3945,10 +4171,10 @@ const InventarioPage = () => {
                           {/* Ubicación */}
                           <div className="flex items-center gap-3 text-xs mb-1">
                             <div className="flex items-center gap-1">
-                              <span className="text-gray-500">📍</span>
+                              {diseno3g ? <MapPin size={14} className="text-gray-500" aria-hidden="true" /> : <span className="text-gray-500">📍</span>}
                               {esUbicacionRevisar ? (
                                 <span className="text-yellow-900 font-bold">
-                                  ⚠️ {item.ubicacion?.codigo || item.ubicacion?.nombre}
+                                  {diseno3g ? <AlertTriangle size={13} className="g3:inline g3:align-[-2px] g3:mr-0.5" aria-hidden="true" /> : '⚠️ '}{item.ubicacion?.codigo || item.ubicacion?.nombre}
                                 </span>
                               ) : (
                                 <span className="text-gray-700 font-medium">{item.ubicacion?.codigo || 'N/A'}</span>
@@ -3984,7 +4210,7 @@ const InventarioPage = () => {
                         {puedeGestionarInventario && (
                           <button
                             onClick={() => handleAbrirEntrada(item)}
-                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
+                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto g3p-icono-ok"
                           >
                             <PackagePlus size={14} />
                             Entrada
@@ -3993,7 +4219,7 @@ const InventarioPage = () => {
                         {puedeRegistrarSalida && (
                           <button
                             onClick={() => handleAbrirSalida(item)}
-                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-700"
+                            className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-700 g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto g3p-icono-aviso"
                           >
                             <PackageMinus size={14} />
                             Salida
@@ -4013,7 +4239,7 @@ const InventarioPage = () => {
                             <>
                               <button
                                 onClick={() => handleReactivar(item)}
-                                className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700"
+                                className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 g3:!bg-g3-ok-suave g3:!text-g3-ok g3:hover:!bg-g3-contenedor-alto"
                               >
                                 <Plus size={14} />
                                 Reactivar
@@ -4021,7 +4247,7 @@ const InventarioPage = () => {
                               {esAdministrador && (
                                 <button
                                   onClick={() => handleEliminarPermanente(item)}
-                                  className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-800 text-white text-xs rounded-lg hover:bg-red-900"
+                                  className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-800 text-white text-xs rounded-lg hover:bg-red-900 g3:!bg-transparent g3:!text-g3-mal g3:!border g3:!border-g3-mal g3:hover:!bg-g3-mal-suave"
                                 >
                                   <Trash2 size={14} />
                                   Eliminar
@@ -4031,7 +4257,7 @@ const InventarioPage = () => {
                           ) : (
                             <button
                               onClick={() => handleEliminar(item)}
-                              className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700"
+                              className="flex-1 min-w-[100px] inline-flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 g3:!bg-transparent g3:!text-g3-mal g3:hover:!bg-g3-mal-suave"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -4074,14 +4300,14 @@ const InventarioPage = () => {
                                         unidad.estado === 'asignada' ? 'text-blue-600' :
                                           'text-gray-600'
                                     }`}>
-                                    {unidad.estado === 'buen_estado' ? '🟢 Buen estado' :
+                                    {sinEmojiG3(unidad.estado === 'buen_estado' ? '🟢 Buen estado' :
                                       unidad.estado === 'estado_regular' ? '🟡 Estado regular' :
                                         unidad.estado === 'mal_estado' ? '🔴 Mal estado' :
                                           unidad.estado === 'disponible' ? '🟢 Buen estado' :
                                             unidad.estado === 'asignada' ? '📍 Asignada' :
                                               unidad.estado === 'en_reparacion' ? '🟡 Estado regular' :
                                                 unidad.estado === 'perdida' || unidad.estado === 'baja' ? '🔴 Mal estado' :
-                                                  unidad.estado}
+                                                  unidad.estado)}
                                   </span>
                                 </div>
                               </div>
@@ -4664,7 +4890,7 @@ const InventarioPage = () => {
                 : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
-              🏷️ Sin etiquetar
+              {diseno3g ? 'Sin etiquetar' : '🏷️ Sin etiquetar'}
             </button>
             <button
               onClick={() => setFiltroEstadoEtiquetado('etiquetados')}
@@ -4673,7 +4899,7 @@ const InventarioPage = () => {
                 : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
-              ✓ Ya etiquetados
+              {diseno3g ? 'Ya etiquetados' : '✓ Ya etiquetados'}
             </button>
           </div>
 
@@ -4781,9 +5007,9 @@ const InventarioPage = () => {
                   return (
                     <React.Fragment key={articulo.id}>
                       <div className={`flex items-center gap-4 p-4 transition-colors ${esPendienteRevision
-                        ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500'
+                        ? 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-500 g3p-estado-pendiente'
                         : esUbicacionRevisar
-                          ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500'
+                          ? 'bg-yellow-100 hover:bg-yellow-200 border-l-4 border-yellow-500 g3p-estado-revisar'
                           : 'hover:bg-gray-50'
                         }`}>
                         {/* Checkbox para artículos consumibles */}
@@ -4815,7 +5041,7 @@ const InventarioPage = () => {
                           />
                         ) : (
                           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
-                            {esHerramienta ? '🔧' : '📦'}
+                            {diseno3g ? (esHerramienta ? <Wrench size={18} className="text-gray-500" aria-hidden="true" /> : <Package size={18} className="text-gray-500" aria-hidden="true" />) : (esHerramienta ? '🔧' : '📦')}
                           </div>
                         )}
 
@@ -4824,17 +5050,17 @@ const InventarioPage = () => {
                             <h4 className="font-medium text-gray-900 truncate">{articulo.nombre}</h4>
                             {articulo.etiquetado && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 text-xs font-semibold rounded border border-green-300">
-                                ✓ Etiquetado
+                                {diseno3g ? <><Check size={12} aria-hidden="true" />Etiquetado</> : '✓ Etiquetado'}
                               </span>
                             )}
                             {esPendienteRevision && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-200 text-orange-900 text-xs font-bold rounded">
-                                🔔 Pendiente de Revisión
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-200 text-orange-900 text-xs font-bold rounded g3p-estado-pendiente">
+                                {diseno3g ? <><Clock size={12} aria-hidden="true" />Pendiente de autorizar</> : '🔔 Pendiente de Revisión'}
                               </span>
                             )}
                             {esUbicacionRevisar && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-200 text-yellow-900 text-xs font-bold rounded border border-yellow-400">
-                                ⚠️ REVISAR
+                                {diseno3g ? <><AlertTriangle size={12} aria-hidden="true" />Ubicación por revisar</> : '⚠️ REVISAR'}
                               </span>
                             )}
                           </div>
@@ -4865,7 +5091,7 @@ const InventarioPage = () => {
                                     }`}
                                 >
                                   {unidades.every(u => unidadesSeleccionadasEtiquetas.includes(u.id))
-                                    ? '✓ Deseleccionar todas'
+                                    ? (diseno3g ? 'Deseleccionar todas' : '✓ Deseleccionar todas')
                                     : 'Seleccionar todas'}
                                 </button>
                               </div>
@@ -4887,7 +5113,7 @@ const InventarioPage = () => {
                                       </span>
                                       {unidad.etiquetado && (
                                         <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 font-semibold rounded border border-green-300">
-                                          ✓ Etiquetado
+                                          {diseno3g ? <><Check size={12} aria-hidden="true" />Etiquetado</> : '✓ Etiquetado'}
                                         </span>
                                       )}
                                       <span className={`text-xs px-2 py-0.5 rounded-full ${unidad.estado === 'disponible' ? 'bg-green-100 text-green-800' :
@@ -5061,7 +5287,7 @@ const InventarioPage = () => {
                         <div>
                           <div className="flex items-center justify-between">
                             <div>
-                              <h4 className="font-semibold text-gray-900">🏢 {almacen.nombre}</h4>
+                              <h4 className="font-semibold text-gray-900">{diseno3g ? null : '🏢 '}{almacen.nombre}</h4>
                               <p className="text-sm text-gray-500">
                                 {almacen.ubicaciones_count || 0} ubicaciones · {almacen.categorias?.length || 0} categorías · {almacen.articulos_count || 0} artículos
                               </p>

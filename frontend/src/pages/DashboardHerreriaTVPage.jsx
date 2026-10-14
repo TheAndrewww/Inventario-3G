@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Clock, AlertTriangle, Calendar } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, Clock, AlertTriangle, Calendar, CheckCircle2 } from 'lucide-react';
 import { Loader } from '../components/common';
 import { Toaster } from 'react-hot-toast';
 import { useProduccionData } from '../hooks/useProduccionData';
 import { sortProyectosPorUrgencia, calcularDiasPorEtapa, calcularDiasHabiles, getHoyStr } from '../utils/produccion';
 import { px } from '../utils/produccion';
+import { useTvG3, tipoTv } from '../diseno-3g/tvG3';
+import { BarraTv, VivoTv, ControlesTv, CargandoTv } from '../diseno-3g/PiezasTv';
 
 /**
  * Tarjeta grande de proyecto para el TV de Herrería
  */
 const ProyectoCardHerreria = ({ proyecto }) => {
+    const tv = useTvG3(); // Diseño 3G para TV (solo con ?diseno=3g en la liga de esta pantalla)
     // Calcular fecha límite del ÁREA (producción) usando la misma lógica del dashboard
     const diasPorEtapa = calcularDiasPorEtapa(proyecto);
 
@@ -35,6 +38,48 @@ const ProyectoCardHerreria = ({ proyecto }) => {
         }
         return new Date(fecha + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
     };
+
+    // Diseño 3G para TV: mismos cálculos de arriba (fecha y días del área, urgente, advertencia); solo cambia cómo se ve.
+    if (tv) {
+        const tipo = tipoTv(proyecto.tipo_proyecto);
+        const fechaTexto = formatFecha(fechaLimiteArea);
+        const plazoMal = diasRestantesArea !== null && diasRestantesArea <= 2;
+        return (
+            <article className={`g3tv-tarjeta${critico ? ' g3tv-tarjeta--critico' : advertencia ? ' g3tv-tarjeta--advertencia' : ''}`}>
+                <div className="g3tv-tarjeta-cuerpo">
+                    <h3 className="g3tv-nombre">{proyecto.nombre}</h3>
+                    {(critico || tipo) && (
+                        <div className="g3tv-fila">
+                            {critico && <span className="g3tv-etq g3tv-etq--mal"><AlertTriangle aria-hidden="true" />Urgente</span>}
+                            {tipo && <span className={`g3tv-etq ${tipo.clase}`}>{tipo.texto}</span>}
+                        </div>
+                    )}
+                    {proyecto.cliente && <p className="g3tv-cliente">{proyecto.cliente}</p>}
+                </div>
+                <div className="g3tv-fecha">
+                    {fechaLimiteArea && (
+                        <>
+                            <span className="g3tv-fecha-etq">Fecha de entrega</span>
+                            <span className={`g3tv-fecha-valor${plazoMal ? ' g3tv-fecha-valor--mal' : ''}`}>
+                                <Calendar aria-hidden="true" />
+                                {fechaTexto === 'HOY' ? 'Hoy' : fechaTexto === 'MAÑANA' ? 'Mañana' : fechaTexto}
+                            </span>
+                        </>
+                    )}
+                    {diasRestantesArea !== null && diasRestantesArea >= 0 && (
+                        <p className={`g3tv-plazo${diasRestantesArea <= 2 ? ' g3tv-plazo--mal' : ''}`}>
+                            {diasRestantesArea} día{diasRestantesArea !== 1 ? 's' : ''} restante{diasRestantesArea !== 1 ? 's' : ''}
+                        </p>
+                    )}
+                    {diasRestantesArea !== null && diasRestantesArea < 0 && (
+                        <p className="g3tv-plazo g3tv-plazo--mal">
+                            {Math.abs(diasRestantesArea)} día{Math.abs(diasRestantesArea) !== 1 ? 's' : ''} de atraso
+                        </p>
+                    )}
+                </div>
+            </article>
+        );
+    }
 
     return (
         <div
@@ -97,6 +142,8 @@ const DashboardHerreriaTVPage = () => {
         refreshInterval: 60 * 1000,
         isPublic: true
     });
+    // Diseño 3G para TV: solo si la liga de esta pantalla trae ?diseno=3g (ver diseno-3g/tvG3.js). Mismos datos y misma frecuencia.
+    const tv = useTvG3();
 
     const [zoomLevel, setZoomLevel] = useState(() => {
         const saved = localStorage.getItem('herreriaTVScale');
@@ -171,7 +218,35 @@ const DashboardHerreriaTVPage = () => {
     }, [proyectos]);
 
     if (loading && proyectos.length === 0) {
+        if (tv) return <CargandoTv>Cargando proyectos…</CargandoTv>;
         return <div className="flex items-center justify-center h-screen"><Loader size="lg" /></div>;
+    }
+
+    if (tv) {
+        return (
+            <div className="g3tv-fijo" style={{ '--escala': zoomLevel }}>
+                <Toaster position="top-right" />
+                <div className="w-full h-full transition-all duration-300 origin-center" style={getRotationStyle()}>
+                    <div className="g3tv-desplaza">
+                        <div className="g3tv-pila">
+                            <BarraTv
+                                titulo="Producción de herrería"
+                                subtitulo={<><b>{enProduccion.length}</b> proyecto{enProduccion.length !== 1 ? 's' : ''} en proceso</>}
+                                derecha={<VivoTv>Herrería · en vivo · se actualiza cada minuto</VivoTv>}
+                            />
+                            {enProduccion.length > 0 ? (
+                                <div className="g3tv-lista">
+                                    {enProduccion.map(p => <ProyectoCardHerreria key={p.id} proyecto={p} />)}
+                                </div>
+                            ) : (
+                                <div className="g3tv-vacio"><CheckCircle2 aria-hidden="true" /><b>No hay proyectos en herrería actualmente</b></div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <ControlesTv visibles={controlsVisible} rotacion={rotacion} zoom={zoomLevel} onReducir={handleZoomOut} onAumentar={handleZoomIn} onRotar={rotar} />
+            </div>
+        );
     }
 
     return (

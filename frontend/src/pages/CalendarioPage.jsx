@@ -15,26 +15,29 @@ import { obtenerCalendarioMes, obtenerDistribucionEquipos } from '../services/ca
 import { toast } from 'react-hot-toast';
 import { useCalendario } from '../context/CalendarioContext';
 import ProyectoVentasModal from '../components/calendario/ProyectoVentasModal';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 
 const MESES = [
   'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
   'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
 ];
 
+// Diseño 3G: «g3p-color-equipo» conserva con el interruptor encendido el color de cada equipo y tipo (identifica al
+// equipo; el mapa de colores juntaba Equipo IV y Manufactura en el mismo ámbar). Apagado no hace nada.
 const COLORES_EQUIPO = {
   // Tipos de proyectos
   'NORMAL': { bg: 'bg-white', text: 'text-gray-800', border: 'border-gray-300' },
-  'MANTENIMIENTO': { bg: 'bg-yellow-50', text: 'text-yellow-900', border: 'border-yellow-200' },
-  'GARANTIA': { bg: 'bg-red-50', text: 'text-red-900', border: 'border-red-200' },
+  'MANTENIMIENTO': { bg: 'bg-yellow-50 g3p-color-equipo', text: 'text-yellow-900', border: 'border-yellow-200' },
+  'GARANTIA': { bg: 'bg-red-50 g3p-color-equipo', text: 'text-red-900', border: 'border-red-200' },
 
   // Equipos (para las horas y distribución)
-  'EQUIPO I': { bg: 'bg-blue-100', text: 'text-blue-900', border: 'border-blue-300' },
-  'EQUIPO II': { bg: 'bg-green-100', text: 'text-green-900', border: 'border-green-300' },
+  'EQUIPO I': { bg: 'bg-blue-100 g3p-color-equipo', text: 'text-blue-900', border: 'border-blue-300' },
+  'EQUIPO II': { bg: 'bg-green-100 g3p-color-equipo', text: 'text-green-900', border: 'border-green-300' },
   'EQUIPO III': { bg: 'bg-gray-200', text: 'text-gray-900', border: 'border-gray-400' },
-  'EQUIPO IV': { bg: 'bg-orange-100', text: 'text-orange-900', border: 'border-orange-300' },
-  'EQUIPO V': { bg: 'bg-purple-100', text: 'text-purple-900', border: 'border-purple-300' },
-  'MANUFACTURA': { bg: 'bg-yellow-100', text: 'text-yellow-900', border: 'border-yellow-300' },
-  'HERRERIA': { bg: 'bg-pink-100', text: 'text-pink-900', border: 'border-pink-300' },
+  'EQUIPO IV': { bg: 'bg-orange-100 g3p-color-equipo', text: 'text-orange-900', border: 'border-orange-300' },
+  'EQUIPO V': { bg: 'bg-purple-100 g3p-color-equipo', text: 'text-purple-900', border: 'border-purple-300' },
+  'MANUFACTURA': { bg: 'bg-yellow-100 g3p-color-equipo', text: 'text-yellow-900', border: 'border-yellow-300' },
+  'HERRERIA': { bg: 'bg-pink-100 g3p-color-equipo', text: 'text-pink-900', border: 'border-pink-300' },
   'PINTURA': { bg: 'bg-white', text: 'text-gray-800', border: 'border-gray-300' },
   'ALMACEN': { bg: 'bg-gray-300', text: 'text-gray-900', border: 'border-gray-500' },
   'FALLA': { bg: 'bg-red-600', text: 'text-white', border: 'border-red-700' }
@@ -66,6 +69,7 @@ const CalendarioPage = () => {
   // Almacén/calidad lo usa para ver la carpeta de ventas sin salir del calendario.
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState(null);
   const { modoPantallaCompleta, togglePantallaCompleta, setModoPantallaCompleta } = useCalendario();
+  const g3 = useDiseno3G(); // Diseño 3G: título en oración y barra de controles del paquete (apagado, lo de siempre)
 
   // Cargar datos del calendario
   const cargarCalendario = async (mostrarToast = true) => {
@@ -229,32 +233,34 @@ const CalendarioPage = () => {
 
   return (
     <div
-      className={`flex flex-col ${modoPantallaCompleta ? 'h-screen overflow-hidden p-2 bg-gray-900' : 'min-h-full p-2 sm:p-4 bg-gradient-to-br from-red-50 to-orange-100'}`}
+      className={`flex flex-col ${modoPantallaCompleta ? 'h-screen overflow-hidden p-2 bg-gray-900' : 'min-h-full p-2 sm:p-4 bg-gradient-to-br from-red-50 to-orange-100 g3:!bg-none'}`}
       style={modoPantallaCompleta && !mostrarControles ? { cursor: 'none' } : undefined}
     >
       {/* Header compacto - Solo en modo normal */}
       {!modoPantallaCompleta && (
         <div className="mb-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-lg shadow-md p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-lg shadow-md p-3 g3:!rounded-g3-gr g3:!shadow-none g3:border g3:border-g3-linea g3:!px-4">
             <div className="flex items-center space-x-3">
               <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-red-700 flex-shrink-0" />
               <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-gray-800">
-                  Calendario de Entregas 2026
+                <h1 className="text-lg sm:text-2xl font-bold text-gray-800 g3:font-g3-titulo g3:font-semibold">
+                  {g3 ? 'Calendario de entregas 2026' : 'Calendario de Entregas 2026'}
                 </h1>
                 <div className="flex items-center space-x-4 mt-1">
                   <button
                     onClick={() => cambiarMes(-1)}
                     className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    aria-label={g3 ? 'Mes anterior' : undefined}
                   >
                     <ChevronLeft className="w-5 h-5 text-gray-600" />
                   </button>
                   <h2 className="text-base sm:text-xl font-bold text-gray-800">
-                    {mesActual}
+                    {g3 ? mesActual.charAt(0) + mesActual.slice(1).toLowerCase() : mesActual}
                   </h2>
                   <button
                     onClick={() => cambiarMes(1)}
                     className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    aria-label={g3 ? 'Mes siguiente' : undefined}
                   >
                     <ChevronRight className="w-5 h-5 text-gray-600" />
                   </button>
@@ -519,7 +525,7 @@ const CalendarioPage = () => {
                 <div className="flex items-center space-x-1 mb-2">
                   <Users className="w-5 h-5 text-red-700" />
                   <h3 className="text-base font-bold text-gray-800">
-                    Distribución de Equipos
+                    {g3 ? 'Distribución de equipos' : 'Distribución de Equipos'}
                   </h3>
                 </div>
 
@@ -569,10 +575,10 @@ const CalendarioPage = () => {
               </div>
 
               {/* Vista Normal - Reloj - 1/3 del ancho */}
-              <div className="bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md p-4 sm:p-6 flex flex-col items-center justify-center text-white">
+              <div className="bg-gradient-to-br from-red-700 to-red-800 rounded-lg shadow-md p-4 sm:p-6 flex flex-col items-center justify-center text-white g3:!bg-none g3:!bg-g3-superficie g3:!text-g3-tinta g3:border g3:border-g3-linea g3:!shadow-none">
                 <div className="flex items-center space-x-2 mb-4">
                   <Clock className="w-8 h-8" />
-                  <h3 className="text-lg font-bold">Hora Actual</h3>
+                  <h3 className="text-lg font-bold">{g3 ? 'Hora actual' : 'Hora Actual'}</h3>
                 </div>
 
                 <div className="text-center">
@@ -840,19 +846,19 @@ const CalendarioPage = () => {
                           <div key={diaIndex} className={`flex-col ${dia.numero === null ? 'hidden md:flex bg-gray-100' : 'flex'} ${esAsueto ? 'bg-red-50' : esDiaActual ? 'bg-yellow-50' : ''} overflow-hidden`}>
                             {/* Header del día */}
                             <div className={`${dia.numero === null ? 'bg-gray-400' : esAsueto ? 'bg-red-600' : esDiaActual ? 'bg-yellow-500' : 'bg-blue-600'} text-white px-2 py-1.5 md:p-1.5 flex items-center gap-2 md:block ${esDiaActual || esAsueto ? 'shadow-md' : ''}`}>
-                              <div className="font-bold text-sm md:text-[10px] uppercase">
+                              <div className="font-bold text-sm md:text-[10px] uppercase g3:md:!text-xs">
                                 {dia.nombre}
                               </div>
                               <div className="text-lg font-bold">
                                 {dia.numero || '-'}
                               </div>
                               {esDiaActual && (
-                                <div className="text-[10px] md:text-[8px] font-bold md:mt-0.5 animate-pulse">
+                                <div className="text-[10px] md:text-[8px] font-bold md:mt-0.5 animate-pulse g3:!text-xs">
                                   HOY
                                 </div>
                               )}
                               {esAsueto && (
-                                <div className="text-[10px] md:text-[8px] font-bold md:mt-0.5">
+                                <div className="text-[10px] md:text-[8px] font-bold md:mt-0.5 g3:!text-xs">
                                   ASUETO
                                 </div>
                               )}
@@ -897,7 +903,7 @@ const CalendarioPage = () => {
                                   {proyecto.hora && (
                                     <div className={`${coloresHora.bg} ${coloresHora.text} rounded flex items-center justify-center flex-shrink-0 overflow-hidden px-2 py-1 md:px-1 md:py-2 md:w-6 md:max-w-[24px]`}>
                                       <div className="hora-vertical whitespace-nowrap overflow-hidden">
-                                        <span className="font-bold text-xs md:text-[10px] text-center leading-tight">
+                                        <span className="font-bold text-xs md:text-[10px] text-center leading-tight g3:md:!text-xs">
                                           {proyecto.hora}
                                         </span>
                                       </div>

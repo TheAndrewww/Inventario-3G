@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { X, Download, Printer, Package, Hash } from 'lucide-react';
 import { Modal } from '../common';
 import herramientasRentaService from '../../services/herramientasRenta.service';
+import { g3Activo, avisoG3 } from '../../diseno-3g/dialogosG3';
 
 const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClose }) => {
   const barcodeRef = useRef(null);
@@ -60,7 +61,8 @@ const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClos
   // Función para descargar el código QR
   const handleDescargar = async () => {
     if (!qrImageUrl) {
-      alert('El código QR aún no ha cargado. Por favor, espera un momento.');
+      if (g3Activo()) avisoG3('El código QR aún no ha cargado. Por favor, espera un momento.', 'aviso');
+      else alert('El código QR aún no ha cargado. Por favor, espera un momento.');
       return;
     }
 
@@ -73,20 +75,23 @@ const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClos
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error al descargar código QR:', error);
-      alert('Error al descargar el código QR');
+      if (g3Activo()) avisoG3('Error al descargar el código QR', 'mal');
+      else alert('Error al descargar el código QR');
     }
   };
 
   // Función para imprimir el código de barras
   const handleImprimir = () => {
     if (!qrImageUrl) {
-      alert('El código QR aún no ha cargado. Por favor, espera un momento.');
+      if (g3Activo()) avisoG3('El código QR aún no ha cargado. Por favor, espera un momento.', 'aviso');
+      else alert('El código QR aún no ha cargado. Por favor, espera un momento.');
       return;
     }
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Por favor, permite las ventanas emergentes para imprimir');
+      if (g3Activo()) avisoG3('Por favor, permite las ventanas emergentes para imprimir', 'aviso');
+      else alert('Por favor, permite las ventanas emergentes para imprimir');
       return;
     }
 

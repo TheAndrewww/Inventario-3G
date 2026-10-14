@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, X, Camera } from 'lucide-react';
 import CameraCapture from './CameraCapture';
+import { g3Activo, avisoG3 } from '../../diseno-3g/dialogosG3';
 
 const ImageUpload = ({ currentImage, onImageSelect, onImageRemove, disabled = false }) => {
   const [preview, setPreview] = useState(currentImage || null);
@@ -18,13 +19,13 @@ const ImageUpload = ({ currentImage, onImageSelect, onImageRemove, disabled = fa
     if (file) {
       // Validar tipo
       if (!file.type.startsWith('image/')) {
-        alert('Por favor selecciona un archivo de imagen');
+        if (g3Activo()) avisoG3('Selecciona un archivo de imagen.', 'mal'); else alert('Por favor selecciona un archivo de imagen');
         return;
       }
 
       // Validar tamaño (5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('La imagen no debe superar 5MB');
+        if (g3Activo()) avisoG3('La imagen no debe pesar más de 5 MB.', 'mal'); else alert('La imagen no debe superar 5MB');
         return;
       }
 
@@ -50,7 +51,7 @@ const ImageUpload = ({ currentImage, onImageSelect, onImageRemove, disabled = fa
   const handleCameraCapture = (file) => {
     // Validar tamaño (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('La imagen no debe superar 5MB');
+      if (g3Activo()) avisoG3('La imagen no debe pesar más de 5 MB.', 'mal'); else alert('La imagen no debe superar 5MB');
       return;
     }
 

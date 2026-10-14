@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Edit, Trash2, Search, Shield, UserCheck, UserX, RotateCcw } from 'lucide-react';
 import usuariosService from '../services/usuarios.service';
 import toast from 'react-hot-toast';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
+import MasAcciones from '../diseno-3g/MasAcciones';
+import { g3Activo, confirmarG3, pedirTextoG3, cx, etq } from '../diseno-3g/dialogosG3';
 
 const UsuariosPage = () => {
   const [usuarios, setUsuarios] = useState([]);
@@ -11,6 +15,7 @@ const UsuariosPage = () => {
   const [busqueda, setBusqueda] = useState('');
   const [filtroRol, setFiltroRol] = useState('');
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
+  const g3 = useDiseno3G(); // Diseño 3G: encabezado, tabla en tarjetas, acciones y confirmación del paquete (apagado, lo de siempre)
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
@@ -126,7 +131,16 @@ const UsuariosPage = () => {
   };
 
   const handleEliminar = async (usuarioId) => {
-    if (!confirm('¿Estás seguro de que deseas desactivar este usuario?')) {
+    if (g3Activo()) {
+      // Vista previa con los datos del usuario que ya están en pantalla; la petición de después es la misma
+      const u = usuarios.find(x => x.id === usuarioId);
+      if (!(await confirmarG3({
+        titulo: '¿Desactivar este usuario?',
+        datos: u ? [['Usuario', u.nombre], ['Correo', u.email], ['Rol', u.rol]] : [],
+        pasa: ['Queda como inactivo; lo puedes reactivar desde «Ver inactivos».'],
+        confirmar: 'Desactivar usuario', cancelar: 'No desactivar', peligro: true,
+      }))) return;
+    } else if (!confirm('¿Estás seguro de que deseas desactivar este usuario?')) {
       return;
     }
 
@@ -153,13 +167,24 @@ const UsuariosPage = () => {
   };
 
   const handleEliminarPermanente = async (usuario) => {
-    const confirmacion = prompt(
-      `⚠️ ELIMINACIÓN PERMANENTE\n\n` +
-      `Vas a borrar definitivamente al usuario "${usuario.nombre}" (${usuario.email}).\n` +
-      `Esta acción NO se puede deshacer.\n\n` +
-      `Si el usuario tiene movimientos, pedidos u órdenes históricas, la operación se rechazará y permanecerá desactivado.\n\n` +
-      `Para confirmar, escribe el correo del usuario:`
-    );
+    // Diseño 3G encendido: cajón con el mismo campo (devuelve lo mismo que prompt(): lo escrito o null). La comparación
+    // con el correo es la de siempre, abajo.
+    const confirmacion = g3Activo()
+      ? await pedirTextoG3({
+        titulo: 'Eliminación permanente',
+        aviso: `Vas a borrar definitivamente al usuario «${usuario.nombre}» (${usuario.email}). Esta acción no se puede deshacer.`,
+        texto: 'Si el usuario tiene movimientos, pedidos u órdenes históricas, la operación se rechazará y permanecerá desactivado.',
+        etiqueta: 'Para confirmar, escribe el correo del usuario',
+        modoTeclado: 'email',
+        confirmar: 'Eliminar permanentemente', cancelar: 'No eliminar', peligro: true,
+      })
+      : prompt(
+        `⚠️ ELIMINACIÓN PERMANENTE\n\n` +
+        `Vas a borrar definitivamente al usuario "${usuario.nombre}" (${usuario.email}).\n` +
+        `Esta acción NO se puede deshacer.\n\n` +
+        `Si el usuario tiene movimientos, pedidos u órdenes históricas, la operación se rechazará y permanecerá desactivado.\n\n` +
+        `Para confirmar, escribe el correo del usuario:`
+      );
     if (confirmacion === null) return;
     if (confirmacion.trim().toLowerCase() !== usuario.email.toLowerCase()) {
       toast.error('Confirmación incorrecta. Operación cancelada.');
@@ -229,6 +254,13 @@ const UsuariosPage = () => {
   return (
     <div className="p-6">
       {/* Header */}
+      {g3 ? (
+        <CabG3 titulo="Usuarios" descripcion="Administra los usuarios del sistema y su rol.">
+          <button type="button" onClick={abrirModalNuevo} className="g3-btn g3-btn--primario">
+            <UserPlus size={18} aria-hidden="true" /> Nuevo usuario
+          </button>
+        </CabG3>
+      ) : (
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gestión de Usuarios</h1>
@@ -244,6 +276,7 @@ const UsuariosPage = () => {
           Nuevo Usuario
         </button>
       </div>
+      )}
 
       {/* Filtros */}
       <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -252,7 +285,7 @@ const UsuariosPage = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
-              placeholder="Buscar por nombre o email..."
+              placeholder={g3 ? 'Buscar por nombre o correo' : 'Buscar por nombre o email...'}
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
@@ -307,7 +340,7 @@ const UsuariosPage = () => {
       </div>
 
       {/* Tabla de usuarios */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className={g3 ? 'g3-tabla g3-tabla--tarjetas' : 'bg-white rounded-xl shadow-sm overflow-hidden'}>
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -315,7 +348,7 @@ const UsuariosPage = () => {
                 Usuario
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Email
+                {g3 ? 'Correo' : 'Email'}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Rol
@@ -341,7 +374,7 @@ const UsuariosPage = () => {
             ) : (
               usuariosFiltrados.map((usuario) => (
                 <tr key={usuario.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-titulo')}>
                     <div className="flex items-center">
                       <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center text-red-700 font-bold">
                         {usuario.nombre.charAt(0).toUpperCase()}
@@ -356,10 +389,10 @@ const UsuariosPage = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900" {...etq(g3, 'Correo')}>
                     {usuario.email}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Rol')}>
                     <span
                       className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full ${getRolColor(
                         usuario.rol
@@ -369,12 +402,12 @@ const UsuariosPage = () => {
                       {usuario.rol}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" {...etq(g3, 'Puesto')}>
                     {usuario.puesto || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                  <td className={cx('px-6 py-4 whitespace-nowrap text-center', g3 && 'g3-celda-estado')}>
                     <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      className={g3 ? `g3-estado ${usuario.activo ? 'g3-estado--ok' : 'g3-estado--mal'}` : `inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         usuario.activo
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
@@ -383,7 +416,32 @@ const UsuariosPage = () => {
                       {usuario.activo ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                  <td className={cx('px-6 py-4 whitespace-nowrap text-right text-sm', g3 && 'g3-celda-acciones')}>
+                    {g3 ? (
+                      <div className="flex items-center justify-end gap-2">
+                        {usuario.activo ? (
+                          <>
+                            <button type="button" onClick={() => abrirModalEditar(usuario)} className="g3-btn g3-btn--tonal g3-btn--ch">
+                              <Edit size={16} aria-hidden="true" /> Editar
+                            </button>
+                            <MasAcciones titulo={usuario.nombre} acciones={[
+                              { texto: 'Desactivar usuario', icono: Trash2, peligro: true, onClick: () => handleEliminar(usuario.id) },
+                            ]} />
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" onClick={() => handleReactivar(usuario.id)} className="g3-btn g3-btn--tonal g3-btn--ch">
+                              <RotateCcw size={16} aria-hidden="true" /> Reactivar
+                            </button>
+                            <MasAcciones titulo={usuario.nombre} acciones={[
+                              { texto: 'Editar', icono: Edit, onClick: () => abrirModalEditar(usuario) },
+                              '-',
+                              { texto: 'Eliminar permanentemente', icono: Trash2, peligro: true, title: 'Eliminar permanentemente (irreversible)', onClick: () => handleEliminarPermanente(usuario) },
+                            ]} />
+                          </>
+                        )}
+                      </div>
+                    ) : (
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => abrirModalEditar(usuario)}
@@ -412,7 +470,7 @@ const UsuariosPage = () => {
                           </button>
                           <button
                             onClick={() => handleEliminarPermanente(usuario)}
-                            className="inline-flex items-center gap-1 px-2 py-1.5 bg-red-700 text-white hover:bg-red-800 rounded-lg font-medium text-xs"
+                            className="inline-flex items-center gap-1 px-2 py-1.5 bg-red-700 text-white hover:bg-red-800 rounded-lg font-medium text-xs g3:!bg-g3-mal g3:!text-g3-sobre-mal g3:hover:!bg-g3-mal-hover"
                             title="Eliminar permanentemente (irreversible)"
                           >
                             <Trash2 size={16} />
@@ -421,6 +479,7 @@ const UsuariosPage = () => {
                         </>
                       )}
                     </div>
+                    )}
                   </td>
                 </tr>
               ))

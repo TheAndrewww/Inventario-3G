@@ -5,6 +5,9 @@ import ubicacionesService from '../services/ubicaciones.service';
 import configuracionService from '../services/configuracion.service';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
+import { g3Activo, confirmarG3, pedirTextoG3, cx, siG3 } from '../diseno-3g/dialogosG3';
 
 const TIPO_LABEL = {
   cambio_ubicacion: 'Cambio de ubicación',
@@ -29,6 +32,8 @@ const ESTADO_BADGE = {
   aprobada: 'bg-emerald-100 text-emerald-800 border-emerald-300',
   rechazada: 'bg-red-100 text-red-800 border-red-300'
 };
+// Diseño 3G: estado con color y texto (aviso / ok / mal)
+const ESTADO_G3 = { pendiente: ['g3-estado--aviso', 'Pendiente'], aprobada: ['g3-estado--ok', 'Aprobada'], rechazada: ['g3-estado--mal', 'Rechazada'] };
 
 const SolicitudesCambioPage = () => {
   const { user } = useAuth();
@@ -36,6 +41,7 @@ const SolicitudesCambioPage = () => {
   const esCompras = user?.rol === 'compras';
   // Quién puede resolver una solicitud: admin todas; compras solo reactivaciones.
   const puedeResolver = (s) => esAdmin || (esCompras && s.tipo === 'reactivar_articulo');
+  const g3 = useDiseno3G(); // Diseño 3G: encabezado, pestañas, estados y confirmaciones del paquete (apagado, lo de siempre)
 
   const [solicitudes, setSolicitudes] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
@@ -75,7 +81,17 @@ const SolicitudesCambioPage = () => {
 
   const toggleAjusteDirecto = async () => {
     const nuevo = !ajusteDirecto;
-    if (nuevo && !window.confirm('¿Activar ajuste directo? Almacén podrá registrar entradas y salidas de stock sin tu aprobación.')) return;
+    if (nuevo) {
+      // Diseño 3G encendido: vista previa del paquete; apagado, el confirm() de siempre. Misma petición después.
+      if (g3Activo()) {
+        if (!(await confirmarG3({
+          titulo: '¿Activar el ajuste directo?',
+          aviso: 'Almacén podrá registrar entradas y salidas de stock sin tu aprobación.',
+          pasa: ['Las entradas y salidas que registre Almacén se aplican al momento y quedan aquí como aprobadas.', 'Lo puedes desactivar con este mismo interruptor.'],
+          confirmar: 'Activar ajuste directo', cancelar: 'No activar',
+        }))) return;
+      } else if (!window.confirm('¿Activar ajuste directo? Almacén podrá registrar entradas y salidas de stock sin tu aprobación.')) return;
+    }
     try {
       setCambiandoAjuste(true);
       const res = await configuracionService.setAjusteDirecto(nuevo);
@@ -106,7 +122,21 @@ const SolicitudesCambioPage = () => {
   }, []);
 
   const aprobar = async (id) => {
-    if (!window.confirm('¿Aprobar esta solicitud? El cambio se aplicará inmediatamente.')) return;
+    if (g3Activo()) {
+      // Vista previa armada solo con la solicitud que ya está en pantalla (sin pedir nada al servidor)
+      const s = solicitudes.find(x => x.id === id);
+      if (!(await confirmarG3({
+        titulo: '¿Aprobar esta solicitud?',
+        aviso: 'El cambio se aplicará inmediatamente.',
+        datos: s ? [
+          ['Tipo', TIPO_LABEL[s.tipo] || s.tipo],
+          ...(s.articulo ? [['Artículo', s.articulo.nombre]] : []),
+          ['Cambio', describirCambio(s)],
+          ['Solicitado por', s.solicitante?.nombre || '?'],
+        ] : [],
+        confirmar: 'Aprobar y aplicar', cancelar: 'Regresar',
+      }))) return;
+    } else if (!window.confirm('¿Aprobar esta solicitud? El cambio se aplicará inmediatamente.')) return;
     try {
       setProcesandoId(id);
       const res = await solicitudesCambioService.aprobar(id);
@@ -123,7 +153,25 @@ const SolicitudesCambioPage = () => {
   };
 
   const rechazar = async (id) => {
-    const motivo = window.prompt('Motivo del rechazo (será notificado al solicitante):');
+    // Diseño 3G encendido: cajón con el mismo campo (devuelve lo mismo que prompt(): el texto o null); la validación de
+    // abajo es la de siempre. Los datos del cajón salen de la solicitud que ya está en pantalla.
+    let motivo;
+    if (g3Activo()) {
+      const s = solicitudes.find(x => x.id === id);
+      motivo = await pedirTextoG3({
+        titulo: 'Rechazar solicitud',
+        datos: s ? [
+          ['Tipo', TIPO_LABEL[s.tipo] || s.tipo],
+          ...(s.articulo ? [['Artículo', s.articulo.nombre]] : []),
+          ['Solicitado por', s.solicitante?.nombre || '?'],
+        ] : [],
+        etiqueta: 'Motivo del rechazo',
+        ayuda: 'Será notificado al solicitante.',
+        confirmar: 'Rechazar solicitud', cancelar: 'Regresar', peligro: true,
+      });
+    } else {
+      motivo = window.prompt('Motivo del rechazo (será notificado al solicitante):');
+    }
     if (!motivo || !motivo.trim()) return;
     try {
       setProcesandoId(id);
@@ -172,6 +220,18 @@ const SolicitudesCambioPage = () => {
 
   return (
     <div className="p-4 md:p-6">
+      {g3 ? (
+        <CabG3 titulo="Cambios por autorizar" descripcion={esAdmin
+          ? 'Aprueba o rechaza los cambios que pide Almacén.'
+          : esCompras
+            ? 'Aprueba o rechaza las solicitudes para reactivar artículos.'
+            : 'Estado de las solicitudes que enviaste al administrador.'}>
+          <button onClick={cargar} disabled={loading} className="g3-btn g3-btn--ch">
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
+            Actualizar
+          </button>
+        </CabG3>
+      ) : (
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Solicitudes de cambio</h1>
@@ -192,6 +252,7 @@ const SolicitudesCambioPage = () => {
           Actualizar
         </button>
       </div>
+      )}
 
       {/* Interruptor: ajuste directo de almacén (solo admin) */}
       {esAdmin && (
@@ -220,19 +281,20 @@ const SolicitudesCambioPage = () => {
       )}
 
       {/* Tabs */}
-      <div className="mb-4 flex gap-2 border-b border-gray-200">
+      <div className={cx('mb-4 flex gap-2 border-b border-gray-200', g3 && 'g3-pestanas')} {...siG3(g3, { role: 'tablist', 'aria-label': 'Solicitudes por estado' })}>
         {['pendiente', 'aprobada', 'rechazada'].map(estado => {
           const count = solicitudes.filter(s => s.estado === estado).length;
           return (
             <button
               key={estado}
+              {...siG3(g3, { role: 'tab', 'aria-selected': tabActivo === estado })}
               onClick={() => setTabActivo(estado)}
               className={`px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors ${tabActivo === estado
                 ? 'border-red-700 text-red-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
               {estado}s
-              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs">
+              <span className={g3 ? 'g3-insignia g3-insignia--neutra' : 'ml-1.5 px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs'}>
                 {count}
               </span>
             </button>
@@ -264,8 +326,8 @@ const SolicitudesCambioPage = () => {
                         <span className="font-semibold text-gray-900">
                           {TIPO_LABEL[s.tipo] || s.tipo}
                         </span>
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full border ${ESTADO_BADGE[s.estado]}`}>
-                          {s.estado}
+                        <span className={g3 ? `g3-estado ${ESTADO_G3[s.estado]?.[0] || 'g3-estado--neutro'}` : `inline-flex px-2 py-0.5 text-xs font-semibold rounded-full border ${ESTADO_BADGE[s.estado]}`}>
+                          {g3 ? (ESTADO_G3[s.estado]?.[1] || s.estado) : s.estado}
                         </span>
                       </div>
 
@@ -310,14 +372,14 @@ const SolicitudesCambioPage = () => {
                       <button
                         onClick={() => aprobar(s.id)}
                         disabled={procesandoId === s.id}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg disabled:opacity-50"
+                        className={g3 ? 'g3-btn g3-btn--primario g3-btn--ch flex-1' : 'flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg disabled:opacity-50'}
                       >
                         <CheckCircle2 size={16} /> Aprobar
                       </button>
                       <button
                         onClick={() => rechazar(s.id)}
                         disabled={procesandoId === s.id}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg disabled:opacity-50"
+                        className={g3 ? 'g3-btn g3-btn--peligro g3-btn--ch flex-1' : 'flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg disabled:opacity-50'}
                       >
                         <XCircle size={16} /> Rechazar
                       </button>

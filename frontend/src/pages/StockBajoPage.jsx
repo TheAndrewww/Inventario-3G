@@ -6,6 +6,9 @@ import { Loader } from '../components/common';
 import { getImageUrl } from '../utils/imageUtils';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
+import { cx, etq } from '../diseno-3g/dialogosG3';
 
 const formatCurrency = (n) => `$${(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatNumber = (n) => (n || 0).toLocaleString('es-MX');
@@ -16,9 +19,11 @@ const formatCantidad = (n) => {
 
 const ESTADOS = {
     agotado: { texto: 'Agotado', badge: 'bg-red-100 text-red-800 border-red-200', barra: 'bg-red-500', dot: 'bg-red-500' },
-    critico: { texto: 'Crítico', badge: 'bg-orange-100 text-orange-800 border-orange-200', barra: 'bg-orange-500', dot: 'bg-orange-500' },
+    critico: { texto: 'Crítico', badge: 'bg-orange-100 text-orange-800 border-orange-200', barra: 'bg-orange-500 g3p-fondo-naranja', dot: 'bg-orange-500' },
     bajo: { texto: 'Bajo mínimo', badge: 'bg-yellow-100 text-yellow-800 border-yellow-200', barra: 'bg-yellow-500', dot: 'bg-yellow-500' }
 };
+// Diseño 3G: estado con punto y texto (agotado = mal, crítico = naranja, bajo mínimo = aviso)
+const ESTADO_G3 = { agotado: 'g3-estado--mal', critico: 'g3p-estado--naranja', bajo: 'g3-estado--aviso' };
 
 const KpiCard = ({ icon, bg, label, value, sub }) => (
     <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
@@ -34,12 +39,13 @@ const KpiCard = ({ icon, bg, label, value, sub }) => (
 // Miniatura del SKU; si no hay imagen (o falla la carga) se muestra el ícono
 const MiniaturaArticulo = ({ articulo, onClick }) => {
     const [falló, setFalló] = useState(false);
+    const g3 = useDiseno3G(); // Diseño 3G: ícono en vez de emoji
     const url = !falló ? getImageUrl(articulo.imagen_url) : null;
 
     if (!url) {
         return (
             <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
-                📦
+                {g3 ? <Package size={18} className="text-gray-500" aria-hidden="true" /> : '📦'}
             </div>
         );
     }
@@ -73,6 +79,7 @@ const BarraCobertura = ({ articulo }) => {
 
 const StockBajoPage = () => {
     const { user } = useAuth();
+    const g3 = useDiseno3G(); // Diseño 3G: encabezado, números, chips, estados y tabla en tarjetas (apagado, lo de siempre)
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [busqueda, setBusqueda] = useState('');
@@ -181,6 +188,16 @@ const StockBajoPage = () => {
     return (
         <div className="p-6 max-w-7xl mx-auto">
             {/* Header */}
+            {g3 ? (
+                <CabG3 titulo="Stock bajo" descripcion="Todos los artículos por debajo de su mínimo, en todos los almacenes.">
+                    <button onClick={exportarCSV} disabled={totales.articulos === 0} className="g3-btn g3-btn--ch">
+                        <Download size={16} aria-hidden="true" /> Exportar CSV
+                    </button>
+                    <button onClick={cargar} disabled={loading} className="g3-btn g3-btn--ch">
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Actualizar
+                    </button>
+                </CabG3>
+            ) : (
             <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -210,8 +227,18 @@ const StockBajoPage = () => {
                     </button>
                 </div>
             </div>
+            )}
 
             {/* KPIs */}
+            {g3 ? (
+                <div className="g3-rejilla g3p-rejilla-5 g3p-cab">
+                    <div className="g3-kpi"><span className="g3-kpi-valor">{formatNumber(totales.articulos)}</span><span className="g3-kpi-texto">Artículos bajo mínimo{totales.articulos !== resumen.total ? ` · de ${formatNumber(resumen.total)} en total` : ''}</span></div>
+                    <div className="g3-kpi"><span className="g3-kpi-valor" style={totales.agotados ? { color: 'var(--g3-mal)' } : undefined}>{formatNumber(totales.agotados)}</span><span className="g3-kpi-texto">Agotados</span></div>
+                    <div className="g3-kpi"><span className="g3-kpi-valor" style={totales.criticos ? { color: 'var(--g3p-naranja)' } : undefined}>{formatNumber(totales.criticos)}</span><span className="g3-kpi-texto">Críticos · menos de la mitad del mínimo</span></div>
+                    <div className="g3-kpi"><span className="g3-kpi-valor">{formatNumber(almacenesFiltrados.length)}</span><span className="g3-kpi-texto">Almacenes afectados</span></div>
+                    <div className="g3-kpi g3p-kpi-dinero"><span className="g3-kpi-valor">{formatCurrency(totales.reposicion)}</span><span className="g3-kpi-texto">Costo de reposición · para volver al máximo</span></div>
+                </div>
+            ) : (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                 <KpiCard
                     icon={<Package size={22} className="text-blue-600" />}
@@ -247,6 +274,7 @@ const StockBajoPage = () => {
                     sub="Para volver al máximo"
                 />
             </div>
+            )}
 
             {/* Filtros */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 space-y-3">
@@ -257,7 +285,7 @@ const StockBajoPage = () => {
                             type="text"
                             value={busqueda}
                             onChange={(e) => setBusqueda(e.target.value)}
-                            placeholder="Buscar por artículo, SKU, código, categoría o proveedor..."
+                            placeholder={g3 ? 'Buscar por artículo, clave, código, categoría o proveedor' : 'Buscar por artículo, SKU, código, categoría o proveedor...'}
                             className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                         />
                     </div>
@@ -286,7 +314,7 @@ const StockBajoPage = () => {
                 <div className="flex flex-wrap gap-2">
                     <button
                         onClick={() => setAlmacenActivo('todos')}
-                        className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${almacenActivo === 'todos'
+                        className={g3 ? cx('g3-chip', almacenActivo === 'todos' && 'g3-chip--activo') : `px-3 py-1.5 text-sm rounded-full border transition-colors ${almacenActivo === 'todos'
                             ? 'bg-red-700 text-white border-red-700'
                             : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
                     >
@@ -300,7 +328,7 @@ const StockBajoPage = () => {
                             <button
                                 key={clave}
                                 onClick={() => setAlmacenActivo(clave)}
-                                className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${activo
+                                className={g3 ? cx('g3-chip', activo && 'g3-chip--activo') : `px-3 py-1.5 text-sm rounded-full border transition-colors ${activo
                                     ? 'bg-red-700 text-white border-red-700'
                                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
                             >
@@ -353,7 +381,7 @@ const StockBajoPage = () => {
                                 </button>
 
                                 {!colapsado && (
-                                    <div className="overflow-x-auto">
+                                    <div className={cx('overflow-x-auto', g3 && 'g3-tabla g3-tabla--tarjetas g3p-tabla-en-tarjeta')}>
                                         <table className="w-full text-sm">
                                             <thead className="bg-white border-b border-gray-200">
                                                 <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
@@ -370,33 +398,33 @@ const StockBajoPage = () => {
                                             <tbody className="divide-y divide-gray-100">
                                                 {g.articulos.map(a => (
                                                     <tr key={a.id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-2.5">
+                                                        <td className={cx('px-4 py-2.5', g3 && 'g3-celda-titulo')}>
                                                             <div className="flex items-center gap-3">
                                                                 <MiniaturaArticulo articulo={a} onClick={() => setImagenAmpliada(a)} />
                                                                 <div className="min-w-0">
                                                                     <p className="font-medium text-gray-900">{a.nombre}</p>
                                                                     <p className="text-xs text-gray-500">
                                                                         {a.categoria}
-                                                                        {a.sku ? ` · SKU ${a.sku}` : ''}
+                                                                        {a.sku ? ` · ${g3 ? 'Clave' : 'SKU'} ${a.sku}` : ''}
                                                                         {a.proveedor ? ` · ${a.proveedor}` : ''}
                                                                     </p>
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        <td className="px-4 py-2.5 text-gray-600">{a.ubicacion || '—'}</td>
-                                                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900">
+                                                        <td className="px-4 py-2.5 text-gray-600" {...etq(g3, 'Ubicación')}>{a.ubicacion || '—'}</td>
+                                                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900" {...etq(g3, 'Actual')}>
                                                             {formatCantidad(a.stock_actual)} <span className="text-xs font-normal text-gray-500">{a.unidad}</span>
                                                         </td>
-                                                        <td className="px-4 py-2.5 text-right text-gray-600">{formatCantidad(a.stock_minimo)}</td>
-                                                        <td className="px-4 py-2.5"><BarraCobertura articulo={a} /></td>
-                                                        <td className="px-4 py-2.5 text-right font-medium text-gray-900">
+                                                        <td className="px-4 py-2.5 text-right text-gray-600" {...etq(g3, 'Mínimo')}>{formatCantidad(a.stock_minimo)}</td>
+                                                        <td className="px-4 py-2.5" {...etq(g3, 'Cobertura')}><BarraCobertura articulo={a} /></td>
+                                                        <td className="px-4 py-2.5 text-right font-medium text-gray-900" {...etq(g3, 'Comprar')}>
                                                             {a.sugerido_comprar > 0 ? formatCantidad(a.sugerido_comprar) : '—'}
                                                         </td>
-                                                        <td className="px-4 py-2.5 text-right text-gray-600">
+                                                        <td className="px-4 py-2.5 text-right text-gray-600" {...etq(g3, 'Costo')}>
                                                             {a.costo_reposicion > 0 ? formatCurrency(a.costo_reposicion) : '—'}
                                                         </td>
-                                                        <td className="px-4 py-2.5">
-                                                            <span className={`px-2 py-0.5 text-xs rounded-full border ${ESTADOS[a.estado].badge}`}>
+                                                        <td className={cx('px-4 py-2.5', g3 && 'g3-celda-estado')}>
+                                                            <span className={g3 ? `g3-estado ${ESTADO_G3[a.estado]}` : `px-2 py-0.5 text-xs rounded-full border ${ESTADOS[a.estado].badge}`}>
                                                                 {ESTADOS[a.estado].texto}
                                                             </span>
                                                         </td>
@@ -429,7 +457,7 @@ const StockBajoPage = () => {
                                 <p className="font-semibold text-gray-900">{imagenAmpliada.nombre}</p>
                                 <p className="text-sm text-gray-500">
                                     {imagenAmpliada.almacen}
-                                    {imagenAmpliada.sku ? ` · SKU ${imagenAmpliada.sku}` : ''}
+                                    {imagenAmpliada.sku ? ` · ${g3 ? 'Clave' : 'SKU'} ${imagenAmpliada.sku}` : ''}
                                     {' · '}{formatCantidad(imagenAmpliada.stock_actual)} de {formatCantidad(imagenAmpliada.stock_minimo)} {imagenAmpliada.unidad}
                                 </p>
                             </div>

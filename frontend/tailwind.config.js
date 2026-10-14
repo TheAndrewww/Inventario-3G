@@ -1,5 +1,9 @@
 /** @type {import('tailwindcss').Config} */
+// Diseño 3G: agrega la variante g3: (solo con el interruptor encendido) y los colores g3-*. No cambia ninguna clase existente.
+import g3 from './src/diseno-3g/puentes/tailwind-preset.cjs'
+
 export default {
+  presets: [g3],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",

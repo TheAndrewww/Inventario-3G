@@ -1,0 +1,114 @@
+{
+  "version": "1.1.0",
+  "nota": "Sistemas de 3G Velarias para el selector de apps (botón de 9 puntos). El mismo dato vive dentro de diseno-3g.js (G3.sistemas). Si cambias uno, cambia el otro. Este archivo se sirve sin sesión en varios sistemas: NO lleva direcciones internas. url null + sensible true = dirección privada; la completa G3.configurar({urls}) desde una página con sesión (ver DESIGN.md §14 y sistemas-privado.example.js). Sin ella, el selector dice «Ábrela desde Inicio 3G» y no es un enlace. url null sin sensible = todavía sin dirección («Pronto»).",
+  "sistemas": [
+    {
+      "id": "inicio",
+      "nombre": "Inicio 3G",
+      "descripcion": "Todas las apps y los pendientes del día",
+      "icono": "inicio",
+      "color": "#c4122f",
+      "degradado": [
+        "#e0405a",
+        "#b0102a"
+      ],
+      "url": null,
+      "sistema_clave": null
+    },
+    {
+      "id": "ventas",
+      "nombre": "Ventas",
+      "descripcion": "Plataforma de asesores: leads, conversaciones y cotizaciones",
+      "icono": "ventas",
+      "color": "#1f5fd1",
+      "degradado": [
+        "#4f8df5",
+        "#1f5fd1"
+      ],
+      "url": "https://frontend-red-five-17.vercel.app",
+      "sistema_clave": "asesores"
+    },
+    {
+      "id": "operacion",
+      "nombre": "Operación",
+      "descripcion": "Pedidos, obras, calendario y avisos",
+      "icono": "operacion",
+      "color": "#0b7d86",
+      "degradado": [
+        "#20b8a8",
+        "#0b7d86"
+      ],
+      "url": null,
+      "sensible": true,
+      "sistema_clave": "operaciones"
+    },
+    {
+      "id": "entregas",
+      "nombre": "Entregas",
+      "descripcion": "App de supervisores: entrega en obra, check y carta",
+      "icono": "entregas",
+      "color": "#188a4c",
+      "degradado": [
+        "#3fc27a",
+        "#188a4c"
+      ],
+      "url": null,
+      "sensible": true,
+      "sistema_clave": "operaciones"
+    },
+    {
+      "id": "planta",
+      "nombre": "Planta",
+      "descripcion": "Inventario, tickets de material, compras y producción",
+      "icono": "planta",
+      "color": "#e07a10",
+      "degradado": [
+        "#ffad42",
+        "#e07a10"
+      ],
+      "url": "https://inventario-3-g.vercel.app",
+      "sistema_clave": "inventario"
+    },
+    {
+      "id": "finanzas",
+      "nombre": "Finanzas",
+      "descripcion": "Cobros, pagos, facturas y gastos",
+      "icono": "finanzas",
+      "color": "#157347",
+      "degradado": [
+        "#38c172",
+        "#157347"
+      ],
+      "url": null,
+      "sensible": true,
+      "sistema_clave": "contable"
+    },
+    {
+      "id": "admin-sitio",
+      "nombre": "Administrador del sitio",
+      "descripcion": "Contenido de la página web, campañas y contactos",
+      "icono": "admin-sitio",
+      "color": "#4250d6",
+      "degradado": [
+        "#6b7cff",
+        "#4250d6"
+      ],
+      "url": null,
+      "sensible": true,
+      "sistema_clave": "web-y-otros"
+    },
+    {
+      "id": "sitio",
+      "nombre": "Sitio web",
+      "descripcion": "www.3gvelarias.com, la página pública",
+      "icono": "sitio",
+      "color": "#6b3fbf",
+      "degradado": [
+        "#a77bff",
+        "#6b3fbf"
+      ],
+      "url": "https://www.3gvelarias.com",
+      "sistema_clave": "web-y-otros"
+    }
+  ]
+}

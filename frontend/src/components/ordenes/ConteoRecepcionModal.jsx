@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { X, ClipboardCheck, AlertTriangle, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ordenesCompraService from '../../services/ordenesCompra.service';
+import { g3Activo, confirmarG3 } from '../../diseno-3g/dialogosG3';
 
 const formatCantidad = (n) => {
     const v = parseFloat(n) || 0;
@@ -40,7 +41,17 @@ const ConteoRecepcionModal = ({ isOpen, onClose, conteo, onSuccess }) => {
         const mensaje = diferencias.length === 0
             ? '¿Cerrar el conteo? Todo cuadra con lo facturado.'
             : `¿Cerrar el conteo? Se ajustarán ${diferencias.length} artículo(s) y se avisará a Compras.`;
-        if (!window.confirm(mensaje)) return;
+        if (g3Activo()) {
+            // Diseño 3G: vista previa con las diferencias que ya calculó la pantalla; la petición de después es la misma
+            if (!(await confirmarG3({
+                titulo: '¿Cerrar el conteo?',
+                texto: diferencias.length === 0 ? 'Todo cuadra con lo facturado.' : undefined,
+                cambios: diferencias.slice(0, 8).map(d => ({ campo: d.nombre, antes: `${formatCantidad(d.cantidad_recibida)} facturado`, despues: `${formatCantidad(d.real)} contado` })),
+                datos: diferencias.length > 8 ? [['Además', `${diferencias.length - 8} artículo(s) más con diferencia`]] : [],
+                pasa: diferencias.length === 0 ? [] : [`Se ajustarán ${diferencias.length} artículo(s) y se avisará a Compras.`],
+                confirmar: 'Cerrar conteo', cancelar: 'Regresar',
+            }))) return;
+        } else if (!window.confirm(mensaje)) return;
 
         try {
             setGuardando(true);

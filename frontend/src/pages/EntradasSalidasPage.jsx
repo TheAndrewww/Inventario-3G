@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Truck, Factory, Hammer, PaintBucket, ArrowUpFromLine, ArrowDownToLine, Search, X, Plus, Minus, Check, ScanLine } from 'lucide-react';
+import { Truck, Factory, Hammer, PaintBucket, ArrowUpFromLine, ArrowDownToLine, Search, X, Plus, Minus, Check, ScanLine, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 import articulosService from '../services/articulos.service';
 import camionetasService from '../services/camionetas.service';
@@ -7,6 +7,8 @@ import movimientosService from '../services/movimientos.service';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { getImageUrl } from '../utils/imageUtils';
 import { Loader } from '../components/common';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
 
 // Áreas de planta que reciben material sin pasar por un ticket de diseño
 const AREAS = [
@@ -32,6 +34,7 @@ const EntradasSalidasPage = () => {
     const [guardando, setGuardando] = useState(false);
 
     const inputBusquedaRef = useRef(null);
+    const g3 = useDiseno3G(); // Diseño 3G: encabezado, colores de selección y textos (apagado, lo de siempre)
 
     useEffect(() => {
         const cargar = async () => {
@@ -204,16 +207,20 @@ const EntradasSalidasPage = () => {
 
     return (
         <div className="p-4 md:p-6 max-w-5xl mx-auto pb-32">
+            {g3 ? (
+                <CabG3 titulo="Entradas y salidas" descripcion="Material que se lleva o regresa una camioneta o un área de planta. No genera ticket." />
+            ) : (
             <div className="mb-5">
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Entradas y Salidas</h1>
                 <p className="text-gray-600 text-sm mt-1">
                     Material que se lleva o regresa una camioneta o un área de planta. No genera ticket.
                 </p>
             </div>
+            )}
 
             {/* Paso 1: destino */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">1 · ¿A dónde va?</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3 g3:normal-case g3:tracking-normal g3:text-[13px] g3:text-g3-tinta-2">1 · ¿A dónde va?</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                     {camionetas.map(cam => {
                         const activo = destino?.tipo === 'camioneta' && destino.id === cam.id;
@@ -222,7 +229,7 @@ const EntradasSalidasPage = () => {
                                 key={`cam-${cam.id}`}
                                 onClick={() => setDestino({ tipo: 'camioneta', id: cam.id, nombre: cam.nombre })}
                                 className={`flex items-center gap-2 px-3 py-3 rounded-xl border-2 text-left transition-colors ${activo
-                                    ? 'border-gray-900 bg-gray-900 text-white'
+                                    ? 'border-gray-900 bg-gray-900 text-white g3:!bg-g3-primario-suave g3:!text-g3-sobre-primario-suave g3:!border-g3-primario'
                                     : 'border-gray-200 hover:border-gray-400 text-gray-800'}`}
                             >
                                 <Truck size={20} className="shrink-0" />
@@ -238,7 +245,7 @@ const EntradasSalidasPage = () => {
                                 key={area.valor}
                                 onClick={() => setDestino({ tipo: 'area', valor: area.valor, nombre: area.nombre })}
                                 className={`flex items-center gap-2 px-3 py-3 rounded-xl border-2 text-left transition-colors ${activo
-                                    ? 'border-gray-900 bg-gray-900 text-white'
+                                    ? 'border-gray-900 bg-gray-900 text-white g3:!bg-g3-primario-suave g3:!text-g3-sobre-primario-suave g3:!border-g3-primario'
                                     : 'border-gray-200 hover:border-gray-400 text-gray-800'}`}
                             >
                                 <Icono size={20} className="shrink-0" />
@@ -254,7 +261,7 @@ const EntradasSalidasPage = () => {
 
             {/* Paso 2: entrada o salida */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">2 · ¿Sale o regresa?</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3 g3:normal-case g3:tracking-normal g3:text-[13px] g3:text-g3-tinta-2">2 · ¿Sale o regresa?</p>
                 <div className="grid grid-cols-2 gap-3">
                     <button
                         onClick={() => setOperacion('salida')}
@@ -280,7 +287,7 @@ const EntradasSalidasPage = () => {
             {/* Paso 3: artículos */}
             <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">3 · ¿Qué piezas?</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 g3:normal-case g3:tracking-normal g3:text-[13px] g3:text-g3-tinta-2">3 · ¿Qué piezas?</p>
                     {destino && (
                         <span className="inline-flex items-center gap-1 text-xs text-gray-500">
                             <ScanLine size={14} /> Pistola activa
@@ -296,7 +303,7 @@ const EntradasSalidasPage = () => {
                         value={busqueda}
                         onChange={(e) => setBusqueda(e.target.value)}
                         onKeyDown={handleEnterBusqueda}
-                        placeholder="Escanea el código o busca por nombre / SKU..."
+                        placeholder={g3 ? 'Escanea el código o busca por nombre o clave' : 'Escanea el código o busca por nombre / SKU...'}
                         disabled={!destino}
                         className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 disabled:bg-gray-50 disabled:text-gray-400"
                     />
@@ -313,12 +320,12 @@ const EntradasSalidasPage = () => {
                                 {getImageUrl(art.imagen_url) ? (
                                     <img src={getImageUrl(art.imagen_url)} alt="" className="w-9 h-9 rounded object-cover shrink-0" />
                                 ) : (
-                                    <div className="w-9 h-9 rounded bg-gray-100 flex items-center justify-center shrink-0">📦</div>
+                                    <div className="w-9 h-9 rounded bg-gray-100 flex items-center justify-center shrink-0">{g3 ? <Package size={18} className="text-gray-500" aria-hidden="true" /> : '📦'}</div>
                                 )}
                                 <div className="min-w-0 flex-1">
                                     <p className="font-medium text-gray-900 truncate">{art.nombre}</p>
                                     <p className="text-xs text-gray-500">
-                                        {art.sku ? `SKU ${art.sku} · ` : ''}Hay {formatCantidad(art.stock_actual)} {art.unidad}
+                                        {art.sku ? `${g3 ? 'Clave' : 'SKU'} ${art.sku} · ` : ''}Hay {formatCantidad(art.stock_actual)} {art.unidad}
                                     </p>
                                 </div>
                                 <Plus size={18} className="text-gray-400 shrink-0" />
@@ -387,14 +394,14 @@ const EntradasSalidasPage = () => {
 
             {/* Barra de confirmación */}
             {seleccionados.length > 0 && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg">
+                <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg g3:bottom-[var(--g3-espacio-inferior)] g3:min-[861px]:left-[var(--g3-riel)]">
                     <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
                         <div className="min-w-0">
                             <p className="font-semibold text-gray-900 truncate">
                                 {esSalida ? 'Salida' : 'Entrada'} · {destino?.nombre}
                             </p>
                             <p className="text-sm text-gray-500">
-                                {seleccionados.length} artículo(s) · {formatCantidad(totalPiezas)} pzas
+                                {seleccionados.length} {g3 ? (seleccionados.length === 1 ? 'artículo' : 'artículos') : 'artículo(s)'} · {formatCantidad(totalPiezas)} {g3 ? 'piezas' : 'pzas'}
                             </p>
                         </div>
                         <button
@@ -403,7 +410,7 @@ const EntradasSalidasPage = () => {
                             className={`flex items-center gap-2 px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 ${esSalida ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
                         >
                             <Check size={20} />
-                            {guardando ? 'Guardando...' : 'Confirmar'}
+                            {guardando ? 'Guardando...' : (g3 ? (esSalida ? 'Confirmar salida' : 'Confirmar entrada') : 'Confirmar')}
                         </button>
                     </div>
                 </div>

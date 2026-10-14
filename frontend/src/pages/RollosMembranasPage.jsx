@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Search, Package, ArrowLeft, X, Plus, Minus, Edit2, Trash2, CheckCircle2, AlertTriangle, Ruler, CircleDot } from 'lucide-react';
+import { Layers, Search, Package, ArrowLeft, X, Plus, Minus, Edit2, Trash2, CheckCircle2, AlertTriangle, Ruler, CircleDot, Palette, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
+import MasAcciones from '../diseno-3g/MasAcciones';
+import { g3Activo, confirmarG3, cx } from '../diseno-3g/dialogosG3';
 
 const API = '/rollos-membrana';
 
@@ -39,6 +43,7 @@ const RollosMembranasPage = () => {
 
     const cantidadRef = useRef(null);
     const idRef = useRef(null);
+    const g3 = useDiseno3G(); // Diseño 3G: encabezado, filtros, acciones por renglón y confirmación del paquete (apagado, lo de siempre)
 
     // === CARGAR ARTÍCULOS ===
     useEffect(() => {
@@ -161,7 +166,19 @@ const RollosMembranasPage = () => {
 
     // === ELIMINAR ROLLO ===
     const eliminarRollo = async (rollo) => {
-        if (!window.confirm(`¿Eliminar rollo "${rollo.identificador}"?`)) return;
+        if (g3Activo()) {
+            // Vista previa con los datos del rollo que ya están en pantalla; la petición de después es la misma
+            if (!(await confirmarG3({
+                titulo: `¿Eliminar el rollo «${rollo.identificador}»?`,
+                datos: [
+                    ['Artículo', articuloSeleccionado?.nombre || ''],
+                    ['Metraje', `${parseFloat(rollo.metraje_restante)} de ${parseFloat(rollo.metraje_total)} metros`],
+                    ['Estado', (estadoConfig[rollo.estado] || estadoConfig.disponible).label],
+                ],
+                pasa: ['El rollo deja de aparecer en la lista de este artículo.'],
+                confirmar: 'Eliminar rollo', cancelar: 'No eliminar', peligro: true,
+            }))) return;
+        } else if (!window.confirm(`¿Eliminar rollo "${rollo.identificador}"?`)) return;
         try {
             await api.delete(`${API}/rollos/${rollo.id}`);
             toast.success(`Rollo "${rollo.identificador}" eliminado`);
@@ -231,6 +248,27 @@ const RollosMembranasPage = () => {
     return (
         <div className="p-4 md:p-6 max-w-2xl mx-auto">
             {/* Header */}
+            {g3 ? (
+                vista === 'rollos' ? (
+                    <CabG3
+                        titulo={articuloSeleccionado?.nombre}
+                        descripcion={`${rollos.length} ${rollos.length === 1 ? 'rollo registrado' : 'rollos registrados'}. Al cortar, el metraje se descuenta del rollo exacto.`}
+                        miga={(
+                            <nav className="g3-miga" aria-label="Ruta">
+                                <button type="button" className="g3p-miga-boton" onClick={volverAArticulos}>Rollos de membrana</button>
+                                <span aria-hidden="true">›</span>
+                                <span aria-current="page">{articuloSeleccionado?.nombre}</span>
+                            </nav>
+                        )}
+                    >
+                        <button type="button" onClick={abrirCrearRollo} className="g3-btn g3-btn--primario">
+                            <Plus size={18} aria-hidden="true" /> Nuevo rollo
+                        </button>
+                    </CabG3>
+                ) : (
+                    <CabG3 titulo="Rollos de membrana" descripcion="Almacén de membranas: cada rollo lleva su metraje y al cortar se descuenta del rollo exacto." />
+                )
+            ) : (
             <div className="flex items-center gap-3 mb-5">
                 {vista === 'rollos' && (
                     <button
@@ -266,6 +304,7 @@ const RollosMembranasPage = () => {
                     </button>
                 )}
             </div>
+            )}
 
             {/* ===== VISTA: ARTÍCULOS DE MEMBRANA ===== */}
             {vista === 'articulos' && (
@@ -362,7 +401,7 @@ const RollosMembranasPage = () => {
                         <div className="bg-white rounded-xl shadow-lg border-2 border-purple-200 p-4 mb-4">
                             <div className="flex items-center justify-between mb-3">
                                 <h3 className="font-semibold text-gray-900">
-                                    {modalRollo === 'crear' ? 'Nuevo Rollo' : `Editar: ${modalRollo.identificador}`}
+                                    {modalRollo === 'crear' ? (g3 ? 'Nuevo rollo' : 'Nuevo Rollo') : `Editar: ${modalRollo.identificador}`}
                                 </h3>
                                 <button onClick={() => setModalRollo(null)} className="p-1 hover:bg-gray-100 rounded-lg">
                                     <X size={18} className="text-gray-400" />
@@ -417,12 +456,12 @@ const RollosMembranasPage = () => {
                                 <button
                                     onClick={guardarRollo}
                                     disabled={guardando}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 font-medium active:scale-[0.98]"
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 font-medium active:scale-[0.98] g3:!bg-g3-primario g3:hover:!bg-g3-primario-hover g3:!text-g3-sobre-primario"
                                 >
                                     {guardando ? (
                                         <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Guardando...</>
                                     ) : (
-                                        <><CheckCircle2 size={18} /> {modalRollo === 'crear' ? 'Crear Rollo' : 'Guardar Cambios'}</>
+                                        <><CheckCircle2 size={18} /> {modalRollo === 'crear' ? (g3 ? 'Crear rollo' : 'Crear Rollo') : (g3 ? 'Guardar cambios' : 'Guardar Cambios')}</>
                                     )}
                                 </button>
                             </div>
@@ -491,12 +530,12 @@ const RollosMembranasPage = () => {
                                 <button
                                     onClick={confirmarDescuento}
                                     disabled={descontando || !cantidadDescuento || parseFloat(cantidadDescuento) <= 0 || parseFloat(cantidadDescuento) > parseFloat(rolloDescuento.metraje_restante)}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium active:scale-[0.98]"
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium active:scale-[0.98] g3:!bg-g3-primario g3:hover:!bg-g3-primario-hover g3:!text-g3-sobre-primario"
                                 >
                                     {descontando ? (
                                         <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Descontando...</>
                                     ) : (
-                                        <><Minus size={18} /> Confirmar Descuento</>
+                                        <><Minus size={18} /> {g3 ? 'Confirmar descuento' : 'Confirmar Descuento'}</>
                                     )}
                                 </button>
                             </div>
@@ -504,10 +543,10 @@ const RollosMembranasPage = () => {
                     )}
 
                     {/* Filtros de estado */}
-                    <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1">
+                    <div className={cx('flex items-center gap-2 mb-3 overflow-x-auto pb-1', g3 && 'g3-chips g3p-chips-fila')}>
                         <button
                             onClick={() => setFiltroEstado('')}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${!filtroEstado ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                            className={g3 ? cx('g3-chip', !filtroEstado && 'g3-chip--activo') : `px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${!filtroEstado ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                         >
                             Todos
                         </button>
@@ -515,7 +554,7 @@ const RollosMembranasPage = () => {
                             <button
                                 key={key}
                                 onClick={() => setFiltroEstado(key)}
-                                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${filtroEstado === key ? 'bg-purple-600 text-white' : `${cfg.bg} ${cfg.text} hover:opacity-80`}`}
+                                className={g3 ? cx('g3-chip', filtroEstado === key && 'g3-chip--activo') : `px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${filtroEstado === key ? 'bg-purple-600 text-white' : `${cfg.bg} ${cfg.text} hover:opacity-80`}`}
                             >
                                 {cfg.label}
                             </button>
@@ -532,7 +571,7 @@ const RollosMembranasPage = () => {
                         <div className="text-center py-16 text-gray-500">
                             <Layers size={48} className="mx-auto mb-3 text-gray-300" />
                             <p className="font-medium text-sm">{filtroEstado ? 'Sin rollos con ese estado' : 'No hay rollos registrados'}</p>
-                            <p className="text-xs text-gray-400 mt-1">Usa el botón "Nuevo Rollo" para agregar uno</p>
+                            <p className="text-xs text-gray-400 mt-1">{g3 ? 'Usa el botón «Nuevo rollo» para agregar uno' : 'Usa el botón "Nuevo Rollo" para agregar uno'}</p>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -552,16 +591,43 @@ const RollosMembranasPage = () => {
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className="font-bold text-gray-900 text-sm">{rollo.identificador}</span>
+                                                    {g3 ? (
+                                                        <span className={`g3-estado ${{ disponible: 'g3-estado--ok', en_uso: 'g3-estado--aviso', agotado: 'g3-estado--mal' }[rollo.estado] || 'g3-estado--ok'}`}>{cfg.label}</span>
+                                                    ) : (
                                                     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${cfg.bg} ${cfg.text}`}>
                                                         <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`}></span>
                                                         {cfg.label}
                                                     </span>
+                                                    )}
                                                 </div>
                                                 <div className="flex items-center gap-3 text-xs text-gray-500">
+                                                    {g3 ? (
+                                                        <>
+                                                            {rollo.color && <span className="inline-flex items-center gap-1"><Palette size={12} aria-hidden="true" />{rollo.color}</span>}
+                                                            <span className="inline-flex items-center gap-1"><CalendarDays size={12} aria-hidden="true" />{new Date(rollo.fecha_ingreso).toLocaleDateString('es-MX')}</span>
+                                                        </>
+                                                    ) : (
+                                                    <>
                                                     {rollo.color && <span>🎨 {rollo.color}</span>}
                                                     <span>📅 {new Date(rollo.fecha_ingreso).toLocaleDateString('es-MX')}</span>
+                                                    </>
+                                                    )}
                                                 </div>
                                             </div>
+                                            {g3 ? (
+                                                <div className="flex items-center gap-1 flex-shrink-0">
+                                                    {rollo.estado !== 'agotado' && (
+                                                        <button type="button" onClick={() => abrirDescuento(rollo)} className="g3-btn g3-btn--tonal g3-btn--ch">
+                                                            <Minus size={16} aria-hidden="true" /> Descontar
+                                                        </button>
+                                                    )}
+                                                    <MasAcciones titulo={rollo.identificador} acciones={[
+                                                        { texto: 'Editar rollo', icono: Edit2, onClick: () => abrirEditarRollo(rollo) },
+                                                        '-',
+                                                        { texto: 'Eliminar rollo', icono: Trash2, peligro: true, onClick: () => eliminarRollo(rollo) },
+                                                    ]} />
+                                                </div>
+                                            ) : (
                                             <div className="flex items-center gap-1 flex-shrink-0">
                                                 {rollo.estado !== 'agotado' && (
                                                     <button
@@ -587,6 +653,7 @@ const RollosMembranasPage = () => {
                                                     <Trash2 size={14} />
                                                 </button>
                                             </div>
+                                            )}
                                         </div>
 
                                         {/* Row 2: barra de metraje */}

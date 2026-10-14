@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import checklistService from '../../services/checklist.service';
 import ImportarChecklistModal from './ImportarChecklistModal';
 import EnlazarArticulosModal from './EnlazarArticulosModal';
+import { g3Activo, confirmarG3 } from '../../diseno-3g/dialogosG3';
 
 const ChecklistManager = ({ isOpen, onClose }) => {
   const [items, setItems] = useState([]);
@@ -34,7 +35,9 @@ const ChecklistManager = ({ isOpen, onClose }) => {
   };
 
   const handleEliminar = async (item) => {
-    if (!confirm(`¿Eliminar "${item.nombre}" del checklist?`)) return;
+    if (g3Activo()) {
+      if (!(await confirmarG3({ titulo: `¿Eliminar «${item.nombre}» del checklist?`, confirmar: 'Eliminar del checklist', cancelar: 'No eliminar', peligro: true }))) return;
+    } else if (!confirm(`¿Eliminar "${item.nombre}" del checklist?`)) return;
     try {
       await checklistService.eliminarItem(item.id);
       toast.success('Ítem eliminado');

@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { X, Camera, Upload, Sparkles, AlertTriangle, CheckCircle2, HelpCircle, Trash2, PackageCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ordenesCompraService from '../../services/ordenesCompra.service';
+import { g3Activo } from '../../diseno-3g/dialogosG3';
 
 const ESTADOS = {
     identificado: { texto: 'Identificado', clase: 'bg-green-100 text-green-800 border-green-200', Icono: CheckCircle2 },
@@ -49,7 +50,7 @@ const RecibirConFacturaModal = ({ isOpen, onClose, orden, onSuccess }) => {
 
             const { identificados, revisar, sin_identificar } = data.resumen;
             if (sin_identificar > 0 || revisar > 0) {
-                toast(`${identificados} identificados · ${revisar + sin_identificar} por confirmar`, { icon: '🔎' });
+                toast(`${identificados} identificados · ${revisar + sin_identificar} por confirmar`, g3Activo() ? undefined : { icon: '🔎' });
             } else {
                 toast.success(`${identificados} renglón(es) identificados`);
             }

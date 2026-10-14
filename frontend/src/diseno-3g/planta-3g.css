@@ -1,0 +1,202 @@
+/* Diseño 3G — planta-3g.css: ajustes propios de Planta (Inventario 3G).
+   TODO vive bajo html[data-diseno="3g"]: con el interruptor apagado este archivo no cambia nada.
+   Va después de diseno-3g.css y de planta-mapa-tailwind.css (los colores de Tailwind ya re-pintados).
+   .g3-zona = el área de trabajo (<main>) del armazón nuevo; ahí se adaptan radios, sombras, tablas y formularios. */
+
+/* ---------- 1. Base ---------- */
+[data-diseno="3g"] body { background-color: var(--g3-fondo); color: var(--g3-tinta); }
+[data-diseno="3g"] ::-webkit-scrollbar-track { background: var(--g3-fondo); }
+[data-diseno="3g"] ::-webkit-scrollbar-thumb { background: var(--g3-linea-fuerte); border-radius: 999px; }
+[data-diseno="3g"] ::-webkit-scrollbar-thumb:hover { background: var(--g3-linea-campo); }
+/* Nada de texto menor a 12 px */
+[data-diseno="3g"] :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]) { font-size: var(--g3-t-min); }
+/* Botón rojo de peligro: al pasar el cursor sigue rojo (no se vuelve azul de acción) */
+[data-diseno="3g"] :is(.bg-red-500, .bg-red-600):is(.hover\:bg-red-600, .hover\:bg-red-700, .hover\:bg-red-800):hover { background-color: var(--g3-mal-hover); }
+[data-diseno="3g"] :is(.bg-red-500, .bg-red-600):is(.hover\:bg-red-600, .hover\:bg-red-700, .hover\:bg-red-800):hover { color: var(--g3-sobre-mal); }
+
+/* ---------- 2. Armazón (riel, barra, pestañas, barra inferior) ---------- */
+[data-diseno="3g"] .g3p-marco { background: var(--g3-fondo); }
+[data-diseno="3g"] .g3p-riel { background: var(--g3-fondo); padding-top: 8px; }
+[data-diseno="3g"] .g3p-riel-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+[data-diseno="3g"] .g3p-riel .g3-logo { padding: 6px 12px 10px; }
+[data-diseno="3g"] .g3p-riel-seccion { display: grid; gap: 2px; }
+[data-diseno="3g"] .g3p-riel .g3-riel-grupo { padding-top: 12px; }
+[data-diseno="3g"] .g3p-riel-texto { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-diseno="3g"] .g3p-riel-texto small { display: block; font-size: var(--g3-t-min); font-weight: 500; color: var(--g3-tinta-2); }
+[data-diseno="3g"] .g3p-riel .g3-riel-item { min-height: 40px; }
+[data-diseno="3g"] .g3p-riel .g3-riel-item > svg { flex: none; }
+[data-diseno="3g"] .g3p-riel-editar { cursor: grab; border: 1px dashed var(--g3-linea-fuerte); padding-right: 4px; }
+[data-diseno="3g"] .g3p-riel-editar[data-oculto] { opacity: 0.55; }
+[data-diseno="3g"] .g3p-riel-editar[data-oculto] .g3p-riel-texto { text-decoration: line-through; }
+[data-diseno="3g"] .g3p-asa { color: var(--g3-tinta-3); }
+[data-diseno="3g"] .g3p-ojo { width: 36px; height: 36px; }
+[data-diseno="3g"] .g3p-personalizar { display: grid; gap: 8px; padding: 4px 8px 8px; }
+[data-diseno="3g"] .g3p-perfil { min-height: 52px; }
+[data-diseno="3g"] .g3p-perfil .g3-avatar { width: 30px; height: 30px; }
+
+[data-diseno="3g"] .g3p-barra { gap: 8px; }
+/* El cuadro 3G de celular no se encoge sobre el título */
+[data-diseno="3g"] .g3p-barra .g3-logo--movil { flex: none; }
+[data-diseno="3g"] .g3p-barra .g3-barra-titulo { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+/* La campana de siempre, con la forma de los botones de la barra */
+[data-diseno="3g"] .g3p-avisos-campana > .relative > button { width: 40px; height: 40px; display: inline-grid; place-items: center; padding: 0; border-radius: 50%; }
+[data-diseno="3g"] .g3p-avisos-campana > .relative > button:hover { background: var(--g3-contenedor-alto); }
+[data-diseno="3g"] .g3p-avisos-campana > .relative > button svg { color: var(--g3-tinta-2); }
+[data-diseno="3g"] .g3p-avisos-campana .absolute.w-96 {
+  border-radius: var(--g3-r-gr); box-shadow: var(--g3-sombra-3); border-color: var(--g3-linea);
+  background: var(--g3-vidrio-fuerte); -webkit-backdrop-filter: var(--g3-desenfoque); backdrop-filter: var(--g3-desenfoque);
+}
+
+[data-diseno="3g"] .g3p-pestanas { background: var(--g3-vidrio); -webkit-backdrop-filter: var(--g3-desenfoque); backdrop-filter: var(--g3-desenfoque); padding: 0 16px; position: sticky; top: var(--g3-barra-alto); z-index: 40; }
+[data-diseno="3g"] .g3p-principal { flex: 1; min-width: 0; padding: 0 0 24px; }
+
+[data-diseno="3g"] .g3p-solo-movil { display: none; }
+@media (max-width: 860px) {
+  [data-diseno="3g"] .g3p-solo-movil { display: inline-grid; }
+  [data-diseno="3g"] .g3p-solo-escritorio { display: none !important; }
+  [data-diseno="3g"] .g3p-principal { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  [data-diseno="3g"] .g3p-barra { flex-wrap: nowrap; }
+  [data-diseno="3g"] .g3p-barra .g3-barra-titulo { font-size: 1.0625rem; }
+  [data-diseno="3g"] .g3p-pestanas { top: 56px; padding: 0 4px; }
+  [data-diseno="3g"] .g3p-pestanas > a { padding: 12px 12px; }
+  /* El panel de avisos ocupa el ancho de la pantalla (no se sale por la izquierda) */
+  [data-diseno="3g"] .g3p-avisos-campana .absolute.w-96 { position: fixed; left: 8px; right: 8px; top: 60px; width: auto; margin-top: 0; }
+  [data-diseno="3g"] .g3p-barra-inferior > :is(a, button) > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* ---------- 3. Radios, sombras y tarjetas de Tailwind dentro del área de trabajo ---------- */
+[data-diseno="3g"] .g3-zona :is(.rounded-xl, .rounded-2xl, .rounded-3xl) { border-radius: var(--g3-r-gr); }
+[data-diseno="3g"] .g3-zona .rounded-lg { border-radius: var(--g3-r-md); }
+/* Botones con Tailwind → píldora (no los renglones de lista que ocupan todo el ancho, ni las tarjetas-botón) */
+[data-diseno="3g"] .g3-zona :is(button, a[class*="px-"]):is(.rounded-lg, .rounded-md, .rounded):not(.text-left):not([class*="flex-col"]):not([class*="g3-"]) { border-radius: var(--g3-r-pildora); }
+[data-diseno="3g"] .g3-zona .shadow-sm { --tw-shadow: var(--g3-sombra-1); }
+[data-diseno="3g"] .g3-zona :is(.shadow, .shadow-md, .hover\:shadow-md:hover) { --tw-shadow: var(--g3-sombra-1); }
+[data-diseno="3g"] .g3-zona :is(.shadow-lg, .shadow-xl, .hover\:shadow-lg:hover, .hover\:shadow-xl:hover) { --tw-shadow: var(--g3-sombra-2); }
+[data-diseno="3g"] .g3-zona .shadow-2xl { --tw-shadow: var(--g3-sombra-3); }
+/* Tarjeta blanca de siempre → tarjeta Diseño 3G (borde fino, sombra mínima) */
+[data-diseno="3g"] .g3-zona .bg-white:is(.rounded-lg, .rounded-xl, .rounded-2xl):is(.shadow-sm, .shadow, .shadow-md):not([class*="border"]) { box-shadow: 0 0 0 1px var(--g3-linea), var(--g3-sombra-1); }
+
+/* ---------- 4. Tablas ---------- */
+[data-diseno="3g"] .g3-zona table thead { background-color: var(--g3-superficie); }
+[data-diseno="3g"] .g3-zona table thead th {
+  color: var(--g3-tinta-2); font-size: var(--g3-t-ch); font-weight: 600; text-transform: none; letter-spacing: 0;
+  border-bottom: 1px solid var(--g3-linea);
+}
+[data-diseno="3g"] .g3-zona table :is(td, th) { border-color: var(--g3-linea); }
+[data-diseno="3g"] .g3-zona table tbody tr:hover { background-color: var(--g3-hover); }
+
+/* ---------- 5. Formularios ----------
+   Campos de siempre: borde de campo (3:1), esquinas de 12 px y foco azul. Los que ya son «chip» de color
+   (fondo de color o rounded-full, p. ej. la categoría en la tabla de Inventario) conservan su forma. */
+[data-diseno="3g"] .g3-zona :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="submit"], [type="button"], [type="image"]), select, textarea):not(.g3-busca *):not([class*="g3-"]):is(:not([class*="bg-"]), .bg-white, [class*="bg-gray-"]):not(.rounded-full) {
+  border-color: var(--g3-linea-campo); border-radius: 12px;
+}
+[data-diseno="3g"] .g3-zona :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="submit"], [type="button"], [type="image"]), select, textarea):not(.g3-busca *):not([class*="g3-"]):not([class*="bg-"]) {
+  background-color: var(--g3-superficie); color: var(--g3-tinta);
+}
+[data-diseno="3g"] .g3-zona :is(input, select, textarea):not(.g3-busca *):not([class*="g3-"])::placeholder { color: var(--g3-tinta-3); opacity: 1; }
+[data-diseno="3g"] .g3-zona :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"]), select, textarea):not(.g3-busca *):not([class*="g3-"]):focus {
+  border-color: var(--g3-primario); box-shadow: 0 0 0 3px var(--g3-foco-anillo); outline: 2px solid transparent;
+}
+[data-diseno="3g"] .g3-zona :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"]), select, textarea):disabled { background-color: var(--g3-contenedor); color: var(--g3-tinta-3); }
+[data-diseno="3g"] .g3-zona select:not([class*="g3-"]) { color-scheme: inherit; }
+[data-diseno="3g"] :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--g3-primario); }
+
+/* ---------- 6. Modales de siempre: velo, hoja redonda, sombra grande ---------- */
+[data-diseno="3g"] .fixed.inset-0:is(.bg-black, .bg-gray-800, .bg-gray-900).bg-opacity-50,
+[data-diseno="3g"] .fixed.inset-0.bg-black\/50 { background-color: var(--g3-velo); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+[data-diseno="3g"] .fixed.inset-0 :is(.max-w-sm, .max-w-md, .max-w-lg, .max-w-xl, .max-w-2xl, .max-w-3xl, .max-w-4xl, .max-w-5xl, .max-w-6xl, .max-w-7xl).bg-white {
+  border-radius: var(--g3-r-gr); box-shadow: 0 0 0 1px var(--g3-linea), var(--g3-sombra-3);
+}
+
+/* ---------- 7. Avisos de react-hot-toast (los de siempre) con la forma del aviso flotante ---------- */
+[data-diseno="3g"] [data-rht-toaster] > div > div { border-radius: 14px !important; background: var(--g3-flotante-fondo) !important; color: var(--g3-flotante-tinta) !important; font-family: var(--g3-f-texto); box-shadow: var(--g3-sombra-2) !important; }
+
+/* ---------- 8. Piezas nuevas de las pantallas piloto ---------- */
+[data-diseno="3g"] .g3p-inv-cab { margin-bottom: 20px; gap: 16px; }
+[data-diseno="3g"] .g3p-kpi-boton { text-align: left; font: inherit; cursor: pointer; width: 100%; }
+[data-diseno="3g"] .g3p-kpi-boton:hover, [data-diseno="3g"] a.g3-kpi:hover { border-color: var(--g3-linea-fuerte); box-shadow: var(--g3-sombra-2); }
+[data-diseno="3g"] .g3p-miga-boton { border: 0; background: none; padding: 0; font: inherit; color: var(--g3-tinta-2); cursor: pointer; }
+[data-diseno="3g"] .g3p-miga-boton:hover { color: var(--g3-primario); text-decoration: underline; }
+[data-diseno="3g"] svg.g3-si { flex: none; }
+[data-diseno="3g"] .g3p-titulo-lista { margin: 4px 0 12px; }
+[data-diseno="3g"] .g3p-texto-min { font-size: var(--g3-t-min) !important; }
+
+/* ---------- 9. Encabezados de página dentro del área de trabajo ---------- */
+[data-diseno="3g"] .g3-zona :is(h1, h2).text-2xl, [data-diseno="3g"] .g3-zona h1.text-3xl { font-family: var(--g3-f-titulo); font-weight: 600; letter-spacing: -0.01em; }
+[data-diseno="3g"] .g3-zona h1:is(.text-2xl, .text-3xl) { font-size: var(--g3-t-xl); line-height: 1.15; }
+@media (max-width: 860px) { [data-diseno="3g"] .g3-zona h1:is(.text-2xl, .text-3xl) { font-size: 1.5rem; } }
+
+/* ---------- 10. Estados de renglón de Inventario (ola 2) ----------
+   «Pendiente de autorizar» (artículo nuevo que dio de alta Almacén) y «Ubicación por revisar» se distinguían por color
+   (naranja contra amarillo). Con el mapa de colores los dos caían en «aviso»: aquí el pendiente queda en naranja
+   (entre aviso y mal) y lleva además su ícono y texto; la ubicación por revisar se queda en ámbar con su triángulo. */
+:root[data-diseno="3g"] {
+  /* Naranja = entre «aviso» y «mal» (pendiente de autorizar en Inventario, crítico en Stock bajo) */
+  --g3p-naranja: color-mix(in srgb, var(--g3-aviso) 50%, var(--g3-mal));
+  --g3p-naranja-suave: color-mix(in srgb, var(--g3-aviso-suave) 40%, var(--g3-mal-suave));
+}
+[data-diseno="3g"] .g3p-estado-pendiente { background-color: var(--g3p-naranja-suave) !important; border-color: var(--g3p-naranja) !important; }
+[data-diseno="3g"] .g3p-estado-pendiente:is(span) { color: var(--g3-tinta) !important; }
+[data-diseno="3g"] .g3p-estado-revisar { background-color: var(--g3-aviso-suave) !important; border-color: var(--g3-aviso) !important; }
+[data-diseno="3g"] .g3p-estado-pendiente-texto, [data-diseno="3g"] .g3p-estado--naranja { color: var(--g3p-naranja); background: var(--g3p-naranja-suave); }
+[data-diseno="3g"] .g3p-fondo-naranja { background-color: var(--g3p-naranja) !important; }
+[data-diseno="3g"] .g3p-rejilla-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1100px) { [data-diseno="3g"] .g3p-rejilla-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { [data-diseno="3g"] .g3p-rejilla-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+[data-diseno="3g"] .g3p-estado-pendiente-texto::before { display: none; }
+[data-diseno="3g"] .g3p-estado-pendiente-texto > svg { flex: none; }
+[data-diseno="3g"] .g3p-ayuda-cab { width: 100%; margin: 0; }
+
+/* ---------- 11. Piezas comunes de la ola 2 ---------- */
+[data-diseno="3g"] .g3p-cab { margin-bottom: 20px; }
+[data-diseno="3g"] .g3p-mas { display: inline-flex; position: relative; }
+[data-diseno="3g"] .g3p-mas-boton { width: 36px; height: 36px; }
+[data-diseno="3g"] .g3p-mas-menu { position: fixed; z-index: 80; max-width: calc(100vw - 16px); }
+[data-diseno="3g"] .g3p-mas-menu button[disabled] { opacity: 0.5; cursor: not-allowed; }
+/* Pestañas dentro de una pantalla (las de siempre, con la forma del paquete) */
+[data-diseno="3g"] .g3p-pestanas-pagina { background: transparent !important; padding: 0 !important; border-radius: 0 !important; gap: 2px !important; margin-bottom: 20px; }
+[data-diseno="3g"] .g3p-pestanas-pagina > button { flex: none !important; box-shadow: none !important; }
+/* Tabla de siempre dentro de g3-tabla: sin el fondo de encabezado ni bordes duplicados */
+[data-diseno="3g"] .g3-tabla > table { min-width: 0; }
+[data-diseno="3g"] .g3-tabla thead :is(th, td) { background: var(--g3-superficie); }
+[data-diseno="3g"] .g3-tabla :is(td, th).g3p-derecha { text-align: right; }
+@media (max-width: 720px) {
+  [data-diseno="3g"] .g3-tabla--tarjetas td.g3-celda-acciones { justify-content: flex-start; }
+  [data-diseno="3g"] .g3-tabla--tarjetas td[data-etq] > * { min-width: 0; }
+  [data-diseno="3g"] .g3-tabla--tarjetas td:empty { display: none; }
+}
+/* Tabla dentro de una tarjeta (Stock bajo por almacén): sin el marco propio de g3-tabla */
+[data-diseno="3g"] .g3p-tabla-en-tarjeta { border: 0; border-radius: 0; }
+@media (max-width: 720px) { [data-diseno="3g"] .g3p-tabla-en-tarjeta { padding: 10px; } }
+/* Cifras de dinero en los números: sin partirse en dos renglones */
+[data-diseno="3g"] .g3p-kpi-dinero .g3-kpi-valor { font-size: 1.5rem; white-space: nowrap; }
+@media (max-width: 720px) { [data-diseno="3g"] .g3p-kpi-dinero .g3-kpi-valor { font-size: 1.125rem; } }
+
+/* ---- Ola 3 ---- */
+/* Producción: los anillos de la tarjeta avisan («urgente», «hay que cerrar»): rojo de problema, no el azul de foco del mapa */
+[data-diseno="3g"] :is(.ring-red-400, .ring-red-500):not(:focus) { --tw-ring-color: var(--g3-mal); }
+/* Cajón con un campo (lo que antes pedía prompt()) */
+[data-diseno="3g"] .g3p-cajon-texto { background: var(--g3-superficie); } /* sólido: lo de atrás no se cuela en el campo */
+[data-diseno="3g"] .g3p-cajon-texto .g3-cajon-cuerpo { gap: 16px; }
+[data-diseno="3g"] .g3p-cajon-texto :is(.g3-entrada, .g3-area) { background: var(--g3-superficie); }
+/* Inventario: Entrada y Salida son tonales (el principal del renglón es «Agregar»); el ícono conserva su sentido */
+[data-diseno="3g"] .g3p-icono-ok svg { color: var(--g3-ok); }
+[data-diseno="3g"] .g3p-icono-aviso svg { color: var(--g3-aviso); }
+/* Calendario de instalaciones: cada equipo y cada tipo de obra conserva su color de siempre (identifica al equipo).
+   Valores de la paleta de Tailwind 3 que ya usa la pantalla apagada. */
+[data-diseno="3g"] .g3p-color-equipo.bg-yellow-50 { background-color: #fefce8; border-color: #fef08a; }
+[data-diseno="3g"] .g3p-color-equipo.bg-red-50 { background-color: #fef2f2; border-color: #fecaca; }
+[data-diseno="3g"] .g3p-color-equipo.bg-blue-100 { background-color: #dbeafe; border-color: #93c5fd; }
+[data-diseno="3g"] .g3p-color-equipo.bg-green-100 { background-color: #dcfce7; border-color: #86efac; }
+[data-diseno="3g"] .g3p-color-equipo.bg-orange-100 { background-color: #ffedd5; border-color: #fdba74; }
+[data-diseno="3g"] .g3p-color-equipo.bg-purple-100 { background-color: #f3e8ff; border-color: #d8b4fe; }
+[data-diseno="3g"] .g3p-color-equipo.bg-yellow-100 { background-color: #fef9c3; border-color: #fde047; }
+[data-diseno="3g"] .g3p-color-equipo.bg-pink-100 { background-color: #fce7f3; border-color: #f9a8d4; }
+[data-diseno="3g"] :is(.g3p-color-equipo.text-yellow-900, .g3p-color-equipo .text-yellow-900) { color: #713f12; }
+[data-diseno="3g"] :is(.g3p-color-equipo.text-red-900, .g3p-color-equipo .text-red-900) { color: #7f1d1d; }
+[data-diseno="3g"] :is(.g3p-color-equipo.text-blue-900, .g3p-color-equipo .text-blue-900) { color: #1e3a8a; }
+[data-diseno="3g"] :is(.g3p-color-equipo.text-green-900, .g3p-color-equipo .text-green-900) { color: #14532d; }
+[data-diseno="3g"] :is(.g3p-color-equipo.text-orange-900, .g3p-color-equipo .text-orange-900) { color: #7c2d12; }
+[data-diseno="3g"] :is(.g3p-color-equipo.text-purple-900, .g3p-color-equipo .text-purple-900) { color: #581c87; }
+[data-diseno="3g"] :is(.g3p-color-equipo.text-pink-900, .g3p-color-equipo .text-pink-900) { color: #831843; }

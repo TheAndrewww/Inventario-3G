@@ -19,6 +19,7 @@ import {
 import { useNotificaciones } from '../../context/NotificacionesContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { g3Activo } from '../../diseno-3g/dialogosG3';
 
 const NotificacionesDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -133,7 +134,7 @@ const NotificacionesDropdown = () => {
         : await requestPushPermission();
 
       if (token || pushPermission === 'granted') {
-        toast.success('¡Notificaciones push activadas! 🔔');
+        toast.success(g3Activo() ? '¡Notificaciones push activadas!' : '¡Notificaciones push activadas! 🔔');
       } else {
         toast.error('Permiso de notificaciones denegado. Puedes habilitarlo desde la configuración de tu navegador.');
       }
@@ -147,7 +148,7 @@ const NotificacionesDropdown = () => {
     const newValue = !soundEnabled;
     setSoundEnabled(newValue);
     setGlobalSoundEnabled(newValue);
-    toast.success(newValue ? '🔊 Sonido activado' : '🔇 Sonido desactivado');
+    toast.success(g3Activo() ? (newValue ? 'Sonido activado' : 'Sonido desactivado') : (newValue ? '🔊 Sonido activado' : '🔇 Sonido desactivado'));
   };
 
   return (
