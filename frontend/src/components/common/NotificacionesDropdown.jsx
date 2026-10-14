@@ -37,6 +37,7 @@ const NotificacionesDropdown = () => {
     fcmSupported,
     fcmToken,
     activarNotificacionesFCM,
+    requestPushPermission, // D6 · PLA-03 (error 34): sin FCM se pide el permiso con la función del contexto
     setSoundEnabled: setGlobalSoundEnabled
   } = useNotificaciones();
 
@@ -132,8 +133,10 @@ const NotificacionesDropdown = () => {
       const token = fcmSupported
         ? await activarNotificacionesFCM()
         : await requestPushPermission();
+      // Sin FCM, requestPushPermission devuelve el permiso ('granted', 'denied', 'default' o 'unsupported'), no un token
+      const activadas = fcmSupported ? (token || pushPermission === 'granted') : token === 'granted';
 
-      if (token || pushPermission === 'granted') {
+      if (activadas) {
         toast.success(g3Activo() ? '¡Notificaciones push activadas!' : '¡Notificaciones push activadas! 🔔');
       } else {
         toast.error('Permiso de notificaciones denegado. Puedes habilitarlo desde la configuración de tu navegador.');
