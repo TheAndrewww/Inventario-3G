@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, Package } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Package, Landmark } from 'lucide-react';
 import proveedoresService from '../services/proveedores.service';
 import { Loader, Modal, Button } from '../components/common';
 import toast from 'react-hot-toast';
@@ -7,6 +7,41 @@ import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import MasAcciones from '../diseno-3g/MasAcciones';
 import { g3Activo, confirmarG3, cx, etq } from '../diseno-3g/dialogosG3';
+
+// B3 paso 1 · PLA-11 (solo con Diseño 3G): liga a la otra mitad de «Proveedores», que vive en Finanzas.
+// La dirección de Finanzas es privada: Planta no la escribe en su JS público. Si una página con sesión la configuró
+// (G3.configurar), es enlace; si no, dice «Ábrela desde Inicio 3G», como el selector de apps.
+const VISTA_FINANZAS = '/#vista=proveedores-a-credito';
+const urlFinanzas = () => {
+  try {
+    const base = window.G3?.sistemas?.find((s) => s.id === 'finanzas')?.url;
+    if (!base) return null;
+    const url = new URL(VISTA_FINANZAS, base).toString();
+    return window.G3?.urlCon ? window.G3.urlCon(url) : url;
+  } catch { return null; }
+};
+const LigaCreditoFinanzas = () => {
+  const [url, setUrl] = useState(urlFinanzas);
+  useEffect(() => {
+    const actualizar = () => setUrl(urlFinanzas());
+    window.addEventListener('g3:sistemas', actualizar);
+    return () => window.removeEventListener('g3:sistemas', actualizar);
+  }, []);
+  return (
+    <div className="g3-caja g3-caja--info mb-6">
+      <Landmark aria-hidden="true" />
+      <div className="g3-caja-cuerpo">
+        <strong>Crédito, pagos y contacto para Julia</strong>
+        <span>El crédito y el plazo de cada proveedor los lleva Contabilidad en Finanzas › Por pagar › Proveedores a crédito. Aquí quedan sus datos y artículos.</span>
+        <span>
+          {url
+            ? <a className="g3-btn g3-btn--tonal g3-btn--ch" href={url}>Abrir en Finanzas</a>
+            : <span className="g3-tenue">Ábrela desde Inicio 3G › Proveedores.</span>}
+        </span>
+      </div>
+    </div>
+  );
+};
 
 const ProveedoresPage = () => {
   const [proveedores, setProveedores] = useState([]);
@@ -175,6 +210,8 @@ const ProveedoresPage = () => {
         </Button>
       </div>
       )}
+
+      {g3 && <LigaCreditoFinanzas />}
 
       {/* Barra de búsqueda */}
       <div className="mb-6">

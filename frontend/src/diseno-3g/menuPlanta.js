@@ -126,7 +126,6 @@ export const GRUPOS_RIEL = [
   { id: 'produccion', titulo: 'Producción', items: [
     { path: '/produccion', icono: Factory },
     { path: '/avance-produccion', icono: Gauge },
-    { path: '/control-campana', icono: Flag },
   ] },
   { id: 'calendario', titulo: 'Calendario', items: [
     { path: '/calendario', icono: CalendarDays },
@@ -139,8 +138,12 @@ export const GRUPOS_RIEL = [
   { id: 'administracion', titulo: 'Administración', items: [
     { path: '/usuarios', icono: UserCog },
     { path: '/reportes', icono: BarChart3 },
+    // A12.2 · PLA-11: Control de campaña pasa de Producción a Administración (mismos roles y misma ruta)
+    { path: '/control-campana', icono: Flag },
   ] },
 ];
+// B6 · PLA-11: el rol ventas ya no ve «Órdenes de compra» ni «Solicitudes de compra». Los permisos de este riel salen
+// de ALL_MENU_ITEMS (Sidebar.jsx), así que el cambio de roles de allí aplica igual al menú de siempre y a este.
 
 // Riel para un rol: solo lo que el rol ve hoy (mismos permisos), sin los paneles que el usuario ocultó.
 export const rielParaRol = (rol, userId, ocultos = new Set()) => GRUPOS_RIEL.map((g) => ({

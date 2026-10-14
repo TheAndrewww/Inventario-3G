@@ -15,8 +15,9 @@ export const ALL_MENU_ITEMS = [
   { path: '/camionetas', icon: Briefcase, label: 'Equipos', roles: ['administrador'] },
   { path: '/usuarios', icon: UserCog, label: 'Usuarios', roles: ['administrador'] },
   { path: '/solicitudes-cambio', icon: Inbox, label: 'Solicitudes', roles: ['administrador', 'almacen', 'compras'] },
-  { path: '/ordenes-compra', icon: FileText, label: 'Órdenes de Compra', roles: ['administrador', 'diseñador', 'ventas', 'compras'], grupo: 'compras' },
-  { path: '/solicitudes-compra', icon: AlertCircle, label: 'Solicitudes Pendientes', roles: ['administrador', 'diseñador', 'ventas', 'compras'], grupo: 'compras' },
+  // B6 · PLA-11: sin el rol ventas (se publica después de DUE-20: el dueño revisa quién tiene ese rol). La ruta sigue igual; solo sale del menú.
+  { path: '/ordenes-compra', icon: FileText, label: 'Órdenes de Compra', roles: ['administrador', 'diseñador', 'compras'], grupo: 'compras' },
+  { path: '/solicitudes-compra', icon: AlertCircle, label: 'Solicitudes Pendientes', roles: ['administrador', 'diseñador', 'compras'], grupo: 'compras' },
   { path: '/calendario', icon: Calendar, label: 'Calendario', roles: ['administrador', 'diseñador', 'ventas', 'encargado', 'almacen'] },
   { path: '/mi-equipo', icon: User, label: 'Mi Equipo', roles: ['administrador', 'diseñador', 'ventas', 'encargado', 'operador'] },
   { path: '/produccion', icon: Factory, label: 'Dashboard Producción', roles: ['administrador', 'diseñador', 'almacen'] },
