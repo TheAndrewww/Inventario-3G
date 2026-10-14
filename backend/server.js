@@ -82,7 +82,8 @@ app.use(cors({
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    // X-Codigo-Area: el código de la terminal de producción (A4 · PLA-04). Sin esto el navegador corta la petición.
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Codigo-Area']
 }));
 
 app.use(express.json());
