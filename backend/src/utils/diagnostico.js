@@ -7,7 +7,8 @@
  * diagnóstico a ciegas: se ve el 500 y nada más.
  *
  * Aquí se guardan los últimos errores para poder consultarlos por
- * GET /api/estado-sistema. Solo mensajes de error, ningún dato del negocio, y
+ * GET /api/estado-sistema/detalle (sesión de administración, A16 · PLA-01).
+ * Solo mensajes de error, ningún dato del negocio, y
  * nada se persiste: al reiniciar el servidor se vacía.
  */
 

@@ -220,19 +220,25 @@ export const enviarEmailAprobacion = async (orden) => {
 };
 
 /**
- * Enviar un email de prueba para verificar configuración
+ * Prueba del correo de órdenes (A16 · PLA-01), solo administración.
+ * GET solo dice si cada dato está configurado (sí/no): nunca partes de la llave.
+ * POST manda el correo de prueba a Dirección.
  */
 export const testEmail = async (req, res) => {
-    try {
-        const config = {
-            RESEND_API_KEY: process.env.RESEND_API_KEY ? `configurado (${process.env.RESEND_API_KEY.substring(0, 10)}...)` : 'NO configurado',
-            BACKEND_URL: process.env.BACKEND_URL || 'NO configurado'
-        };
+    const config = {
+        RESEND_API_KEY: process.env.RESEND_API_KEY ? 'sí' : 'no',
+        BACKEND_URL: process.env.BACKEND_URL ? 'sí' : 'no'
+    };
 
-        console.log('🧪 [TEST EMAIL] Config:', config);
+    try {
+        console.log('🧪 [TEST EMAIL] Configurado:', config);
+
+        if (req.method !== 'POST') {
+            return res.json({ message: 'Para mandar el correo de prueba usa POST en esta misma ruta.', configurado: config });
+        }
 
         if (!resend) {
-            return res.json({ success: false, message: 'RESEND_API_KEY no configurado', config });
+            return res.json({ success: false, message: 'RESEND_API_KEY no configurado', configurado: config });
         }
 
         const { data, error } = await resend.emails.send({
@@ -244,18 +250,16 @@ export const testEmail = async (req, res) => {
 
         if (error) {
             console.error('❌ [TEST EMAIL] Error:', error);
-            return res.json({ success: false, error: error.message, config });
+            return res.json({ success: false, error: error.message, configurado: config });
         }
 
-        return res.json({ success: true, messageId: data.id, config });
+        return res.json({ success: true, messageId: data.id, configurado: config });
     } catch (error) {
         console.error('❌ [TEST EMAIL] Error:', error.message);
         return res.json({
             success: false,
             error: error.message,
-            config: {
-                RESEND_API_KEY: process.env.RESEND_API_KEY ? 'configurado' : 'NO'
-            }
+            configurado: config
         });
     }
 };
