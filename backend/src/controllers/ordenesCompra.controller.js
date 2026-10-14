@@ -43,6 +43,51 @@ import { pedirAutorizacionOrden } from '../services/whatsapp.service.js';
 import { programarBarridoCompras, consumoDiarioPorArticulo, stockProyectado, siguienteTicket } from '../services/barridoCompras.service.js';
 import { migrarArticuloIndividual } from '../utils/autoMigrate.js';
 
+// ── B6 · PLA-21: importes de las órdenes según el rol ────────────────────────────────────────────────────────────
+// Bandera OC_OCULTA_IMPORTES: apagada (por omisión) todos reciben los importes, como hoy. Encendida (decisión D-7):
+//   · administración y compras: todo, con el mismo JSON de hoy (fijo: son quienes editan y aprueban las órdenes);
+//   · almacén: solo en Recepción (la lista que pide esa pantalla con ?pantalla=recepcion), como hoy;
+//   · diseño, ventas, encargado, operador y cualquier rol nuevo: sin importes.
+// Lo de almacén y los demás roles se cambia sin tocar código con OC_IMPORTES_ROLES ("rol=todo|recepcion|nada",
+// separados por coma, encima de "almacen=recepcion"; un nivel que no existe se ignora). Sin importes = los montos van
+// en null y la respuesta lleva importesOcultos:true; lo demás (artículos, cantidades, proveedor, fechas) sale igual,
+// así que el PDF de la orden no cambia. No rehace los roles de Planta (E6 no está aprobada).
+const IMPORTES_SIEMPRE = new Set(['administrador', 'compras']);
+const NIVELES_IMPORTES = new Set(['todo', 'recepcion', 'nada']);
+const sinAcentos = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+export const ocultaImportesEncendida = () => String(process.env.OC_OCULTA_IMPORTES ?? '').trim() === '1';
+export const nivelImportes = (rol) => {
+  if (IMPORTES_SIEMPRE.has(rol)) return 'todo';
+  const niveles = new Map([['almacen', 'recepcion']]);
+  for (const par of String(process.env.OC_IMPORTES_ROLES ?? '').split(',')) {
+    const [r, n] = par.split('=').map(sinAcentos);
+    if (r && NIVELES_IMPORTES.has(n)) niveles.set(r, n);
+  }
+  return niveles.get(sinAcentos(rol)) || 'nada';
+};
+// ¿Esta lectura lleva importes? `pantalla` solo cuenta en la lista (Recepción la pide con ?pantalla=recepcion).
+export const veImportes = (usuario, pantalla) => {
+  if (!ocultaImportesEncendida()) return true;
+  const nivel = nivelImportes(usuario?.rol);
+  return nivel === 'todo' || (nivel === 'recepcion' && pantalla === 'recepcion');
+};
+const vaciarCampos = (obj, campos) => {
+  if (obj && typeof obj === 'object') for (const c of campos) if (c in obj) obj[c] = null;
+  return obj;
+};
+// Copia de la orden tal como saldría en el JSON, con los montos en null (no agrega campos que no venían).
+export const ordenSinImportes = (orden) => {
+  if (!orden) return orden;
+  const o = JSON.parse(JSON.stringify(orden));
+  vaciarCampos(o, ['total_estimado']);
+  for (const d of Array.isArray(o.detalles) ? o.detalles : []) {
+    vaciarCampos(d, ['costo_unitario', 'subtotal']);
+    vaciarCampos(d?.articulo, ['costo_unitario']);
+  }
+  o.importesOcultos = true;
+  return o;
+};
+
 /**
  * Crear una nueva orden de compra
  * - Diseñadores, Almacenistas, Compras y Administradores pueden crear órdenes de compra
@@ -357,16 +402,20 @@ export const listarOrdenesCompra = async (req, res) => {
       offset
     });
 
+    // B6 · PLA-21: sin importes para quien no debe verlos (con la bandera apagada, siempre `true`: el JSON de hoy)
+    const conImportes = veImportes(req.usuario, req.query.pantalla);
+
     res.status(200).json({
       success: true,
       data: {
-        ordenes,
+        ordenes: conImportes ? ordenes : ordenes.map(ordenSinImportes),
         paginacion: {
           total: count,
           pagina_actual: parseInt(page),
           total_paginas: Math.ceil(count / parseInt(limit)),
           por_pagina: parseInt(limit)
-        }
+        },
+        ...(conImportes ? {} : { importesOcultos: true })
       }
     });
 
@@ -433,9 +482,10 @@ export const obtenerOrdenCompra = async (req, res) => {
       });
     }
 
+    // B6 · PLA-21: el detalle no es Recepción (almacén lo recibe sin importes con la bandera encendida)
     res.status(200).json({
       success: true,
-      data: { orden }
+      data: veImportes(req.usuario) ? { orden } : { orden: ordenSinImportes(orden), importesOcultos: true }
     });
 
   } catch (error) {
@@ -1659,6 +1709,9 @@ export const obtenerEstadisticas = async (req, res) => {
       attributes: ['id', 'ticket_id', 'estado', 'total_estimado', 'created_at']
     });
 
+    // B6 · PLA-21: los conteos salen igual; el total del mes y los de las órdenes recientes, vacíos si no los ve
+    const conImportes = veImportes(req.usuario);
+
     res.status(200).json({
       success: true,
       data: {
@@ -1666,10 +1719,11 @@ export const obtenerEstadisticas = async (req, res) => {
           solicitudesPendientes,
           ordenesBorrador,
           ordenesEnviadas,
-          totalEstimadoMes
+          totalEstimadoMes: conImportes ? totalEstimadoMes : null
         },
         distribucionPrioridad,
-        ordenesRecientes
+        ordenesRecientes: conImportes ? ordenesRecientes : ordenesRecientes.map(ordenSinImportes),
+        ...(conImportes ? {} : { importesOcultos: true })
       }
     });
   } catch (error) {
@@ -1888,22 +1942,32 @@ export const obtenerHistorialTrazabilidad = async (req, res) => {
       })) || []
     };
 
+    // B6 · PLA-21: la trazabilidad es la otra pestaña del mismo detalle; sin importes para quien no los ve
+    const conImportes = veImportes(req.usuario);
+    if (!conImportes) {
+      for (const ev of timeline) {
+        if (ev.datos && 'total_estimado' in ev.datos) ev.datos = { ...ev.datos, total_estimado: null };
+      }
+      arbolDependencias.orden.total_estimado = null;
+    }
+    const ordenHistorial = {
+      id: orden.id,
+      ticket_id: orden.ticket_id,
+      estado: orden.estado,
+      total_estimado: orden.total_estimado,
+      observaciones: orden.observaciones,
+      fecha_envio: orden.fecha_envio,
+      fecha_recepcion: orden.fecha_recepcion,
+      created_at: orden.created_at,
+      creador: orden.creador,
+      proveedor: orden.proveedor,
+      detalles: orden.detalles
+    };
+
     res.status(200).json({
       success: true,
       data: {
-        orden: {
-          id: orden.id,
-          ticket_id: orden.ticket_id,
-          estado: orden.estado,
-          total_estimado: orden.total_estimado,
-          observaciones: orden.observaciones,
-          fecha_envio: orden.fecha_envio,
-          fecha_recepcion: orden.fecha_recepcion,
-          created_at: orden.created_at,
-          creador: orden.creador,
-          proveedor: orden.proveedor,
-          detalles: orden.detalles
-        },
+        orden: conImportes ? ordenHistorial : ordenSinImportes(ordenHistorial),
         timeline,
         arbolDependencias,
         estadisticas: {
@@ -1915,7 +1979,8 @@ export const obtenerHistorialTrazabilidad = async (req, res) => {
             ...orden.solicitudes_origen?.map(s => s.solicitante.id) || [],
             ...Array.from(pedidosUnicos.values()).map(p => p.usuario.id)
           ])].length
-        }
+        },
+        ...(conImportes ? {} : { importesOcultos: true })
       }
     });
 

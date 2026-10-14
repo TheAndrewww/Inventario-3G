@@ -16,6 +16,11 @@ import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import { cx, etq, g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
 
+// B6 · PLA-21: con OC_OCULTA_IMPORTES el servidor manda los importes vacíos (importesOcultos) a quien no debe verlos;
+// la pantalla muestra «—». Sin la bandera, o para administración y compras, se ve lo de siempre.
+const SIN_IMPORTE = '—';
+const totalOrden = (orden) => (orden?.importesOcultos ? SIN_IMPORTE : `$${parseFloat(orden?.total_estimado || 0).toFixed(2)}`);
+
 // La misma pantalla sirve dos sub-pestañas del menú Compras:
 // /ordenes-compra (vista="ordenes") y /solicitudes-compra (vista="solicitudes")
 const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
@@ -196,7 +201,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
       const o = ordenes.find(x => x.id === ordenId) || (ordenSeleccionada?.id === ordenId ? ordenSeleccionada : null);
       if (!(await confirmarG3({
         titulo: '¿Enviar esta orden al proveedor?',
-        datos: o ? [['Orden', o.ticket_id], ['Proveedor', o.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', `$${parseFloat(o.total_estimado || 0).toFixed(2)}`]] : [],
+        datos: o ? [['Orden', o.ticket_id], ['Proveedor', o.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', totalOrden(o)]] : [],
         confirmar: 'Enviar orden', cancelar: 'Regresar',
       }))) return;
     } else if (!window.confirm('¿Está seguro de enviar esta orden al proveedor?')) return;
@@ -759,7 +764,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     if (g3Activo()) {
       if (!(await confirmarG3({
         titulo: `¿Aprobar la orden ${orden.ticket_id}?`,
-        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', `$${parseFloat(orden.total_estimado || 0).toFixed(2)}`]],
+        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', totalOrden(orden)]],
         confirmar: 'Aprobar orden', cancelar: 'Regresar',
       }))) return;
     } else if (!confirm(`¿Aprobar la orden ${orden.ticket_id}?`)) return;
@@ -810,7 +815,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
       if (!(await confirmarG3({
         titulo: `¿Eliminar permanentemente la orden ${orden.ticket_id}?`,
         aviso: 'Esta acción no se puede deshacer.',
-        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', `$${parseFloat(orden.total_estimado || 0).toFixed(2)}`]],
+        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', totalOrden(orden)]],
         confirmar: 'Eliminar orden', cancelar: 'No eliminar', peligro: true,
       }))) return;
     } else if (!confirm(`¿Eliminar permanentemente la orden ${orden.ticket_id}? Esta acción no se puede deshacer.`)) return;
@@ -922,7 +927,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
             <span className="g3-kpi-texto">Esperando entrega</span>
           </div>
           <div className="g3-kpi g3p-kpi-dinero">
-            <span className="g3-kpi-valor">${parseFloat(estadisticas.resumen.totalEstimadoMes).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span className="g3-kpi-valor">{estadisticas.importesOcultos ? SIN_IMPORTE : `$${parseFloat(estadisticas.resumen.totalEstimadoMes).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
             <span className="g3-kpi-texto">Total del mes · {new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })}</span>
           </div>
         </div>
@@ -986,7 +991,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Total del Mes</p>
                 <p className="text-3xl font-bold text-gray-900">
-                  ${parseFloat(estadisticas.resumen.totalEstimadoMes).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {estadisticas.importesOcultos ? SIN_IMPORTE : `$${parseFloat(estadisticas.resumen.totalEstimadoMes).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })}
@@ -1127,7 +1132,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Total estimado')}>
                           <div className="text-sm font-semibold text-gray-900">
-                            ${parseFloat(orden.total_estimado || 0).toFixed(2)}
+                            {totalOrden(orden)}
                           </div>
                         </td>
                         <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-estado')}>
@@ -2497,7 +2502,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
             </div>
             <div>
               <p className="text-sm text-gray-500">Total Estimado</p>
-              <p className="font-medium">${parseFloat(orden.total_estimado || 0).toFixed(2)}</p>
+              <p className="font-medium">{totalOrden(orden)}</p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Proveedor</p>
@@ -2578,10 +2583,10 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                         {parseFloat(detalle.cantidad_solicitada).toFixed(2)} {detalle.articulo?.unidad}
                       </td>
                       <td className="px-4 py-2 text-sm">
-                        ${parseFloat(detalle.costo_unitario || 0).toFixed(2)}
+                        {orden.importesOcultos ? SIN_IMPORTE : `$${parseFloat(detalle.costo_unitario || 0).toFixed(2)}`}
                       </td>
                       <td className="px-4 py-2 text-sm font-medium">
-                        ${parseFloat(detalle.subtotal || 0).toFixed(2)}
+                        {orden.importesOcultos ? SIN_IMPORTE : `$${parseFloat(detalle.subtotal || 0).toFixed(2)}`}
                       </td>
                     </tr>
                   ))}
