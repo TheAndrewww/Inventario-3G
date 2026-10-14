@@ -47,6 +47,14 @@ const LoginPage = () => {
       // El useEffect se encargará de la navegación
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
+      // Límite de intentos (A10): el servidor responde 429 con los minutos que faltan
+      if (error?.codigo === 'DEMASIADOS_INTENTOS') {
+        const minutos = Math.max(1, Number(error.minutos) || 1);
+        const espera = `Demasiados intentos. Espera ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}.`;
+        setError(espera);
+        toast.error(espera);
+        return;
+      }
       setError(error.message || 'Credenciales incorrectas');
       toast.error('Error al iniciar sesión');
     } finally {

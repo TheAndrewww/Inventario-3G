@@ -25,6 +25,11 @@ if (process.env.NODE_ENV !== 'production') {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// La pantalla llama directo a Railway, que pone un proxy delante (A10 · PLA-02):
+// confiar en ese único salto hace que req.ip sea la del cliente y no la del
+// proxy. Sin esto, el límite de intentos al entrar contaría a todos como uno.
+app.set('trust proxy', 1);
+
 // Middlewares
 
 // Lista de orígenes permitidos
