@@ -15,6 +15,7 @@ import { crearNotificacion } from '../controllers/notificaciones.controller.js';
 import { getNombresProyectosAbiertos, pedidoEsDeProyectoAbierto, mismosProyectos } from '../controllers/pedidos.controller.js';
 import { enviarEmailEstadoOrden } from '../services/email.service.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
+import { ventanaAvisos, dentroDeHorario } from '../utils/horarioAvisos.js';
 
 const router = express.Router();
 
@@ -113,16 +114,37 @@ router.use(verificarPuente);
 /**
  * GET /api/avisos-whatsapp/pendientes
  * Avisos que faltan por publicar, del más viejo al más nuevo.
+ *
+ * D7 · PLA-18 (HORARIO_AVISOS, apagada por omisión = como hoy): fuera de horario (D-11: lunes a sábado de 8:00 a
+ * 21:00) solo se entregan los avisos `urgente`; los demás esperan en la cola y salen al abrir, en el mismo orden.
+ * Un aviso de autorización que quedó reemplazado (A9) antes de salir se descarta: ya no se publica.
+ * Lo que recibe Julia no cambia de forma.
  */
+const descartarReemplazados = async () => {
+    const [n] = await AvisoWhatsApp.update(
+        { estado: 'descartado', error: 'Reemplazado por un aviso más nuevo de la misma orden antes de salir (no se publica)' },
+        { where: { estado: 'pendiente', reemplazado_por_id: { [Op.ne]: null } } }
+    );
+    if (n) console.log(`[horario-avisos] ${n} aviso(s) reemplazado(s) descartado(s) antes de salir`);
+};
+
 router.get('/pendientes', async (req, res) => {
     try {
         const limite = Math.min(parseInt(req.query.limit) || 20, 50);
 
+        const where = {
+            estado: 'pendiente',
+            intentos: { [Op.lt]: 5 } // tras 5 intentos fallidos deja de reintentarse
+        };
+        const ventana = ventanaAvisos();
+        if (ventana) {
+            await descartarReemplazados();
+            where.reemplazado_por_id = null;
+            if (!dentroDeHorario(new Date(), ventana)) where.urgente = true;
+        }
+
         const avisos = await AvisoWhatsApp.findAll({
-            where: {
-                estado: 'pendiente',
-                intentos: { [Op.lt]: 5 } // tras 5 intentos fallidos deja de reintentarse
-            },
+            where,
             order: [['id', 'ASC']], // el id autoincremental ya da el orden cronológico
             limit: limite,
             attributes: ['id', 'destino', 'mensaje', 'intentos', 'tipo', 'referencia_id']

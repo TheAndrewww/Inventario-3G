@@ -452,6 +452,19 @@ app.get('/api/admin/ensayo-cierre-obras', verificarToken, esAdministrador, async
     }
 });
 
+// ===== Ensayo de la cancelación programada de órdenes (D6 · PLA-18) =====
+// Solo lectura y solo administración: qué cancelaría y a cuáles avisaría hoy la tarea de las 8:15 con
+// CANCELACION_PROGRAMADA, y si la regla de siempre (al abrir la lista) funciona en esta base. No escribe nada.
+app.get('/api/admin/ensayo-cancelacion-ordenes', verificarToken, esAdministrador, async (req, res) => {
+    try {
+        const { ensayoCancelacionProgramada } = await import('./src/controllers/ordenesCompra.controller.js');
+        res.json({ success: true, data: await ensayoCancelacionProgramada() });
+    } catch (error) {
+        console.error('Error en el ensayo de la cancelación programada:', error);
+        res.status(500).json({ success: false, message: 'Error al armar el ensayo de la cancelación programada' });
+    }
+});
+
 // Manejo de errores
 app.use((err, req, res, next) => {
     console.error(err.stack);
@@ -1250,6 +1263,8 @@ const startServer = async () => {
             await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS referencia_id INTEGER");
             // A9 · PLA-06: el aviso de autorización que reemplazó a este (la orden se editó y se volvió a pedir)
             await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS reemplazado_por_id INTEGER");
+            // D7 · PLA-18: los avisos que pasan de noche y en domingo con HORARIO_AVISOS (AVISOS_URGENTES vacía = ninguno)
+            await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS urgente BOOLEAN NOT NULL DEFAULT FALSE");
             console.log('✅ Tabla avisos_whatsapp verificada');
         } catch (avisosErr) {
             console.error('⚠️ Error verificando tabla avisos_whatsapp:', avisosErr.message);
@@ -1276,6 +1291,11 @@ const startServer = async () => {
             );
             await sequelize.query(
                 "ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS cierre_incompleto JSONB"
+            );
+            // D6 · PLA-18: cuándo se avisó en Compras que la orden se cancela al día siguiente (CANCELACION_PROGRAMADA).
+            // No está en el modelo: solo la lee y la escribe la tarea programada, así el JSON de las órdenes no cambia.
+            await sequelize.query(
+                "ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS cancelacion_avisada_at TIMESTAMP WITH TIME ZONE"
             );
             console.log('✅ Columnas de ventana de conteo verificadas en ordenes_compra');
         } catch (conteoErr) {

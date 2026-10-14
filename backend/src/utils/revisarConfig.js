@@ -133,6 +133,9 @@ export const banderasPlanta = async () => {
     const { configTerminal } = await import('../middleware/codigoTerminal.middleware.js');
     const { cierreRespetaEntregado } = await import('../services/pedidosCleanup.service.js');
     const { modoSinHoraEsLimite } = await import('../services/fechaInstalacion.service.js');
+    const { ventanaAvisos, avisosUrgentes } = await import('./horarioAvisos.js');
+    const { modoCorreoOrdenes } = await import('../services/email.service.js');
+    const { cancelacionProgramadaEncendida } = await import('../controllers/ordenesCompra.controller.js');
     const terminal = Object.fromEntries(configTerminal().banderas.map((b) => [b.nombre, b.encendida]));
     return [
         { nombre: 'FALLA_CERRADA', encendida: fallaCerradaEncendida() },
@@ -143,7 +146,12 @@ export const banderasPlanta = async () => {
         { nombre: 'CIERRE_OBRA_RESPETA_ENTREGADO', encendida: cierreRespetaEntregado() },
         { nombre: 'OC_CORREO_PIDE_SESION', encendida: valor('OC_CORREO_PIDE_SESION') === '1' },
         { nombre: 'OC_OCULTA_IMPORTES', encendida: valor('OC_OCULTA_IMPORTES') === '1' },
-        { nombre: 'SIN_HORA_ES_LIMITE', encendida: modoSinHoraEsLimite() === 'exigir' }
+        { nombre: 'SIN_HORA_ES_LIMITE', encendida: modoSinHoraEsLimite() === 'exigir' },
+        // PLA-18 (D6, D7). OC_CORREO_MODO: «encendida» = ya no es «aprobar» (resumen o apagado).
+        { nombre: 'HORARIO_AVISOS', encendida: !!ventanaAvisos() },
+        { nombre: 'AVISOS_URGENTES', encendida: avisosUrgentes().length > 0 },
+        { nombre: 'OC_CORREO_MODO', encendida: modoCorreoOrdenes() !== 'aprobar' },
+        { nombre: 'CANCELACION_PROGRAMADA', encendida: cancelacionProgramadaEncendida() }
     ];
 };
 

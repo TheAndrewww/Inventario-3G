@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'crypto';
 import { generarPDFOrdenCompra } from '../utils/ordenCompraPDF.js';
-import { Usuario } from '../models/index.js';
+import { Usuario, OrdenCompra, Proveedor } from '../models/index.js';
 
 // Inicializar Resend
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -227,10 +227,34 @@ const generarEmailAprobacion = (orden, tokenAprobar, frontendUrl) => {
 };
 
 /**
+ * Correo de órdenes por autorizar (D6 · PLA-18, decisión N4). OC_CORREO_MODO:
+ *   - `aprobar` (por omisión, = hoy con A9): un correo por orden con «Aprobar» y «Rechazar»;
+ *   - `resumen` (recomendado): ya no sale un correo por orden; a las 8:00 de lunes a sábado sale UNO con la lista de
+ *     órdenes por autorizar y la liga a cada una en Planta, sin botón (se autoriza en Planta o con la palomita);
+ *   - `apagado`: ni uno ni otro.
+ * Un valor que no se entiende se queda en `aprobar`. Las ligas de correos que ya salieron siguen valiendo.
+ */
+const MODOS_CORREO = new Set(['aprobar', 'resumen', 'apagado']);
+let avisoModoCorreo = '';
+export const modoCorreoOrdenes = () => {
+    const v = String(process.env.OC_CORREO_MODO ?? '').trim().toLowerCase();
+    if (!v) return 'aprobar';
+    if (MODOS_CORREO.has(v)) return v;
+    if (avisoModoCorreo !== v) { avisoModoCorreo = v; console.warn('⚠️ OC_CORREO_MODO no se entiende: se queda en «aprobar»'); }
+    return 'aprobar';
+};
+
+/**
  * Enviar email de aprobación de orden usando Resend
  */
 export const enviarEmailAprobacion = async (orden) => {
     try {
+        // D6 · PLA-18: con OC_CORREO_MODO=resumen la orden va en el resumen de las 8:00; con «apagado», en ninguno.
+        const modo = modoCorreoOrdenes();
+        if (modo !== 'aprobar') {
+            console.log(`📧 [correo-oc] OC_CORREO_MODO=${modo}: no sale el correo de la orden ${orden?.ticket_id}${modo === 'resumen' ? ' (va en el resumen de las 8:00)' : ''}`);
+            return false;
+        }
         console.log('📧 [RESEND] Iniciando envío de email de aprobación para orden:', orden?.ticket_id);
         // A15 · PLA-08: el registro solo dice si está configurada, nunca una parte de la llave.
         console.log('📧 [RESEND] RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'configurado' : 'NO configurado');
@@ -267,6 +291,86 @@ export const enviarEmailAprobacion = async (orden) => {
         console.error('❌ [RESEND] Error al enviar email de aprobación:', error.message);
         console.error('❌ [RESEND] Stack:', error.stack);
         return false;
+    }
+};
+
+const escH = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const pesosMX = (v) => `$${(Number.parseFloat(v) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fechaCortaMX = (d) => new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', day: 'numeric', month: 'short' }).format(d);
+
+/** HTML del resumen diario (sin botones: cada orden liga a su detalle en Planta). */
+export const generarEmailResumen = (ordenes, { seCancelanHoy = [], fecha = new Date() } = {}) => {
+    const planta = (process.env.FRONTEND_URL || 'https://inventario-3-g.vercel.app').replace(/\/$/, '');
+    const cancelan = new Set(seCancelanHoy);
+    const total = ordenes.reduce((s, o) => s + (Number.parseFloat(o.total_estimado) || 0), 0);
+    const renglones = ordenes.map(o => `
+                <tr>
+                    <td style="padding:12px 8px 12px 0;border-bottom:1px solid #e5e7eb;vertical-align:top;">
+                        <a href="${escH(planta)}/ordenes-compra?orden=${encodeURIComponent(o.ticket_id)}" style="color:#1d4ed8;font-weight:700;text-decoration:none;">${escH(o.ticket_id)}</a>
+                        <div style="font-size:13px;color:#6b7280;margin-top:2px;">${escH(o.proveedor?.nombre || 'Sin proveedor')} · la pidió ${escH(o.creador?.nombre || '—')} · ${escH(fechaCortaMX(new Date(o.created_at)))}</div>
+                        ${cancelan.has(o.ticket_id) ? '<div style="font-size:13px;color:#b91c1c;font-weight:600;margin-top:4px;">Se cancela hoy a las 8:15 si nadie la autoriza</div>' : ''}
+                    </td>
+                    <td style="padding:12px 0 12px 8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;font-weight:600;color:#111827;vertical-align:top;">${pesosMX(o.total_estimado)}</td>
+                </tr>`).join('');
+    return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+    <div style="max-width:600px;margin:0 auto;padding:20px;">
+        <div style="background:#ffffff;border-radius:16px;padding:28px 24px;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
+            <p style="margin:0 0 4px;font-size:13px;color:#6b7280;text-transform:uppercase;font-weight:600;">Planta · Compras · ${escH(new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', weekday: 'long', day: 'numeric', month: 'long' }).format(fecha))}</p>
+            <h1 style="margin:0 0 8px;font-size:22px;color:#111827;">Órdenes de compra por autorizar: ${ordenes.length}</h1>
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.5;">Se autorizan en Planta (Compras › Órdenes de compra) o con la palomita en el grupo Compras. Cada folio abre su orden.</p>
+            <table style="width:100%;border-collapse:collapse;font-size:15px;">
+                <tbody>${renglones}</tbody>
+                <tfoot><tr><td style="padding:12px 8px 0 0;font-weight:700;color:#374151;">Total</td><td style="padding:12px 0 0 8px;text-align:right;font-weight:700;color:#111827;">${pesosMX(total)}</td></tr></tfoot>
+            </table>
+            <p style="margin:24px 0 0;font-size:12px;color:#6b7280;line-height:1.5;">Este resumen sale de lunes a sábado a las 8:00 y solo si hay órdenes por autorizar. Ya no sale un correo por cada orden.</p>
+        </div>
+        <p style="text-align:center;font-size:12px;color:#9ca3af;margin:16px 0 0;">3G Arquitectura Textil — Sistema de Inventario</p>
+    </div>
+</body>
+</html>`;
+};
+
+/**
+ * Resumen diario de órdenes por autorizar (OC_CORREO_MODO=resumen; lo llama la tarea de las 8:00 de cronJobs.js).
+ * No sale si no hay órdenes. Un solo correo a Dirección (no lleva ligas firmadas).
+ * @param {{ seCancelanHoy?: string[] }} opciones - folios que la tarea de las 8:15 cancelaría hoy
+ */
+export const enviarResumenOrdenesPorAutorizar = async ({ seCancelanHoy = [] } = {}) => {
+    try {
+        const ordenes = await OrdenCompra.findAll({
+            where: { estado: 'pendiente_aprobacion' },
+            include: [
+                { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'], required: false },
+                { model: Usuario, as: 'creador', attributes: ['id', 'nombre'], required: false }
+            ],
+            order: [['created_at', 'ASC'], ['id', 'ASC']]
+        });
+        if (!ordenes.length) {
+            console.log('📧 [correo-oc] Resumen de las 8:00: no hay órdenes por autorizar, no sale correo');
+            return { enviado: false, ordenes: 0 };
+        }
+        if (!resend) {
+            console.log('⚠️ RESEND_API_KEY no configurado, no se puede enviar el resumen');
+            return { enviado: false, ordenes: ordenes.length };
+        }
+        const { error } = await resend.emails.send({
+            from: '3G Inventario <notificaciones@3gvelarias.com>',
+            to: ADMIN_EMAILS,
+            subject: `🔔 ${ordenes.length} ${ordenes.length === 1 ? 'orden' : 'órdenes'} de compra por autorizar`,
+            html: generarEmailResumen(ordenes, { seCancelanHoy })
+        });
+        if (error) {
+            console.error('❌ [correo-oc] Error al enviar el resumen:', error.message || error);
+            return { enviado: false, ordenes: ordenes.length };
+        }
+        console.log(`📧 [correo-oc] Resumen de las 8:00 enviado: ${ordenes.length} orden(es) por autorizar`);
+        return { enviado: true, ordenes: ordenes.length };
+    } catch (error) {
+        console.error('❌ [correo-oc] Error al armar el resumen:', error.message);
+        return { enviado: false, ordenes: 0 };
     }
 };
 
@@ -619,6 +723,8 @@ export const enviarEmailOrdenCancelada = async (orden, motivo, canceladoPor, rol
 
 export default {
     enviarEmailAprobacion,
+    enviarResumenOrdenesPorAutorizar,
+    modoCorreoOrdenes,
     enviarEmailEstadoOrden,
     enviarEmailOrdenCancelada,
     generarTokenAprobacion,

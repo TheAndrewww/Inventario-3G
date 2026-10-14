@@ -233,9 +233,51 @@ export const barridoComprasDiario = () => {
   console.log('⏰ Cron job iniciado: Barrido de compras (8:30 AM lun-sáb)');
 };
 
+/**
+ * D6 · PLA-18 · Resumen de órdenes por autorizar a las 8:00, lunes a sábado. Solo sale con OC_CORREO_MODO=resumen
+ * (por omisión «aprobar»: un correo por orden, como hoy) y solo si hay órdenes por autorizar.
+ */
+export const resumenCorreoOrdenes = () => {
+  cron.schedule('0 8 * * 1-6', async () => {
+    try {
+      const { modoCorreoOrdenes, enviarResumenOrdenesPorAutorizar } = await import('../services/email.service.js');
+      if (modoCorreoOrdenes() !== 'resumen') return;
+      const { cancelacionProgramadaEncendida, cancelacionProgramadaOrdenes, siguienteCorridaCancelacion } = await import('../controllers/ordenesCompra.controller.js');
+      // Las que la tarea de las 8:15 cancelaría hoy (ensayo con la hora de esa corrida), para marcarlas en el resumen.
+      const plan = cancelacionProgramadaEncendida()
+        ? await cancelacionProgramadaOrdenes({ ensayo: true, ahora: siguienteCorridaCancelacion(new Date()) || new Date() })
+        : null;
+      await enviarResumenOrdenesPorAutorizar({ seCancelanHoy: (plan?.seCancelan || []).map(o => o.folio) });
+    } catch (error) {
+      console.error('❌ Error en el resumen de órdenes por autorizar:', error.message);
+    }
+  }, { timezone: 'America/Mexico_City' });
+  console.log('⏰ Cron job iniciado: Resumen de órdenes por autorizar (8:00 lun-sáb, con OC_CORREO_MODO=resumen)');
+};
+
+/**
+ * D6 · PLA-18 · Cancelación programada de las órdenes viejas a las 8:15, lunes a sábado. Solo con
+ * CANCELACION_PROGRAMADA (por omisión apagada: la regla corre al abrir las listas, como hoy). Avisa en Compras un día
+ * antes y solo cancela lo ya avisado (ver cancelacionProgramadaOrdenes en ordenesCompra.controller.js).
+ */
+export const cancelacionProgramadaDiaria = () => {
+  cron.schedule('15 8 * * 1-6', async () => {
+    try {
+      const { cancelacionProgramadaEncendida, cancelacionProgramadaOrdenes } = await import('../controllers/ordenesCompra.controller.js');
+      if (!cancelacionProgramadaEncendida()) return;
+      await cancelacionProgramadaOrdenes();
+    } catch (error) {
+      console.error('❌ Error en la cancelación programada de órdenes:', error.message);
+    }
+  }, { timezone: 'America/Mexico_City' });
+  console.log('⏰ Cron job iniciado: Cancelación programada de órdenes viejas (8:15 lun-sáb, con CANCELACION_PROGRAMADA)');
+};
+
 export const iniciarCronJobs = () => {
   verificarOrdenesVencidas();
   barridoComprasDiario();
+  resumenCorreoOrdenes();
+  cancelacionProgramadaDiaria();
   cerrarVentanasDeConteo();
   reportarConteosCiclicosSemana();
   iniciarJobAnuncios();

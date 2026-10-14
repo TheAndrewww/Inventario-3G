@@ -16,6 +16,7 @@ import {
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { notificarPorRol, crearNotificacion } from './notificaciones.controller.js';
+import { isoMexico } from '../utils/revisarConfig.js';
 
 /**
  * Costo con el que se valúa una partida de la orden.
@@ -348,7 +349,8 @@ export const crearOrdenCompra = async (req, res) => {
 export const listarOrdenesCompra = async (req, res) => {
   try {
     // Ejecutar limpieza de órdenes viejas antes de listar
-    await anularOrdenesViejas();
+    // D6 · PLA-18: con CANCELACION_PROGRAMADA la limpieza ya no corre al abrir la lista (corre a las 8:15, con aviso).
+    if (!cancelacionProgramadaEncendida()) await anularOrdenesViejas();
 
     const {
       estado,
@@ -629,6 +631,52 @@ export const cancelarSolicitudesPorOrdenCreada = async (articulos_ids, orden_com
 };
 
 /**
+ * Anula UNA orden por antigüedad y regresa sus solicitudes a pendiente. Lo usan la regla de siempre (al abrir la lista)
+ * y la cancelación programada (D6 · PLA-18): mismo texto, mismas solicitudes revertidas.
+ * @returns {Promise<boolean>} true si se anuló
+ */
+const anularOrdenPorAntiguedad = async (orden, diasTranscurridos) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    // Anular la orden
+    await orden.update({
+      estado: 'cancelada',
+      observaciones: `${orden.observaciones || ''}\n\n[Anulada automáticamente] Orden con más de 3 días (${diasTranscurridos} días) sin aprobación. Las solicitudes fueron revertidas a pendiente.`.trim()
+    }, { transaction });
+
+    // Revertir solicitudes asociadas a pendiente
+    if (orden.solicitudes_origen && orden.solicitudes_origen.length > 0) {
+      await SolicitudCompra.update(
+        {
+          estado: 'pendiente',
+          orden_compra_id: null,
+          observaciones: `[Revertida automáticamente] La orden ${orden.ticket_id} fue anulada por antigüedad (${diasTranscurridos} días sin aprobación).`
+        },
+        {
+          where: {
+            orden_compra_id: orden.id,
+            estado: { [Op.in]: ['en_orden', 'cancelada'] }
+          },
+          transaction
+        }
+      );
+
+      console.log(`   ✅ Orden ${orden.ticket_id} anulada (${diasTranscurridos} días) - ${orden.solicitudes_origen.length} solicitud(es) revertida(s)`);
+    } else {
+      console.log(`   ✅ Orden ${orden.ticket_id} anulada (${diasTranscurridos} días) - sin solicitudes asociadas`);
+    }
+
+    await transaction.commit();
+    return true;
+  } catch (error) {
+    await transaction.rollback();
+    console.error(`   ❌ Error al anular orden ${orden.ticket_id}:`, error.message);
+    return false;
+  }
+};
+
+/**
  * Función auxiliar: Anular órdenes viejas (más de 3 días) en estado pendiente_aprobacion o rechazada
  * Revierte los artículos a solicitudes pendientes automáticamente
  */
@@ -674,45 +722,8 @@ export const anularOrdenesViejas = async () => {
     let anuladas = 0;
 
     for (const orden of ordenesViejas) {
-      const transaction = await sequelize.transaction();
-
-      try {
-        const diasTranscurridos = Math.floor((new Date() - new Date(orden.fecha_creacion)) / (1000 * 60 * 60 * 24));
-
-        // Anular la orden
-        await orden.update({
-          estado: 'cancelada',
-          observaciones: `${orden.observaciones || ''}\n\n[Anulada automáticamente] Orden con más de 3 días (${diasTranscurridos} días) sin aprobación. Las solicitudes fueron revertidas a pendiente.`.trim()
-        }, { transaction });
-
-        // Revertir solicitudes asociadas a pendiente
-        if (orden.solicitudes_origen && orden.solicitudes_origen.length > 0) {
-          await SolicitudCompra.update(
-            {
-              estado: 'pendiente',
-              orden_compra_id: null,
-              observaciones: `[Revertida automáticamente] La orden ${orden.ticket_id} fue anulada por antigüedad (${diasTranscurridos} días sin aprobación).`
-            },
-            {
-              where: {
-                orden_compra_id: orden.id,
-                estado: { [Op.in]: ['en_orden', 'cancelada'] }
-              },
-              transaction
-            }
-          );
-
-          console.log(`   ✅ Orden ${orden.ticket_id} anulada (${diasTranscurridos} días) - ${orden.solicitudes_origen.length} solicitud(es) revertida(s)`);
-        } else {
-          console.log(`   ✅ Orden ${orden.ticket_id} anulada (${diasTranscurridos} días) - sin solicitudes asociadas`);
-        }
-
-        await transaction.commit();
-        anuladas++;
-      } catch (error) {
-        await transaction.rollback();
-        console.error(`   ❌ Error al anular orden ${orden.ticket_id}:`, error.message);
-      }
+      const diasTranscurridos = Math.floor((new Date() - new Date(orden.fecha_creacion)) / (1000 * 60 * 60 * 24));
+      if (await anularOrdenPorAntiguedad(orden, diasTranscurridos)) anuladas++;
     }
 
     if (anuladas > 0) {
@@ -724,6 +735,148 @@ export const anularOrdenesViejas = async () => {
     console.error('❌ [anularOrdenesViejas] Error:', error.message);
     return 0;
   }
+};
+
+// ── D6 · PLA-18: cancelación programada de las órdenes viejas ────────────────────────────────────────────────────
+// Bandera CANCELACION_PROGRAMADA (apagada por omisión = como hoy: anularOrdenesViejas() corre al abrir la lista de
+// órdenes y la de solicitudes). Encendida: las listas ya no cancelan nada y la regla corre en una tarea a las 8:15 de
+// lunes a sábado (cronJobs.js). La regla es la misma: pendiente de aprobación o rechazada con más de 3 días. Lo que
+// cambia es que nadie se entera tarde: un día antes se avisa en el grupo Compras (WhatsApp, por la cola de siempre) y
+// una orden solo se cancela si ya se avisó en una corrida anterior (así ni la primera corrida cancela sin aviso).
+// La regla usa la fecha de alta de la orden (created_at). OJO: la de siempre pregunta por `fecha_creacion`, una
+// columna que el modelo no tiene; en una base sin esa columna la consulta falla y hoy no cancela nada (ver el ensayo).
+export const ESTADOS_CANCELABLES = ['pendiente_aprobacion', 'rechazada'];
+const DIAS_CANCELACION = 3;
+const DIA_MS = 24 * 60 * 60 * 1000;
+const HORA_CANCELACION = { h: 8, m: 15 }; // la misma de cronJobs.js (cancelacionProgramadaDiaria)
+export const cancelacionProgramadaEncendida = () =>
+  ['1', 'true', 'si', 'sí', 'on'].includes(String(process.env.CANCELACION_PROGRAMADA ?? '').trim().toLowerCase());
+
+const fechaMX = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(d);
+const fechaLargaMX = (d) => new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', day: 'numeric', month: 'long' }).format(d);
+
+/** La siguiente corrida de la tarea (8:15 de México, lunes a sábado) después de `ahora`. */
+export const siguienteCorridaCancelacion = (ahora = new Date()) => {
+  for (let i = 0; i <= 8; i++) {
+    const dia = fechaMX(new Date(ahora.getTime() + i * DIA_MS));
+    // México no tiene horario de verano desde 2022: UTC-6 todo el año.
+    const t = new Date(`${dia}T${String(HORA_CANCELACION.h).padStart(2, '0')}:${String(HORA_CANCELACION.m).padStart(2, '0')}:00-06:00`);
+    if (t > ahora && t.getUTCDay() !== 0) return t;
+  }
+  return null;
+};
+
+const fichaOrden = (o, ahora) => ({
+  folio: o.ticket_id,
+  estado: o.estado,
+  proveedor: o.proveedor?.nombre || null,
+  creada: o.created_at ? isoMexico(new Date(o.created_at)) : null,
+  dias: o.created_at ? Math.floor((ahora - new Date(o.created_at)) / DIA_MS) : null,
+  avisada: o.cancelacion_avisada_at ? isoMexico(new Date(o.cancelacion_avisada_at)) : null
+});
+
+/**
+ * La tarea de las 8:15. Con `ensayo` no escribe nada: dice qué cancelaría y a cuáles avisaría ahora (para revisarlo
+ * contra datos reales antes de encender la bandera).
+ * @returns {{ ensayo, ahora, siguienteCorrida, seCancelan: [], seAvisan: [], esperan: [], aviso: string|null }}
+ */
+export const cancelacionProgramadaOrdenes = async ({ ensayo = false, ahora = new Date() } = {}) => {
+  const limite = new Date(ahora.getTime() - DIAS_CANCELACION * DIA_MS);
+  const siguiente = siguienteCorridaCancelacion(ahora);
+  const limiteManana = siguiente ? new Date(siguiente.getTime() - DIAS_CANCELACION * DIA_MS) : limite;
+
+  const ordenes = await OrdenCompra.findAll({
+    where: { estado: { [Op.in]: ESTADOS_CANCELABLES }, created_at: { [Op.lt]: limiteManana } },
+    include: [
+      { model: SolicitudCompra, as: 'solicitudes_origen', attributes: ['id', 'ticket_id', 'articulo_id', 'cantidad_solicitada'] },
+      { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'], required: false }
+    ],
+    order: [['created_at', 'ASC'], ['id', 'ASC']]
+  });
+  // La marca del aviso vive en una columna que no está en el modelo (el JSON de las órdenes no cambia).
+  const avisadas = new Map();
+  if (ordenes.length) {
+    const [filas] = await sequelize.query(
+      'SELECT id, cancelacion_avisada_at FROM ordenes_compra WHERE id IN (:ids)',
+      { replacements: { ids: ordenes.map((o) => o.id) } }
+    );
+    for (const f of filas) if (f.cancelacion_avisada_at) avisadas.set(f.id, new Date(f.cancelacion_avisada_at));
+  }
+  for (const o of ordenes) o.cancelacion_avisada_at = avisadas.get(o.id) || null;
+
+  const seCancelan = []; const seAvisan = []; const esperan = [];
+  for (const o of ordenes) {
+    const vencida = new Date(o.created_at) < limite;
+    // El aviso vale si la orden no se movió después (si se editó o se volvió a pedir, se avisa otra vez).
+    const marca = avisadas.get(o.id);
+    const avisada = marca && !(o.updated_at && new Date(o.updated_at) > marca) ? marca : null;
+    // Se cancela solo si ya se avisó en una corrida anterior (al menos 12 h antes).
+    if (vencida && avisada && ahora - avisada >= 12 * 60 * 60 * 1000) seCancelan.push(o);
+    else if (!avisada) seAvisan.push(o);
+    else esperan.push(o);
+  }
+
+  const manana = siguiente && fechaMX(siguiente) === fechaMX(new Date(ahora.getTime() + DIA_MS));
+  const hoy = siguiente && fechaMX(siguiente) === fechaMX(ahora); // solo si se corre a mano antes de las 8:15
+  const cuando = !siguiente ? 'En la siguiente corrida' : hoy ? 'Hoy' : manana ? 'Mañana' : `El ${new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', weekday: 'long' }).format(siguiente)}`;
+  const aviso = seAvisan.length ? [
+    `⏰ *Órdenes de compra que se cancelan ${cuando.toLowerCase()}*`,
+    `${cuando} a las 8:15 se cancelan solas si nadie las autoriza, y su material regresa a Solicitudes de compra:`,
+    '',
+    ...seAvisan.map((o) => `• ${o.ticket_id} · ${o.proveedor?.nombre || 'Sin proveedor'} · ${o.estado === 'rechazada' ? 'rechazada' : 'por autorizar'} desde el ${fechaLargaMX(new Date(o.created_at))}`)
+  ].join('\n') : null;
+
+  const resultado = {
+    ensayo, ahora: isoMexico(ahora), siguienteCorrida: siguiente ? isoMexico(siguiente) : null,
+    seCancelan: seCancelan.map((o) => fichaOrden(o, ahora)),
+    seAvisan: seAvisan.map((o) => fichaOrden(o, ahora)),
+    esperan: esperan.map((o) => fichaOrden(o, ahora)),
+    aviso
+  };
+  if (ensayo) return resultado;
+
+  let canceladas = 0;
+  for (const o of seCancelan) {
+    if (await anularOrdenPorAntiguedad(o, Math.floor((ahora - new Date(o.created_at)) / DIA_MS))) canceladas++;
+  }
+  if (aviso) {
+    const { enviarWhatsApp } = await import('../services/whatsapp.service.js');
+    await enviarWhatsApp(aviso, 'compras');
+    await sequelize.query('UPDATE ordenes_compra SET cancelacion_avisada_at = :ahora WHERE id IN (:ids)', {
+      replacements: { ahora, ids: seAvisan.map((o) => o.id) }
+    });
+  }
+  console.log(`[cancelacion-programada] ${canceladas} orden(es) cancelada(s), ${seAvisan.length} avisada(s) para la siguiente corrida`);
+  return { ...resultado, canceladas };
+};
+
+/**
+ * Ensayo (solo lectura) para Dirección: qué haría hoy la tarea y qué hace la regla de siempre en esta base.
+ */
+export const ensayoCancelacionProgramada = async ({ ahora = new Date() } = {}) => {
+  const plan = await cancelacionProgramadaOrdenes({ ensayo: true, ahora });
+  const [col] = await sequelize.query(
+    "SELECT COUNT(*)::int AS n FROM information_schema.columns WHERE table_name = 'ordenes_compra' AND column_name = 'fecha_creacion'"
+  );
+  const reglaFunciona = (col[0]?.n || 0) > 0;
+  const limite = new Date(ahora.getTime() - DIAS_CANCELACION * DIA_MS);
+  const vencidas = await OrdenCompra.findAll({
+    where: { estado: { [Op.in]: ESTADOS_CANCELABLES }, created_at: { [Op.lt]: limite } },
+    include: [{ model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'], required: false }],
+    order: [['created_at', 'ASC'], ['id', 'ASC']]
+  });
+  return {
+    ...plan,
+    bandera: { CANCELACION_PROGRAMADA: cancelacionProgramadaEncendida() },
+    criterio: `Pendiente de aprobación o rechazada con más de ${DIAS_CANCELACION} días; se cancela en la corrida de las 8:15 (lunes a sábado) después de avisar en Compras en una corrida anterior.`,
+    reglaDeHoy: {
+      funciona: reglaFunciona,
+      nota: reglaFunciona
+        ? 'La regla de siempre (al abrir la lista) encuentra su columna: hoy cancela las órdenes vencidas en cuanto alguien abre Órdenes o Solicitudes.'
+        : 'La regla de siempre pregunta por la columna fecha_creacion, que esta base no tiene: la consulta falla y hoy no cancela nada. Al encender CANCELACION_PROGRAMADA se empiezan a cancelar las órdenes vencidas (después del aviso).',
+      vencidasHoy: vencidas.map((o) => fichaOrden(o, ahora))
+    }
+  };
 };
 
 /**
@@ -839,7 +992,8 @@ export const completarSolicitudesDeOrdenesRecibidas = async () => {
 export const listarSolicitudesCompra = async (req, res) => {
   try {
     // Ejecutar limpieza de órdenes viejas (esto también revierte sus solicitudes)
-    await anularOrdenesViejas();
+    // D6 · PLA-18: con CANCELACION_PROGRAMADA ya no corre al abrir la lista (error 4): corre a las 8:15, con aviso.
+    if (!cancelacionProgramadaEncendida()) await anularOrdenesViejas();
 
     // Ejecutar limpieza de solicitudes obsoletas antes de listar
     await cancelarSolicitudesObsoletas();
