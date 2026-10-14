@@ -18,6 +18,7 @@ import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 import { ventanaAvisos, dentroDeHorario } from '../utils/horarioAvisos.js';
 import BitacoraAviso from '../models/BitacoraAviso.js';
 import { ORIGENES_BITACORA } from './sistemas/bitacora.js';
+import { anotarLatido } from './sistemas/latidos.js';
 
 const router = express.Router();
 
@@ -169,6 +170,10 @@ router.use(verificarPuente);
  * 21:00) solo se entregan los avisos `urgente`; los demás esperan en la cola y salen al abrir, en el mismo orden.
  * Un aviso de autorización que quedó reemplazado (A9) antes de salir se descarta: ya no se publica.
  * Lo que recibe Julia no cambia de forma.
+ *
+ * D1 · PLA-15: si la consulta trae las cabeceras X-3G-Latido-* (Julia con FIN-08), Planta guarda el latido de la línea
+ * del contable para GET /api/sistemas/v1/latidos (ver routes/sistemas/latidos.js). No cambia ni retrasa la respuesta;
+ * sin cabeceras (Julia de antes) todo sigue igual.
  */
 const descartarReemplazados = async () => {
     const [n] = await AvisoWhatsApp.update(
@@ -179,6 +184,7 @@ const descartarReemplazados = async () => {
 };
 
 router.get('/pendientes', async (req, res) => {
+    anotarLatido(req.headers); // D1 · PLA-15: nunca lanza ni espera
     try {
         const limite = Math.min(parseInt(req.query.limit) || 20, 50);
 

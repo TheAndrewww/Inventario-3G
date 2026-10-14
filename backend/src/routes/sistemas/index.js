@@ -8,6 +8,7 @@
  *   GET /api/sistemas/v1/llaves       alcance «llaves.leer»  llaves y enlaces vivos, solo metadatos (B8; lo lee Cuentas 3G)
  *   GET /api/inicio3g/v1/llaves       el mismo de arriba (el contrato acepta los dos prefijos)
  *   POST /api/sistemas/v1/bitacora-avisos  alcance «bitacora.escribir»  avisos de Carla y Julia a Producción (B1 · PLA-14)
+ *   GET /api/sistemas/v1/latidos      alcance «latidos.leer» (llave nueva de Ventas)  latido de la línea del contable (D1 · PLA-15)
  *
  * Cómo se entra (igual en los cinco sistemas):
  *   - «Authorization: Bearer <llave>» y «X-3G-Origen: <sistema>» (inicio, cuentas, finanzas, ventas…).
@@ -33,6 +34,7 @@ import LlaveSistema from '../../models/LlaveSistema.js';
 import Idempotencia from '../../models/Idempotencia.js';
 import { cuerpoSalud, isoMexico } from '../../utils/revisarConfig.js';
 import { registrarBitacora } from './bitacora.js';
+import { leerLatidos } from './latidos.js';
 
 export const PREFIJO_INICIO = '/api/inicio3g/v1';
 export const PREFIJO_SISTEMAS = '/api/sistemas/v1';
@@ -440,6 +442,8 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
 
     // B1 · PLA-14: la bitácora de los avisos de Carla y Julia a Producción (la escribe Finanzas, FIN-09)
     router.post(`${PREFIJO_SISTEMAS}/bitacora-avisos`, ...escribirCon('bitacora.escribir', (req) => registrarBitacora(req.body)));
+    // D1 · PLA-15: el latido de Julia (lo guarda la cola de avisos) para la vigilancia de Ventas (VEN-11)
+    router.get(`${PREFIJO_SISTEMAS}/latidos`, ...leer('latidos.leer', async () => leerLatidos()));
 
     // Cualquier otra ruta de las puertas
     router.use([PREFIJO_INICIO, PREFIJO_SISTEMAS], (req, res) => error(res, 404, 'No existe esa puerta en Planta.'));

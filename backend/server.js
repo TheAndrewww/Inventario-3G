@@ -1296,6 +1296,15 @@ const startServer = async () => {
             console.error('⚠️ Error verificando la tabla bitacora_avisos:', bitacoraErr.message);
         }
 
+        // D1 · PLA-15: último latido de la línea del contable (su propio sync: crea si no existe; nunca alter)
+        try {
+            const { default: LatidoSistema } = await import('./src/models/LatidoSistema.js');
+            await LatidoSistema.sync();
+            console.log('✅ Tabla latidos_sistemas verificada');
+        } catch (latidoErr) {
+            console.error('⚠️ Error verificando la tabla latidos_sistemas:', latidoErr.message);
+        }
+
         // Tickets de salida ya vistos en la carpeta del proyecto — aplica en dev y prod.
         // Sirve para no repetir el aviso 🎫 al grupo de PRODUCCIÓN en cada barrido.
         try {
