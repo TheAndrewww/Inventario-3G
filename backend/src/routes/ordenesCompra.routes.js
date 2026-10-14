@@ -55,8 +55,10 @@ router.get('/ordenes-compra/aprobar-email', aprobarPorEmail);
 router.get('/ordenes-compra/rechazar-email', mostrarFormularioRechazo);
 router.post('/ordenes-compra/rechazar-email', rechazarPorEmail);
 
-// Ruta de prueba para verificar configuración de email
-router.get('/ordenes-compra/test-email', testEmail);
+// Prueba del correo de órdenes (A16 · PLA-01): solo administración.
+// GET solo dice si el correo está configurado (sí/no); POST manda el correo de prueba a Dirección.
+router.get('/ordenes-compra/test-email', verificarToken, verificarRol('administrador'), testEmail);
+router.post('/ordenes-compra/test-email', verificarToken, verificarRol('administrador'), testEmail);
 
 // Todas las rutas a partir de aquí requieren autenticación
 router.use(verificarToken);

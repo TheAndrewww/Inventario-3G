@@ -10,6 +10,7 @@ import {
     verificarToken,
     esAdministrador
 } from '../middleware/auth.middleware.js';
+import { limiteLogin } from '../middleware/limiteLogin.middleware.js';
 
 const router = express.Router();
 
@@ -22,10 +23,10 @@ router.post('/register', verificarToken, esAdministrador, register);
 
 /**
  * @route   POST /api/auth/login
- * @desc    Iniciar sesión
+ * @desc    Iniciar sesión (con límite de intentos fallidos, A10 · PLA-02: ver LOGIN_LIMITE)
  * @access  Public
  */
-router.post('/login', login);
+router.post('/login', limiteLogin, login);
 
 /**
  * @route   GET /api/auth/verify

@@ -14,6 +14,7 @@ import { registrarError, ultimosErrores } from './src/utils/diagnostico.js';
 import './src/models/index.js'; // Importar modelos y relaciones
 import { iniciarCronJobs } from './src/utils/cronJobs.js';
 import { ejecutarAutoMigracion } from './src/utils/autoMigrate.js';
+import { verificarToken, esAdministrador } from './src/middleware/auth.middleware.js';
 
 // Cargar variables de entorno solo en desarrollo
 // En producción (Railway, Heroku), las variables están en process.env directamente
@@ -23,6 +24,11 @@ if (process.env.NODE_ENV !== 'production') {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// La pantalla llama directo a Railway, que pone un proxy delante (A10 · PLA-02):
+// confiar en ese único salto hace que req.ip sea la del cliente y no la del
+// proxy. Sin esto, el límite de intentos al entrar contaría a todos como uno.
+app.set('trust proxy', 1);
 
 // Middlewares
 
@@ -168,15 +174,25 @@ app.get('/', (req, res) => {
 });
 
 /**
- * Diagnóstico del backend, sin sesión: sirve para saber desde fuera si el
- * sistema está sano cuando alguien reporta que "todo se queda cargando".
+ * Estado del sistema sin sesión (A16 · PLA-01): solo dice que el servidor
+ * está arriba. Si no responde, está abajo.
+ */
+app.get('/api/estado-sistema', (req, res) => {
+    res.json({ ok: true });
+});
+
+/**
+ * Diagnóstico del backend, con sesión de administración (A16 · PLA-01):
+ * sirve para saber si el sistema está sano cuando alguien reporta que
+ * "todo se queda cargando".
  *
  * Lo que importa es `conexiones`: si `libres` es 0 y hay peticiones
  * `esperando`, el pool está agotado y NADA que escriba en la base va a
  * terminar (completar un ticket, palomear, crear una orden). No expone
- * ningún dato del negocio.
+ * ningún dato del negocio, pero sí los últimos errores del servidor:
+ * por eso ya no es público.
  */
-app.get('/api/estado-sistema', (req, res) => {
+app.get('/api/estado-sistema/detalle', verificarToken, esAdministrador, (req, res) => {
     const pool = sequelize?.connectionManager?.pool;
     res.json({
         version: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || 'desconocida',
@@ -195,18 +211,24 @@ app.get('/api/estado-sistema', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/articulos', articulosRoutes);
 app.use('/api/movimientos', movimientosRoutes);
-// Ruta de prueba de email (antes de auth)
-app.get('/api/test-email', async (req, res) => {
-    const config = {
-        EMAIL_USER: process.env.EMAIL_USER || 'NO CONFIGURADO',
-        EMAIL_PASS: process.env.EMAIL_PASS ? `SI (${process.env.EMAIL_PASS.length} chars)` : 'NO CONFIGURADO',
-        BACKEND_URL: process.env.BACKEND_URL || 'NO CONFIGURADO'
-    };
+// Prueba del correo general (A16 · PLA-01): solo administración.
+// GET solo dice si cada dato está configurado (sí/no), nunca la cuenta, partes
+// de la contraseña ni su longitud. El correo de prueba se manda con POST.
+const correoGeneralConfigurado = () => ({
+    EMAIL_USER: process.env.EMAIL_USER ? 'sí' : 'no',
+    EMAIL_PASS: process.env.EMAIL_PASS ? 'sí' : 'no',
+    BACKEND_URL: process.env.BACKEND_URL ? 'sí' : 'no'
+});
 
-    // Sin ?send=1, solo mostrar config
-    if (req.query.send !== '1') {
-        return res.json({ message: 'Agrega ?send=1 a la URL para enviar email de prueba', config });
-    }
+app.get('/api/test-email', verificarToken, esAdministrador, (req, res) => {
+    res.json({
+        message: 'Para mandar el correo de prueba usa POST en esta misma ruta.',
+        configurado: correoGeneralConfigurado()
+    });
+});
+
+app.post('/api/test-email', verificarToken, esAdministrador, async (req, res) => {
+    const configurado = correoGeneralConfigurado();
 
     try {
         const nodemailer = (await import('nodemailer')).default;
@@ -226,9 +248,9 @@ app.get('/api/test-email', async (req, res) => {
             subject: '🧪 Email de prueba - Inventario 3G',
             html: '<h1>✅ Funciona!</h1><p>La configuración de email está correcta.</p>'
         });
-        return res.json({ success: true, messageId: info.messageId, config });
+        return res.json({ success: true, messageId: info.messageId, configurado });
     } catch (error) {
-        return res.json({ success: false, error: error.message, config });
+        return res.json({ success: false, error: error.message, configurado });
     }
 });
 
@@ -260,8 +282,24 @@ app.use('/api/avisos-whatsapp', avisosWhatsappRoutes);
 app.use('/api', ordenesCompraRoutes);
 app.use('/api', notificacionesRoutes);
 
-// ===== ENDPOINT TEMPORAL: Limpieza de espacio en BD =====
-app.get('/api/admin/limpiar-db', async (req, res) => {
+// ===== Limpieza de espacio en BD (A16 · PLA-01) =====
+// Antes bastaba abrir la liga (GET ?limpiar=1) con cualquier sesión. Ahora es
+// POST, con sesión de administración y el cuerpo {"confirmar":"LIMPIAR"}.
+app.get('/api/admin/limpiar-db', (req, res) => {
+    res.set('Allow', 'POST').status(405).json({
+        success: false,
+        message: 'La limpieza ya no se lanza abriendo una liga. Usa POST con sesión de administración y el cuerpo {"confirmar":"LIMPIAR"}.'
+    });
+});
+
+app.post('/api/admin/limpiar-db', verificarToken, esAdministrador, async (req, res) => {
+    if (req.body?.confirmar !== 'LIMPIAR') {
+        return res.status(400).json({
+            success: false,
+            message: 'Falta confirmar: manda {"confirmar":"LIMPIAR"} en el cuerpo.'
+        });
+    }
+
     try {
         const resultado = { diagnostico: {}, limpieza: null };
 
@@ -319,55 +357,53 @@ app.get('/api/admin/limpiar-db', async (req, res) => {
             resultado.diagnostico.dead_tuples = dead;
         } catch (e) { }
 
-        // LIMPIEZA (solo si ?limpiar=1)
-        if (req.query.limpiar === '1') {
-            resultado.limpieza = {};
+        // LIMPIEZA (ya confirmada)
+        resultado.limpieza = {};
 
-            // Limpiar notificaciones
-            try {
-                const [r] = await sequelize.query(`
-                    DELETE FROM notificaciones 
-                    WHERE (leida = true AND created_at < NOW() - INTERVAL '7 days')
-                       OR created_at < NOW() - INTERVAL '60 days'
-                `);
-                resultado.limpieza.notificaciones_eliminadas = r?.rowCount || 'ejecutado';
-            } catch (e) { resultado.limpieza.notificaciones_error = e.message; }
+        // Limpiar notificaciones
+        try {
+            const [r] = await sequelize.query(`
+                DELETE FROM notificaciones 
+                WHERE (leida = true AND created_at < NOW() - INTERVAL '7 days')
+                   OR created_at < NOW() - INTERVAL '60 days'
+            `);
+            resultado.limpieza.notificaciones_eliminadas = r?.rowCount || 'ejecutado';
+        } catch (e) { resultado.limpieza.notificaciones_error = e.message; }
 
-            // Limpiar cola de imágenes
-            try {
-                const [r] = await sequelize.query(`
-                    DELETE FROM image_processing_queue 
-                    WHERE status IN ('completed', 'failed', 'error')
-                       OR created_at < NOW() - INTERVAL '30 days'
-                `);
-                resultado.limpieza.image_queue_eliminados = r?.rowCount || 'ejecutado';
-            } catch (e) { resultado.limpieza.image_queue_error = e.message; }
+        // Limpiar cola de imágenes
+        try {
+            const [r] = await sequelize.query(`
+                DELETE FROM image_processing_queue 
+                WHERE status IN ('completed', 'failed', 'error')
+                   OR created_at < NOW() - INTERVAL '30 days'
+            `);
+            resultado.limpieza.image_queue_eliminados = r?.rowCount || 'ejecutado';
+        } catch (e) { resultado.limpieza.image_queue_error = e.message; }
 
-            // Limpiar JSON de proyectos completados antiguos
-            try {
-                const [r] = await sequelize.query(`
-                    UPDATE produccion_proyectos 
-                    SET archivos_manufactura = '[]'::jsonb, archivos_herreria = '[]'::jsonb
-                    WHERE etapa_actual = 'completado' 
-                      AND fecha_completado < NOW() - INTERVAL '90 days'
-                      AND (jsonb_array_length(COALESCE(archivos_manufactura, '[]'::jsonb)) > 0
-                           OR jsonb_array_length(COALESCE(archivos_herreria, '[]'::jsonb)) > 0)
-                `);
-                resultado.limpieza.proyectos_json_limpiados = r?.[1]?.rowCount || 'ejecutado';
-            } catch (e) { resultado.limpieza.proyectos_error = e.message; }
+        // Limpiar JSON de proyectos completados antiguos
+        try {
+            const [r] = await sequelize.query(`
+                UPDATE produccion_proyectos 
+                SET archivos_manufactura = '[]'::jsonb, archivos_herreria = '[]'::jsonb
+                WHERE etapa_actual = 'completado' 
+                  AND fecha_completado < NOW() - INTERVAL '90 days'
+                  AND (jsonb_array_length(COALESCE(archivos_manufactura, '[]'::jsonb)) > 0
+                       OR jsonb_array_length(COALESCE(archivos_herreria, '[]'::jsonb)) > 0)
+            `);
+            resultado.limpieza.proyectos_json_limpiados = r?.[1]?.rowCount || 'ejecutado';
+        } catch (e) { resultado.limpieza.proyectos_error = e.message; }
 
-            // VACUUM
-            try {
-                await sequelize.query('VACUUM');
-                resultado.limpieza.vacuum = 'completado';
-            } catch (e) { resultado.limpieza.vacuum_error = e.message; }
+        // VACUUM
+        try {
+            await sequelize.query('VACUUM');
+            resultado.limpieza.vacuum = 'completado';
+        } catch (e) { resultado.limpieza.vacuum_error = e.message; }
 
-            // Tamaño final
-            const [finalSize] = await sequelize.query(
-                "SELECT pg_size_pretty(pg_database_size(current_database())) as total"
-            );
-            resultado.limpieza.tamano_final = finalSize[0].total;
-        }
+        // Tamaño final
+        const [finalSize] = await sequelize.query(
+            "SELECT pg_size_pretty(pg_database_size(current_database())) as total"
+        );
+        resultado.limpieza.tamano_final = finalSize[0].total;
 
         res.json({ success: true, data: resultado });
     } catch (error) {

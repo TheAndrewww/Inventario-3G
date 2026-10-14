@@ -95,7 +95,7 @@ export const verificarOrdenesVencidas = () => {
     } catch (error) {
       console.error('❌ Error al verificar órdenes vencidas:', error);
     }
-  });
+  }, { timezone: 'America/Mexico_City' }); // D6 · PLA-03: hora de México (el servidor corre en UTC)
 
   console.log('⏰ Cron job iniciado: Verificación de órdenes vencidas (9:00 AM y 2:00 PM)');
 };
@@ -151,7 +151,7 @@ export const cerrarVentanasDeConteo = () => {
     } catch (error) {
       console.error('❌ Error al cerrar ventanas de conteo:', error);
     }
-  });
+  }, { timezone: 'America/Mexico_City' }); // D6 · PLA-03: 8:00 de México, ya no de madrugada
 
   console.log('⏰ Cron job iniciado: Cierre de ventanas de conteo (8:00 AM)');
 };
