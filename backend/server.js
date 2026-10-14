@@ -1323,6 +1323,16 @@ const startServer = async () => {
             console.error('⚠️ Error verificando la tabla orden_seguimiento:', seguimientoErr.message);
         }
 
+        // B3 · PLA-20: ficha maestra de proveedores y crédito de CTAS CRÉDITO (su propio sync: crea si no existe; nunca alter)
+        try {
+            const { ProveedorFicha, ProveedorCredito } = await import('./src/models/Proveedor.js');
+            await ProveedorFicha.sync();
+            await ProveedorCredito.sync();
+            console.log('✅ Tablas proveedores_ficha y proveedores_credito verificadas');
+        } catch (fichaErr) {
+            console.error('⚠️ Error verificando las tablas de la ficha de proveedores:', fichaErr.message);
+        }
+
         // D1 · PLA-15: último latido de la línea del contable (su propio sync: crea si no existe; nunca alter)
         try {
             const { default: LatidoSistema } = await import('./src/models/LatidoSistema.js');

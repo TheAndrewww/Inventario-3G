@@ -42,6 +42,30 @@ const proveedoresService = {
   },
 
   /**
+   * B3 · PLA-20: fichas maestras y crédito de CTAS CRÉDITO (solo los pide Diseño 3G)
+   */
+  fichas: async () => {
+    const response = await api.get('/proveedores/fichas');
+    return response.data;
+  },
+
+  /**
+   * B3 · PLA-20: reporte de proveedores sin RFC (solo lee)
+   */
+  reporteSinRfc: async () => {
+    const response = await api.get('/proveedores/reporte-sin-rfc');
+    return response.data;
+  },
+
+  /**
+   * B3 · PLA-20: guardar la ficha maestra de un proveedor
+   */
+  guardarFicha: async (id, ficha) => {
+    const response = await api.put(`/proveedores/${id}/ficha`, ficha);
+    return response.data;
+  },
+
+  /**
    * Obtener artículos de un proveedor
    */
   obtenerArticulos: async (id, activo = true) => {

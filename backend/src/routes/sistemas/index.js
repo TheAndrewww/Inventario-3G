@@ -11,6 +11,8 @@
  *   GET /api/sistemas/v1/latidos      alcance «latidos.leer» (llave nueva de Ventas)  latido de la línea del contable (D1 · PLA-15)
  *   POST /api/sistemas/v1/ordenes/:folio/seguimiento  alcance «ordenes.seguimiento»  estados de la orden según Julia (C4 · PLA-16)
  *   POST /api/sistemas/v1/produccion/pronostico  alcance «produccion.pronostico»  el sí o el no de Producción (C7 · PLA-17)
+ *   POST /api/sistemas/v1/proveedores/credito  alcance «proveedores.credito»  crédito y plazo de CTAS CRÉDITO (B3 · PLA-20)
+ *   GET /api/sistemas/v1/proveedores  alcance «proveedores.credito»  la ficha maestra de proveedores para Julia (B3 · PLA-20)
  *
  * Cómo se entra (igual en los cinco sistemas):
  *   - «Authorization: Bearer <llave>» y «X-3G-Origen: <sistema>» (inicio, cuentas, finanzas, ventas…).
@@ -39,6 +41,7 @@ import { registrarBitacora } from './bitacora.js';
 import { leerLatidos } from './latidos.js';
 import { registrarSeguimiento } from './ordenes.js';
 import { registrarPronostico } from './pronostico.js';
+import { ALCANCE_PROVEEDORES, recibirCredito, leerProveedores } from './proveedores.js';
 
 export const PREFIJO_INICIO = '/api/inicio3g/v1';
 export const PREFIJO_SISTEMAS = '/api/sistemas/v1';
@@ -452,6 +455,9 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
     router.post(`${PREFIJO_SISTEMAS}/ordenes/:folio/seguimiento`, ...escribirCon('ordenes.seguimiento', (req) => registrarSeguimiento(req.params.folio, req.body, req.puerta.origen)));
     // C7 · PLA-17: el sí o el no de Producción a «¿se completa hoy?» (FIN-11); solo se muestra, no cierra nada
     router.post(`${PREFIJO_SISTEMAS}/produccion/pronostico`, ...escribirCon('produccion.pronostico', (req) => registrarPronostico(req.body)));
+    // B3 · PLA-20: crédito y plazo de CTAS CRÉDITO (los manda Julia) y la ficha maestra que lee Julia (FIN-23)
+    router.post(`${PREFIJO_SISTEMAS}/proveedores/credito`, ...escribirCon(ALCANCE_PROVEEDORES, recibirCredito));
+    router.get(`${PREFIJO_SISTEMAS}/proveedores`, ...leer(ALCANCE_PROVEEDORES, leerProveedores));
 
     // Cualquier otra ruta de las puertas
     router.use([PREFIJO_INICIO, PREFIJO_SISTEMAS], (req, res) => error(res, 404, 'No existe esa puerta en Planta.'));

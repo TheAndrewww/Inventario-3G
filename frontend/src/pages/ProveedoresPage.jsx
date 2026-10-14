@@ -7,6 +7,11 @@ import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import MasAcciones from '../diseno-3g/MasAcciones';
 import { g3Activo, confirmarG3, cx, etq } from '../diseno-3g/dialogosG3';
+import { useAuth } from '../context/AuthContext';
+import { SeccionFicha, ReporteSinRfc } from '../components/proveedores/FichaProveedor';
+import {
+  fichaVacia, fichaAFormulario, fichaParaGuardar, tieneRfc, creditoDe, textoCredito
+} from '../components/proveedores/fichaDatos';
 
 // B3 paso 1 · PLA-11 (solo con Diseño 3G): liga a la otra mitad de «Proveedores», que vive en Finanzas.
 // La dirección de Finanzas es privada: Planta no la escribe en su JS público. Si una página con sesión la configuró
@@ -50,6 +55,18 @@ const ProveedoresPage = () => {
   const [showModal, setShowModal] = useState(false);
   const g3 = useDiseno3G(); // Diseño 3G: encabezado, tabla en tarjetas, acciones y confirmación del paquete (apagado, lo de siempre)
   const [editingProveedor, setEditingProveedor] = useState(null);
+  // B3 paso 3 · PLA-20 (solo Diseño 3G): ficha maestra, crédito de CTAS CRÉDITO y reporte sin RFC
+  const { user } = useAuth();
+  const puedeEditar = ['compras', 'encargado', 'administrador'].includes(user?.rol);
+  const [fichas, setFichas] = useState({});
+  const [credito, setCredito] = useState([]);
+  const [vista, setVista] = useState('lista');
+  const [reporte, setReporte] = useState(null);
+  const [cargandoReporte, setCargandoReporte] = useState(false);
+  const [errorReporte, setErrorReporte] = useState(null);
+  // null = las fichas no han llegado (o fallaron): el formulario se guarda como siempre y no pisa ninguna ficha
+  const [fichaForm, setFichaForm] = useState(null);
+  const [fichasListas, setFichasListas] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
     rfc: '',
@@ -66,6 +83,39 @@ const ProveedoresPage = () => {
   useEffect(() => {
     fetchProveedores();
   }, []);
+
+  // Las fichas y el crédito solo se piden con Diseño 3G (apagado, la pantalla pide lo mismo que siempre)
+  const cargarFichas = async () => {
+    try {
+      const r = await proveedoresService.fichas();
+      setFichas(r.data?.fichas || {});
+      setCredito(r.data?.credito || []);
+      setFichasListas(true);
+    } catch (error) {
+      console.error('Error al cargar las fichas de proveedores:', error);
+    }
+  };
+  useEffect(() => {
+    if (g3) cargarFichas();
+  }, [g3]);
+
+  const cargarReporte = async () => {
+    setCargandoReporte(true);
+    setErrorReporte(null);
+    try {
+      const r = await proveedoresService.reporteSinRfc();
+      setReporte(r.data);
+    } catch (error) {
+      console.error('Error al cargar el reporte sin RFC:', error);
+      setErrorReporte('No se pudo cargar el reporte de proveedores sin RFC.');
+    } finally {
+      setCargandoReporte(false);
+    }
+  };
+  const verVista = (v) => {
+    setVista(v);
+    if (v === 'sinrfc') cargarReporte();
+  };
 
   const fetchProveedores = async () => {
     try {
@@ -96,6 +146,7 @@ const ProveedoresPage = () => {
         codigo_postal: proveedor.codigo_postal || '',
         notas: proveedor.notas || ''
       });
+      setFichaForm(fichasListas ? fichaAFormulario(fichas[proveedor.id]) : null);
     } else {
       setEditingProveedor(null);
       setFormData({
@@ -110,8 +161,15 @@ const ProveedoresPage = () => {
         codigo_postal: '',
         notas: ''
       });
+      setFichaForm(fichasListas ? fichaVacia() : null);
     }
     setShowModal(true);
+  };
+
+  // Desde el reporte: abre el formulario del proveedor con su ficha
+  const abrirFicha = (id) => {
+    const p = proveedores.find((x) => x.id === id);
+    if (p) handleOpenModal(p);
   };
 
   const handleCloseModal = () => {
@@ -132,6 +190,38 @@ const ProveedoresPage = () => {
 
     if (!formData.nombre.trim()) {
       toast.error('El nombre es requerido');
+      return;
+    }
+
+    // B3 · PLA-20 (Diseño 3G): la ficha se guarda junto con los datos. Si ya existe, primero la ficha (si no pasa la
+    // revisión, no se guarda nada); si es nuevo, primero el proveedor (para tener su id).
+    if (g3 && puedeEditar && fichaForm) {
+      try {
+        const ficha = fichaParaGuardar(fichaForm);
+        if (editingProveedor) {
+          await proveedoresService.guardarFicha(editingProveedor.id, ficha);
+          await proveedoresService.actualizar(editingProveedor.id, formData);
+          toast.success('Proveedor y ficha guardados');
+        } else {
+          const creado = await proveedoresService.crear(formData);
+          const id = creado?.data?.id;
+          if (id) {
+            try {
+              await proveedoresService.guardarFicha(id, ficha);
+            } catch (error) {
+              toast.error(`Se creó el proveedor, pero la ficha no se guardó: ${error.response?.data?.message || error.message}`);
+            }
+          }
+          toast.success('Proveedor creado');
+        }
+        handleCloseModal();
+        fetchProveedores();
+        cargarFichas();
+        if (reporte) cargarReporte();
+      } catch (error) {
+        console.error('Error al guardar proveedor:', error);
+        toast.error(error.response?.data?.message || error.message || 'Error al guardar proveedor');
+      }
       return;
     }
 
@@ -213,6 +303,21 @@ const ProveedoresPage = () => {
 
       {g3 && <LigaCreditoFinanzas />}
 
+      {g3 && puedeEditar && (
+        <div className="g3-pestanas mb-6" role="tablist" aria-label="Proveedores">
+          <button type="button" role="tab" aria-selected={vista === 'lista'} onClick={() => verVista('lista')}>
+            Proveedores <span className="g3-insignia g3-insignia--neutra">{proveedores.length}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={vista === 'sinrfc'} onClick={() => verVista('sinrfc')}>
+            Sin RFC <span className="g3-insignia g3-insignia--neutra">{proveedores.filter((p) => !tieneRfc(p, fichas[p.id])).length}</span>
+          </button>
+        </div>
+      )}
+
+      {g3 && puedeEditar && vista === 'sinrfc' ? (
+        <ReporteSinRfc reporte={reporte} cargando={cargandoReporte} error={errorReporte} onReintentar={cargarReporte} onAbrir={abrirFicha} />
+      ) : (<>
+
       {/* Barra de búsqueda */}
       <div className="mb-6">
         <div className="relative">
@@ -252,6 +357,18 @@ const ProveedoresPage = () => {
                 <tr key={proveedor.id} className="hover:bg-gray-50 transition-colors">
                   <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-titulo')}>
                     <div className="font-medium text-gray-900">{proveedor.nombre}</div>
+                    {/* B3 · PLA-20: nombre corto, «Sin RFC» y el crédito de CTAS CRÉDITO (solo Diseño 3G) */}
+                    {g3 && (() => {
+                      const f = fichas[proveedor.id];
+                      const c = creditoDe(credito, proveedor.id);
+                      return (
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          {f?.nombreCorto && <span className="g3-tenue">{f.nombreCorto}</span>}
+                          {!tieneRfc(proveedor, f) && <span className="g3-estado g3-estado--aviso">Sin RFC</span>}
+                          {c && <span className="g3-estado g3-estado--info" title={`CTAS CRÉDITO · pestaña «${c.pestana}»`}>{textoCredito(c)}</span>}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" {...etq(g3, 'RFC')}>
                     {proveedor.rfc || 'N/A'}
@@ -300,6 +417,7 @@ const ProveedoresPage = () => {
           </tbody>
         </table>
       </div>
+      </>)}
 
       {/* Modal de crear/editar */}
       <Modal
@@ -445,6 +563,11 @@ const ProveedoresPage = () => {
               placeholder="Notas adicionales sobre el proveedor..."
             />
           </div>
+
+          {/* B3 paso 3 · PLA-20: la ficha maestra (solo Diseño 3G y quien puede editar proveedores) */}
+          {g3 && puedeEditar && fichaForm && (
+            <SeccionFicha valor={fichaForm} onCambio={setFichaForm} credito={editingProveedor ? creditoDe(credito, editingProveedor.id) : null} rfcPrincipal={formData.rfc?.trim() || null} />
+          )}
 
           {/* Botones */}
           <div className="flex gap-3 pt-4 border-t">
