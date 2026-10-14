@@ -15,6 +15,7 @@
  * su «correo en Planta» de Cuentas 3G), con el rol que ya tiene, y solo si ese usuario está activo. Cuentas 3G no
  * escribe en la base de Planta: lo único que Planta guarda es su propio registro de entradas y la última lista buena.
  */
+import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { Usuario } from '../models/index.js';
 import c3g from '../cuentas3g-cliente/cuentas3g-cliente.cjs';
@@ -216,17 +217,39 @@ export async function anotarEntrada({ usuarioId, via, sub = null, empate = null 
 // ── Sesiones (verificarToken) y aviso de baja ───────────────────────────────────────────────────
 
 const TEXTO_SESION_TERMINADA = 'Tu acceso con tu cuenta 3G cambió o terminó. Vuelve a entrar.';
+const TEXTO_CUENTA_REQUERIDA = 'Planta ya se entra con tu cuenta 3G. Vuelve a entrar con «Entrar con tu cuenta 3G».';
+
+// ── Modo «solo» y llave de emergencia (PLA-24) ─────────────────────────────────────────────────
+
+/**
+ * ¿Puede entrar con la contraseña de siempre? En «apagado» y «ambos», sí (como hoy). En «solo», solo con la llave de
+ * emergencia y solo administración (Dirección); el rol se revisa DESPUÉS de comprobar la contraseña.
+ */
+export const contrasenaPermitida = () => modoCuentas3g() !== 'solo' || emergenciaCuentas3g();
+export const esEntradaDeEmergencia = () => modoCuentas3g() === 'solo' && emergenciaCuentas3g();
+
+/** Lo que la pantalla de entrada necesita saber (público, sin datos): el modo que aplica y si hay emergencia. */
+export const estadoPublico = () => {
+    const modo = modoCuentas3g();
+    return { modo, emergencia: modo === 'solo' && emergenciaCuentas3g() };
+};
 
 /**
  * ¿Hay que rechazar esta sesión? null = sigue. Con «apagado», nunca (idéntico a hoy).
  * PLA-23: un JWT con c3g_sub se revisa contra la lista de versiones y los avisos de baja.
+ * PLA-24: en «solo», un JWT SIN c3g_sub (el de la contraseña, que duraría hasta 7 días) ya no vale, salvo el de la
+ * llave de emergencia (c3g_emergencia) mientras CUENTAS3G_EMERGENCIA siga puesta y el usuario siga siendo administrador.
  */
-export function rechazoDeSesion(decoded) {
+export function rechazoDeSesion(decoded, usuario = null) {
     const modo = modoCuentas3g();
     if (modo === 'apagado') return null;
     if (decoded && decoded.c3g_sub) {
         const vigente = obtenerCliente().sesionVigente({ sub: decoded.c3g_sub, ver: Number(decoded.c3g_ver) || 0, en: (Number(decoded.iat) || 0) * 1000 });
         return vigente ? null : { codigo: 'CUENTAS3G_SESION_TERMINADA', message: TEXTO_SESION_TERMINADA };
+    }
+    if (modo === 'solo') {
+        if (decoded && decoded.c3g_emergencia === true && emergenciaCuentas3g() && usuario && usuario.rol === 'administrador') return null;
+        return { codigo: 'CUENTAS3G_REQUERIDA', message: TEXTO_CUENTA_REQUERIDA };
     }
     return null;
 }
@@ -265,7 +288,50 @@ export function piezaCuentas3g() {
     return { ...base, estado: 'ok', mensaje: `Modo ${pedido} · cuentas3g-cliente ${c3g.VERSION}${e.lista ? ` · lista de versiones de hace ${Math.max(0, Math.round(edadMs / 60000))} min` : ' · lista de versiones por llegar'}` };
 }
 
-/** Edad de la lista para el reporte de PLA-24: solo cuándo y si está vieja, nada personal. */
+/**
+ * Reporte «Quién no ha entrado con su cuenta 3G» (PLA-24), para Planta › Usuarios (administración). Es la llave para pasar
+ * Planta a «solo»: cada usuario activo debe haber entrado al menos una vez con su cuenta (DISEÑO §3.2). Incluye las
+ * entradas de emergencia de los últimos 30 días.
+ */
+export async function reporteCuentas3g() {
+    const { Cuentas3gEntrada } = await modelos();
+    const usuarios = await Usuario.findAll({ attributes: ['id', 'nombre', 'email', 'rol', 'puesto', 'activo'], order: [['nombre', 'ASC']] });
+    const entradas = await Cuentas3gEntrada.findAll({
+        attributes: ['usuario_id', [sequelize.fn('MIN', sequelize.col('created_at')), 'primera'], [sequelize.fn('MAX', sequelize.col('created_at')), 'ultima'], [sequelize.fn('COUNT', sequelize.col('id')), 'veces']],
+        where: { via: 'cuentas3g' },
+        group: ['usuario_id'],
+        raw: true
+    });
+    const porUsuario = new Map(entradas.map((e) => [Number(e.usuario_id), e]));
+    const hace30 = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+    const emergencias = await Cuentas3gEntrada.findAll({
+        where: { via: 'emergencia', created_at: { [Op.gte]: hace30 } },
+        order: [['created_at', 'DESC']],
+        limit: 20,
+        raw: true
+    });
+    const nombre = new Map(usuarios.map((u) => [u.id, u]));
+    const activos = usuarios.filter((u) => u.activo);
+    const fila = (u) => ({ id: u.id, nombre: u.nombre, email: u.email, rol: u.rol, puesto: u.puesto || null });
+    const entraron = activos.filter((u) => porUsuario.has(u.id)).map((u) => {
+        const e = porUsuario.get(u.id);
+        return { ...fila(u), primera: new Date(e.primera).toISOString(), ultima: new Date(e.ultima).toISOString(), veces: Number(e.veces) };
+    });
+    const faltan = activos.filter((u) => !porUsuario.has(u.id)).map(fila);
+    return {
+        ...estadoPublico(),
+        lista: estadoDeLaLista(),
+        activos: activos.length,
+        conCuenta: entraron.length,
+        faltan,
+        entraron,
+        emergencias: emergencias.map((e) => ({ usuario: nombre.get(e.usuario_id)?.nombre || `Usuario ${e.usuario_id}`, cuando: new Date(e.created_at).toISOString() })),
+        // Para la liga «Abrir Cuentas 3G» (pública; nunca el secreto).
+        emisor: valor('CUENTAS3G_EMISOR')
+    };
+}
+
+/** Lo que va en el reporte (PLA-24): solo cuándo y si está vieja, nada personal. */
 export function estadoDeLaLista() {
     if (modoCuentas3g() === 'apagado') return null;
     const { e, en, edadMs, vieja } = estadoLista();

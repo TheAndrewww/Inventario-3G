@@ -6,7 +6,9 @@ import {
     getMe,
     cambiarPassword,
     entrarConCuentas3g,
-    avisoCuentas3g
+    avisoCuentas3g,
+    estadoCuentas3g,
+    reporteCuentas3g
 } from '../controllers/auth.controller.js';
 import {
     verificarToken,
@@ -45,6 +47,20 @@ router.post('/cuentas3g', soloConCuentas3g, limiteCuentas3g, entrarConCuentas3g)
  * @access  Cuentas 3G (se valida la firma)
  */
 router.post('/cuentas3g/aviso', soloConCuentas3g, avisoCuentas3g);
+
+/**
+ * @route   GET /api/auth/cuentas3g/estado
+ * @desc    { modo, emergencia } para la pantalla de entrada (E1 · PLA-24). Sin datos. Con apagado no existe.
+ * @access  Public
+ */
+router.get('/cuentas3g/estado', soloConCuentas3g, estadoCuentas3g);
+
+/**
+ * @route   GET /api/auth/cuentas3g/reporte
+ * @desc    «Quién no ha entrado con su cuenta 3G» y entradas de emergencia (E1 · PLA-24). Con apagado no existe.
+ * @access  Private (Admin)
+ */
+router.get('/cuentas3g/reporte', soloConCuentas3g, verificarToken, esAdministrador, reporteCuentas3g);
 
 /**
  * @route   GET /api/auth/verify

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Edit, Trash2, Search, Shield, UserCheck, UserX, RotateCcw } from 'lucide-react';
 import usuariosService from '../services/usuarios.service';
+import api from '../services/api';
+import { modoCuentas3g } from '../services/cuentas3g';
 import toast from 'react-hot-toast';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
@@ -26,9 +28,25 @@ const UsuariosPage = () => {
     activo: true
   });
 
+  // Cuentas 3G (E1 · PLA-24): reporte «quién no ha entrado con su cuenta 3G», solo con Diseño 3G y con
+  // VITE_CUENTAS3G_MODO en «ambos» o «solo». Si el servidor está apagado (404), no se muestra nada.
+  const conC3g = modoCuentas3g() !== 'apagado';
+  const [reporteC3g, setReporteC3g] = useState(null);
+
   useEffect(() => {
     cargarUsuarios();
   }, []);
+
+  useEffect(() => {
+    if (!g3 || !conC3g) return undefined;
+    let vivo = true;
+    api.get('/auth/cuentas3g/reporte')
+      .then((r) => { if (vivo) setReporteC3g(r.data?.data || null); })
+      .catch(() => { if (vivo) setReporteC3g(null); });
+    return () => { vivo = false; };
+  }, [g3, conC3g]);
+
+  const fechaCorta = (iso) => (iso ? new Date(iso).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
 
   const cargarUsuarios = async () => {
     try {
@@ -278,6 +296,60 @@ const UsuariosPage = () => {
       </div>
       )}
 
+      {/* Cuenta 3G: quién falta por entrar (E1 · PLA-24, solo con Diseño 3G) */}
+      {g3 && reporteC3g && (
+        <section className="g3-tarjeta g3-pila" style={{ gap: 12, marginBottom: 24 }} aria-labelledby="c3g-reporte-titulo">
+          <div className="g3-tarjeta-cab">
+            <h2 id="c3g-reporte-titulo">Cuenta 3G: quién falta por entrar</h2>
+            <span className={`g3-estado ${reporteC3g.faltan.length ? 'g3-estado--aviso' : 'g3-estado--ok'}`}>
+              {reporteC3g.faltan.length ? `Faltan ${reporteC3g.faltan.length}` : 'Ya entraron todos'}
+            </span>
+          </div>
+          <p className="g3-chico g3-tenue" style={{ margin: 0 }}>
+            {reporteC3g.conCuenta} de {reporteC3g.activos} usuarios activos ya entraron a Planta con su cuenta 3G.
+            {' '}Planta pasa a «solo cuenta 3G» cuando esta lista queda vacía. Modo de hoy: {reporteC3g.modo === 'solo' ? 'solo cuenta 3G' : 'cuenta 3G y acceso de siempre'}.
+          </p>
+          {reporteC3g.lista?.vieja && (
+            <div className="g3-caja g3-caja--aviso" role="status">
+              <div className="g3-caja-cuerpo"><span>La lista de Cuentas 3G no se actualiza desde hace más de 24 horas. Las sesiones siguen; avisa a Dirección para revisar Cuentas 3G.</span></div>
+            </div>
+          )}
+          {reporteC3g.emergencia && (
+            <div className="g3-caja g3-caja--aviso" role="status">
+              <div className="g3-caja-cuerpo"><span>La llave de emergencia está puesta: Dirección puede entrar con su contraseña. Quítala en cuanto Cuentas 3G responda.</span></div>
+            </div>
+          )}
+          {reporteC3g.emergencias.length > 0 && (
+            <div className="g3-caja g3-caja--info">
+              <div className="g3-caja-cuerpo">
+                <b>Entradas de emergencia en los últimos 30 días: {reporteC3g.emergencias.length}</b>
+                <span>Última: {reporteC3g.emergencias[0].usuario} · {fechaCorta(reporteC3g.emergencias[0].cuando)}</span>
+              </div>
+            </div>
+          )}
+          {reporteC3g.faltan.length > 0 && (
+            <details>
+              <summary className="g3-chico" style={{ cursor: 'pointer', fontWeight: 600 }}>Ver quién falta ({reporteC3g.faltan.length})</summary>
+              <ul className="g3-lista" style={{ marginTop: 8 }}>
+                {reporteC3g.faltan.map((u) => (
+                  <li key={u.id} className="g3-fila">
+                    <div className="g3-fila-cuerpo">
+                      <b>{u.nombre}</b>
+                      <span className="g3-chico g3-tenue">{u.email} · {u.rol}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          <p className="g3-chico g3-tenue" style={{ margin: 0 }}>
+            A las personas se les da (y se les quita) la entrada en Cuentas 3G › Personas. Aquí solo se elige su rol en Planta,
+            con el mismo correo o con el «correo en Planta» de su ficha.
+            {reporteC3g.emisor ? <> <a href={reporteC3g.emisor} target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>Abrir Cuentas 3G</a></> : null}
+          </p>
+        </section>
+      )}
+
       {/* Filtros */}
       <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
@@ -509,6 +581,14 @@ const UsuariosPage = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {g3 && reporteC3g && !usuarioEditando && (
+                <div className="g3-caja g3-caja--info">
+                  <div className="g3-caja-cuerpo">
+                    <b>Para que entre con su cuenta 3G</b>
+                    <span>Dale de alta también en Cuentas 3G › Personas con este mismo correo (o anótalo como «correo en Planta» en su ficha). La contraseña solo sirve para el acceso de siempre.</span>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

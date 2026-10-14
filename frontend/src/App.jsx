@@ -40,6 +40,8 @@ import ReportesPage from './pages/ReportesPage';
 import StockBajoPage from './pages/StockBajoPage';
 import EntradasSalidasPage from './pages/EntradasSalidasPage';
 import AvisosProduccionPage from './pages/AvisosProduccionPage';
+import EntrarRegresoPage from './pages/EntrarRegresoPage';
+import { modoCuentas3g } from './services/cuentas3g';
 import RutaDiseno3G from './diseno-3g/RutaDiseno3G';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAuth } from './context/AuthContext';
@@ -97,6 +99,9 @@ function App() {
         <Route path="/herreria-tv" element={<DashboardHerreriaTVPage />} />
         <Route path="/terminal" element={<TerminalAreaPage />} />
         <Route path="/terminal/:area" element={<TerminalAreaPage />} />
+        {/* Regreso de Cuentas 3G (E1 · PLA-24): pública y fuera del AuthProvider. Solo con VITE_CUENTAS3G_MODO en «ambos»
+            o «solo»; apagado, la ruta no existe (como hoy). */}
+        {modoCuentas3g() !== 'apagado' && <Route path="/entrar/regreso" element={<EntrarRegresoPage />} />}
 
         {/* Resto de la aplicación con autenticación */}
         <Route path="/*" element={

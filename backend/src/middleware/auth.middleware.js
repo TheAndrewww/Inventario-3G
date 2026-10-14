@@ -53,8 +53,9 @@ export const verificarToken = async (req, res, next) => {
 
         // E1 · PLA-23: con Cuentas 3G encendido, la sesión que viene de una cuenta 3G (c3g_sub) se revisa contra la lista
         // de versiones y los avisos de baja: una baja o un cambio en Cuentas 3G la cierra en un minuto o menos.
-        // Con CUENTAS3G_MODO apagado no se revisa nada (idéntico a hoy).
-        const rechazo = rechazoDeSesion(decoded);
+        // PLA-24: en «solo», el JWT de la contraseña (sin c3g_sub) ya no vale, salvo el de la llave de emergencia de
+        // administración. Con CUENTAS3G_MODO apagado no se revisa nada (idéntico a hoy).
+        const rechazo = rechazoDeSesion(decoded, usuario);
         if (rechazo) {
             return res.status(401).json({
                 success: false,
@@ -220,8 +221,8 @@ export const verificarTokenOpcional = async (req, res, next) => {
             attributes: { exclude: ['password'] }
         });
 
-        // E1 · PLA-23: una sesión de cuenta 3G que ya no vale cuenta como sin sesión (con apagado, como hoy).
-        req.usuario = usuario && !rechazoDeSesion(decoded) ? usuario : null;
+        // E1 · PLA-23/24: una sesión que Cuentas 3G ya no deja pasar cuenta como sin sesión (con apagado, como hoy).
+        req.usuario = usuario && !rechazoDeSesion(decoded, usuario) ? usuario : null;
 
         next();
 

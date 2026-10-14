@@ -8,7 +8,11 @@ import {
     anotarEntrada,
     recibirAviso,
     avisoSinRespuesta,
-    correoOculto
+    correoOculto,
+    contrasenaPermitida,
+    esEntradaDeEmergencia,
+    estadoPublico,
+    reporteCuentas3g as armarReporteCuentas3g
 } from '../services/cuentas3g.service.js';
 
 /**
@@ -110,6 +114,16 @@ export const register = async (req, res) => {
  */
 export const login = async (req, res) => {
     try {
+        // E1 · PLA-24: con CUENTAS3G_MODO=solo la contraseña de siempre ya no entra, salvo con la llave de emergencia
+        // (CUENTAS3G_EMERGENCIA) y solo para administración. En «apagado» y «ambos», como hoy.
+        if (!contrasenaPermitida()) {
+            return res.status(403).json({
+                success: false,
+                codigo: 'CUENTAS3G_SOLO',
+                message: 'Planta ya se entra con tu cuenta 3G: usa «Entrar con tu cuenta 3G».'
+            });
+        }
+
         const { email, password } = req.body;
 
         // Validar campos requeridos
@@ -157,13 +171,29 @@ export const login = async (req, res) => {
             });
         }
 
+        // E1 · PLA-24: en «solo» esto solo pasa con la llave de emergencia, y es solo para administración (Dirección).
+        // Cada entrada de emergencia queda en el registro del servidor y en cuentas3g_entradas.
+        const emergencia = esEntradaDeEmergencia();
+        if (emergencia && usuario.rol !== 'administrador') {
+            console.warn(`[cuentas3g] entrada de emergencia RECHAZADA (no es administración) · usuario id=${usuario.id} (${correoOculto(usuario.email)}) · ip=${req.ip}`);
+            return res.status(403).json({
+                success: false,
+                codigo: 'CUENTAS3G_EMERGENCIA_SOLO_DIRECCION',
+                message: 'La llave de emergencia es solo para Dirección. Entra con tu cuenta 3G cuando vuelva a responder.'
+            });
+        }
+
         console.log('✅ Login exitoso para:', email);
 
         // Actualizar última conexión
         await usuario.update({ ultima_conexion: new Date() });
 
         // Generar token
-        const token = generarToken(usuario);
+        const token = emergencia ? generarToken(usuario, { c3g_emergencia: true }) : generarToken(usuario);
+        if (emergencia) {
+            console.warn(`[cuentas3g] ENTRADA DE EMERGENCIA · usuario id=${usuario.id} (${correoOculto(usuario.email)}) · ip=${req.ip} · quitar CUENTAS3G_EMERGENCIA cuando Cuentas 3G vuelva`);
+            await anotarEntrada({ usuarioId: usuario.id, via: 'emergencia' });
+        }
 
         // Remover password de la respuesta
         const usuarioRespuesta = usuario.toJSON();
@@ -249,6 +279,25 @@ export const avisoCuentas3g = async (req, res) => {
     } catch (error) {
         console.warn(`[cuentas3g] aviso de baja rechazado (${error?.codigo || 'error'}${error?.message ? `: ${String(error.message).slice(0, 60)}` : ''})`);
         return res.status(avisoSinRespuesta(error) ? 503 : 400).json({ error: 'Aviso inválido' });
+    }
+};
+
+/**
+ * GET /api/auth/cuentas3g/estado (E1 · PLA-24)
+ * Lo que la pantalla de entrada necesita saber: { modo, emergencia }. Público y sin datos. Con apagado no existe.
+ */
+export const estadoCuentas3g = (req, res) => res.status(200).json({ success: true, data: estadoPublico() });
+
+/**
+ * GET /api/auth/cuentas3g/reporte (E1 · PLA-24, administración)
+ * «Quién no ha entrado con su cuenta 3G» para Planta › Usuarios, más las entradas de emergencia de 30 días.
+ */
+export const reporteCuentas3g = async (req, res) => {
+    try {
+        return res.status(200).json({ success: true, data: await armarReporteCuentas3g() });
+    } catch (error) {
+        console.error('[cuentas3g] error al armar el reporte:', error.message);
+        return res.status(500).json({ success: false, message: 'No se pudo armar el reporte de Cuentas 3G' });
     }
 };
 
@@ -379,5 +428,7 @@ export default {
     getMe,
     cambiarPassword,
     entrarConCuentas3g,
-    avisoCuentas3g
+    avisoCuentas3g,
+    estadoCuentas3g,
+    reporteCuentas3g
 };
