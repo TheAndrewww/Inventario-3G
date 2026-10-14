@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, Package, X } from 'lucide-react';
 import { getImageUrl } from '../../utils/imageUtils';
+import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
 
 /**
  * Componente de notificación visual cuando se escanea y agrega un artículo exitosamente
  */
 const ScanSuccessNotification = ({ articulo, onClose }) => {
+  const g3 = useDiseno3G(); // Diseño 3G: sin emoji (ya lleva el ícono de palomita)
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
@@ -39,7 +41,7 @@ const ScanSuccessNotification = ({ articulo, onClose }) => {
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-2">
               <h4 className="font-bold text-green-800 text-sm">
-                ✓ Artículo agregado al pedido
+                {g3 ? 'Artículo agregado al pedido' : '✓ Artículo agregado al pedido'}
               </h4>
               <button
                 onClick={() => {

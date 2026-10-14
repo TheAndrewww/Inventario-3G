@@ -1,13 +1,25 @@
 import React, { memo } from 'react';
-import { User, Clock, Calendar } from 'lucide-react';
+import { User, Clock, Calendar, AlertTriangle } from 'lucide-react';
 import { s, px, calcularDiasPorEtapa, esUrgenteMTO } from '../../utils/produccion';
 import { ETAPAS_CONFIG, getColorPorTipo, calcularPorcentaje, usaTimelineSimplificado } from './constants';
+import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
+import { useTvG3, tipoTv } from '../../diseno-3g/tvG3';
+
+// Diseño 3G (interruptor o TV): tipo de trabajo con su nombre completo y el color del tipo (tokens del paquete).
+const COLOR_TIPO_G3 = {
+    'g3tv-etq--instalacion': { background: 'var(--g3-instalacion-suave)', color: 'var(--g3-instalacion)' },
+    'g3tv-etq--mantenimiento': { background: 'var(--g3-mantenimiento-suave)', color: 'var(--g3-mantenimiento)' },
+    'g3tv-etq--garantia': { background: 'var(--g3-garantia-suave)', color: 'var(--g3-garantia)' },
+};
 
 /**
  * Header de la tarjeta de proyecto
  * Muestra: badges, nombre, cliente y círculo de progreso
  */
 const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
+    const g3 = useDiseno3G();
+    const tv = useTvG3();
+    const nuevo = g3 || !!tv; // textos sin siglas ni emojis (apagado, lo de siempre)
     const diasRestantes = proyecto.diasRestantes;
     const esGarantia = proyecto.tipo_proyecto?.toUpperCase() === 'GTIA';
     const esMTO = proyecto.tipo_proyecto?.toUpperCase() === 'MTO';
@@ -61,20 +73,32 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
             <div className="flex-1" style={{ minWidth: 0 }}>
                 {/* Badges */}
                 <div className="flex items-center mb-1" style={{ gap: px(4) }}>
-                    {colorTipo.label && (
+                    {colorTipo.label && (nuevo ? (() => {
+                        const t = tipoTv(proyecto.tipo_proyecto);
+                        return (
+                            <span
+                                className="inline-flex items-center font-bold rounded-full"
+                                style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, ...(COLOR_TIPO_G3[t.clase] || { background: 'var(--g3-neutro-suave)', color: 'var(--g3-tinta)' }) }}
+                            >
+                                {t.texto}
+                            </span>
+                        );
+                    })() : (
                         <span
                             className={`inline-flex items-center font-bold rounded-full ${colorTipo.labelBg}`}
                             style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}` }}
                         >
                             {colorTipo.label}
                         </span>
-                    )}
+                    ))}
                     {enRetraso && (
                         <span
                             className="inline-flex items-center font-bold rounded-full bg-red-600 text-white animate-pulse"
                             style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, gap: px(4) }}
                         >
-                            ⚠️ {diasRetrasoDisplay}d atraso
+                            {nuevo
+                                ? <><AlertTriangle style={{ width: s(0.85), height: s(0.85) }} aria-hidden="true" />{diasRetrasoDisplay} día{diasRetrasoDisplay !== 1 ? 's' : ''} de atraso</>
+                                : <>⚠️ {diasRetrasoDisplay}d atraso</>}
                         </span>
                     )}
                     {esUrgente && !enRetraso && (
@@ -82,7 +106,7 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
                             className="inline-flex items-center font-bold rounded-full bg-red-500 text-white animate-pulse"
                             style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, gap: px(4) }}
                         >
-                            !
+                            {nuevo ? 'Urgente' : '!'}
                         </span>
                     )}
                     {/* Badge etapa actual */}
@@ -97,7 +121,7 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
                         }}
                     >
                         {timelineSimplificado && proyecto.etapa_actual !== 'completado'
-                            ? ETAPAS_CONFIG.instalacion.nombre.toUpperCase()
+                            ? (nuevo ? ETAPAS_CONFIG.instalacion.nombre : ETAPAS_CONFIG.instalacion.nombre.toUpperCase())
                             : ETAPAS_CONFIG[proyecto.etapa_actual]?.nombre}
                     </span>
                 </div>
@@ -144,7 +168,7 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
                     <div className="flex items-center justify-center mb-1">
                         {proyecto._fechaCalendario ? (
                             <div className="flex flex-col items-center justify-center bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5 shadow-sm min-w-[85px]">
-                                <div className="flex items-center gap-1 text-blue-600 font-bold uppercase tracking-wider mb-0.5" style={{ fontSize: s(0.65) }}>
+                                <div className="flex items-center gap-1 text-blue-600 font-bold uppercase tracking-wider mb-0.5 g3p-texto-min g3:normal-case g3:tracking-normal" style={{ fontSize: s(0.65) }}>
                                     <Calendar size={12} />
                                     Cita agendada
                                 </div>
@@ -154,7 +178,7 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm min-w-[85px]">
-                                <span className="text-gray-400 font-bold uppercase tracking-wider mb-0.5" style={{ fontSize: s(0.65) }}>AVANCE</span>
+                                <span className="text-gray-400 font-bold uppercase tracking-wider mb-0.5 g3p-texto-min g3:normal-case g3:tracking-normal" style={{ fontSize: s(0.65) }}>{nuevo ? 'Avance' : 'AVANCE'}</span>
                                 <span className="font-bold text-gray-700 leading-tight" style={{ fontSize: s(1.15) }}>{porcentaje}%</span>
                             </div>
                         )}

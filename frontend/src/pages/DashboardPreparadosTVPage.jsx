@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Snowflake } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, Snowflake, CheckCircle2 } from 'lucide-react';
 import { Loader } from '../components/common';
 import { Toaster } from 'react-hot-toast';
 import ProyectoTimeline from '../components/produccion/ProyectoTimeline';
@@ -7,6 +7,8 @@ import EstadisticasHeader from '../components/produccion/EstadisticasHeader';
 import { useProduccionData } from '../hooks/useProduccionData';
 import { sortProyectosPorUrgencia } from '../utils/produccion';
 import { px } from '../utils/produccion';
+import { useTvG3 } from '../diseno-3g/tvG3';
+import { BarraTv, VivoTv, ControlesTv, CargandoTv } from '../diseno-3g/PiezasTv';
 
 const DashboardPreparadosTVPage = () => {
     // Hook para datos (modo público, refresh cada 1 min)
@@ -15,6 +17,8 @@ const DashboardPreparadosTVPage = () => {
         refreshInterval: 60 * 1000,
         isPublic: true
     });
+    // Diseño 3G para TV: solo si la liga de esta pantalla trae ?diseno=3g (ver diseno-3g/tvG3.js). Mismos datos y misma frecuencia.
+    const tv = useTvG3();
 
     // Zoom y Orientación (persistidos en localStorage con key diferente)
     const [zoomLevel, setZoomLevel] = useState(() => {
@@ -101,7 +105,47 @@ const DashboardPreparadosTVPage = () => {
     );
 
     if (loading && proyectos.length === 0) {
+        if (tv) return <CargandoTv>Cargando proyectos…</CargandoTv>;
         return <div className="flex items-center justify-center h-screen"><Loader size="lg" /></div>;
+    }
+
+    if (tv) {
+        return (
+            <div className="g3tv-fijo" style={{ '--escala': zoomLevel }}>
+                <Toaster position="top-right" />
+                <div className="w-full h-full transition-all duration-300 origin-center" style={getRotationStyle()}>
+                    <div className="g3tv-desplaza">
+                        <div className="g3tv-pila">
+                            <BarraTv
+                                titulo="Proyectos completados"
+                                subtitulo={<><b>{proyectosPreparados.length}</b> proyecto{proyectosPreparados.length !== 1 ? 's' : ''} completado{proyectosPreparados.length !== 1 ? 's' : ''}</>}
+                                derecha={<VivoTv>En vivo · se actualiza cada minuto</VivoTv>}
+                            />
+                            <div className="g3tv-resumen">
+                                {proyectosCongelados.length > 0 && (
+                                    <section className="g3tv-panel" aria-label="Proyectos completados pausados">
+                                        <div className="g3tv-panel-cab"><Snowflake aria-hidden="true" />Proyectos completados pausados ({proyectosCongelados.length})</div>
+                                        <div className="g3tv-chips">
+                                            {proyectosCongelados.map(p => <span key={p.id} title={p.nombre}>{p.nombre}</span>)}
+                                        </div>
+                                    </section>
+                                )}
+                            </div>
+                            {proyectosPreparados.length > 0 ? (
+                                <div className="g3tv-mapa g3tv-lista">
+                                    {proyectosPreparados.map(proyecto => (
+                                        <ProyectoTimeline key={proyecto.id} proyecto={proyecto} modoPreparados />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="g3tv-vacio"><CheckCircle2 aria-hidden="true" /><b>No hay proyectos completados</b></div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <ControlesTv visibles={controlsVisible} rotacion={rotacion} zoom={zoomLevel} onReducir={handleZoomOut} onAumentar={handleZoomIn} onRotar={rotar} />
+            </div>
+        );
     }
 
     return (

@@ -3,6 +3,7 @@ import { X, Plus, Save, Trash2, Package, Search, Check, Edit2 } from 'lucide-rea
 import camionetasService from '../../services/camionetas.service';
 import herramientasRentaService from '../../services/herramientasRenta.service';
 import toast from 'react-hot-toast';
+import { g3Activo, confirmarG3, pedirTextoG3 } from '../../diseno-3g/dialogosG3';
 
 const ConfigurarStockMinimoModal = ({ camioneta, onClose, onActualizar }) => {
   const [tiposHerramientas, setTiposHerramientas] = useState([]);
@@ -119,7 +120,9 @@ const ConfigurarStockMinimoModal = ({ camioneta, onClose, onActualizar }) => {
   };
 
   const eliminarConfiguracion = async (stockId, nombreHerramienta) => {
-    if (!window.confirm(`¿Eliminar configuración de ${nombreHerramienta}?`)) {
+    if (g3Activo()) {
+      if (!(await confirmarG3({ titulo: `¿Eliminar la configuración de ${nombreHerramienta}?`, datos: [['Equipo', camioneta?.nombre || '']], confirmar: 'Eliminar configuración', cancelar: 'No eliminar', peligro: true }))) return;
+    } else if (!window.confirm(`¿Eliminar configuración de ${nombreHerramienta}?`)) {
       return;
     }
 
@@ -138,10 +141,21 @@ const ConfigurarStockMinimoModal = ({ camioneta, onClose, onActualizar }) => {
   };
 
   const editarConfiguracion = async (stock) => {
-    const nuevaCantidad = prompt(
-      `Nueva cantidad mínima para ${stock.tipoHerramienta.nombre}:`,
-      stock.cantidad_minima
-    );
+    // Diseño 3G encendido: cajón con el mismo campo y el mismo valor inicial (devuelve lo mismo que prompt(): el texto
+    // o null). La validación de abajo es la de siempre.
+    const nuevaCantidad = g3Activo()
+      ? await pedirTextoG3({
+        titulo: 'Cambiar la cantidad mínima',
+        datos: [['Equipo', camioneta?.nombre || ''], ['Herramienta', stock.tipoHerramienta.nombre], ['Mínimo actual', String(stock.cantidad_minima)]],
+        etiqueta: `Nueva cantidad mínima para ${stock.tipoHerramienta.nombre}`,
+        valor: stock.cantidad_minima,
+        modoTeclado: 'numeric',
+        confirmar: 'Guardar cantidad', cancelar: 'Regresar',
+      })
+      : prompt(
+        `Nueva cantidad mínima para ${stock.tipoHerramienta.nombre}:`,
+        stock.cantidad_minima
+      );
 
     if (!nuevaCantidad || nuevaCantidad === stock.cantidad_minima.toString()) {
       return;

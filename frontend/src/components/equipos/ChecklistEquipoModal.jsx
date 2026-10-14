@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ClipboardCheck, Plus, Trash2, Package, Loader, Check, Search, Wrench, Box } from 'lucide-react';
 import toast from 'react-hot-toast';
 import checklistService from '../../services/checklist.service';
+import { g3Activo, confirmarG3 } from '../../diseno-3g/dialogosG3';
 
 const ChecklistEquipoModal = ({ isOpen, onClose, equipo }) => {
   const [checklist, setChecklist] = useState([]);
@@ -58,7 +59,13 @@ const ChecklistEquipoModal = ({ isOpen, onClose, equipo }) => {
   const asignarTodos = async () => {
     const itemsTipo = todosLosItems.filter(i => i.tipo === tabActiva && !idsAsignados.has(i.id));
     if (itemsTipo.length === 0) return;
-    if (!confirm(`¿Asignar ${itemsTipo.length} ${tabActiva === 'herramienta' ? 'herramientas' : 'materiales'} a este equipo?`)) return;
+    if (g3Activo()) {
+      if (!(await confirmarG3({
+        titulo: `¿Asignar ${itemsTipo.length} ${tabActiva === 'herramienta' ? 'herramientas' : 'materiales'} a este equipo?`,
+        datos: [['Equipo', equipo?.nombre || ''], ['Renglones', itemsTipo.slice(0, 6).map(i => i.nombre).join(', ') + (itemsTipo.length > 6 ? ` y ${itemsTipo.length - 6} más` : '')]],
+        confirmar: 'Asignar al equipo', cancelar: 'Regresar',
+      }))) return;
+    } else if (!confirm(`¿Asignar ${itemsTipo.length} ${tabActiva === 'herramienta' ? 'herramientas' : 'materiales'} a este equipo?`)) return;
     try {
       const items = itemsTipo.map(i => ({
         checklist_item_id: i.id,

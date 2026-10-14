@@ -4,6 +4,15 @@ import movimientosService from '../services/movimientos.service';
 import { Loader, Modal } from '../components/common';
 import toast from 'react-hot-toast';
 import { generateTicketPDF } from '../utils/pdfGenerator';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import { cx, etq } from '../diseno-3g/dialogosG3';
+
+// Diseño 3G: estado del movimiento con color y texto
+const ESTADO_G3 = {
+  completado: ['ok', 'Completado'], pendiente_aprobacion: ['aviso', 'Pendiente de aprobación'], aprobado: ['info', 'Aprobado'],
+  rechazado: ['mal', 'Rechazado'], pendiente: ['neutro', 'Pendiente'], cancelado: ['neutro', 'Cancelado'],
+  listo_para_entrega: ['neutro', 'Listo para entregar'], entregado: ['neutro', 'Entregado'],
+};
 
 const HistorialPage = () => {
   const [movimientos, setMovimientos] = useState([]);
@@ -11,6 +20,7 @@ const HistorialPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMovimiento, setSelectedMovimiento] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const g3 = useDiseno3G(); // Diseño 3G: tabla en tarjetas y estados con texto (apagado, lo de siempre)
 
   useEffect(() => {
     fetchHistorial();
@@ -55,8 +65,8 @@ const HistorialPage = () => {
   return (
     <div className="p-6">
       {/* Barra de búsqueda */}
-      <div className="mb-6 flex items-center gap-4">
-        <div className="flex-1 relative">
+      <div className="mb-6 flex items-center gap-4 g3:max-sm:flex-wrap g3:max-sm:gap-2">
+        <div className="flex-1 relative g3:max-sm:basis-full">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
@@ -76,11 +86,11 @@ const HistorialPage = () => {
       </div>
 
       {/* Tabla de historial */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className={g3 ? 'g3-tabla g3-tabla--tarjetas' : 'bg-white rounded-xl shadow-sm overflow-hidden'}>
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Ticket</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{g3 ? 'Ticket' : 'ID Ticket'}</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proyecto</th>
@@ -99,19 +109,19 @@ const HistorialPage = () => {
             ) : (
               filteredMovimientos.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900">
+                  <td className={cx('px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900', g3 && 'g3-celda-titulo')}>
                     {item.ticket_id}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" {...etq(g3, 'Fecha')}>
                     {new Date(item.created_at || item.createdAt).toLocaleDateString('es-MX')} {new Date(item.created_at || item.createdAt).toLocaleTimeString('es-MX')}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900" {...etq(g3, 'Usuario')}>
                     {item.usuario?.nombre || 'N/A'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900" {...etq(g3, 'Proyecto')}>
                     {item.proyecto || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Tipo')}>
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                       item.tipo === 'retiro'
                         ? 'bg-orange-100 text-orange-800'
@@ -120,7 +130,10 @@ const HistorialPage = () => {
                       {item.tipo}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-estado')}>
+                    {g3 ? (
+                      <span className={`g3-estado g3-estado--${(ESTADO_G3[item.estado] || ['neutro'])[0]}`}>{(ESTADO_G3[item.estado] || [null, item.estado])[1]}</span>
+                    ) : (
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                       item.estado === 'completado' ? 'bg-green-100 text-green-800' :
                       item.estado === 'pendiente_aprobacion' ? 'bg-yellow-100 text-yellow-800' :
@@ -132,18 +145,19 @@ const HistorialPage = () => {
                     }`}>
                       {item.estado === 'pendiente_aprobacion' ? 'Pendiente Aprobación' : item.estado}
                     </span>
+                    )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                  <td className={cx('px-6 py-4 whitespace-nowrap text-right text-sm', g3 && 'g3-celda-acciones')}>
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => handleVerDetalles(item)}
-                        className="text-red-700 hover:text-red-900 font-medium"
+                        className={g3 ? 'g3-btn g3-btn--tonal g3-btn--ch' : 'text-red-700 hover:text-red-900 font-medium'}
                       >
-                        Ver Detalles
+                        {g3 ? 'Ver detalles' : 'Ver Detalles'}
                       </button>
                       <button
                         onClick={() => generateTicketPDF(item)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-700 text-white rounded-lg hover:bg-red-800 transition-colors"
+                        className={g3 ? 'g3-btn g3-btn--ch' : 'inline-flex items-center gap-1 px-3 py-1.5 bg-red-700 text-white rounded-lg hover:bg-red-800 transition-colors'}
                         title="Descargar PDF"
                       >
                         <Download size={16} />
@@ -162,7 +176,7 @@ const HistorialPage = () => {
       <Modal
         isOpen={showModal}
         onClose={handleCloseModal}
-        title="Detalles del Movimiento"
+        title={g3 ? 'Detalles del movimiento' : 'Detalles del Movimiento'}
         size="lg"
       >
         {selectedMovimiento && (

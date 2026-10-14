@@ -9,16 +9,20 @@ import {
     Package,
     AlertCircle,
     ChevronRight,
-    RefreshCw
+    RefreshCw,
+    ClipboardList
 } from 'lucide-react';
 import miEquipoService from '../services/miEquipo.service';
 import { Loader, Button } from '../components/common';
 import { useAuth } from '../context/AuthContext';
 import { getImageUrl } from '../utils/imageUtils';
 import toast from 'react-hot-toast';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
 
 const MiEquipoPage = () => {
     const { user } = useAuth();
+    const g3 = useDiseno3G(); // Diseño 3G: encabezado, estados con texto y sin emojis (apagado, lo de siempre)
     const esAdmin = user?.rol === 'administrador';
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
@@ -66,6 +70,12 @@ const MiEquipoPage = () => {
             malo: { color: 'bg-red-100 text-red-800 border-red-200', icon: '🔴' }
         };
         const badge = badges[condicion] || badges.bueno;
+        if (g3) {
+            // Mismo texto que hoy (la condición tal cual, «Bueno» si no trae); el color sigue al estado
+            const g3c = { bueno: ['ok', 'Bueno'], regular: ['aviso', 'Regular'], malo: ['mal', 'Malo'] }[condicion]
+                || (condicion ? ['neutro', condicion.charAt(0).toUpperCase() + condicion.slice(1)] : ['ok', 'Bueno']);
+            return <span className={`g3-estado g3-estado--${g3c[0]}`}>{g3c[1]}</span>;
+        }
         return (
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${badge.color}`}>
                 {badge.icon} {condicion || 'Bueno'}
@@ -83,6 +93,33 @@ const MiEquipoPage = () => {
     return (
         <div className="p-6 max-w-6xl mx-auto">
             {/* Header */}
+            {g3 ? (
+                <CabG3
+                    titulo={viendoOtro ? `Equipo de ${usuarioVisto.nombre}` : 'Mi equipo'}
+                    descripcion={viendoOtro ? `Viendo como administrador · rol del usuario: ${usuarioVisto.rol}` : `Bienvenido, ${user?.nombre || ''}`}
+                >
+                    {esAdmin && (
+                        <select
+                            value={usuarioSeleccionado}
+                            onChange={(e) => setUsuarioSeleccionado(e.target.value)}
+                            className="g3-selector g3p-selector-cab"
+                            title="Ver el equipo de otro usuario"
+                            aria-label="Ver el equipo de otro usuario"
+                        >
+                            <option value="">Mi propio equipo</option>
+                            {usuariosDisponibles.length > 0 && <option disabled>──────────</option>}
+                            {usuariosDisponibles.map(u => (
+                                <option key={u.id} value={u.id}>
+                                    {u.nombre} ({u.rol})
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                    <button type="button" onClick={handleRefresh} disabled={refreshing} className="g3-btn g3-btn--ch">
+                        <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" /> Actualizar
+                    </button>
+                </CabG3>
+            ) : (
             <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -125,13 +162,14 @@ const MiEquipoPage = () => {
                     </Button>
                 </div>
             </div>
+            )}
 
             {/* Estadísticas */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-500">{viendoOtro ? 'Herramientas' : 'Mis Herramientas'}</p>
+                            <p className="text-sm text-gray-500">{viendoOtro ? 'Herramientas' : (g3 ? 'Mis herramientas' : 'Mis Herramientas')}</p>
                             <p className="text-3xl font-bold text-gray-900">{stats.totalHerramientas || 0}</p>
                         </div>
                         <div className="p-3 bg-blue-100 rounded-xl">
@@ -139,16 +177,26 @@ const MiEquipoPage = () => {
                         </div>
                     </div>
                     <div className="mt-3 flex gap-2 text-xs">
+                        {g3 ? (
+                            <>
+                                <span className="g3-estado g3-estado--ok">Buenas {stats.herramientasPorCondicion?.bueno || 0}</span>
+                                <span className="g3-estado g3-estado--aviso">Regulares {stats.herramientasPorCondicion?.regular || 0}</span>
+                                <span className="g3-estado g3-estado--mal">Malas {stats.herramientasPorCondicion?.malo || 0}</span>
+                            </>
+                        ) : (
+                        <>
                         <span className="px-2 py-1 bg-green-50 text-green-700 rounded">🟢 {stats.herramientasPorCondicion?.bueno || 0}</span>
                         <span className="px-2 py-1 bg-yellow-50 text-yellow-700 rounded">🟡 {stats.herramientasPorCondicion?.regular || 0}</span>
                         <span className="px-2 py-1 bg-red-50 text-red-700 rounded">🔴 {stats.herramientasPorCondicion?.malo || 0}</span>
+                        </>
+                        )}
                     </div>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-500">{viendoOtro ? 'Camionetas' : 'Mis Camionetas'}</p>
+                            <p className="text-sm text-gray-500">{viendoOtro ? 'Camionetas' : (g3 ? 'Mis camionetas' : 'Mis Camionetas')}</p>
                             <p className="text-3xl font-bold text-gray-900">{stats.totalCamionetas || 0}</p>
                         </div>
                         <div className="p-3 bg-purple-100 rounded-xl">
@@ -165,7 +213,7 @@ const MiEquipoPage = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-500">Alertas Stock</p>
+                            <p className="text-sm text-gray-500">{g3 ? 'Alertas de stock' : 'Alertas Stock'}</p>
                             <p className="text-3xl font-bold text-gray-900">{stats.alertasStock || 0}</p>
                         </div>
                         <div className={`p-3 rounded-xl ${stats.alertasStock > 0 ? 'bg-orange-100' : 'bg-green-100'}`}>
@@ -187,7 +235,7 @@ const MiEquipoPage = () => {
                 <div className="px-6 py-4 border-b border-gray-200">
                     <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                         <Wrench size={20} className="text-blue-600" />
-                        {viendoOtro ? 'Herramientas Asignadas' : 'Mis Herramientas Asignadas'}
+                        {viendoOtro ? (g3 ? 'Herramientas asignadas' : 'Herramientas Asignadas') : (g3 ? 'Mis herramientas asignadas' : 'Mis Herramientas Asignadas')}
                     </h2>
                 </div>
                 <div className="p-4">
@@ -247,7 +295,7 @@ const MiEquipoPage = () => {
                     <div className="px-6 py-4 border-b border-gray-200">
                         <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                             <Truck size={20} className="text-purple-600" />
-                            {viendoOtro ? 'Camionetas a Cargo' : 'Mis Camionetas a Cargo'}
+                            {viendoOtro ? (g3 ? 'Camionetas a cargo' : 'Camionetas a Cargo') : (g3 ? 'Mis camionetas a cargo' : 'Mis Camionetas a Cargo')}
                         </h2>
                     </div>
                     <div className="p-4">
@@ -295,15 +343,24 @@ const MiEquipoPage = () => {
                                     </div>
 
                                     <div className="flex items-center gap-4 text-sm text-gray-600">
+                                        {g3 ? (
+                                            <>
+                                                <span className="inline-flex items-center gap-1"><Package size={14} aria-hidden="true" />{camioneta.inventarioActual} herramientas</span>
+                                                <span className="inline-flex items-center gap-1"><ClipboardList size={14} aria-hidden="true" />{camioneta.stockMinimoConfigurado} tipos configurados</span>
+                                            </>
+                                        ) : (
+                                        <>
                                         <span>📦 {camioneta.inventarioActual} herramientas</span>
                                         <span>📋 {camioneta.stockMinimoConfigurado} tipos configurados</span>
+                                        </>
+                                        )}
                                     </div>
 
                                     {/* Alertas de faltantes */}
                                     {camioneta.alertas.length > 0 && (
                                         <div className="mt-3 pt-3 border-t border-orange-200">
                                             <p className="text-sm font-medium text-orange-800 mb-2">
-                                                ⚠️ Herramientas faltantes:
+                                                {g3 ? <><AlertTriangle size={14} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" />Herramientas faltantes:</> : '⚠️ Herramientas faltantes:'}
                                             </p>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {camioneta.alertas.map((alerta, idx) => (

@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, X, CheckCircle, AlertCircle, Plus, Minus, Trash2, ShoppingCart, SwitchCamera } from 'lucide-react';
+import { Camera, X, CheckCircle, AlertCircle, Plus, Minus, Trash2, ShoppingCart, SwitchCamera, Package } from 'lucide-react';
+import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
 import toast from 'react-hot-toast';
 import articulosService from '../../services/articulos.service';
 import { usePedido } from '../../context/PedidoContext';
 import { getImageUrl } from '../../utils/imageUtils';
+import { g3Activo, confirmarG3 } from '../../diseno-3g/dialogosG3';
 
 const EAN13Scanner = ({ onClose }) => {
+  const g3 = useDiseno3G(); // Diseño 3G: ícono en vez de emoji (apagado, lo de siempre)
   const [isScanning, setIsScanning] = useState(false);
   const [cameras, setCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState(null);
@@ -186,6 +189,22 @@ const EAN13Scanner = ({ onClose }) => {
   // Cancelar y limpiar carrito
   const cancelar = () => {
     if (carritoEscaneados.length > 0) {
+      // Diseño 3G encendido y con la cámara apagada: vista previa del paquete. Con la cámara encendida se queda el
+      // confirm() de siempre, que detiene la lectura mientras pregunta (un diálogo propio la dejaría seguir leyendo).
+      if (g3Activo() && !isScanning) {
+        const n = carritoEscaneados.length;
+        confirmarG3({
+          titulo: '¿Descartar los artículos escaneados?',
+          datos: [['Artículos escaneados', String(n)]],
+          pasa: ['No se agregan al pedido y se cierra el escáner.'],
+          confirmar: 'Descartar', cancelar: 'Seguir escaneando', peligro: true,
+        }).then((si) => {
+          if (!si) return;
+          setCarritoEscaneados([]);
+          onClose();
+        });
+        return;
+      }
       if (window.confirm('¿Deseas descartar los artículos escaneados?')) {
         setCarritoEscaneados([]);
         onClose();
@@ -345,7 +364,7 @@ const EAN13Scanner = ({ onClose }) => {
                   className="w-14 h-14 sm:w-16 sm:h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center text-xl sm:text-2xl"
                   style={{ display: item.articulo.imagen_url ? 'none' : 'flex' }}
                 >
-                  📦
+                  {g3 ? <Package size={24} className="text-gray-400" aria-hidden="true" /> : '📦'}
                 </div>
               </div>
 
@@ -408,6 +427,14 @@ const EAN13Scanner = ({ onClose }) => {
         </button>
         <button
           onClick={() => {
+            if (g3Activo() && !isScanning) {
+              confirmarG3({
+                titulo: '¿Vaciar el carrito?',
+                datos: [['Artículos escaneados', String(carritoEscaneados.length)]],
+                confirmar: 'Vaciar carrito', cancelar: 'No vaciar', peligro: true,
+              }).then((si) => { if (si) setCarritoEscaneados([]); });
+              return;
+            }
             if (window.confirm('¿Deseas vaciar el carrito?')) {
               setCarritoEscaneados([]);
             }

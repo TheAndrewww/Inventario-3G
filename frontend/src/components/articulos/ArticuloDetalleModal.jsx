@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, MapPin, DollarSign, Hash, Box, Edit, Sparkles, Eye, PackagePlus, PackageMinus, Clock } from 'lucide-react';
+import { X, Package, MapPin, DollarSign, Hash, Box, Edit, Sparkles, Eye, PackagePlus, PackageMinus, Clock, Wrench, User, Users } from 'lucide-react';
+import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
 import { Modal } from '../common';
 import BarcodeDisplay from './BarcodeDisplay';
 import UnidadHerramientaDetalleModal from './UnidadHerramientaDetalleModal';
 import { getImageUrl } from '../../utils/imageUtils';
 import articulosService from '../../services/articulos.service';
 import herramientasRentaService from '../../services/herramientasRenta.service';
+import { g3Activo, confirmarG3, avisoG3 } from '../../diseno-3g/dialogosG3';
 
 const ArticuloDetalleModal = ({
   articulo,
@@ -19,6 +21,7 @@ const ArticuloDetalleModal = ({
   puedeGestionarInventario = false,
   puedeRegistrarSalida = false
 }) => {
+  const g3 = useDiseno3G(); // Diseño 3G: íconos en vez de emojis (apagado, el DOM de siempre)
   const [imagenExpandida, setImagenExpandida] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
 
@@ -116,14 +119,23 @@ const ArticuloDetalleModal = ({
   const handleReprocessImage = async () => {
     if (!articulo.imagen_url) return;
 
-    if (!confirm('¿Reprocesar esta imagen con IA para mejorar su calidad? Esto puede tardar unos segundos.')) {
+    // Diseño 3G encendido: vista previa y avisos del paquete; apagado, el confirm()/alert() de siempre.
+    if (g3Activo()) {
+      if (!(await confirmarG3({
+        titulo: '¿Reprocesar esta imagen con IA?',
+        texto: 'Mejora la calidad de la foto. Esto puede tardar unos segundos.',
+        datos: [['Artículo', articulo.nombre]],
+        confirmar: 'Reprocesar imagen', cancelar: 'No reprocesar',
+      }))) return;
+    } else if (!confirm('¿Reprocesar esta imagen con IA para mejorar su calidad? Esto puede tardar unos segundos.')) {
       return;
     }
 
     setReprocessing(true);
     try {
       const result = await articulosService.reprocessImagen(articulo.id);
-      alert('✅ Imagen reprocesada exitosamente con IA');
+      if (g3Activo()) avisoG3('Imagen reprocesada con IA.', 'ok');
+      else alert('✅ Imagen reprocesada exitosamente con IA');
 
       // Notificar al componente padre para actualizar la lista
       if (onImageReprocessed) {
@@ -131,7 +143,8 @@ const ArticuloDetalleModal = ({
       }
     } catch (error) {
       console.error('Error al reprocesar imagen:', error);
-      alert('❌ ' + (error.message || 'Error al reprocesar imagen. Verifica que Nano Banana esté configurado.'));
+      if (g3Activo()) avisoG3(error.message || 'Error al reprocesar imagen. Verifica que Nano Banana esté configurado.', 'mal');
+      else alert('❌ ' + (error.message || 'Error al reprocesar imagen. Verifica que Nano Banana esté configurado.'));
     } finally {
       setReprocessing(false);
     }
@@ -177,7 +190,7 @@ const ArticuloDetalleModal = ({
                 </div>
               ) : (
                 <div className="w-24 h-24 bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center text-4xl">
-                  📦
+                  {g3 ? <Package size={40} className="text-gray-400" aria-hidden="true" /> : '📦'}
                 </div>
               )}
             </div>
@@ -216,7 +229,7 @@ const ArticuloDetalleModal = ({
         {articulo.es_herramienta && (
           <div className="bg-orange-50 border border-orange-200 rounded-lg overflow-hidden">
             <div className="flex items-center gap-2 p-4 border-b border-orange-200 bg-orange-100">
-              <span className="text-2xl">🔧</span>
+              {g3 ? <Wrench size={24} className="text-orange-700 shrink-0" aria-hidden="true" /> : <span className="text-2xl">🔧</span>}
               <div>
                 <p className="text-sm font-medium text-orange-900">
                   Herramienta de Renta - Unidades Individuales
@@ -263,17 +276,17 @@ const ArticuloDetalleModal = ({
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.bg} ${badge.text}`}>
-                            {badge.icon} {badge.label}
+                            {g3 ? badge.label : <>{badge.icon} {badge.label}</>}
                           </span>
                         </div>
                         {unidad.usuarioAsignado && (
                           <p className="text-xs text-gray-600 mt-1 truncate">
-                            👤 {unidad.usuarioAsignado.nombre}
+                            {g3 ? <User size={12} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '👤 '}{unidad.usuarioAsignado.nombre}
                           </p>
                         )}
                         {unidad.equipoAsignado && (
                           <p className="text-xs text-gray-600 mt-1 truncate">
-                            👥 {unidad.equipoAsignado.nombre}
+                            {g3 ? <Users size={12} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '👥 '}{unidad.equipoAsignado.nombre}
                           </p>
                         )}
                       </button>
@@ -401,7 +414,7 @@ const ArticuloDetalleModal = ({
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-500">Realizado por:</span>
                   <span className="text-sm font-medium text-gray-900">
-                    👤 {ultimoMovimiento.usuario.nombre}
+                    {g3 ? <User size={14} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '👤 '}{ultimoMovimiento.usuario.nombre}
                   </span>
                   <span className="text-xs text-gray-400">({ultimoMovimiento.usuario.rol})</span>
                 </div>

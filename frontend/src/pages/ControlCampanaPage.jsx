@@ -3,6 +3,8 @@ import { toast } from 'react-hot-toast';
 import { Loader2, Check, X, Trash2, Save, XCircle, Download, Eye, ChevronDown, ChevronRight } from 'lucide-react';
 import { campanaControlService } from '../services/campanaControl.service';
 import { useAuth } from '../context/AuthContext';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
 
 const QUARTERS = [
     { id: 1, name: '1ER TRIMESTRE', weeks: Array.from({ length: 13 }, (_, i) => i + 1) },
@@ -57,6 +59,7 @@ const AREAS = [
 const ControlCampanaPage = () => {
     const { user } = useAuth();
     const esSoloLectura = ['compras', 'encargado', 'almacen'].includes(user?.rol);
+    const g3 = useDiseno3G(); // Diseño 3G: encabezado del paquete, títulos en oración y colores de estado (apagado, lo de siempre)
 
     const [data, setData] = useState({});
     const [totals, setTotals] = useState({ byQuarter: {}, byArea: {} });
@@ -270,33 +273,42 @@ const ControlCampanaPage = () => {
     }
 
     return (
-        <div className="p-2 md:p-8 max-w-[1920px] mx-auto bg-gray-50 min-h-screen">
-            <header className="flex flex-col sm:flex-row items-center justify-between mb-4 md:mb-8 pb-4 border-b-4 border-red-700 bg-white p-4 md:p-6 rounded-lg shadow-sm gap-4">
+        <div className="p-2 md:p-8 max-w-[1920px] mx-auto bg-gray-50 min-h-screen g3:!bg-transparent g3:!min-h-0 g3:!p-4 g3:md:!p-6">
+            <header className={g3 ? 'g3-pila g3p-cab' : 'flex flex-col sm:flex-row items-center justify-between mb-4 md:mb-8 pb-4 border-b-4 border-red-700 bg-white p-4 md:p-6 rounded-lg shadow-sm gap-4'}>
+                {g3 ? (
+                    <div className="g3-cab">
+                        <div>
+                            <h1>Campaña de control 2026</h1>
+                            <p>Cada semana se califica a cada área como bien o mal, con una nota opcional. {esSoloLectura ? 'Toca un cuadro para ver su calificación y su nota.' : 'Toca un cuadro para calificar.'}</p>
+                        </div>
+                    </div>
+                ) : (
                 <div className="flex items-center gap-4 w-full sm:w-auto justify-center sm:justify-start">
                     <img src="/logo-3g.png" alt="3G Logo" className="h-8 md:h-12 w-auto" onError={(e) => e.target.style.display = 'none'} />
                     <h1 className="text-xl md:text-3xl font-bold text-gray-800 text-center sm:text-left">
                         CAMPAÑA DE <span className="text-red-700">CONTROL</span> 2026
                     </h1>
                 </div>
-                <div className="flex flex-wrap items-center justify-center gap-2">
+                )}
+                <div className={g3 ? 'g3-cab-acciones' : 'flex flex-wrap items-center justify-center gap-2'}>
                 <button
                     onClick={soloActual}
-                    className="bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all text-sm md:text-base"
+                    className={g3 ? 'g3-btn g3-btn--ch' : 'bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all text-sm md:text-base'}
                 >
                     Solo trimestre actual
                 </button>
                 <button
                     onClick={() => guardarOcultos([])}
-                    className="bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all text-sm md:text-base"
+                    className={g3 ? 'g3-btn g3-btn--ch' : 'bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-all text-sm md:text-base'}
                 >
                     Mostrar todos
                 </button>
                 <button
                     onClick={exportarComentarios}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 active:transform active:scale-95 transition-all flex items-center gap-2 shadow-md text-sm md:text-base"
+                    className={g3 ? 'g3-btn g3-btn--tonal g3-btn--ch' : 'bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 active:transform active:scale-95 transition-all flex items-center gap-2 shadow-md text-sm md:text-base'}
                 >
                     <Download className="w-4 h-4 md:w-5 md:h-5" />
-                    Exportar Comentarios
+                    {g3 ? 'Exportar comentarios' : 'Exportar Comentarios'}
                 </button>
                 </div>
             </header>
@@ -318,7 +330,7 @@ const ControlCampanaPage = () => {
                             <span className="text-red-700">✗ {getQuarterTotal(quarter.id, 'bad')}</span>
                             {(() => {
                                 const pct = getPct(getQuarterTotal(quarter.id, 'good'), getQuarterTotal(quarter.id, 'bad'));
-                                return <span className={`px-2 py-0.5 rounded ${pctClasses(pct)}`}>CAL {formatCalif(pct)}</span>;
+                                return <span className={`px-2 py-0.5 rounded ${pctClasses(pct)}`}>{g3 ? 'Calificación' : 'CAL'} {formatCalif(pct)}</span>;
                             })()}
                         </span>
                     </button>
@@ -336,7 +348,7 @@ const ControlCampanaPage = () => {
                         </button>
                         <button
                             onClick={() => toggleTrimestre(quarter.id)}
-                            className="md:hidden w-full flex items-center justify-center gap-2 py-2 font-bold text-red-700 bg-red-50 border-b border-red-100 text-lg sticky top-0 z-20"
+                            className="md:hidden w-full flex items-center justify-center gap-2 py-2 font-bold text-red-700 bg-red-50 border-b border-red-100 text-lg sticky top-0 z-20 g3:!text-g3-primario g3:!bg-g3-primario-tinte g3:!border-g3-linea"
                         >
                             <ChevronDown className="w-5 h-5" />
                             {quarter.name}
@@ -346,15 +358,15 @@ const ControlCampanaPage = () => {
                             <table className="w-full border-collapse min-w-[max-content]">
                                 <thead>
                                     <tr>
-                                        <th className="bg-red-700 text-white p-2 md:p-3 text-xs md:text-sm w-24 md:w-32 sticky left-0 z-20 shadow-md">AREA</th>
+                                        <th className="bg-red-700 text-white p-2 md:p-3 text-xs md:text-sm w-24 md:w-32 sticky left-0 z-20 shadow-md g3:!bg-g3-contenedor-alto g3:!text-g3-tinta g3:!border-g3-linea-fuerte">{g3 ? 'Área' : 'AREA'}</th>
                                         {quarter.weeks.map(week => (
-                                            <th key={week} className="bg-red-700 text-white border border-red-600 p-1 text-[10px] md:text-xs w-8 md:w-10 min-w-[32px]">
+                                            <th key={week} className="bg-red-700 text-white border border-red-600 p-1 text-[10px] md:text-xs w-8 md:w-10 min-w-[32px] g3:!bg-g3-contenedor-alto g3:!text-g3-tinta g3:!border-g3-linea-fuerte">
                                                 S{week}
                                             </th>
                                         ))}
                                         <th className="bg-green-600 text-white border border-green-500 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-[80px] md:right-[112px] z-10 shadow-sm">✓</th>
-                                        <th className="bg-red-700 text-white border border-red-800 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-[40px] md:right-[56px] z-10 shadow-sm">✗</th>
-                                        <th className="bg-blue-700 text-white border border-blue-800 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-0 z-10 shadow-md">CAL</th>
+                                        <th className="bg-red-700 text-white border border-red-800 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-[40px] md:right-[56px] z-10 shadow-sm g3:!bg-g3-mal g3:!text-g3-sobre-mal">✗</th>
+                                        <th className="bg-blue-700 text-white border border-blue-800 p-1 text-xs md:text-sm w-10 md:w-14 min-w-[40px] sticky right-0 z-10 shadow-md g3:!bg-g3-contenedor-alto g3:!text-g3-tinta g3:!border-g3-linea-fuerte" title={g3 ? 'Calificación' : undefined}>CAL</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -404,15 +416,15 @@ const ControlCampanaPage = () => {
                                             })()}
                                         </tr>
                                     ))}
-                                    <tr className="bg-red-800 text-white font-bold">
-                                        <td colSpan={14} className="p-2 text-right sticky left-0 bg-red-800 z-20 text-xs md:text-sm shadow-md">TRIM {quarter.id}</td>
+                                    <tr className="bg-red-800 text-white font-bold g3:!bg-g3-contenedor g3:!text-g3-tinta">
+                                        <td colSpan={14} className="p-2 text-right sticky left-0 bg-red-800 z-20 text-xs md:text-sm shadow-md g3:!bg-g3-contenedor g3:!text-g3-tinta">{g3 ? 'Trimestre' : 'TRIM'} {quarter.id}</td>
                                         <td className="p-2 text-center bg-green-700 text-sm md:text-base sticky right-[80px] md:right-[112px] z-10 shadow-sm">
                                             {getQuarterTotal(quarter.id, 'good')}
                                         </td>
-                                        <td className="p-2 text-center bg-red-900 text-sm md:text-base sticky right-[40px] md:right-[56px] z-10 shadow-sm">
+                                        <td className="p-2 text-center bg-red-900 text-sm md:text-base sticky right-[40px] md:right-[56px] z-10 shadow-sm g3:!bg-g3-mal g3:!text-g3-sobre-mal">
                                             {getQuarterTotal(quarter.id, 'bad')}
                                         </td>
-                                        <td className="p-2 text-center bg-blue-800 text-sm md:text-base sticky right-0 z-10 shadow-md">
+                                        <td className="p-2 text-center bg-blue-800 text-sm md:text-base sticky right-0 z-10 shadow-md g3:!bg-g3-contenedor g3:!text-g3-tinta">
                                             {formatCalif(getPct(getQuarterTotal(quarter.id, 'good'), getQuarterTotal(quarter.id, 'bad')))}
                                         </td>
                                     </tr>

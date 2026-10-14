@@ -2,13 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ClipboardCheck, Search, Package, CheckCircle2, AlertTriangle, ArrowRight, BarChart3, RefreshCw, X, Calendar, TrendingUp, ChevronDown, ChevronUp, FastForward } from 'lucide-react';
 import toast from 'react-hot-toast';
 import conteosCiclicosService from '../services/conteosCiclicos.service';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
+import { cx, etq, siG3 } from '../diseno-3g/dialogosG3';
 
 const ConteoCiclicoPage = () => {
     const [tab, setTab] = useState('conteo'); // 'conteo' | 'reportes'
+    const g3 = useDiseno3G(); // Diseño 3G: encabezado y pestañas del paquete (apagado, lo de siempre)
 
     return (
         <div className="p-4 md:p-6 max-w-5xl mx-auto">
             {/* Header */}
+            {g3 ? (
+                <CabG3 titulo="Conteo cíclico" descripcion="Lista diaria de artículos por contar: anota lo que hay en el estante y se compara con el sistema." />
+            ) : (
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-red-100 rounded-lg">
@@ -20,10 +27,12 @@ const ConteoCiclicoPage = () => {
                     </div>
                 </div>
             </div>
+            )}
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6">
+            <div className={cx('flex gap-1 bg-gray-100 rounded-lg p-1 mb-6', g3 && 'g3-pestanas g3p-pestanas-pagina')} {...siG3(g3, { role: 'tablist', 'aria-label': 'Conteo cíclico' })}>
                 <button
+                    {...siG3(g3, { role: 'tab', 'aria-selected': tab === 'conteo' })}
                     onClick={() => setTab('conteo')}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${tab === 'conteo'
                         ? 'bg-white text-red-700 shadow-sm'
@@ -31,9 +40,10 @@ const ConteoCiclicoPage = () => {
                         }`}
                 >
                     <ClipboardCheck size={18} />
-                    Conteo del Día
+                    {g3 ? 'Conteo del día' : 'Conteo del Día'}
                 </button>
                 <button
+                    {...siG3(g3, { role: 'tab', 'aria-selected': tab === 'reportes' })}
                     onClick={() => setTab('reportes')}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${tab === 'reportes'
                         ? 'bg-white text-red-700 shadow-sm'
@@ -67,6 +77,7 @@ const TabConteo = () => {
 
     const searchInputRef = useRef(null);
     const cantidadInputRef = useRef(null);
+    const g3 = useDiseno3G(); // Diseño 3G: colores de acción y textos sin emojis (apagado, lo de siempre)
 
     useEffect(() => {
         cargarConteoHoy();
@@ -145,15 +156,15 @@ const TabConteo = () => {
 
             const diff = cantidad - parseFloat(articuloSeleccionado.stock_actual);
             if (diff === 0) {
-                toast.success('✅ Cantidad coincide');
+                toast.success(g3 ? 'La cantidad coincide' : '✅ Cantidad coincide');
             } else if (diff > 0) {
-                toast(`Sobrante: +${diff}`, { icon: '📦' });
+                toast(`Sobrante: +${diff}`, g3 ? undefined : { icon: '📦' });
             } else {
-                toast(`Faltante: ${diff}`, { icon: '⚠️' });
+                toast(`Faltante: ${diff}`, g3 ? undefined : { icon: '⚠️' });
             }
 
             if (res.data?.sesion?.completado) {
-                toast.success('🎉 ¡Checklist del día completado!', { duration: 5000 });
+                toast.success(g3 ? 'Terminaste la lista de conteo del día.' : '🎉 ¡Checklist del día completado!', { duration: 5000 });
             }
 
             setConteo(prev => ({
@@ -231,7 +242,7 @@ const TabConteo = () => {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <span className={`text-2xl font-bold ${completado ? 'text-green-600' : 'text-red-600'}`}>
+                        <span className={`text-2xl font-bold ${completado ? 'text-green-600' : 'text-red-600 g3:!text-g3-tinta'}`}>
                             {progreso}%
                         </span>
                         <button
@@ -245,7 +256,7 @@ const TabConteo = () => {
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3">
                     <div
-                        className={`h-3 rounded-full transition-all duration-500 ${completado ? 'bg-gradient-to-r from-green-400 to-green-500' : 'bg-gradient-to-r from-red-500 to-red-600'
+                        className={`h-3 rounded-full transition-all duration-500 ${completado ? 'bg-gradient-to-r from-green-400 to-green-500 g3:!bg-none g3:!bg-g3-ok' : 'bg-gradient-to-r from-red-500 to-red-600 g3:!bg-none g3:!bg-g3-primario'
                             }`}
                         style={{ width: `${progreso}%` }}
                     ></div>
@@ -266,7 +277,7 @@ const TabConteo = () => {
                         <button
                             onClick={handleAdelantarConteo}
                             disabled={adelantando}
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium g3:!bg-none g3:!bg-g3-primario g3:hover:!bg-g3-primario-hover g3:!text-g3-sobre-primario g3:!shadow-none"
                         >
                             {adelantando ? (
                                 <>
@@ -276,7 +287,7 @@ const TabConteo = () => {
                             ) : (
                                 <>
                                     <FastForward size={20} />
-                                    Adelantar: Generar Nuevo Conteo
+                                    {g3 ? 'Generar conteo extra' : 'Adelantar: Generar Nuevo Conteo'}
                                 </>
                             )}
                         </button>
@@ -286,7 +297,7 @@ const TabConteo = () => {
                 <>
                     {/* Panel de registro */}
                     {articuloSeleccionado && (
-                        <div className="bg-white rounded-xl shadow-sm border-2 border-red-200 p-5">
+                        <div className="bg-white rounded-xl shadow-sm border-2 border-red-200 p-5 g3:!border-g3-primario">
                             <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-center gap-3">
                                     {articuloSeleccionado.imagen_url ? (
@@ -311,7 +322,7 @@ const TabConteo = () => {
 
                             <div className="flex gap-3">
                                 <div className="flex-1">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad Física</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{g3 ? 'Cantidad física' : 'Cantidad Física'}</label>
                                     <input
                                         ref={cantidadInputRef}
                                         type="number"
@@ -340,7 +351,7 @@ const TabConteo = () => {
                             <button
                                 onClick={registrarConteo}
                                 disabled={registrando || cantidadFisica === ''}
-                                className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                                className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium g3:!bg-g3-primario g3:hover:!bg-g3-primario-hover g3:!text-g3-sobre-primario"
                             >
                                 {registrando ? (
                                     <>
@@ -350,7 +361,7 @@ const TabConteo = () => {
                                 ) : (
                                     <>
                                         <CheckCircle2 size={20} />
-                                        Confirmar Conteo
+                                        {g3 ? 'Confirmar conteo' : 'Confirmar Conteo'}
                                     </>
                                 )}
                             </button>
@@ -365,7 +376,7 @@ const TabConteo = () => {
                             type="text"
                             value={busqueda}
                             onChange={e => setBusqueda(e.target.value)}
-                            placeholder="Buscar artículo por nombre, código o SKU..."
+                            placeholder={g3 ? 'Buscar artículo por nombre, código o clave' : 'Buscar artículo por nombre, código o SKU...'}
                             className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
                         />
                         {busqueda && (
@@ -392,7 +403,7 @@ const TabConteo = () => {
                                 <div
                                     key={articulo.id}
                                     onClick={() => seleccionarArticulo(articulo)}
-                                    className={`flex items-center gap-3 px-4 py-3 hover:bg-red-50 cursor-pointer transition-colors ${articuloSeleccionado?.id === articulo.id ? 'bg-red-50 border-l-4 border-l-red-500' : ''
+                                    className={`flex items-center gap-3 px-4 py-3 hover:bg-red-50 cursor-pointer transition-colors g3:hover:!bg-g3-hover ${articuloSeleccionado?.id === articulo.id ? 'bg-red-50 border-l-4 border-l-red-500 g3:!bg-g3-primario-tinte g3:!border-l-g3-primario' : ''
                                         }`}
                                 >
                                     {articulo.imagen_url ? (
@@ -536,7 +547,7 @@ const TabReportes = () => {
                     </div>
                     <button
                         onClick={aplicarFiltros}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors g3:!bg-g3-primario g3:hover:!bg-g3-primario-hover g3:!text-g3-sobre-primario"
                     >
                         Filtrar
                     </button>
@@ -625,7 +636,7 @@ const TabReportes = () => {
                             key={page}
                             onClick={() => cargarReportes(page)}
                             className={`px-3 py-1 rounded text-sm ${page === pagination.page
-                                ? 'bg-red-600 text-white'
+                                ? 'bg-red-600 text-white g3:!bg-g3-primario g3:!text-g3-sobre-primario'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 }`}
                         >
@@ -641,6 +652,7 @@ const TabReportes = () => {
 // ============ RESUMEN DETALLE ============
 const ResumenDetalle = ({ resumen }) => {
     const { estadisticas, articulos } = resumen;
+    const g3 = useDiseno3G(); // Diseño 3G: la tabla se vuelve tarjetas en celular (apagado, la de siempre)
 
     return (
         <div className="space-y-3">
@@ -667,16 +679,16 @@ const ResumenDetalle = ({ resumen }) => {
                 <div>
                     <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
                         <AlertTriangle size={14} className="text-yellow-500" />
-                        Artículos con Diferencia
+                        {g3 ? 'Artículos con diferencia' : 'Artículos con Diferencia'}
                     </h4>
-                    <div className="overflow-x-auto">
+                    <div className={cx('overflow-x-auto', g3 && 'g3-tabla g3-tabla--tarjetas')}>
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-gray-50">
                                     <th className="text-left px-3 py-2 font-medium text-gray-600">Artículo</th>
                                     <th className="text-right px-3 py-2 font-medium text-gray-600">Sistema</th>
                                     <th className="text-right px-3 py-2 font-medium text-gray-600">Físico</th>
-                                    <th className="text-right px-3 py-2 font-medium text-gray-600">Dif.</th>
+                                    <th className="text-right px-3 py-2 font-medium text-gray-600">{g3 ? 'Diferencia' : 'Dif.'}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -685,15 +697,15 @@ const ResumenDetalle = ({ resumen }) => {
                                     .sort((a, b) => Math.abs(parseFloat(b.diferencia)) - Math.abs(parseFloat(a.diferencia)))
                                     .map(item => (
                                         <tr key={item.id} className="hover:bg-gray-50">
-                                            <td className="px-3 py-2">
+                                            <td className={cx('px-3 py-2', g3 && 'g3-celda-titulo')}>
                                                 <p className="font-medium text-gray-800 truncate max-w-[200px]">
                                                     {item.articulo?.nombre || `ID: ${item.articulo_id}`}
                                                 </p>
                                             </td>
-                                            <td className="text-right px-3 py-2 text-gray-600">{parseFloat(item.cantidad_sistema)}</td>
-                                            <td className="text-right px-3 py-2 text-gray-600">{parseFloat(item.cantidad_fisica)}</td>
+                                            <td className="text-right px-3 py-2 text-gray-600" {...etq(g3, 'Sistema')}>{parseFloat(item.cantidad_sistema)}</td>
+                                            <td className="text-right px-3 py-2 text-gray-600" {...etq(g3, 'Físico')}>{parseFloat(item.cantidad_fisica)}</td>
                                             <td className={`text-right px-3 py-2 font-semibold ${parseFloat(item.diferencia) > 0 ? 'text-yellow-600' : 'text-red-600'
-                                                }`}>
+                                                }`} {...etq(g3, 'Diferencia')}>
                                                 {parseFloat(item.diferencia) > 0 ? '+' : ''}{parseFloat(item.diferencia)}
                                             </td>
                                         </tr>
@@ -707,7 +719,7 @@ const ResumenDetalle = ({ resumen }) => {
             {estadisticas.con_diferencia === 0 && estadisticas.total_contados > 0 && (
                 <div className="text-center py-2 text-green-600 font-medium flex items-center justify-center gap-2">
                     <CheckCircle2 size={16} />
-                    Todo coincide perfectamente
+                    {g3 ? 'Todo coincide con el sistema' : 'Todo coincide perfectamente'}
                 </div>
             )}
         </div>

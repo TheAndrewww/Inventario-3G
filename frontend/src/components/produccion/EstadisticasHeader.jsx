@@ -1,8 +1,10 @@
 import React from 'react';
 import { ETAPAS_CONFIG } from './ProyectoTimeline';
 import { s, px } from '../../utils/produccion';
+import { useTvG3 } from '../../diseno-3g/tvG3';
 
 const EstadisticasHeader = ({ estadisticas }) => {
+    const tv = useTvG3(); // Diseño 3G para TV (solo con ?diseno=3g en la pantalla de TV); si no, lo de siempre
 
     const items = [
         { label: 'En Diseño', value: estadisticas.diseno || 0, color: ETAPAS_CONFIG.diseno.color, icon: ETAPAS_CONFIG.diseno.icon },
@@ -11,8 +13,25 @@ const EstadisticasHeader = ({ estadisticas }) => {
         { label: 'Completado', value: estadisticas.instalacion || 0, color: ETAPAS_CONFIG.instalacion.color, icon: ETAPAS_CONFIG.instalacion.icon },
     ];
 
+    if (tv) {
+        // Mismos números y mismas etiquetas (en oración), con el ícono de cada etapa en su color.
+        return (
+            <section className="g3tv-kpis" aria-label="Proyectos por etapa">
+                {items.map(item => {
+                    const Icon = item.icon;
+                    return (
+                        <div key={item.label} className="g3tv-kpi">
+                            <div className="g3tv-kpi-cab"><Icon aria-hidden="true" style={{ color: item.color }} />{item.label.charAt(0) + item.label.slice(1).toLowerCase()}</div>
+                            <div className="g3tv-kpi-valor">{item.value}</div>
+                        </div>
+                    );
+                })}
+            </section>
+        );
+    }
+
     return (
-        <div className="grid grid-cols-4 mb-6" style={{ gap: px(8) }}>
+        <div className="grid grid-cols-4 mb-6 g3:max-md:grid-cols-2" style={{ gap: px(8) }}>
             {items.map(item => {
                 const Icon = item.icon;
                 return (

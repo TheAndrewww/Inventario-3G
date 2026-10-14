@@ -11,6 +11,8 @@ import movimientosService from '../../services/movimientos.service';
 import EAN13InputScanner from './EAN13InputScanner';
 import { useAuth } from '../../context/AuthContext';
 import { getImageUrl } from '../../utils/imageUtils';
+import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
+import { g3Activo } from '../../diseno-3g/dialogosG3';
 
 // Unidades que admiten decimales; cualquier otra (piezas, cajas, unidades…) es entera.
 // La comparación es case-insensitive porque la unidad se guarda en MAYÚSCULAS
@@ -27,6 +29,7 @@ const sanitizarCantidad = (value, unidad) => {
 };
 
 const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigoInicial = null, nombreInicial = null, permisosAlmacenAbiertos = false, mantenerPendiente = false }) => {
+  const g3 = useDiseno3G(); // Diseño 3G: solo textos sin emojis (apagado, el DOM de siempre)
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState([]);
@@ -519,7 +522,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
         observaciones: `Ingreso de inventario: ${articuloSeleccionado.nombre}`
       });
 
-      toast.success(`✅ Ingreso exitoso de ${cantidadIngreso} ${articuloSeleccionado.unidad} de ${articuloSeleccionado.nombre}`);
+      toast.success(g3Activo() ? `Ingreso registrado: ${cantidadIngreso} ${articuloSeleccionado.unidad} de ${articuloSeleccionado.nombre}` : `✅ Ingreso exitoso de ${cantidadIngreso} ${articuloSeleccionado.unidad} de ${articuloSeleccionado.nombre}`);
 
       // Limpiar y cerrar
       handleCancelarModoIngreso();
@@ -860,7 +863,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             </p>
             {formData.codigo_ean13 && formData.codigo_tipo && (
               <p className="mt-1 text-xs text-green-600 font-medium">
-                ✓ Tipo detectado: {tiposCodigo.find(t => t.value === formData.codigo_tipo)?.label}
+                {g3 ? <><Check size={12} className="g3:inline g3:align-[-1px] g3:mr-1" aria-hidden="true" />Tipo detectado: </> : '✓ Tipo detectado: '}{tiposCodigo.find(t => t.value === formData.codigo_tipo)?.label}
               </p>
             )}
           </div>
@@ -898,7 +901,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
               <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                 <div className="p-2 bg-blue-50 border-b border-blue-200">
                   <p className="text-xs text-blue-800 font-medium">
-                    💡 Selecciona un artículo existente para registrar una entrada de inventario
+                    {g3 ? 'Selecciona un artículo existente para registrar una entrada de inventario' : '💡 Selecciona un artículo existente para registrar una entrada de inventario'}
                   </p>
                 </div>
                 {articulosFiltrados.slice(0, 10).map((art) => (
@@ -917,7 +920,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                         </p>
                       </div>
                       <span className="ml-2 text-xs text-blue-600 font-medium whitespace-nowrap">
-                        Ingresar ➜
+                        {g3 ? 'Registrar entrada' : 'Ingresar ➜'}
                       </span>
                     </div>
                   </button>
@@ -1048,9 +1051,13 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
 
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-700">
-                {isEdit
-                  ? '⚠️ Solo puedes modificar el nombre y la foto del artículo.'
-                  : '⚠️ Solo capturas nombre y foto. El SKU se enviará a NUEVOS REGISTROS y el administrador completará proveedor, stock, almacén y mejorará la foto.'}
+                {g3
+                  ? (isEdit
+                    ? 'Solo puedes modificar el nombre y la foto del artículo.'
+                    : 'Solo capturas nombre y foto. La clave nueva se enviará a «Nuevos registros» y el administrador completará proveedor, stock, almacén y mejorará la foto.')
+                  : (isEdit
+                    ? '⚠️ Solo puedes modificar el nombre y la foto del artículo.'
+                    : '⚠️ Solo capturas nombre y foto. El SKU se enviará a NUEVOS REGISTROS y el administrador completará proveedor, stock, almacén y mejorará la foto.')}
               </p>
             </div>
           </>
@@ -1194,7 +1201,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                     {showNuevaCategoria && (
                       <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
                         <p className="text-xs text-yellow-800">
-                          ⚠️ <strong>Categoría pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
+                          {g3
+                            ? <><strong>Categoría pendiente:</strong> presiona Enter o el botón de la palomita para guardar, o Esc o la X para cancelar.</>
+                            : <>⚠️ <strong>Categoría pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar</>}
                         </p>
                       </div>
                     )}
@@ -1228,7 +1237,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                   <option value="">Seleccionar almacén...</option>
                   {almacenes.map(al => (
                     <option key={al.id} value={al.id}>
-                      📦 {al.nombre.toUpperCase()}
+                      {g3 ? al.nombre : `📦 ${al.nombre.toUpperCase()}`}
                     </option>
                   ))}
                 </select>
@@ -1342,7 +1351,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                     {showNuevaUbicacion && (
                       <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
                         <p className="text-xs text-yellow-800">
-                          ⚠️ <strong>Ubicación pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
+                          {g3
+                            ? <><strong>Ubicación pendiente:</strong> presiona Enter o el botón de la palomita para guardar, o Esc o la X para cancelar.</>
+                            : <>⚠️ <strong>Ubicación pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar</>}
                         </p>
                       </div>
                     )}
@@ -1475,7 +1486,9 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                     </div>
                     <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
                       <p className="text-xs text-yellow-800">
-                        ⚠️ <strong>Proveedor pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar
+                        {g3
+                          ? <><strong>Proveedor pendiente:</strong> presiona Enter o el botón de la palomita para guardar, o Esc o la X para cancelar.</>
+                          : <>⚠️ <strong>Proveedor pendiente:</strong> Presiona Enter o el botón verde ✓ para guardar, o Escape/X para cancelar</>}
                       </p>
                     </div>
                   </div>
@@ -1600,7 +1613,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
                   className="w-4 h-4 text-blue-600 rounded"
                 />
                 <label htmlFor="es_herramienta" className="text-sm font-medium text-blue-800 cursor-pointer">
-                  🔧 Es una herramienta (crea unidades individuales rastreables)
+                  {g3 ? 'Es una herramienta (crea unidades individuales rastreables)' : '🔧 Es una herramienta (crea unidades individuales rastreables)'}
                 </label>
               </div>
             )}
@@ -1608,7 +1621,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             {!isEdit && !formData.codigo_ean13 && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-sm text-blue-800">
-                  ℹ️ Si no proporcionas un código EAN-13, se generará uno automáticamente.
+                  {g3 ? 'Si no proporcionas un código de barras, se generará uno automáticamente.' : 'ℹ️ Si no proporcionas un código EAN-13, se generará uno automáticamente.'}
                 </p>
               </div>
             )}
@@ -1616,7 +1629,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
             {!isEdit && formData.codigo_ean13 && /^[0-9]{13}$/.test(formData.codigo_ean13) && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                 <p className="text-sm text-green-800">
-                  ✅ Se utilizará el código EAN-13 proporcionado: <span className="font-mono font-semibold">{formData.codigo_ean13}</span>
+                  {g3 ? 'Se utilizará el código de barras que escribiste: ' : '✅ Se utilizará el código EAN-13 proporcionado: '}<span className="font-mono font-semibold">{formData.codigo_ean13}</span>
                 </p>
               </div>
             )}

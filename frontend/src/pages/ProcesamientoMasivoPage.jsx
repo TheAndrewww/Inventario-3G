@@ -17,6 +17,9 @@ import {
 import articulosService from '../services/articulos.service';
 import { Loader, Button } from '../components/common';
 import toast from 'react-hot-toast';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
+import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
 
 const ProcesamientoMasivoPage = () => {
   const [articulos, setArticulos] = useState([]);
@@ -29,6 +32,7 @@ const ProcesamientoMasivoPage = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [imagenModal, setImagenModal] = useState(null); // Para ver imagen grande
+  const g3 = useDiseno3G(); // Diseño 3G: encabezado, columnas apiladas en celular y confirmación del paquete (apagado, lo de siempre)
 
   // Cargar artículos, estado de cola e historial al iniciar
   useEffect(() => {
@@ -163,7 +167,13 @@ const ProcesamientoMasivoPage = () => {
   };
 
   const handleLimpiarCola = async () => {
-    if (!window.confirm('¿Eliminar artículos completados y fallidos de más de 7 días?')) {
+    if (g3Activo()) {
+      if (!(await confirmarG3({
+        titulo: '¿Limpiar la cola?',
+        aviso: 'Se eliminan de la cola los artículos completados y fallidos de más de 7 días.',
+        confirmar: 'Limpiar cola', cancelar: 'No limpiar', peligro: true,
+      }))) return;
+    } else if (!window.confirm('¿Eliminar artículos completados y fallidos de más de 7 días?')) {
       return;
     }
 
@@ -218,15 +228,9 @@ const ProcesamientoMasivoPage = () => {
     return <Loader />;
   }
 
-  return (
-    <div className="h-full flex flex-col">
-      {/* Header Compacto */}
-      <div className="px-4 py-3 border-b bg-white flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Wand2 className="w-6 h-6 text-purple-600" />
-          <h1 className="text-xl font-bold text-gray-900">Procesamiento Masivo con IA</h1>
-        </div>
-        <div className="flex items-center gap-2">
+  // Acciones de la cabecera: las mismas en los dos diseños (solo cambia dónde se acomodan)
+  const accionesCabecera = (
+    <>
           {selectedArticulos.length > 0 && (
             <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
               {selectedArticulos.length} seleccionados
@@ -237,7 +241,7 @@ const ProcesamientoMasivoPage = () => {
             size="sm"
             variant="outline"
           >
-            {selectedArticulos.length === articulos.length ? 'Deseleccionar' : 'Seleccionar Todos'}
+            {selectedArticulos.length === articulos.length ? 'Deseleccionar' : (g3 ? 'Seleccionar todos' : 'Seleccionar Todos')}
           </Button>
           <Button
             onClick={handleProcesarSeleccionados}
@@ -256,14 +260,35 @@ const ProcesamientoMasivoPage = () => {
               </>
             )}
           </Button>
+    </>
+  );
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header Compacto */}
+      {g3 ? (
+        <div className="px-4 pt-4 md:px-6 md:pt-6">
+          <CabG3 titulo="Fotos de artículos con IA" descripcion="Selecciona artículos para procesar sus fotos con IA. Se atienden en una cola; el historial muestra cómo va cada uno.">
+            {accionesCabecera}
+          </CabG3>
+        </div>
+      ) : (
+      <div className="px-4 py-3 border-b bg-white flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Wand2 className="w-6 h-6 text-purple-600" />
+          <h1 className="text-xl font-bold text-gray-900">Procesamiento Masivo con IA</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {accionesCabecera}
         </div>
       </div>
+      )}
 
       {/* Layout Horizontal de 3 Columnas */}
-      <div className="flex-1 flex gap-4 p-4 overflow-hidden">
+      <div className="flex-1 flex gap-4 p-4 overflow-hidden g3:max-[860px]:flex-col g3:max-[860px]:overflow-visible g3:md:px-6">
 
         {/* Columna 1: Estado de la Cola */}
-        <div className="w-64 flex-shrink-0 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden">
+        <div className="w-64 flex-shrink-0 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden g3:max-[860px]:w-auto">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <Clock className="w-4 h-4 text-purple-600" />
@@ -325,7 +350,7 @@ const ProcesamientoMasivoPage = () => {
         </div>
 
         {/* Columna 2: Selección de Artículos (Principal - Más Grande) */}
-        <div className="flex-1 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden min-w-0">
+        <div className="flex-1 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden min-w-0 g3:max-[860px]:overflow-visible">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <ImageIcon className="w-4 h-4 text-purple-600" />
@@ -342,8 +367,8 @@ const ProcesamientoMasivoPage = () => {
                   className={`
                     rounded-lg border-2 cursor-pointer transition-all overflow-hidden
                     ${selectedArticulos.includes(articulo.id)
-                      ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-300'
-                      : 'border-gray-200 hover:border-purple-300 bg-white'
+                      ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-300 g3:!border-g3-primario g3:!bg-g3-primario-tinte g3:!ring-0'
+                      : 'border-gray-200 hover:border-purple-300 bg-white g3:hover:!border-g3-linea-fuerte'
                     }
                   `}
                 >
@@ -385,7 +410,7 @@ const ProcesamientoMasivoPage = () => {
                     {/* Badge de seleccionado */}
                     {selectedArticulos.includes(articulo.id) && (
                       <div className="absolute top-2 right-2">
-                        <CheckCircle2 className="w-5 h-5 text-purple-600 bg-white rounded-full" />
+                        <CheckCircle2 className="w-5 h-5 text-purple-600 bg-white rounded-full g3:!text-g3-primario" />
                       </div>
                     )}
                   </div>
@@ -403,7 +428,7 @@ const ProcesamientoMasivoPage = () => {
         </div>
 
         {/* Columna 3: Historial */}
-        <div className="w-80 flex-shrink-0 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden">
+        <div className="w-80 flex-shrink-0 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden g3:max-[860px]:w-auto">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <Clock className="w-4 h-4 text-purple-600" />

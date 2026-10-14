@@ -20,10 +20,13 @@ import BarcodeScannerIndicator from '../components/scanner/BarcodeScannerIndicat
 import ScanSuccessNotification from '../components/scanner/ScanSuccessNotification';
 import { generateTicketPDF } from '../utils/pdfGenerator';
 import { ModalCrearOrdenDesdeSolicitudes } from './OrdenesCompraPage';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
 
 const PedidoPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const g3 = useDiseno3G(); // Diseño 3G: solo textos e íconos (apagado, el DOM de siempre)
   const {
     items,
     incrementar,
@@ -177,6 +180,22 @@ const PedidoPage = () => {
 
   const handleVaciarCarrito = () => {
     if (items.length === 0) {
+      return;
+    }
+
+    // Diseño 3G encendido: vista previa del paquete (no manda nada al servidor); apagado, el confirm() de siempre.
+    if (g3Activo()) {
+      const totalPiezas = getTotalPiezas();
+      confirmarG3({
+        titulo: '¿Vaciar el carrito?',
+        datos: [['Artículos', String(items.length)], ['Piezas', String(totalPiezas)]],
+        pasa: [`Se eliminarán ${items.length} artículo${items.length !== 1 ? 's' : ''} del carrito con un total de ${totalPiezas} pieza${totalPiezas !== 1 ? 's' : ''}.`],
+        confirmar: 'Vaciar carrito', cancelar: 'No vaciar', peligro: true,
+      }).then((si) => {
+        if (!si) return;
+        limpiarPedido();
+        toast.success('Carrito vaciado exitosamente');
+      });
       return;
     }
 
@@ -354,7 +373,7 @@ const PedidoPage = () => {
       const response = await articulosService.getByEAN13(codigo);
       if (response && response.id) {
         agregarArticulo(response);
-        toast.success(`✓ ${response.nombre} agregado`);
+        toast.success(g3Activo() ? `${response.nombre} agregado` : `✓ ${response.nombre} agregado`);
         setBusqueda('');
         setResultadosBusqueda([]);
         setShowScanner(false);
@@ -403,17 +422,17 @@ const PedidoPage = () => {
         setShowScanSuccess(true);
 
         // También mostrar toast para confirmación
-        toast.success(`✓ ${articuloEncontrado.nombre} agregado`, {
-          icon: '📦',
+        toast.success(g3Activo() ? `${articuloEncontrado.nombre} agregado` : `✓ ${articuloEncontrado.nombre} agregado`, {
+          icon: g3Activo() ? undefined : '📦',
           duration: 2000,
         });
       } else {
-        toast.error(`❌ Artículo no encontrado: ${codigo}`, {
+        toast.error(g3Activo() ? `Artículo no encontrado: ${codigo}` : `❌ Artículo no encontrado: ${codigo}`, {
           duration: 4000,
         });
       }
     } catch (error) {
-      toast.error(`❌ Error al buscar artículo`, {
+      toast.error(g3Activo() ? 'Error al buscar el artículo' : `❌ Error al buscar artículo`, {
         duration: 3000,
       });
     }
@@ -429,14 +448,14 @@ const PedidoPage = () => {
   // Agregar artículo desde búsqueda
   const handleAgregarArticulo = (articulo) => {
     agregarArticulo(articulo);
-    toast.success(`✓ ${articulo.nombre} agregado`);
+    toast.success(g3Activo() ? `${articulo.nombre} agregado` : `✓ ${articulo.nombre} agregado`);
     setBusqueda('');
     setResultadosBusqueda([]);
   };
 
   // Handler para cuando se crea un nuevo artículo exitosamente
   const handleNuevoArticuloCreado = (nuevoArticulo) => {
-    toast.success(`✓ Artículo "${nuevoArticulo.nombre}" creado exitosamente`);
+    toast.success(g3Activo() ? `Artículo «${nuevoArticulo.nombre}» creado` : `✓ Artículo "${nuevoArticulo.nombre}" creado exitosamente`);
     // Agregar el nuevo artículo al pedido
     agregarArticulo(nuevoArticulo);
     // Limpiar búsqueda
@@ -540,7 +559,7 @@ const PedidoPage = () => {
                                 />
                               ) : (
                                 <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
-                                  📦
+                                  {g3 ? <Package size={18} className="text-gray-500" aria-hidden="true" /> : '📦'}
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
@@ -632,7 +651,7 @@ const PedidoPage = () => {
                           />
                         ) : (
                           <div className="w-14 h-14 md:w-16 md:h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl md:text-3xl flex-shrink-0">
-                            📦
+                            {g3 ? <Package size={22} className="text-gray-500" aria-hidden="true" /> : '📦'}
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
@@ -776,8 +795,8 @@ const PedidoPage = () => {
                     >
                       <option value="">Selecciona un proyecto...</option>
                       <optgroup label="Áreas fijas">
-                        <option value="MANUFACTURA">🏭 MANUFACTURA</option>
-                        <option value="HERRERÍA">⚒️ HERRERÍA</option>
+                        <option value="MANUFACTURA">{g3 ? 'Manufactura' : '🏭 MANUFACTURA'}</option>
+                        <option value="HERRERÍA">{g3 ? 'Herrería' : '⚒️ HERRERÍA'}</option>
                       </optgroup>
                       {proyectosProduccion.length > 0 && (
                         <optgroup label="Proyectos en producción">
@@ -843,7 +862,7 @@ const PedidoPage = () => {
               </div>
               <div className="border-t border-gray-200 pt-2 md:pt-3 flex justify-between">
                 <span className="font-bold text-gray-900 text-sm md:text-base">Costo Total:</span>
-                <span className="font-bold text-lg md:text-xl text-red-700">${getCostoTotal().toFixed(2)}</span>
+                <span className="font-bold text-lg md:text-xl text-red-700 g3:!text-g3-tinta">${getCostoTotal().toFixed(2)}</span>
               </div>
             </div>
 

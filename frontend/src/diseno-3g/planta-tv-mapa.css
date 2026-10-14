@@ -1,0 +1,62 @@
+/* Diseño 3G para TV — planta-tv-mapa.css (GENERADO por generar-mapa-tailwind.mjs --tv; no lo edites a mano)
+   Re-pinta con tokens --g3-* las 53 clases de color de Tailwind de las tarjetas de producción (ProyectoTimeline),
+   solo dentro de .g3tv-mapa y bajo html[data-g3-tv] (las pantallas de TV con ?diseno=3g). Tokens en planta-tv-3g.css.
+   Orden: textos → bordes → fondos (un fondo fuerte pone su propio color de texto para que siempre se lea). */
+
+/* ---- Textos ---- */
+:root[data-g3-tv] .g3tv-mapa .text-amber-600 { color: var(--g3-aviso); }
+:root[data-g3-tv] .g3tv-mapa .text-amber-700 { color: var(--g3-aviso); }
+:root[data-g3-tv] .g3tv-mapa .text-amber-900 { color: var(--g3-aviso); }
+:root[data-g3-tv] .g3tv-mapa .text-blue-600 { color: var(--g3-info); }
+:root[data-g3-tv] .g3tv-mapa .text-blue-800 { color: var(--g3-info); }
+:root[data-g3-tv] .g3tv-mapa .text-gray-400 { color: var(--g3-tinta-3); }
+:root[data-g3-tv] .g3tv-mapa .text-gray-500 { color: var(--g3-tinta-2); }
+:root[data-g3-tv] .g3tv-mapa .text-gray-600 { color: var(--g3-tinta-2); }
+:root[data-g3-tv] .g3tv-mapa .text-gray-700 { color: var(--g3-tinta); }
+:root[data-g3-tv] .g3tv-mapa .text-gray-900 { color: var(--g3-tinta); }
+:root[data-g3-tv] .g3tv-mapa .text-green-600 { color: var(--g3-ok); }
+:root[data-g3-tv] .g3tv-mapa .text-green-700 { color: var(--g3-ok); }
+:root[data-g3-tv] .g3tv-mapa .text-red-600 { color: var(--g3-mal); }
+:root[data-g3-tv] .g3tv-mapa .text-red-700 { color: var(--g3-mal); }
+:root[data-g3-tv] .g3tv-mapa .text-white { color: var(--g3p-sobre-fuerte); }
+:root[data-g3-tv] .g3tv-mapa .text-yellow-900 { color: var(--g3-aviso); }
+
+/* ---- Bordes y anillos ---- */
+:root[data-g3-tv] .g3tv-mapa .border-amber-200 { border-color: color-mix(in srgb, var(--g3-aviso) 40%, transparent); }
+:root[data-g3-tv] .g3tv-mapa .border-amber-300 { border-color: color-mix(in srgb, var(--g3-aviso) 40%, transparent); }
+:root[data-g3-tv] .g3tv-mapa .border-blue-200 { border-color: color-mix(in srgb, var(--g3-info) 40%, transparent); }
+:root[data-g3-tv] .g3tv-mapa .border-blue-400 { border-color: var(--g3-info); }
+:root[data-g3-tv] .g3tv-mapa .border-gray-100 { border-color: var(--g3-linea); }
+:root[data-g3-tv] .g3tv-mapa .border-gray-200 { border-color: var(--g3-linea); }
+:root[data-g3-tv] .g3tv-mapa .border-green-200 { border-color: color-mix(in srgb, var(--g3-ok) 40%, transparent); }
+:root[data-g3-tv] .g3tv-mapa .border-red-200 { border-color: color-mix(in srgb, var(--g3-mal) 40%, transparent); }
+:root[data-g3-tv] .g3tv-mapa .border-red-400 { border-color: var(--g3-mal); }
+:root[data-g3-tv] .g3tv-mapa .border-red-500 { border-color: var(--g3-mal); }
+:root[data-g3-tv] .g3tv-mapa .border-yellow-400 { border-color: var(--g3-aviso); }
+:root[data-g3-tv] .g3tv-mapa .ring-amber-500 { --tw-ring-color: var(--g3-aviso); }
+:root[data-g3-tv] .g3tv-mapa .ring-red-400 { --tw-ring-color: var(--g3-primario); }
+:root[data-g3-tv] .g3tv-mapa .ring-red-500 { --tw-ring-color: var(--g3-primario); }
+
+/* ---- Fondos ---- */
+:root[data-g3-tv] .g3tv-mapa .bg-amber-100:not([class*="bg-opacity-"]) { background-color: var(--g3-aviso-suave); }
+:root[data-g3-tv] .g3tv-mapa .bg-amber-50:not([class*="bg-opacity-"]) { background-color: var(--g3-aviso-suave); }
+:root[data-g3-tv] .g3tv-mapa .bg-amber-500:not([class*="bg-opacity-"]) { background-color: var(--g3-aviso); color: var(--g3p-sobre-fuerte); }
+:root[data-g3-tv] .g3tv-mapa .bg-blue-100:not([class*="bg-opacity-"]) { background-color: var(--g3-info-suave); }
+:root[data-g3-tv] .g3tv-mapa .bg-blue-50:not([class*="bg-opacity-"]) { background-color: var(--g3-info-suave); }
+:root[data-g3-tv] .g3tv-mapa .bg-blue-500:not([class*="bg-opacity-"]) { background-color: var(--g3-primario); color: var(--g3p-sobre-fuerte); }
+:root[data-g3-tv] .g3tv-mapa .bg-emerald-500:not([class*="bg-opacity-"]) { background-color: var(--g3-ok); color: var(--g3p-sobre-fuerte); }
+:root[data-g3-tv] .g3tv-mapa .bg-gray-200:not([class*="bg-opacity-"]) { background-color: var(--g3-contenedor-alto); }
+:root[data-g3-tv] .g3tv-mapa .bg-gray-400:not([class*="bg-opacity-"]) { background-color: var(--g3-neutro); color: var(--g3p-sobre-fuerte); }
+:root[data-g3-tv] .g3tv-mapa .bg-gray-50:not([class*="bg-opacity-"]) { background-color: var(--g3-fondo); }
+:root[data-g3-tv] .g3tv-mapa .bg-green-50:not([class*="bg-opacity-"]) { background-color: var(--g3-ok-suave); }
+:root[data-g3-tv] .g3tv-mapa .bg-green-500:not([class*="bg-opacity-"]) { background-color: var(--g3-ok); color: var(--g3p-sobre-fuerte); }
+:root[data-g3-tv] .g3tv-mapa .bg-red-100:not([class*="bg-opacity-"]) { background-color: var(--g3-mal-suave); }
+:root[data-g3-tv] .g3tv-mapa .bg-red-50:not([class*="bg-opacity-"]) { background-color: var(--g3-mal-suave); }
+:root[data-g3-tv] .g3tv-mapa .bg-red-500:not([class*="bg-opacity-"]) { background-color: var(--g3-mal); color: var(--g3p-sobre-fuerte); }
+:root[data-g3-tv] .g3tv-mapa .bg-red-600:not([class*="bg-opacity-"]) { background-color: var(--g3-mal); color: var(--g3p-sobre-fuerte); }
+:root[data-g3-tv] .g3tv-mapa .bg-violet-500:not([class*="bg-opacity-"]) { background-color: var(--g3-garantia); color: var(--g3p-sobre-fuerte); }
+:root[data-g3-tv] .g3tv-mapa .bg-white:not([class*="bg-opacity-"]) { background-color: var(--g3-superficie); }
+:root[data-g3-tv] .g3tv-mapa .bg-yellow-400:not([class*="bg-opacity-"]) { background-color: var(--g3-aviso); color: var(--g3p-sobre-fuerte); }
+:root[data-g3-tv] .g3tv-mapa .bg-yellow-50:not([class*="bg-opacity-"]) { background-color: var(--g3-aviso-suave); }
+:root[data-g3-tv] .g3tv-mapa .from-gray-50 { --tw-gradient-from: var(--g3-fondo) var(--tw-gradient-from-position); --tw-gradient-to: transparent var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+:root[data-g3-tv] .g3tv-mapa .to-white { --tw-gradient-to: var(--g3-superficie) var(--tw-gradient-to-position); }

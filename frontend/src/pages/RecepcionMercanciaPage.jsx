@@ -8,6 +8,10 @@ import RecibirOrdenModal from '../components/ordenes/RecibirOrdenModal';
 import HistorialRecepcionesOrden from '../components/ordenes/HistorialRecepcionesOrden';
 import RecibirConFacturaModal from '../components/ordenes/RecibirConFacturaModal';
 import ConteoRecepcionModal from '../components/ordenes/ConteoRecepcionModal';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
+import MasAcciones from '../diseno-3g/MasAcciones';
+import { cx, etq } from '../diseno-3g/dialogosG3';
 
 const RecepcionMercanciaPage = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -21,6 +25,7 @@ const RecepcionMercanciaPage = () => {
   const [conteosAbiertos, setConteosAbiertos] = useState([]);
   const [conteoActivo, setConteoActivo] = useState(null);
   const { user: usuario } = useAuth();
+  const g3 = useDiseno3G(); // Diseño 3G: encabezado, estados, tabla en tarjetas y un botón principal por renglón (apagado, lo de siempre)
 
   useEffect(() => {
     cargarOrdenesPendientes();
@@ -110,6 +115,7 @@ const RecepcionMercanciaPage = () => {
       enviada: 'Enviada',
       parcial: 'Parcial',
     };
+    if (g3) return <span className={`g3-estado ${estado === 'parcial' ? 'g3-estado--aviso' : 'g3-estado--info'}`}>{estado === 'parcial' ? 'Recibida en parte' : labels[estado]}</span>;
     return (
       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${badges[estado]}`}>
         {labels[estado]}
@@ -129,9 +135,12 @@ const RecepcionMercanciaPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-6 g3:!min-h-0 g3:!bg-transparent g3:max-md:!p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
+        {g3 ? (
+          <CabG3 titulo="Recepción de mercancía" descripcion="Recibe y registra la mercancía de las órdenes de compra enviadas: con foto de la factura o capturando a mano." />
+        ) : (
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <PackageCheck className="text-green-600" size={32} />
@@ -141,6 +150,7 @@ const RecepcionMercanciaPage = () => {
             Recibe y registra la mercancía de las órdenes de compra enviadas
           </p>
         </div>
+        )}
 
         {/* Conteos abiertos: la ventana de reclamo de 7 días */}
         {conteosAbiertos.length > 0 && (
@@ -171,7 +181,7 @@ const RecepcionMercanciaPage = () => {
                   </div>
                   <button
                     onClick={() => setConteoActivo(conteo)}
-                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
+                    className={g3 ? 'g3-btn g3-btn--tonal g3-btn--ch shrink-0' : 'shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg'}
                   >
                     Contar
                   </button>
@@ -209,8 +219,8 @@ const RecepcionMercanciaPage = () => {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className={g3 ? undefined : 'bg-white rounded-lg shadow overflow-hidden'}>
+            <div className={cx('overflow-x-auto', g3 && 'g3-tabla g3-tabla--tarjetas')}>
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -224,7 +234,7 @@ const RecepcionMercanciaPage = () => {
                       Estado
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Fecha Envío
+                      {g3 ? 'Fecha de envío' : 'Fecha Envío'}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Total
@@ -240,35 +250,54 @@ const RecepcionMercanciaPage = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredOrdenes.map((orden) => (
                     <tr key={orden.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-titulo')}>
                         <div className="text-sm font-medium text-gray-900">{orden.ticket_id}</div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4" {...etq(g3, 'Proveedor')}>
                         <div className="text-sm text-gray-900">
                           {orden.proveedor?.nombre || 'Sin proveedor'}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-estado')}>
                         {getEstadoBadge(orden.estado)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Fecha de envío')}>
                         <div className="text-sm text-gray-900">
                           {orden.fecha_envio
                             ? new Date(orden.fecha_envio).toLocaleDateString('es-MX')
                             : '-'}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Total')}>
                         <div className="text-sm font-semibold text-gray-900">
                           ${parseFloat(orden.total || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Artículos')}>
                         <div className="text-sm text-gray-600">
                           {orden.detalles?.length || 0} artículo(s)
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <td className={cx('px-6 py-4 whitespace-nowrap text-center', g3 && 'g3-celda-acciones')}>
+                        {g3 ? (
+                          <div className="flex items-center justify-end gap-2">
+                            {puedeRecibir ? (
+                              <>
+                                <button type="button" onClick={() => setOrdenConFactura(orden)} className="g3-btn g3-btn--primario g3-btn--ch" title="Recibir tomando foto de la factura">
+                                  <Sparkles size={16} aria-hidden="true" /> Recibir con factura
+                                </button>
+                                <MasAcciones titulo={orden.ticket_id} acciones={[
+                                  { texto: 'Recibir capturando a mano', icono: PackageCheck, onClick: () => handleAbrirModalRecibir(orden) },
+                                  { texto: 'Historial de recepciones', icono: History, onClick: () => handleAbrirHistorial(orden) },
+                                ]} />
+                              </>
+                            ) : (
+                              <button type="button" onClick={() => handleAbrirHistorial(orden)} className="g3-btn g3-btn--ch">
+                                <History size={16} aria-hidden="true" /> Historial de recepciones
+                              </button>
+                            )}
+                          </div>
+                        ) : (
                         <div className="flex items-center justify-center gap-2">
                           {puedeRecibir && (
                             <>
@@ -298,6 +327,7 @@ const RecepcionMercanciaPage = () => {
                             <History size={18} />
                           </button>
                         </div>
+                        )}
                       </td>
                     </tr>
                   ))}

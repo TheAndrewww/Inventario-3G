@@ -3,12 +3,17 @@ import { Search, Plus, Edit2, Trash2, Package } from 'lucide-react';
 import proveedoresService from '../services/proveedores.service';
 import { Loader, Modal, Button } from '../components/common';
 import toast from 'react-hot-toast';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
+import MasAcciones from '../diseno-3g/MasAcciones';
+import { g3Activo, confirmarG3, cx, etq } from '../diseno-3g/dialogosG3';
 
 const ProveedoresPage = () => {
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const g3 = useDiseno3G(); // Diseño 3G: encabezado, tabla en tarjetas, acciones y confirmación del paquete (apagado, lo de siempre)
   const [editingProveedor, setEditingProveedor] = useState(null);
   const [formData, setFormData] = useState({
     nombre: '',
@@ -112,7 +117,16 @@ const ProveedoresPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('¿Estás seguro de eliminar este proveedor?')) {
+    if (g3Activo()) {
+      // Vista previa con lo que ya está en pantalla; la petición de después es la misma
+      const p = proveedores.find(x => x.id === id);
+      if (!(await confirmarG3({
+        titulo: '¿Eliminar este proveedor?',
+        aviso: 'Se elimina de forma permanente. Si tiene artículos asociados, el sistema no lo deja eliminar.',
+        datos: p ? [['Proveedor', p.nombre], ['RFC', p.rfc || 'N/A'], ['Contacto', p.contacto || 'N/A']] : [],
+        confirmar: 'Eliminar proveedor', cancelar: 'No eliminar', peligro: true,
+      }))) return;
+    } else if (!window.confirm('¿Estás seguro de eliminar este proveedor?')) {
       return;
     }
 
@@ -139,6 +153,13 @@ const ProveedoresPage = () => {
   return (
     <div className="p-6">
       {/* Header */}
+      {g3 ? (
+        <CabG3 titulo="Proveedores" descripcion="Gestiona los proveedores de artículos.">
+          <button type="button" onClick={() => handleOpenModal()} className="g3-btn g3-btn--primario">
+            <Plus size={18} aria-hidden="true" /> Nuevo proveedor
+          </button>
+        </CabG3>
+      ) : (
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Proveedores</h1>
@@ -153,6 +174,7 @@ const ProveedoresPage = () => {
           Nuevo Proveedor
         </Button>
       </div>
+      )}
 
       {/* Barra de búsqueda */}
       <div className="mb-6">
@@ -169,7 +191,7 @@ const ProveedoresPage = () => {
       </div>
 
       {/* Tabla de proveedores */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className={g3 ? 'g3-tabla g3-tabla--tarjetas' : 'bg-white rounded-xl shadow-sm overflow-hidden'}>
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -177,7 +199,7 @@ const ProveedoresPage = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFC</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{g3 ? 'Correo' : 'Email'}</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
             </tr>
           </thead>
@@ -191,22 +213,32 @@ const ProveedoresPage = () => {
             ) : (
               filteredProveedores.map((proveedor) => (
                 <tr key={proveedor.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-titulo')}>
                     <div className="font-medium text-gray-900">{proveedor.nombre}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" {...etq(g3, 'RFC')}>
                     {proveedor.rfc || 'N/A'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" {...etq(g3, 'Contacto')}>
                     {proveedor.contacto || 'N/A'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" {...etq(g3, 'Teléfono')}>
                     {proveedor.telefono || 'N/A'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" {...etq(g3, 'Correo')}>
                     {proveedor.email || 'N/A'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                  <td className={cx('px-6 py-4 whitespace-nowrap text-right text-sm', g3 && 'g3-celda-acciones')}>
+                    {g3 ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <button type="button" onClick={() => handleOpenModal(proveedor)} className="g3-btn g3-btn--tonal g3-btn--ch">
+                          <Edit2 size={16} aria-hidden="true" /> Editar
+                        </button>
+                        <MasAcciones titulo={proveedor.nombre} acciones={[
+                          { texto: 'Eliminar proveedor', icono: Trash2, peligro: true, onClick: () => handleDelete(proveedor.id) },
+                        ]} />
+                      </div>
+                    ) : (
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => handleOpenModal(proveedor)}
@@ -223,6 +255,7 @@ const ProveedoresPage = () => {
                         <Trash2 size={18} />
                       </button>
                     </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -235,7 +268,7 @@ const ProveedoresPage = () => {
       <Modal
         isOpen={showModal}
         onClose={handleCloseModal}
-        title={editingProveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+        title={editingProveedor ? (g3 ? 'Editar proveedor' : 'Editar Proveedor') : (g3 ? 'Nuevo proveedor' : 'Nuevo Proveedor')}
         size="large"
       >
         <form onSubmit={handleSubmit} className="space-y-4">

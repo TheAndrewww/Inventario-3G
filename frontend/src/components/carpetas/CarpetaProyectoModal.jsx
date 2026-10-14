@@ -9,8 +9,10 @@ import {
   ArrowLeft,
   AlertCircle,
   Lock,
-  Loader2
+  Loader2,
+  Folder
 } from 'lucide-react';
+import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
 import api from '../../services/api';
 
 const ICONOS = {
@@ -62,6 +64,7 @@ const useArchivoBlob = (ruta, activo = true) => {
 };
 
 const Miniatura = ({ archivo, ruta, onClick }) => {
+  const g3 = useDiseno3G(); // Diseño 3G: ícono en vez de emoji y letra de 12 px como mínimo
   const esImagen = archivo.tipo === 'imagen';
   const { url, error } = useArchivoBlob(ruta, esImagen);
   const Icono = ICONOS[archivo.tipo] || File;
@@ -90,7 +93,7 @@ const Miniatura = ({ archivo, ruta, onClick }) => {
           {archivo.nombre}
         </p>
         {archivo.subcarpeta && (
-          <p className="text-[10px] text-gray-400 mt-0.5 truncate">📁 {archivo.subcarpeta}</p>
+          <p className="text-[10px] text-gray-400 mt-0.5 truncate g3:!text-xs g3:!text-g3-tinta-2">{g3 ? <Folder size={12} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '📁 '}{archivo.subcarpeta}</p>
         )}
       </div>
     </button>

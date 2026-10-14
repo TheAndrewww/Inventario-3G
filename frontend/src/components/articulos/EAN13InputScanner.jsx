@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Camera, X, Loader2, Barcode, AlertCircle, SwitchCamera } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import toast from 'react-hot-toast';
+import { g3Activo } from '../../diseno-3g/dialogosG3';
 import { detectBarcodeType, getBarcodeTypeName } from '../../utils/barcodeTypeDetector';
 
 const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected }) => {
@@ -60,7 +61,7 @@ const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected }
       }
 
       // Mostrar mensaje de éxito
-      toast.success(`✓ ${typeName} escaneado correctamente`);
+      toast.success(g3Activo() ? `${typeName} escaneado correctamente` : `✓ ${typeName} escaneado correctamente`);
 
       // Detener escaneo automáticamente
       stopScanning().catch(err => {

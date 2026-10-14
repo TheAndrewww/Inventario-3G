@@ -55,7 +55,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100 flex items-center justify-center p-4 g3-fondo-lanzador">
       <div className="w-full max-w-md">
         {/* Logo y Título */}
         <div className="text-center mb-8">
@@ -113,7 +113,7 @@ const LoginPage = () => {
           </form>
 
           <div className="mt-6 text-center">
-            <a href="#" className="text-sm text-red-700 hover:text-red-800 font-medium">
+            <a href="#" className="text-sm text-red-700 hover:text-red-800 font-medium g3:!text-g3-primario">
               ¿Olvidaste tu contraseña?
             </a>
           </div>

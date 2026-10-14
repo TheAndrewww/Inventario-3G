@@ -17,9 +17,11 @@ import EstadisticasHeader from '../components/produccion/EstadisticasHeader';
 import { useProduccionData } from '../hooks/useProduccionData';
 import { useProduccionFilters } from '../hooks/useProduccionFilters';
 import { useAuth } from '../context/AuthContext';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 
 // ============ Modal para nuevo proyecto ============
 const ModalNuevoProyecto = ({ isOpen, onClose, onCrear }) => {
+    const g3 = useDiseno3G(); // Diseño 3G: prioridades sin emojis (apagado, las de siempre; mismo valor)
     const [formData, setFormData] = useState({
         nombre: '',
         cliente: '',
@@ -88,11 +90,11 @@ const ModalNuevoProyecto = ({ isOpen, onClose, onCrear }) => {
                             onChange={(e) => setFormData({ ...formData, prioridad: parseInt(e.target.value) })}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500"
                         >
-                            <option value={1}>🔴 Urgente</option>
-                            <option value={2}>🟠 Alta</option>
-                            <option value={3}>🟡 Normal</option>
-                            <option value={4}>🟢 Baja</option>
-                            <option value={5}>⚪ Muy baja</option>
+                            <option value={1}>{g3 ? 'Urgente' : '🔴 Urgente'}</option>
+                            <option value={2}>{g3 ? 'Alta' : '🟠 Alta'}</option>
+                            <option value={3}>{g3 ? 'Normal' : '🟡 Normal'}</option>
+                            <option value={4}>{g3 ? 'Baja' : '🟢 Baja'}</option>
+                            <option value={5}>{g3 ? 'Muy baja' : '⚪ Muy baja'}</option>
                         </select>
                     </div>
 
@@ -149,6 +151,7 @@ const ordenarOpciones = (opciones, guardado) => {
 };
 
 const FiltrosProyectos = ({ filtro, setFiltro, opciones, userId }) => {
+    const g3 = useDiseno3G(); // Diseño 3G: etiquetas sin emojis (apagado, las de siempre)
     const [orden, setOrden] = useState(() => {
         try {
             return ordenarOpciones(opciones, JSON.parse(localStorage.getItem(claveOrdenFiltros(userId)) || 'null'));
@@ -200,11 +203,11 @@ const FiltrosProyectos = ({ filtro, setFiltro, opciones, userId }) => {
                         onClick={() => setFiltro(op.value)}
                         title="Clic para filtrar · arrastra para mover"
                         className={`px-4 py-2 rounded-lg font-medium transition-all text-sm cursor-grab active:cursor-grabbing ${arrastrando === op.value ? 'opacity-40' : ''} ${marcaSoltar} ${filtro === op.value
-                            ? 'bg-gray-900 text-white shadow-md'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-gray-900 text-white shadow-md g3:!bg-g3-primario-suave g3:!text-g3-sobre-primario-suave g3:!shadow-none'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 g3:!bg-transparent g3:border g3:border-g3-linea-fuerte g3:hover:!bg-g3-hover'
                             }`}
                     >
-                        {op.label}
+                        {g3 ? op.label.replace(/^[^\p{L}\p{N}]+/u, '') : op.label}
                     </button>
                 );
             })}
@@ -228,6 +231,7 @@ const DashboardProduccionPage = () => {
     // Proyecto cuya carpeta de Drive se está viendo (click en el nombre).
     const [proyectoCarpeta, setProyectoCarpeta] = useState(null);
     const { user } = useAuth();
+    const g3 = useDiseno3G(); // Diseño 3G: solo textos (apagado, los de siempre)
     const esAlmacen = user?.rol === 'almacen';
 
     // Hooks personalizados
@@ -279,17 +283,17 @@ const DashboardProduccionPage = () => {
         <div className="min-h-screen bg-gray-50 p-4 lg:p-6 transition-all duration-300">
             {/* Header */}
             <div>
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-                    <div>
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 g3:lg:flex-wrap g3:lg:items-end">
+                    <div className="g3:min-w-0">
                         <h1 className="text-3xl font-bold text-gray-900">
-                            🏭 Dashboard de Producción
+                            {g3 ? 'Tablero de producción' : '🏭 Dashboard de Producción'}
                         </h1>
                         <p className="text-gray-600 mt-1">
                             Seguimiento visual de proyectos por etapas
                         </p>
                     </div>
 
-                    <div className="flex gap-2 items-center">
+                    <div className="flex gap-2 items-center g3:flex-wrap">
                         {ultimaSync && (
                             <span className="text-xs text-gray-400">
                                 Actualizado: {ultimaSync.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
@@ -298,10 +302,10 @@ const DashboardProduccionPage = () => {
 
                         {!esAlmacen && (<>
                         <a
-                            href="/produccion-tv"
+                            href={g3 ? '/produccion-tv?diseno=3g' : '/produccion-tv'}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm"
+                            className="flex items-center gap-2 px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto"
                             title="Vista TV - Producción"
                         >
                             <Monitor size={16} />
@@ -310,10 +314,10 @@ const DashboardProduccionPage = () => {
                         </a>
 
                         <a
-                            href="/preparados-tv"
+                            href={g3 ? '/preparados-tv?diseno=3g' : '/preparados-tv'}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto"
                             title="Vista TV - Preparados"
                         >
                             <Monitor size={16} />
@@ -322,10 +326,10 @@ const DashboardProduccionPage = () => {
                         </a>
 
                         <a
-                            href="/manufactura-tv"
+                            href={g3 ? '/manufactura-tv?diseno=3g' : '/manufactura-tv'}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-sm"
+                            className="flex items-center gap-2 px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-sm g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto"
                             title="Vista TV - Manufactura"
                         >
                             <Monitor size={16} />
@@ -334,10 +338,10 @@ const DashboardProduccionPage = () => {
                         </a>
 
                         <a
-                            href="/herreria-tv"
+                            href={g3 ? '/herreria-tv?diseno=3g' : '/herreria-tv'}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
+                            className="flex items-center gap-2 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm g3:!bg-g3-contenedor g3:!text-g3-tinta g3:hover:!bg-g3-contenedor-alto"
                             title="Vista TV - Herrería"
                         >
                             <Monitor size={16} />
@@ -350,31 +354,31 @@ const DashboardProduccionPage = () => {
                         <button
                             onClick={sincronizarSheets}
                             disabled={sincronizando}
-                            className="flex items-center gap-2 px-3 py-2 bg-white text-green-700 border border-green-200 rounded-lg hover:bg-green-50 transition-colors disabled:opacity-50 text-sm font-medium"
+                            className="flex items-center gap-2 px-3 py-2 bg-white text-green-700 border border-green-200 rounded-lg hover:bg-green-50 transition-colors disabled:opacity-50 text-sm font-medium g3:!text-g3-tinta g3:!border-g3-linea-fuerte g3:hover:!bg-g3-hover"
                             title="Actualizar nuevos proyectos desde Google Sheets"
                         >
                             <Database size={16} />
-                            {sincronizando ? '...' : 'Sync Sheets'}
+                            {sincronizando ? '...' : (g3 ? 'Traer obras del Índice' : 'Sync Sheets')}
                         </button>
 
                         <button
                             onClick={sincronizarDrive}
                             disabled={sincronizando}
-                            className="flex items-center gap-2 px-3 py-2 bg-white text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50 text-sm font-medium"
+                            className="flex items-center gap-2 px-3 py-2 bg-white text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50 text-sm font-medium g3:!text-g3-tinta g3:!border-g3-linea-fuerte g3:hover:!bg-g3-hover"
                             title="Actualizar carpetas y archivos desde Google Drive"
                         >
                             <Cloud size={16} />
-                            {sincronizando ? '...' : 'Sync Drive'}
+                            {sincronizando ? '...' : (g3 ? 'Actualizar carpetas de Drive' : 'Sync Drive')}
                         </button>
 
                         <div className="h-8 w-px bg-gray-300 mx-1 hidden lg:block"></div>
 
                         <button
                             onClick={() => setModalOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm font-medium"
+                            className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm font-medium g3:!bg-g3-primario g3:!text-g3-sobre-primario g3:hover:!bg-g3-primario-hover"
                         >
                             <Plus size={16} />
-                            Nuevo Proyecto
+                            {g3 ? 'Nuevo proyecto' : 'Nuevo Proyecto'}
                         </button>
                         </>)}
                     </div>

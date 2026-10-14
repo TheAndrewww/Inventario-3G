@@ -5,7 +5,8 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // diseno-3g.js es el paquete Diseño 3G copiado tal cual (versión 1.0.0): no se edita aquí
+  globalIgnores(['dist', 'src/diseno-3g/diseno-3g.js']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

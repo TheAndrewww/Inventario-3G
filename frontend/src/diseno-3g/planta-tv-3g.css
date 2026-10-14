@@ -1,0 +1,439 @@
+/* Diseño 3G para las pantallas públicas de Planta: TV de producción, preparados, manufactura y herrería, terminal de
+   área, anuncios y calendario público (ola 3).
+   - Todo vive bajo html[data-g3-tv] (lo pone index.html SOLO si la URL de esa carga trae ?diseno=3g; ver tvG3.js).
+     Sin ese atributo este archivo no cambia nada: apagado, las pantallas son exactamente las de hoy.
+   - Estas rutas NO llevan html[data-diseno="3g"] (siguen excluidas del interruptor guardado), por eso los tokens del
+     paquete se repiten aquí con los mismos valores (Diseño 3G v1.1.0), más un ajuste de contraste para ver de lejos.
+   - Letra grande que crece con la escala de cada pantalla (--escala: botones de zoom de siempre) y se ajusta al ancho.
+   - Mismo significado de colores: rojo = problema o urgente, ámbar = atención, verde = bien, azul = acción. */
+
+/* ============================================================================================
+   1. TOKENS — claro (mismos valores del paquete; textos secundarios un poco más oscuros para ver de lejos)
+   ============================================================================================ */
+:root[data-g3-tv] {
+  color-scheme: light;
+  --g3-fondo: #f2f2f2;
+  --g3-superficie: #ffffff;
+  --g3-contenedor: #ececec;
+  --g3-contenedor-alto: #e0e0e0;
+  --g3-tinta: #141414;
+  --g3-tinta-2: #3d3d3d;
+  --g3-tinta-3: #555555;
+  --g3-linea: #dcdcdc;
+  --g3-linea-fuerte: #b8b8b8;
+  --g3-hover: rgba(0, 0, 0, 0.05);
+  --g3-primario: #0e4e92;
+  --g3-primario-hover: #0b3f77;
+  --g3-sobre-primario: #ffffff;
+  --g3-primario-suave: #d6e4f5;
+  --g3-sobre-primario-suave: #062448;
+  --g3-foco: rgba(14, 78, 146, 0.6);
+  --g3-rojo-3g: #c4122f;
+  --g3-ok: #137333;           --g3-ok-suave: #e6f4ea;
+  --g3-aviso: #8a5a00;        --g3-aviso-suave: #fbeac4;
+  --g3-mal: #b3261e;          --g3-mal-suave: #fadedb;
+  --g3-sobre-mal: #ffffff;
+  --g3-neutro: #5e5e5e;       --g3-neutro-suave: #ebebeb;
+  --g3-info: #1a5fb4;         --g3-info-suave: #dbe7fb;
+  --g3-instalacion: #1a5fb4;    --g3-instalacion-suave: #dbe7fb;
+  --g3-mantenimiento: #086b74;  --g3-mantenimiento-suave: #d2f0ee;
+  --g3-garantia: #6b3fbf;       --g3-garantia-suave: #e9e1f8;
+  --g3-vidrio: rgba(255, 255, 255, 0.78);
+  --g3-vidrio-fuerte: rgba(255, 255, 255, 0.92);
+  --g3-vidrio-borde: rgba(0, 0, 0, 0.08);
+  --g3-desenfoque: blur(24px) saturate(1.7);
+  --g3-sombra-1: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --g3-sombra-2: 0 2px 6px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.08);
+  --g3-sombra-3: 0 8px 24px rgba(0, 0, 0, 0.12), 0 24px 60px rgba(0, 0, 0, 0.14);
+  --g3-f-titulo: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --g3-f-texto: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --g3-f-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Roboto Mono", monospace;
+  --g3-r-ch: 10px; --g3-r-md: 16px; --g3-r-gr: 22px; --g3-r-hoja: 28px; --g3-r-pildora: 999px;
+  --g3p-naranja: color-mix(in srgb, var(--g3-aviso) 50%, var(--g3-mal));
+  --g3p-sobre-fuerte: #ffffff;
+  /* Letra de TV: se ajusta al ancho (celular → TV) y crece con la escala de cada pantalla */
+  --g3tv-escala: var(--escala, 1);
+  --g3tv-t-titulo: clamp(1.5rem, 1rem + 2.2vw, 3.25rem);
+  --g3tv-t-grande: clamp(1.375rem, 0.9rem + 1.9vw, 2.75rem);
+  --g3tv-t-medio: clamp(1.125rem, 0.85rem + 0.9vw, 1.75rem);
+  --g3tv-t-base: clamp(1rem, 0.85rem + 0.45vw, 1.375rem);
+  --g3tv-t-chico: clamp(0.875rem, 0.8rem + 0.25vw, 1.0625rem);
+  --g3tv-t-numero: clamp(2rem, 1.2rem + 3vw, 4.5rem);
+}
+/* Oscuro (&tema=oscuro en la liga de esa TV) */
+:root[data-g3-tv="oscuro"] {
+  color-scheme: dark;
+  --g3-fondo: #0d0d0d; --g3-superficie: #191919; --g3-contenedor: #242424; --g3-contenedor-alto: #2e2e2e;
+  --g3-tinta: #f2f2f2; --g3-tinta-2: #cfcfcf; --g3-tinta-3: #ababab;
+  --g3-linea: #333333; --g3-linea-fuerte: #4a4a4a;
+  --g3-hover: rgba(255, 255, 255, 0.06);
+  --g3-primario: #9cc3f0; --g3-primario-hover: #b6d3f4; --g3-sobre-primario: #04213f;
+  --g3-primario-suave: #173a63; --g3-sobre-primario-suave: #d6e4f5;
+  --g3-foco: rgba(156, 195, 240, 0.7);
+  --g3-rojo-3g: #d9203d;
+  --g3-ok: #81c995; --g3-ok-suave: #1e3a2a; --g3-aviso: #f0c066; --g3-aviso-suave: #3b2f12;
+  --g3-mal: #ffb4ab; --g3-mal-suave: #4a1c18; --g3-sobre-mal: #3a0b07;
+  --g3-neutro: #b5b5b5; --g3-neutro-suave: #2b2b2b; --g3-info: #a8c8ff; --g3-info-suave: #1c2d47;
+  --g3-instalacion: #a8c8ff; --g3-instalacion-suave: #1c2d47;
+  --g3-mantenimiento: #73d6dc; --g3-mantenimiento-suave: #123a3c;
+  --g3-garantia: #cdb6ff; --g3-garantia-suave: #2f2447;
+  --g3-vidrio: rgba(28, 28, 28, 0.78); --g3-vidrio-fuerte: rgba(30, 30, 30, 0.94); --g3-vidrio-borde: rgba(255, 255, 255, 0.1);
+  --g3-sombra-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --g3-sombra-2: 0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.35);
+  --g3-sombra-3: 0 8px 24px rgba(0, 0, 0, 0.45), 0 24px 60px rgba(0, 0, 0, 0.5);
+  --g3p-sobre-fuerte: #111111;
+}
+:root[data-g3-tv] body { background: var(--g3-fondo); color: var(--g3-tinta); }
+
+/* ============================================================================================
+   2. ARMAZÓN DE TV
+   ============================================================================================ */
+:root[data-g3-tv] .g3tv { position: relative; min-height: 100%; background: var(--g3-fondo); color: var(--g3-tinta); font-family: var(--g3-f-texto); }
+:root[data-g3-tv] .g3tv-fijo { position: fixed; inset: 0; overflow: hidden; background: var(--g3-fondo); color: var(--g3-tinta); font-family: var(--g3-f-texto); }
+:root[data-g3-tv] .g3tv-desplaza { height: 100%; width: 100%; overflow: auto; padding: calc(clamp(12px, 1.4vw, 28px) * var(--g3tv-escala)); }
+:root[data-g3-tv] .g3tv-pila { display: grid; gap: calc(clamp(12px, 1.1vw, 22px) * var(--g3tv-escala)); align-content: start; }
+
+/* Barra de título: marca 3G + título + estado en vivo */
+:root[data-g3-tv] .g3tv-barra {
+  display: flex; align-items: center; gap: calc(clamp(12px, 1.4vw, 28px) * var(--g3tv-escala)); flex-wrap: wrap;
+  padding: calc(clamp(14px, 1.3vw, 26px) * var(--g3tv-escala)) calc(clamp(16px, 1.6vw, 32px) * var(--g3tv-escala));
+  background: var(--g3-superficie); border: 1px solid var(--g3-linea); border-radius: var(--g3-r-hoja); box-shadow: var(--g3-sombra-1);
+}
+:root[data-g3-tv] .g3tv-marca {
+  display: grid; place-items: center; flex: none; border-radius: 22%;
+  width: calc(clamp(48px, 4.2vw, 84px) * var(--g3tv-escala)); height: calc(clamp(48px, 4.2vw, 84px) * var(--g3tv-escala));
+  background: var(--g3-rojo-3g); color: #ffffff; font: 700 calc(clamp(1.1rem, 0.7rem + 1.2vw, 2rem) * var(--g3tv-escala))/1 var(--g3-f-titulo);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(196, 18, 47, 0.28);
+}
+:root[data-g3-tv] .g3tv-titulos { flex: 1 1 260px; min-width: 0; display: grid; gap: 4px; }
+:root[data-g3-tv] .g3tv-titulos h1 { margin: 0; font: 700 calc(var(--g3tv-t-titulo) * var(--g3tv-escala))/1.1 var(--g3-f-titulo); color: var(--g3-tinta); overflow-wrap: anywhere; }
+:root[data-g3-tv] .g3tv-titulos p { margin: 0; font-size: calc(var(--g3tv-t-medio) * var(--g3tv-escala)); color: var(--g3-tinta-2); font-weight: 500; }
+:root[data-g3-tv] .g3tv-titulos p b { color: var(--g3-tinta); font-weight: 700; }
+:root[data-g3-tv] .g3tv-barra-der { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto; }
+
+/* «En vivo · se actualiza cada minuto» */
+:root[data-g3-tv] .g3tv-vivo {
+  display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: var(--g3-r-pildora);
+  background: var(--g3-ok-suave); color: var(--g3-ok); font-weight: 600; font-size: calc(var(--g3tv-t-chico) * var(--g3tv-escala)); white-space: nowrap;
+}
+:root[data-g3-tv] .g3tv-vivo::before { content: ""; width: 0.7em; height: 0.7em; border-radius: 50%; background: currentColor; flex: none; animation: g3tv-latido 2s ease-in-out infinite; }
+:root[data-g3-tv] .g3tv-vivo--neutro { background: var(--g3-contenedor); color: var(--g3-tinta-2); }
+
+/* Números (tablero) */
+:root[data-g3-tv] .g3tv-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(clamp(10px, 1vw, 20px) * var(--g3tv-escala)); }
+:root[data-g3-tv] .g3tv-kpi {
+  display: grid; gap: 6px; align-content: center; padding: calc(clamp(14px, 1.4vw, 28px) * var(--g3tv-escala));
+  background: var(--g3-superficie); border: 1px solid var(--g3-linea); border-radius: var(--g3-r-gr); box-shadow: var(--g3-sombra-1);
+}
+:root[data-g3-tv] .g3tv-kpi-cab { display: flex; align-items: center; gap: 10px; color: var(--g3-tinta-2); font-weight: 600; font-size: calc(var(--g3tv-t-base) * var(--g3tv-escala)); }
+:root[data-g3-tv] .g3tv-kpi-cab svg { width: 1.3em; height: 1.3em; flex: none; }
+:root[data-g3-tv] .g3tv-kpi-valor { font: 700 calc(var(--g3tv-t-numero) * var(--g3tv-escala))/1 var(--g3-f-titulo); color: var(--g3-tinta); font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) { :root[data-g3-tv] .g3tv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Resumen: números + proyectos pausados (lado a lado en pantallas anchas) */
+:root[data-g3-tv] .g3tv-resumen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, clamp(280px, 26vw, 460px)); gap: calc(clamp(10px, 1vw, 20px) * var(--g3tv-escala)); align-items: stretch; }
+:root[data-g3-tv] .g3tv-resumen:empty { display: none; }
+:root[data-g3-tv] .g3tv-resumen > :only-child { grid-column: 1 / -1; }
+@media (max-width: 1100px) { :root[data-g3-tv] .g3tv-resumen { grid-template-columns: minmax(0, 1fr); } }
+
+/* Panel (proyectos pausados) */
+:root[data-g3-tv] .g3tv-panel {
+  display: grid; gap: 10px; padding: calc(clamp(14px, 1.2vw, 24px) * var(--g3tv-escala));
+  background: var(--g3-superficie); border: 1px solid var(--g3-linea); border-radius: var(--g3-r-gr);
+}
+:root[data-g3-tv] .g3tv-panel-cab { display: flex; align-items: center; gap: 10px; font: 600 calc(var(--g3tv-t-medio) * var(--g3tv-escala))/1.2 var(--g3-f-titulo); color: var(--g3-info); }
+:root[data-g3-tv] .g3tv-panel-cab svg { width: 1.2em; height: 1.2em; flex: none; }
+:root[data-g3-tv] .g3tv-chips { display: flex; flex-wrap: wrap; gap: 8px; max-height: calc(220px * var(--g3tv-escala)); overflow-y: auto; }
+:root[data-g3-tv] .g3tv-chips > span {
+  padding: 6px 14px; border-radius: var(--g3-r-pildora); background: var(--g3-info-suave); color: var(--g3-tinta);
+  font-size: calc(var(--g3tv-t-chico) * var(--g3tv-escala)); font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Etiquetas (estado y tipo de trabajo): siempre con texto */
+:root[data-g3-tv] .g3tv-etq {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: var(--g3-r-pildora);
+  font-weight: 700; font-size: calc(var(--g3tv-t-chico) * var(--g3tv-escala)); line-height: 1.2; white-space: nowrap;
+  background: var(--g3-neutro-suave); color: var(--g3-tinta);
+}
+:root[data-g3-tv] .g3tv-etq svg { width: 1.15em; height: 1.15em; flex: none; }
+:root[data-g3-tv] .g3tv-etq--mal { background: var(--g3-mal); color: var(--g3-sobre-mal); }
+:root[data-g3-tv] .g3tv-etq--aviso { background: var(--g3-aviso-suave); color: var(--g3-aviso); }
+:root[data-g3-tv] .g3tv-etq--ok { background: var(--g3-ok-suave); color: var(--g3-ok); }
+:root[data-g3-tv] .g3tv-etq--instalacion { background: var(--g3-instalacion-suave); color: var(--g3-instalacion); }
+:root[data-g3-tv] .g3tv-etq--mantenimiento { background: var(--g3-mantenimiento-suave); color: var(--g3-mantenimiento); }
+:root[data-g3-tv] .g3tv-etq--garantia { background: var(--g3-garantia-suave); color: var(--g3-garantia); }
+
+/* Tarjeta grande de obra (manufactura, herrería, terminal) */
+:root[data-g3-tv] .g3tv-lista { display: grid; gap: calc(clamp(12px, 1.1vw, 22px) * var(--g3tv-escala)); padding-bottom: calc(72px * var(--g3tv-escala)); }
+:root[data-g3-tv] .g3tv-tarjeta {
+  display: flex; align-items: center; justify-content: space-between; gap: calc(clamp(14px, 2vw, 40px) * var(--g3tv-escala)); flex-wrap: wrap;
+  padding: calc(clamp(16px, 2vw, 40px) * var(--g3tv-escala));
+  background: var(--g3-superficie); border: 2px solid var(--g3-linea); border-left-width: 10px; border-radius: var(--g3-r-gr); box-shadow: var(--g3-sombra-1);
+}
+:root[data-g3-tv] .g3tv-tarjeta--aviso { border-color: var(--g3-aviso); background: color-mix(in srgb, var(--g3-aviso-suave) 55%, var(--g3-superficie)); }
+/* Advertencia (2 días o menos): borde rojo, como hoy; crítico (1 día o menos, o prioridad urgente): fondo rojo que late */
+:root[data-g3-tv] .g3tv-tarjeta--advertencia { border-color: var(--g3-mal); }
+:root[data-g3-tv] .g3tv-tarjeta--critico { border-color: var(--g3-mal); background: var(--g3-mal-suave); animation: g3tv-alerta 2.5s ease-in-out infinite; }
+:root[data-g3-tv] .g3tv-tarjeta-cuerpo { flex: 1 1 340px; min-width: 0; display: grid; gap: calc(10px * var(--g3tv-escala)); }
+:root[data-g3-tv] .g3tv-nombre { margin: 0; font: 700 calc(var(--g3tv-t-grande) * var(--g3tv-escala))/1.12 var(--g3-f-titulo); color: var(--g3-tinta); overflow-wrap: anywhere; }
+:root[data-g3-tv] .g3tv-cliente { margin: 0; font-size: calc(var(--g3tv-t-medio) * var(--g3tv-escala)); color: var(--g3-tinta-2); }
+:root[data-g3-tv] .g3tv-fila { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+:root[data-g3-tv] .g3tv-fecha { display: grid; justify-items: end; gap: 8px; text-align: right; flex: 0 1 auto; }
+:root[data-g3-tv] .g3tv-fecha-etq { font-size: calc(var(--g3tv-t-medio) * var(--g3tv-escala)); font-weight: 600; color: var(--g3-tinta-2); }
+:root[data-g3-tv] .g3tv-fecha-valor {
+  display: inline-flex; align-items: center; gap: 12px; padding: 10px 22px; border-radius: var(--g3-r-md);
+  background: var(--g3-contenedor); color: var(--g3-tinta); font: 700 calc(var(--g3tv-t-grande) * var(--g3tv-escala))/1.1 var(--g3-f-titulo); white-space: nowrap;
+}
+:root[data-g3-tv] .g3tv-fecha-valor svg { width: 0.8em; height: 0.8em; flex: none; color: var(--g3-tinta-2); }
+:root[data-g3-tv] .g3tv-fecha-valor--mal { background: var(--g3-mal); color: var(--g3-sobre-mal); }
+:root[data-g3-tv] .g3tv-fecha-valor--mal svg { color: inherit; }
+:root[data-g3-tv] .g3tv-plazo { margin: 0; font-weight: 700; font-size: calc(var(--g3tv-t-base) * var(--g3tv-escala)); color: var(--g3-tinta-2); }
+:root[data-g3-tv] .g3tv-plazo--mal { color: var(--g3-mal); }
+:root[data-g3-tv] .g3tv-tarjeta--critico .g3tv-plazo--mal { color: var(--g3-mal); }
+
+/* Vacío */
+:root[data-g3-tv] .g3tv-vacio {
+  display: grid; justify-items: center; gap: 12px; text-align: center; padding: calc(clamp(32px, 5vw, 96px) * var(--g3tv-escala)) 16px;
+  background: var(--g3-superficie); border: 1px dashed var(--g3-linea-fuerte); border-radius: var(--g3-r-gr); color: var(--g3-tinta-2);
+}
+:root[data-g3-tv] .g3tv-vacio svg { width: calc(56px * var(--g3tv-escala)); height: calc(56px * var(--g3tv-escala)); color: var(--g3-ok); }
+:root[data-g3-tv] .g3tv-vacio b { font: 600 calc(var(--g3tv-t-medio) * var(--g3tv-escala))/1.25 var(--g3-f-titulo); color: var(--g3-tinta); }
+:root[data-g3-tv] .g3tv-vacio p { margin: 0; font-size: calc(var(--g3tv-t-base) * var(--g3tv-escala)); }
+
+/* Cargando */
+:root[data-g3-tv] .g3tv-cargando { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 18px; background: var(--g3-fondo); color: var(--g3-tinta-2); font-size: var(--g3tv-t-medio); }
+:root[data-g3-tv] .g3tv-cargando::before {
+  content: ""; width: 56px; height: 56px; border-radius: 50%; border: 5px solid var(--g3-contenedor-alto); border-top-color: var(--g3-primario);
+  animation: g3tv-gira 0.9s linear infinite;
+}
+
+/* Botones (terminal y anuncios) */
+:root[data-g3-tv] .g3tv-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 10px 22px;
+  border: 1px solid transparent; border-radius: var(--g3-r-pildora); cursor: pointer; text-decoration: none;
+  font: 600 calc(var(--g3tv-t-base) * var(--g3tv-escala))/1.2 var(--g3-f-texto); transition: background 0.15s, transform 0.1s;
+  background: var(--g3-contenedor); color: var(--g3-tinta);
+}
+:root[data-g3-tv] .g3tv-btn svg { width: 1.3em; height: 1.3em; flex: none; }
+:root[data-g3-tv] .g3tv-btn:hover { background: var(--g3-contenedor-alto); }
+:root[data-g3-tv] .g3tv-btn:active { transform: scale(0.98); }
+:root[data-g3-tv] .g3tv-btn:focus-visible { outline: 3px solid var(--g3-foco); outline-offset: 2px; }
+:root[data-g3-tv] .g3tv-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+:root[data-g3-tv] .g3tv-btn--primario { background: var(--g3-primario); color: var(--g3-sobre-primario); }
+:root[data-g3-tv] .g3tv-btn--primario:hover { background: var(--g3-primario-hover); }
+:root[data-g3-tv] .g3tv-btn--tonal { background: var(--g3-primario-suave); color: var(--g3-sobre-primario-suave); }
+:root[data-g3-tv] .g3tv-btn--tonal:hover { background: color-mix(in srgb, var(--g3-primario-suave) 80%, var(--g3-primario)); }
+:root[data-g3-tv] .g3tv-btn--contorno { background: transparent; border-color: var(--g3-linea-fuerte); }
+:root[data-g3-tv] .g3tv-btn--contorno:hover { background: var(--g3-hover); }
+:root[data-g3-tv] .g3tv-btn--grande { width: 100%; min-height: calc(72px * var(--g3tv-escala)); font-size: calc(var(--g3tv-t-medio) * var(--g3tv-escala)); font-weight: 700; }
+:root[data-g3-tv] .g3tv-btn--bloque { width: 100%; }
+:root[data-g3-tv] .g3tv-btn-icono { width: 52px; height: 52px; min-height: 0; padding: 0; }
+
+/* Controles de zoom y giro (los de siempre, mismo comportamiento: aparecen al mover el mouse) */
+:root[data-g3-tv] .g3tv-controles { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; gap: 8px; transition: opacity 0.3s; }
+:root[data-g3-tv] .g3tv-controles--ocultos { opacity: 0; }
+:root[data-g3-tv] .g3tv-ctrl {
+  display: flex; align-items: stretch; overflow: hidden; border-radius: var(--g3-r-pildora);
+  background: var(--g3-vidrio-fuerte); -webkit-backdrop-filter: var(--g3-desenfoque); backdrop-filter: var(--g3-desenfoque);
+  border: 1px solid var(--g3-vidrio-borde); box-shadow: var(--g3-sombra-2); color: var(--g3-tinta);
+}
+:root[data-g3-tv] .g3tv-ctrl button { display: grid; place-items: center; min-width: 48px; min-height: 48px; padding: 0 12px; border: 0; background: transparent; color: inherit; cursor: pointer; }
+:root[data-g3-tv] .g3tv-ctrl button:hover { background: var(--g3-hover); }
+:root[data-g3-tv] .g3tv-ctrl button:focus-visible { outline: 3px solid var(--g3-foco); outline-offset: -3px; }
+:root[data-g3-tv] .g3tv-ctrl button:disabled { opacity: 0.35; cursor: not-allowed; }
+:root[data-g3-tv] .g3tv-ctrl span { display: grid; place-items: center; min-width: 56px; padding: 0 12px; font-weight: 700; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+
+/* ============================================================================================
+   3. PANEL DE PRODUCCIÓN Y PREPARADOS: tarjetas de siempre (ProyectoTimeline) re-pintadas con tokens
+   (el mapa de colores de estas tarjetas está en planta-tv-mapa.css, solo dentro de .g3tv-mapa)
+   ============================================================================================ */
+/* Tarjeta: esquinas del paquete, sin degradado. La sombra NO se toca: el anillo rojo de «urgente» y el de «hay que cerrar» viven en ella. */
+:root[data-g3-tv] .g3tv-mapa > * { border-radius: var(--g3-r-gr) !important; }
+:root[data-g3-tv] .g3tv-mapa .bg-gradient-to-r { background-image: none !important; }
+/* Anillos de estado de la tarjeta: «urgente» y «hay que cerrar» en rojo, «falla en la instalación» en ámbar (no el azul de foco) */
+:root[data-g3-tv] .g3tv-mapa :is(.ring-red-400, .ring-red-500) { --tw-ring-color: var(--g3-mal); }
+:root[data-g3-tv] .g3tv-mapa .ring-amber-500 { --tw-ring-color: var(--g3-aviso); }
+:root[data-g3-tv] .g3tv-mapa :is(h3, .font-bold) { font-family: var(--g3-f-titulo); }
+/* Etiquetas chicas de las tarjetas (Avance, Cita agendada): mínimo legible y en oración */
+:root[data-g3-tv] .g3tv-mapa .g3p-texto-min { font-size: calc(0.8125rem * var(--escala, 1)) !important; text-transform: none; letter-spacing: normal; }
+
+/* ============================================================================================
+   4. TERMINAL DE ÁREA
+   ============================================================================================ */
+:root[data-g3-tv] .g3tv-acceso { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--g3-fondo); }
+:root[data-g3-tv] .g3tv-acceso-tarjeta {
+  width: min(480px, 100%); display: grid; gap: 18px; justify-items: center; text-align: center; padding: clamp(24px, 4vw, 44px);
+  background: var(--g3-superficie); border: 1px solid var(--g3-linea); border-radius: var(--g3-r-hoja); box-shadow: var(--g3-sombra-2);
+}
+:root[data-g3-tv] .g3tv-acceso-tarjeta h1 { margin: 0; font: 700 clamp(1.5rem, 1.1rem + 1.5vw, 2.25rem)/1.15 var(--g3-f-titulo); }
+:root[data-g3-tv] .g3tv-acceso-tarjeta p { margin: 0; color: var(--g3-tinta-2); font-size: 1.0625rem; }
+:root[data-g3-tv] .g3tv-acceso-tarjeta form { display: grid; gap: 14px; width: 100%; }
+:root[data-g3-tv] .g3tv-acceso-tarjeta label { justify-self: start; font-weight: 600; color: var(--g3-tinta-2); }
+:root[data-g3-tv] .g3tv-codigo {
+  width: 100%; padding: 14px 18px; border: 2px solid var(--g3-linea-fuerte); border-radius: var(--g3-r-md); background: var(--g3-superficie); color: var(--g3-tinta);
+  text-align: center; font: 600 clamp(1.5rem, 1.1rem + 1.4vw, 2.25rem)/1.2 var(--g3-f-mono); letter-spacing: 0.2em;
+}
+:root[data-g3-tv] .g3tv-codigo:focus { outline: none; border-color: var(--g3-primario); box-shadow: 0 0 0 4px var(--g3-primario-suave); }
+:root[data-g3-tv] .g3tv-pie-texto { color: var(--g3-tinta-3); font-size: 0.875rem; }
+:root[data-g3-tv] .g3tv-area-ico {
+  display: grid; place-items: center; flex: none; border-radius: var(--g3-r-md);
+  width: calc(clamp(52px, 4.2vw, 80px) * var(--g3tv-escala)); height: calc(clamp(52px, 4.2vw, 80px) * var(--g3tv-escala));
+  background: var(--g3-primario-suave); color: var(--g3-sobre-primario-suave);
+}
+:root[data-g3-tv] .g3tv-area-ico svg { width: 55%; height: 55%; }
+:root[data-g3-tv] .g3tv-rejilla { display: grid; gap: clamp(14px, 1.4vw, 24px); grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); padding-bottom: 72px; }
+:root[data-g3-tv] .g3tv-obra {
+  display: grid; gap: 14px; align-content: start; padding: clamp(18px, 1.8vw, 28px);
+  background: var(--g3-superficie); border: 2px solid var(--g3-linea); border-radius: var(--g3-r-gr); box-shadow: var(--g3-sombra-1);
+}
+:root[data-g3-tv] .g3tv-obra--urgente { border-color: var(--g3-mal); box-shadow: 0 0 0 4px color-mix(in srgb, var(--g3-mal) 22%, transparent), var(--g3-sombra-1); }
+:root[data-g3-tv] .g3tv-obra-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+:root[data-g3-tv] .g3tv-obra h2 { margin: 0; font: 700 clamp(1.375rem, 1rem + 1vw, 2rem)/1.15 var(--g3-f-titulo); overflow-wrap: anywhere; }
+:root[data-g3-tv] .g3tv-obra .g3tv-cliente { font-size: clamp(1.0625rem, 0.95rem + 0.4vw, 1.375rem); }
+:root[data-g3-tv] .g3tv-num { flex: none; padding: 4px 12px; border-radius: var(--g3-r-pildora); background: var(--g3-contenedor); color: var(--g3-tinta-2); font: 600 0.9375rem/1.4 var(--g3-f-mono); }
+:root[data-g3-tv] .g3tv-obra-plazo { display: flex; align-items: center; gap: 10px; margin: 0; font-size: clamp(1.0625rem, 0.95rem + 0.4vw, 1.375rem); color: var(--g3-tinta-2); }
+:root[data-g3-tv] .g3tv-obra-plazo svg { width: 1.2em; height: 1.2em; flex: none; }
+:root[data-g3-tv] .g3tv-obra-plazo--mal { color: var(--g3-mal); font-weight: 700; }
+:root[data-g3-tv] .g3tv-planos { display: grid; gap: 8px; }
+:root[data-g3-tv] .g3tv-planos p { margin: 0; color: var(--g3-tinta-2); font-weight: 600; font-size: 0.9375rem; }
+:root[data-g3-tv] .g3tv-nota { margin: 0; text-align: center; color: var(--g3-tinta-3); font-size: 0.9375rem; }
+:root[data-g3-tv] .g3tv-gira { animation: g3tv-gira 0.9s linear infinite; }
+:root[data-g3-tv] .g3tv-pie-fijo {
+  position: fixed; left: 0; right: 0; bottom: 12px; display: flex; justify-content: center; pointer-events: none;
+}
+@media (max-width: 720px) { :root[data-g3-tv] .g3tv-pie-fijo { position: static; padding: 0 0 16px; } }
+:root[data-g3-tv] .g3tv-pie-fijo span {
+  padding: 6px 16px; border-radius: var(--g3-r-pildora); background: var(--g3-vidrio-fuerte); border: 1px solid var(--g3-vidrio-borde);
+  -webkit-backdrop-filter: var(--g3-desenfoque); backdrop-filter: var(--g3-desenfoque); color: var(--g3-tinta-2); font-size: 0.875rem; font-weight: 500;
+}
+/* Visor de planos (PDF) */
+:root[data-g3-tv] .g3tv-visor { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, 0.6); }
+:root[data-g3-tv] .g3tv-visor-hoja {
+  display: flex; flex-direction: column; width: min(1200px, 100%); height: min(90vh, 100%); overflow: hidden;
+  background: var(--g3-superficie); border: 1px solid var(--g3-linea); border-radius: var(--g3-r-hoja); box-shadow: var(--g3-sombra-3);
+}
+:root[data-g3-tv] .g3tv-visor-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px 12px 22px; border-bottom: 1px solid var(--g3-linea); }
+:root[data-g3-tv] .g3tv-visor-cab h3 { display: flex; align-items: center; gap: 10px; margin: 0; min-width: 0; font: 600 1.25rem/1.25 var(--g3-f-titulo); overflow-wrap: anywhere; }
+:root[data-g3-tv] .g3tv-visor-cab h3 svg { flex: none; color: var(--g3-primario); }
+:root[data-g3-tv] .g3tv-visor iframe { flex: 1; width: 100%; border: 0; background: #ffffff; }
+
+/* Avisos (react-hot-toast) en las pantallas de TV */
+:root[data-g3-tv] .g3tv-aviso { font-family: var(--g3-f-texto); font-size: 1.25rem; font-weight: 600; text-align: center; }
+
+/* ============================================================================================
+   5. ANUNCIOS (el carrusel de imágenes se queda sobre negro; controles y menú con Diseño 3G)
+   ============================================================================================ */
+:root[data-g3-tv] .g3tv-anuncios { position: relative; height: 100vh; overflow: hidden; background: #000000; }
+:root[data-g3-tv] .g3tv-anuncios .g3tv-ctrl { box-shadow: var(--g3-sombra-2); }
+:root[data-g3-tv] .g3tv-esquina { position: absolute; z-index: 50; transition: opacity 0.5s; }
+:root[data-g3-tv] .g3tv-esquina--oculta { opacity: 0; }
+:root[data-g3-tv] .g3tv-info {
+  padding: 8px 16px; border-radius: var(--g3-r-pildora); background: var(--g3-vidrio-fuerte); border: 1px solid var(--g3-vidrio-borde);
+  -webkit-backdrop-filter: var(--g3-desenfoque); backdrop-filter: var(--g3-desenfoque); color: var(--g3-tinta-2); font-size: 0.9375rem; font-weight: 500;
+}
+:root[data-g3-tv] .g3tv-admin {
+  position: absolute; top: 84px; left: 16px; z-index: 50; display: grid; gap: 16px; align-content: start;
+  width: min(460px, calc(100% - 32px)); max-height: calc(100vh - 110px); overflow-y: auto; padding: 20px;
+  background: var(--g3-vidrio-fuerte); -webkit-backdrop-filter: var(--g3-desenfoque); backdrop-filter: var(--g3-desenfoque);
+  border: 1px solid var(--g3-vidrio-borde); border-radius: var(--g3-r-hoja); box-shadow: var(--g3-sombra-3); color: var(--g3-tinta);
+}
+:root[data-g3-tv] .g3tv-admin-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+:root[data-g3-tv] .g3tv-admin-cab h2 { margin: 0; font: 600 1.375rem/1.2 var(--g3-f-titulo); }
+:root[data-g3-tv] .g3tv-admin h3 { margin: 0; font: 600 1.0625rem/1.3 var(--g3-f-titulo); color: var(--g3-tinta-2); }
+:root[data-g3-tv] .g3tv-progreso { display: grid; gap: 8px; padding: 14px; border-radius: var(--g3-r-md); background: var(--g3-info-suave); color: var(--g3-info); font-weight: 600; }
+:root[data-g3-tv] .g3tv-progreso > div:first-child { display: flex; justify-content: space-between; gap: 8px; }
+:root[data-g3-tv] .g3tv-barra-progreso { height: 10px; border-radius: var(--g3-r-pildora); background: var(--g3-contenedor-alto); overflow: hidden; }
+:root[data-g3-tv] .g3tv-barra-progreso > span { display: block; height: 100%; border-radius: inherit; background: var(--g3-primario); transition: width 0.3s; }
+:root[data-g3-tv] .g3tv-anuncio {
+  display: grid; gap: 12px; padding: 14px; border-radius: var(--g3-r-md); background: var(--g3-superficie); border: 1px solid var(--g3-linea); border-left-width: 6px;
+}
+:root[data-g3-tv] .g3tv-anuncio--ok { border-left-color: var(--g3-ok); }
+:root[data-g3-tv] .g3tv-anuncio--aviso { border-left-color: var(--g3-aviso); }
+:root[data-g3-tv] .g3tv-anuncio--mal { border-left-color: var(--g3-mal); }
+:root[data-g3-tv] .g3tv-anuncio--info { border-left-color: var(--g3-info); }
+:root[data-g3-tv] .g3tv-anuncio-fila { display: flex; align-items: flex-start; gap: 14px; }
+:root[data-g3-tv] .g3tv-miniatura { display: grid; place-items: center; flex: none; width: 76px; height: 76px; overflow: hidden; border-radius: var(--g3-r-ch); background: var(--g3-contenedor); color: var(--g3-tinta-3); }
+:root[data-g3-tv] .g3tv-miniatura img { width: 100%; height: 100%; object-fit: cover; }
+:root[data-g3-tv] .g3tv-anuncio p { margin: 0; font-size: 1rem; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+:root[data-g3-tv] .g3tv-estado { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.875rem; font-weight: 600; }
+:root[data-g3-tv] .g3tv-estado::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+:root[data-g3-tv] .g3tv-estado--ok { color: var(--g3-ok); }
+:root[data-g3-tv] .g3tv-estado--aviso { color: var(--g3-aviso); }
+:root[data-g3-tv] .g3tv-estado--mal { color: var(--g3-mal); }
+:root[data-g3-tv] .g3tv-estado--info { color: var(--g3-info); }
+:root[data-g3-tv] .g3tv-anuncios-estado {
+  height: 100vh; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px; text-align: center;
+  background: var(--g3-fondo); color: var(--g3-tinta);
+}
+:root[data-g3-tv] .g3tv-anuncios-estado b { font: 700 clamp(1.5rem, 1rem + 1.6vw, 2.5rem)/1.2 var(--g3-f-titulo); }
+:root[data-g3-tv] .g3tv-anuncios-estado p { margin: 0; color: var(--g3-tinta-2); font-size: 1.125rem; }
+:root[data-g3-tv] .g3tv-anuncios-estado > svg { width: 64px; height: 64px; color: var(--g3-mal); }
+/* Carrusel (componente de siempre): barra de avance y espera con el azul de acción */
+:root[data-g3-tv] .g3tv-anuncios .bg-orange-500 { background-color: var(--g3-primario); box-shadow: none; }
+:root[data-g3-tv] .g3tv-anuncios .border-orange-500 { border-color: var(--g3-primario); }
+:root[data-g3-tv] .g3tv-anuncios h2 { font-family: var(--g3-f-titulo); }
+
+/* ============================================================================================
+   6. CALENDARIO PÚBLICO (los colores de cada equipo se quedan: identifican al equipo)
+   ============================================================================================ */
+:root[data-g3-tv] .g3tv-cal { background: var(--g3-fondo) !important; }
+:root[data-g3-tv] .g3tv-cal-cab { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 2fr) minmax(0, 3fr); gap: 8px; margin-bottom: 8px; }
+:root[data-g3-tv] .g3tv-cal-marca {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--g3-r-md);
+  background: var(--g3-superficie); border: 1px solid var(--g3-linea); min-width: 0;
+}
+:root[data-g3-tv] .g3tv-cal-marca b { font: 700 calc(1.25rem * var(--escala, 1))/1.15 var(--g3-f-titulo); overflow-wrap: anywhere; }
+:root[data-g3-tv] .g3tv-cal-marca small { display: block; color: var(--g3-tinta-2); font-size: calc(0.875rem * var(--escala, 1)); font-weight: 500; }
+:root[data-g3-tv] .g3tv-cal-hora {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(0.5rem * var(--escala, 1)) calc(1rem * var(--escala, 1));
+  border-radius: var(--g3-r-md); background: var(--g3-primario); color: var(--g3-sobre-primario); min-width: 0;
+}
+:root[data-g3-tv] .g3tv-cal-hora .g3tv-cal-dia { font: 700 calc(1.5rem * var(--escala, 1))/1.15 var(--g3-f-titulo); text-transform: capitalize; }
+:root[data-g3-tv] .g3tv-cal-hora .g3tv-cal-fecha { font-size: calc(1.0625rem * var(--escala, 1)); opacity: 0.92; }
+:root[data-g3-tv] .g3tv-cal-hora .g3tv-cal-reloj { display: flex; align-items: center; gap: 8px; font: 700 calc(2.25rem * var(--escala, 1))/1 var(--g3-f-titulo); font-variant-numeric: tabular-nums; white-space: nowrap; }
+:root[data-g3-tv] .g3tv-cal-equipos { padding: calc(0.5rem * var(--escala, 1)); border-radius: var(--g3-r-md); background: var(--g3-superficie); border: 1px solid var(--g3-linea); min-width: 0; display: flex; flex-direction: column; }
+:root[data-g3-tv] .g3tv-cal-equipos h2 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font: 600 calc(0.9375rem * var(--escala, 1))/1.2 var(--g3-f-titulo); color: var(--g3-tinta-2); }
+@media (max-width: 860px) { :root[data-g3-tv] .g3tv-cal-cab { grid-template-columns: 1fr; } }
+/* Semanas: superficies y encabezados de día con tokens; hoy en ámbar, asueto en rojo, días vacíos en gris.
+   Las fichas de cada obra y su hora (borde izquierdo o esquinas «rounded») conservan el color de su equipo. */
+:root[data-g3-tv] .g3tv-cal .bg-white.shadow-md { background-color: var(--g3-superficie); }
+:root[data-g3-tv] .g3tv-cal .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--g3-linea); }
+:root[data-g3-tv] .g3tv-cal .bg-blue-600.text-white { background-color: var(--g3-primario); color: var(--g3-sobre-primario); }
+:root[data-g3-tv] .g3tv-cal .bg-yellow-500.text-white { background-color: #f2b705; color: #1a1300; }
+:root[data-g3-tv] .g3tv-cal .bg-red-600.text-white:not(.rounded):not(.border-l-4) { background-color: var(--g3-mal); color: var(--g3-sobre-mal); }
+:root[data-g3-tv] .g3tv-cal .bg-gray-400.text-white { background-color: var(--g3-neutro); color: var(--g3p-sobre-fuerte); }
+:root[data-g3-tv] .g3tv-cal .flex-col.bg-yellow-50:not(.border-l-4) { background-color: color-mix(in srgb, #f2b705 16%, var(--g3-superficie)); }
+:root[data-g3-tv] .g3tv-cal .flex-col.bg-red-50:not(.border-l-4) { background-color: var(--g3-mal-suave); }
+:root[data-g3-tv] .g3tv-cal .flex-col.bg-gray-100:not(.border-l-4) { background-color: var(--g3-contenedor); }
+:root[data-g3-tv] .g3tv-cal .text-center.text-gray-400 { color: var(--g3-tinta-3); }
+:root[data-g3-tv] .g3tv-cal .rounded-lg { border-radius: var(--g3-r-md); }
+:root[data-g3-tv] .g3tv-cal .shadow-md { box-shadow: var(--g3-sombra-1); }
+/* En celular o tableta angosta: las semanas y los días se apilan y la página se desplaza (en la TV no cambia nada) */
+@media (max-width: 860px) {
+  :root[data-g3-tv] .g3tv-cal { height: auto !important; min-height: 100vh; overflow: visible !important; }
+  :root[data-g3-tv] .g3tv-cal > .flex-1.overflow-hidden, :root[data-g3-tv] .g3tv-cal .grid-cols-3.overflow-hidden { overflow: visible; }
+  :root[data-g3-tv] .g3tv-cal .grid-cols-3 { grid-template-columns: minmax(0, 1fr); }
+  :root[data-g3-tv] .g3tv-cal :is(.col-span-2, .col-span-1) { grid-column: auto; }
+  :root[data-g3-tv] .g3tv-cal .grid-cols-7 { grid-template-columns: minmax(0, 1fr); }
+  :root[data-g3-tv] .g3tv-cal .grid-cols-7.divide-x > :not([hidden]) ~ :not([hidden]) { border-left-width: 0; border-top-width: 1px; border-top-style: solid; }
+  :root[data-g3-tv] .g3tv-cal .h-full { height: auto; }
+  :root[data-g3-tv] .g3tv-cal .bg-white.shadow-md { overflow: visible; }
+}
+:root[data-g3-tv] .g3tv-cal-sin { display: grid; place-content: center; height: 100%; padding: 24px; text-align: center; color: var(--g3-tinta-2); font-size: var(--g3tv-t-medio); }
+:root[data-g3-tv] .g3tv-cal-boton {
+  position: fixed; z-index: 50; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--g3-vidrio-borde);
+  background: var(--g3-vidrio-fuerte); -webkit-backdrop-filter: var(--g3-desenfoque); backdrop-filter: var(--g3-desenfoque); color: var(--g3-tinta); box-shadow: var(--g3-sombra-2); cursor: pointer;
+}
+
+/* ============================================================================================
+   7. MOVIMIENTO (solo de estas pantallas; las alertas de siempre siguen latiendo)
+   ============================================================================================ */
+@keyframes g3tv-gira { to { transform: rotate(360deg); } }
+@keyframes g3tv-latido { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes g3tv-alerta {
+  0%, 100% { background-color: var(--g3-mal-suave); }
+  50% { background-color: color-mix(in srgb, var(--g3-mal) 30%, var(--g3-mal-suave)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-g3-tv] .g3tv-vivo::before, :root[data-g3-tv] .g3tv-cargando::before, :root[data-g3-tv] .g3tv-gira { animation: none; }
+}

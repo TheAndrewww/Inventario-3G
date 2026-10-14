@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, AlertTriangle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit, Clock } from 'lucide-react';
+import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, AlertTriangle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit, Clock, User, Check } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import articulosService from '../services/articulos.service';
 import proveedoresService from '../services/proveedores.service';
@@ -12,6 +12,9 @@ import EAN13ScannerOrdenesCompra from '../components/scanner/EAN13ScannerOrdenes
 import { jsPDF } from 'jspdf';
 import AnularOrdenCompraModal from '../components/ordenes-compra/AnularOrdenCompraModal';
 import EditarOrdenModal from '../components/ordenes/EditarOrdenModal';
+import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import CabG3 from '../diseno-3g/CabG3';
+import { cx, etq, g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
 
 // La misma pantalla sirve dos sub-pestañas del menú Compras:
 // /ordenes-compra (vista="ordenes") y /solicitudes-compra (vista="solicitudes")
@@ -23,6 +26,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
   const [filterEstado, setFilterEstado] = useState('');
   const [vistaOrdenes, setVistaOrdenes] = useState('activas'); // 'activas', 'completadas', 'canceladas'
   const vistaActual = vista; // 'solicitudes' o 'ordenes' (la decide la ruta)
+  const g3 = useDiseno3G(); // Diseño 3G: encabezado, números, estados y tablas en tarjetas (apagado, lo de siempre)
   const [modalNuevaOrden, setModalNuevaOrden] = useState(false);
   const [modalDetalle, setModalDetalle] = useState(false);
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
@@ -188,7 +192,14 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
   };
 
   const handleEnviarOrden = async (ordenId) => {
-    if (!window.confirm('¿Está seguro de enviar esta orden al proveedor?')) return;
+    if (g3Activo()) {
+      const o = ordenes.find(x => x.id === ordenId) || (ordenSeleccionada?.id === ordenId ? ordenSeleccionada : null);
+      if (!(await confirmarG3({
+        titulo: '¿Enviar esta orden al proveedor?',
+        datos: o ? [['Orden', o.ticket_id], ['Proveedor', o.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', `$${parseFloat(o.total_estimado || 0).toFixed(2)}`]] : [],
+        confirmar: 'Enviar orden', cancelar: 'Regresar',
+      }))) return;
+    } else if (!window.confirm('¿Está seguro de enviar esta orden al proveedor?')) return;
 
     try {
       await ordenesCompraService.enviarOrden(ordenId);
@@ -342,11 +353,11 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
 
       if (articulosBajoStock.length === 0) {
         setModalArticulosEncontrados(false);
-        toast.success('✅ Todos los artículos tienen stock suficiente');
+        toast.success(g3Activo() ? 'Todos los artículos tienen stock suficiente' : '✅ Todos los artículos tienen stock suficiente');
       } else {
         setModalArticulosEncontrados(true);
         toast(`${articulosBajoStock.length} artículo${articulosBajoStock.length !== 1 ? 's' : ''} bajo stock mínimo`, {
-          icon: '⚠️',
+          icon: g3Activo() ? undefined : '⚠️',
           duration: 2000
         });
       }
@@ -402,7 +413,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
         toast.loading('Actualizando lista...', { id: 'updating-list' });
         await handleMostrarBajoStockMinimo();
         toast.dismiss('updating-list');
-        toast.success('✅ Artículo removido de la lista', { duration: 2000 });
+        toast.success(g3Activo() ? 'Artículo quitado de la lista' : '✅ Artículo removido de la lista', { duration: 2000 });
       }
     } catch (error) {
       console.error('Error al crear solicitud:', error);
@@ -745,7 +756,13 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
   }, [solicitudes]);
 
   const handleAprobarOrden = async (orden) => {
-    if (!confirm(`¿Aprobar la orden ${orden.ticket_id}?`)) return;
+    if (g3Activo()) {
+      if (!(await confirmarG3({
+        titulo: `¿Aprobar la orden ${orden.ticket_id}?`,
+        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', `$${parseFloat(orden.total_estimado || 0).toFixed(2)}`]],
+        confirmar: 'Aprobar orden', cancelar: 'Regresar',
+      }))) return;
+    } else if (!confirm(`¿Aprobar la orden ${orden.ticket_id}?`)) return;
     setLoadingAprobacion(true);
     try {
       await ordenesCompraService.aprobarOrden(orden.id);
@@ -789,7 +806,14 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
 
 
   const handleEliminarOrden = async (orden) => {
-    if (!confirm(`¿Eliminar permanentemente la orden ${orden.ticket_id}? Esta acción no se puede deshacer.`)) return;
+    if (g3Activo()) {
+      if (!(await confirmarG3({
+        titulo: `¿Eliminar permanentemente la orden ${orden.ticket_id}?`,
+        aviso: 'Esta acción no se puede deshacer.',
+        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', `$${parseFloat(orden.total_estimado || 0).toFixed(2)}`]],
+        confirmar: 'Eliminar orden', cancelar: 'No eliminar', peligro: true,
+      }))) return;
+    } else if (!confirm(`¿Eliminar permanentemente la orden ${orden.ticket_id}? Esta acción no se puede deshacer.`)) return;
     setLoadingAprobacion(true);
     try {
       await ordenesCompraService.eliminarOrden(orden.id);
@@ -817,6 +841,14 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     const config = estados[estado] || estados.pendiente_aprobacion;
     const IconComponent = config.icon;
 
+    if (g3) {
+      const g3e = {
+        pendiente_aprobacion: ['aviso', 'Pendiente de aprobación'], enviada: ['info', 'Enviada'], parcial: ['aviso', 'Recibida en parte'],
+        recibida: ['ok', 'Recibida'], cancelada: ['mal', 'Cancelada'], rechazada: ['mal', 'Rechazada'],
+      }[estado] || ['aviso', 'Pendiente de aprobación'];
+      return <span className={`g3-estado g3-estado--${g3e[0]}`}>{g3e[1]}</span>;
+    }
+
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
         <IconComponent size={12} />
@@ -833,6 +865,13 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
       urgente: 'bg-red-100 text-red-800'
     };
 
+    if (g3) {
+      // Mismo texto que hoy (la prioridad tal cual; sin prioridad, nada)
+      if (!prioridad) return null;
+      const g3p = { baja: ['neutro', 'Baja'], media: ['info', 'Media'], alta: ['aviso', 'Alta'], urgente: ['mal', 'Urgente'] }[prioridad] || ['info', prioridad];
+      return <span className={`g3-estado g3-estado--${g3p[0]}`}>{g3p[1]}</span>;
+    }
+
     return (
       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${prioridades[prioridad] || prioridades.media}`}>
         {prioridad?.toUpperCase()}
@@ -847,6 +886,16 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
   return (
     <div className="p-6">
       {/* Header */}
+      {g3 ? (
+        <CabG3
+          titulo={vista === 'solicitudes' ? 'Solicitudes de compra' : 'Órdenes de compra'}
+          descripcion={esDiseñador
+            ? 'Puedes crear órdenes aunque no haya stock. Se generarán solicitudes automáticas para artículos faltantes.'
+            : vista === 'solicitudes'
+              ? 'Toca una solicitud para armar su orden de compra; si tiene proveedor, se juntan todas las de ese proveedor.'
+              : 'Gestiona las órdenes de compra y solicitudes pendientes.'}
+        />
+      ) : (
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Órdenes de Compra</h1>
         <p className="text-gray-600">
@@ -855,9 +904,30 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
             : 'Gestiona las órdenes de compra y solicitudes pendientes.'}
         </p>
       </div>
+      )}
 
       {/* Dashboard de Métricas */}
-      {estadisticas && (
+      {g3 && estadisticas && (
+        <div className="g3-rejilla g3-rejilla--4 g3p-cab">
+          <div className="g3-kpi">
+            <span className="g3-kpi-valor" style={{ color: estadisticas.resumen.solicitudesPendientes > 10 ? 'var(--g3-mal)' : 'var(--g3-aviso)' }}>{estadisticas.resumen.solicitudesPendientes}</span>
+            <span className="g3-kpi-texto">Solicitudes pendientes{estadisticas.resumen.solicitudesPendientes > 10 ? ' · requiere atención' : ''}</span>
+          </div>
+          <div className="g3-kpi">
+            <span className="g3-kpi-valor">{estadisticas.resumen.ordenesBorrador}</span>
+            <span className="g3-kpi-texto">Órdenes en borrador</span>
+          </div>
+          <div className="g3-kpi">
+            <span className="g3-kpi-valor">{estadisticas.resumen.ordenesEnviadas}</span>
+            <span className="g3-kpi-texto">Esperando entrega</span>
+          </div>
+          <div className="g3-kpi g3p-kpi-dinero">
+            <span className="g3-kpi-valor">${parseFloat(estadisticas.resumen.totalEstimadoMes).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span className="g3-kpi-texto">Total del mes · {new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })}</span>
+          </div>
+        </div>
+      )}
+      {!g3 && estadisticas && (
         <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Solicitudes Pendientes */}
           <div className={`bg-white rounded-lg shadow p-5 border-l-4 ${estadisticas.resumen.solicitudesPendientes > 10
@@ -995,14 +1065,14 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
                 className="bg-red-700 hover:bg-red-800 text-white"
               >
                 <Plus size={20} />
-                Nueva Orden
+                {g3 ? 'Nueva orden' : 'Nueva Orden'}
               </Button>
             )}
           </div>
 
           {/* Lista de órdenes */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className={g3 ? undefined : 'bg-white rounded-lg shadow overflow-hidden'}>
+            <div className={cx('overflow-x-auto', g3 && 'g3-tabla g3-tabla--tarjetas')}>
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -1043,34 +1113,34 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
                         orden.estado === 'pendiente_aprobacion' ? 'bg-amber-50 hover:bg-amber-100' :
                           'hover:bg-gray-50'
                         }`} onClick={() => handleVerDetalle(orden)}>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-titulo')}>
                           <div className="font-medium text-gray-900">{orden.ticket_id}</div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4" {...etq(g3, 'Proveedor')}>
                           <div className="text-sm text-gray-900">
                             {orden.proveedor?.nombre || 'Sin proveedor'}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4" {...etq(g3, 'Creada por')}>
                           <div className="text-sm text-gray-900">{orden.creador?.nombre}</div>
                           <div className="text-xs text-gray-500">{orden.creador?.rol}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Total estimado')}>
                           <div className="text-sm font-semibold text-gray-900">
                             ${parseFloat(orden.total_estimado || 0).toFixed(2)}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-estado')}>
                           {getEstadoBadge(orden.estado)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" {...etq(g3, 'Fecha')}>
                           {new Date(orden.created_at).toLocaleDateString('es-MX', {
                             day: '2-digit',
                             month: 'short',
                             year: 'numeric'
                           })}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
+                        <td className={cx('px-6 py-4 whitespace-nowrap text-right text-sm font-medium', g3 && 'g3-celda-acciones')} onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => generarPDFOrden(orden)}
                             disabled={!['enviada', 'parcial', 'recibida'].includes(orden.estado)}
@@ -1100,10 +1170,10 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
         <>
           {/* Barra de búsqueda de artículos para crear solicitudes */}
           <div className="mb-6 bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Crear Nueva Solicitud de Compra:</h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">{g3 ? 'Crear una solicitud de compra' : 'Crear Nueva Solicitud de Compra:'}</h3>
 
             <div className="flex flex-col gap-2">
-              <div className="flex gap-2">
+              <div className="flex gap-2 g3:max-sm:flex-col">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <input
@@ -1119,11 +1189,11 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
                 <button
                   onClick={handleMostrarBajoStockMinimo}
                   disabled={buscandoArticulos}
-                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+                  className={g3 ? 'g3-btn g3-btn--ch' : 'px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm disabled:opacity-50 flex items-center gap-2 whitespace-nowrap'}
                   title="Ver artículos que necesitan reposición"
                 >
                   <AlertCircle size={18} />
-                  Bajo Stock Mínimo
+                  {g3 ? 'Bajo stock mínimo' : 'Bajo Stock Mínimo'}
                 </button>
               </div>
 
@@ -1164,13 +1234,13 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
                                 />
                               ) : (
                                 <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg flex-shrink-0">
-                                  📦
+                                  {g3 ? <Package size={18} className="text-gray-500" aria-hidden="true" /> : '📦'}
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
                                 <h4 className={`font-medium text-sm truncate ${desactivado ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                                   {articulo.nombre}
-                                  {desactivado && <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-gray-300 text-gray-700 no-underline">DESACTIVADO</span>}
+                                  {desactivado && <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-gray-300 text-gray-700 no-underline">{g3 ? 'Desactivado' : 'DESACTIVADO'}</span>}
                                 </h4>
                                 <p className="text-xs text-gray-500 truncate">
                                   {articulo.codigo_ean13 && `${articulo.codigo_ean13} • `}
@@ -1191,12 +1261,14 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
                                   <Plus size={12} />
                                   Agregar
                                 </button>
-                                {stockBajo && (
+                                {stockBajo && (g3 ? (
+                                  <span className={`g3-estado ${stockCritico ? 'g3-estado--mal' : 'g3-estado--aviso'}`}>{stockCritico ? 'Crítico' : 'Bajo'}</span>
+                                ) : (
                                   <span className={`px-1.5 py-0.5 text-xs font-semibold rounded ${stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
                                     }`}>
                                     {stockCritico ? '⚠️' : '⚡'}
                                   </span>
-                                )}
+                                ))}
                               </div>
                             </div>
                           </div>
@@ -1220,8 +1292,8 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className={g3 ? undefined : 'bg-white rounded-lg shadow overflow-hidden'}>
+            <div className={cx('overflow-x-auto', g3 && 'g3-tabla g3-tabla--tarjetas')}>
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -1229,10 +1301,10 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
                       Artículo
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cant. Solicitada
+                      {g3 ? 'Cantidad solicitada' : 'Cant. Solicitada'}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Stock Actual
+                      {g3 ? 'Stock actual' : 'Stock Actual'}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Prioridad
@@ -1280,9 +1352,9 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
                       <tr
                         key={solicitud.id}
                         onClick={() => handleClickSolicitud(solicitud)}
-                        className="hover:bg-red-50 cursor-pointer transition-colors"
+                        className="hover:bg-red-50 cursor-pointer transition-colors g3:hover:!bg-g3-hover"
                       >
-                        <td className="px-6 py-4">
+                        <td className={cx('px-6 py-4', g3 && 'g3-celda-titulo')}>
                           <div className="text-sm font-medium text-gray-900">
                             {solicitud.articulo?.nombre}
                           </div>
@@ -1290,7 +1362,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
                             {solicitud.articulo?.categoria?.nombre}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Cantidad solicitada')}>
                           <div className="flex items-center gap-2">
                             <input
                               type="number"
@@ -1304,30 +1376,31 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
                             <span className="text-sm text-gray-600">{solicitud.articulo?.unidad}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Stock actual')}>
                           <div className="text-sm font-semibold text-gray-900">
                             {parseFloat(solicitud.articulo?.stock_actual || 0).toFixed(0)} {solicitud.articulo?.unidad}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-estado')}>
                           {getPrioridadBadge(solicitud.prioridad)}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4" {...etq(g3, 'Solicitante')}>
                           <div className="text-sm text-gray-900">{solicitud.solicitante?.nombre}</div>
                           <div className="text-xs text-gray-500">{solicitud.solicitante?.rol}</div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4" {...etq(g3, 'Motivo')}>
                           <div className="text-sm text-gray-600 max-w-md">
                             {solicitud.motivo}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <td className={cx('px-6 py-4 whitespace-nowrap text-right text-sm font-medium', g3 && 'g3-celda-acciones')}>
                           <button
                             onClick={(e) => handleAbrirModalCancelarSolicitud(solicitud, e)}
-                            className="text-red-600 hover:text-red-900"
+                            className={g3 ? 'g3-btn g3-btn--ch g3-btn--peligro' : 'text-red-600 hover:text-red-900'}
                             title="Cancelar solicitud"
                           >
                             <XCircle size={18} />
+                            {g3 && 'Cancelar solicitud'}
                           </button>
                         </td>
                       </tr>
@@ -1493,7 +1566,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
           // Refrescar solicitudes en segundo plano (no cierra el modal de bajo stock)
           fetchData();
         }}
-        titulo={mostrandoBajoStock ? '⚠️ Artículos Bajo Stock Mínimo' : '🔍 Resultados de Búsqueda'}
+        titulo={mostrandoBajoStock ? (g3 ? 'Artículos bajo stock mínimo' : '⚠️ Artículos Bajo Stock Mínimo') : (g3 ? 'Resultados de búsqueda' : '🔍 Resultados de Búsqueda')}
       />
 
       {/* Modal Crear Solicitud */}
@@ -1522,6 +1595,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
 
 // Modal para crear nueva orden
 const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
+  const g3 = useDiseno3G(); // Diseño 3G: textos sin emojis (apagado, los de siempre)
   const { user } = useAuth();
   const esAdmin = user?.rol === 'administrador';
 
@@ -1833,7 +1907,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
         {esDiseñador && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
             <p className="text-sm text-blue-800">
-              💡 <strong>Modo Diseñador:</strong> Puedes crear órdenes aunque no haya stock suficiente.
+              {g3 ? null : '💡 '}<strong>Modo Diseñador:</strong> Puedes crear órdenes aunque no haya stock suficiente.
               Se generarán solicitudes de compra automáticas para los artículos faltantes.
             </p>
           </div>
@@ -2032,7 +2106,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
             {ordenesSeleccionadas.size > 0 && (
               <div className="mt-3 p-2 bg-yellow-100 rounded-lg">
                 <p className="text-sm font-medium text-yellow-900">
-                  ✓ {ordenesSeleccionadas.size} orden{ordenesSeleccionadas.size !== 1 ? 'es' : ''} seleccionada{ordenesSeleccionadas.size !== 1 ? 's' : ''} para consolidar
+                  {g3 ? <Check size={14} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '✓ '}{ordenesSeleccionadas.size} orden{ordenesSeleccionadas.size !== 1 ? 'es' : ''} seleccionada{ordenesSeleccionadas.size !== 1 ? 's' : ''} para consolidar
                 </p>
                 <p className="text-xs text-yellow-700 mt-1">
                   Los artículos duplicados se eliminarán de estas órdenes al crear la nueva orden.
@@ -2139,7 +2213,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                             </div>
                           </div>
                           {yaSeleccionado && (
-                            <p className="text-xs text-gray-500 mt-1">✓ Ya agregado</p>
+                            <p className="text-xs text-gray-500 mt-1">{g3 ? 'Ya agregado' : '✓ Ya agregado'}</p>
                           )}
                         </button>
                       );
@@ -2188,7 +2262,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                                 </div>
                               </div>
                               {yaSeleccionado && (
-                                <p className="text-xs text-gray-500 mt-1">✓ Ya agregado</p>
+                                <p className="text-xs text-gray-500 mt-1">{g3 ? 'Ya agregado' : '✓ Ya agregado'}</p>
                               )}
                             </button>
                           );
@@ -2251,7 +2325,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
                             />
                             {stockInsuficiente && (
                               <p className="text-xs text-blue-600 mt-1">
-                                ℹ️ Cantidad mayor al stock actual
+                                {g3 ? 'Cantidad mayor al stock actual' : 'ℹ️ Cantidad mayor al stock actual'}
                               </p>
                             )}
                           </div>
@@ -2378,6 +2452,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
   const [tabActual, setTabActual] = React.useState('detalle'); // 'detalle' o 'historial'
   const esPendienteAprobacion = orden && orden.estado === 'pendiente_aprobacion';
   const esRechazada = orden && orden.estado === 'rechazada';
+  const g3 = useDiseno3G(); // Diseño 3G: estado sin emojis (apagado, el de siempre)
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Orden ${orden.ticket_id}`} size="xl">
@@ -2412,12 +2487,12 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
             <div>
               <p className="text-sm text-gray-500">Estado</p>
               <p className="font-medium">
-                {orden.estado === 'pendiente_aprobacion' && '⏳ Pendiente de Aprobación'}
-                {orden.estado === 'enviada' && '✅ Enviada'}
+                {orden.estado === 'pendiente_aprobacion' && (g3 ? 'Pendiente de aprobación' : '⏳ Pendiente de Aprobación')}
+                {orden.estado === 'enviada' && (g3 ? 'Enviada' : '✅ Enviada')}
                 {orden.estado === 'parcial' && 'Parcial'}
                 {orden.estado === 'recibida' && (orden.cierre_incompleto?.faltantes?.length > 0 ? 'Recibida (cerrada incompleta)' : 'Recibida')}
                 {orden.estado === 'cancelada' && 'Cancelada'}
-                {orden.estado === 'rechazada' && '❌ Rechazada'}
+                {orden.estado === 'rechazada' && (g3 ? 'Rechazada' : '❌ Rechazada')}
               </p>
             </div>
             <div>
@@ -2518,7 +2593,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
           {orden.solicitudes_origen && orden.solicitudes_origen.length > 0 && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
               <h4 className="font-semibold text-orange-900 mb-2 text-sm">
-                ⚠️ Solicitudes generadas automáticamente
+                {g3 ? 'Solicitudes generadas automáticamente' : '⚠️ Solicitudes generadas automáticamente'}
               </h4>
               <ul className="text-sm text-orange-800 space-y-1">
                 {orden.solicitudes_origen.map((sol) => (
@@ -2710,6 +2785,7 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
   const [busqueda, setBusqueda] = useState('');
   // Artículos que se darán de alta como herramienta al crear la orden
   const [marcadosHerramienta, setMarcadosHerramienta] = useState(new Set());
+  const g3 = useDiseno3G(); // Diseño 3G: textos sin emojis (apagado, los de siempre)
 
   // Helper: Obtener el proveedor correcto (de artículo o herramienta)
   const obtenerProveedorSolicitud = (solicitud) => {
@@ -2762,7 +2838,7 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
     setArticulosExtra(prev => {
       const siguen = prev.filter(e => esDelProveedor(e.articulo, proveedorId));
       if (siguen.length !== prev.length) {
-        toast(`Se quitaron ${prev.length - siguen.length} producto(s) agregado(s) que no son de este proveedor`, { icon: '⚠️' });
+        toast(`Se quitaron ${prev.length - siguen.length} producto(s) agregado(s) que no son de este proveedor`, g3Activo() ? undefined : { icon: '⚠️' });
       }
       return siguen;
     });
@@ -3020,7 +3096,7 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
         {/* Información de solicitudes */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h3 className="font-semibold text-blue-900 mb-2">
-            📋 Resumen de Solicitudes Seleccionadas
+            {g3 ? 'Resumen de las solicitudes seleccionadas' : '📋 Resumen de Solicitudes Seleccionadas'}
           </h3>
           <p className="text-sm text-blue-800">
             {solicitudes.length} solicitud{solicitudes.length !== 1 ? 'es' : ''} • {articulosAgrupados.length} artículo{articulosAgrupados.length !== 1 ? 's' : ''} único{articulosAgrupados.length !== 1 ? 's' : ''}
@@ -3284,6 +3360,7 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
 
 // Modal para crear nuevo artículo desde la orden de compra
 const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedores, onSuccess, nombreInicial = '', proveedorInicial = '' }) => {
+  const g3 = useDiseno3G(); // Diseño 3G: textos sin emojis (apagado, los de siempre)
   const [formData, setFormData] = useState({
     nombre: nombreInicial || '',
     descripcion: '',
@@ -3415,7 +3492,7 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
           <p className="text-sm text-blue-800">
-            💡 <strong>Nuevo Artículo:</strong> El artículo se creará con stock en 0 y se agregará automáticamente a la orden de compra.
+            {g3 ? null : '💡 '}<strong>{g3 ? 'Nuevo artículo:' : 'Nuevo Artículo:'}</strong> El artículo se creará con stock en 0 y se agregará automáticamente a la orden de compra.
           </p>
         </div>
 
@@ -3505,7 +3582,7 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
               >
                 <option value="">Sin proveedor</option>
                 <option value="nuevo" className="font-semibold text-green-600">
-                  ➕ Crear nuevo proveedor...
+                  {g3 ? 'Crear nuevo proveedor…' : '➕ Crear nuevo proveedor...'}
                 </option>
                 {proveedoresList.map(prov => (
                   <option key={prov.id} value={prov.id}>{prov.nombre}</option>
@@ -3532,22 +3609,24 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
                   onClick={handleCrearProveedorRapido}
                   className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                   title="Crear proveedor"
+                  {...(g3 ? { 'aria-label': 'Crear proveedor' } : {})}
                 >
-                  ✓
+                  {g3 ? <Check size={18} aria-hidden="true" /> : '✓'}
                 </button>
                 <button
                   type="button"
                   onClick={handleCancelarNuevoProveedor}
                   className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors"
                   title="Cancelar"
+                  {...(g3 ? { 'aria-label': 'Cancelar el proveedor nuevo' } : {})}
                 >
-                  ✕
+                  {g3 ? <X size={18} aria-hidden="true" /> : '✕'}
                 </button>
               </div>
             )}
             {modoNuevoProveedor && (
               <p className="text-xs text-gray-500 mt-1">
-                💡 Presiona Enter o click en ✓ para crear
+                {g3 ? 'Presiona Enter o el botón de la palomita para crear.' : '💡 Presiona Enter o click en ✓ para crear'}
               </p>
             )}
           </div>
@@ -3650,6 +3729,7 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
 // Modal para cancelar solicitud de compra
 const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
   const [motivo, setMotivo] = useState('');
+  const g3 = useDiseno3G(); // Diseño 3G: aviso sin emoji
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -3714,7 +3794,7 @@ const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
         {/* Advertencia */}
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
           <p className="text-xs text-yellow-800">
-            ⚠️ Esta acción cambiará el estado de la solicitud a "cancelada".
+            {g3 ? 'Esta acción cambiará el estado de la solicitud a «cancelada».' : '⚠️ Esta acción cambiará el estado de la solicitud a "cancelada".'}{' '}
             La solicitud ya no aparecerá en la lista de pendientes.
           </p>
         </div>
@@ -3762,7 +3842,7 @@ const ArticuloSolicitudBtn = ({ articulo, onCrearSolicitud, tieneSolicitud }) =>
         try {
           await onCrearSolicitud(articulo);
           setCreada(true);
-          toast.success(`✅ Solicitud creada: ${articulo.nombre}`);
+          toast.success(g3Activo() ? `Solicitud creada: ${articulo.nombre}` : `✅ Solicitud creada: ${articulo.nombre}`);
         } catch (error) {
           toast.error(error.response?.data?.message || error.message || 'Error al crear solicitud');
         } finally {
@@ -3790,6 +3870,7 @@ const ArticuloSolicitudBtn = ({ articulo, onCrearSolicitud, tieneSolicitud }) =>
 // Modal de Artículos Encontrados
 // Sub-componente para mostrar último movimiento de un artículo
 const UltimoMovimientoInfo = ({ articuloId }) => {
+  const g3 = useDiseno3G(); // Diseño 3G: sin emoji
   const [mov, setMov] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -3822,12 +3903,13 @@ const UltimoMovimientoInfo = ({ articuloId }) => {
           ? 'bg-orange-100 text-orange-700'
           : 'bg-blue-100 text-blue-700'
         }`}>{mov.tipo_legible}</span>
-      {mov.usuario && <span>👤 {mov.usuario.nombre}</span>}
+      {mov.usuario && <span>{g3 ? <User size={12} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '👤 '}{mov.usuario.nombre}</span>}
     </div>
   );
 };
 
 const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitud, titulo, articulosConSolicitudIds = [] }) => {
+  const g3 = useDiseno3G(); // Diseño 3G: estado del stock con texto, sin emoji
   // Filtros por Almacén y Sección (default Principal / Stock).
   const [filtroAlmacen, setFiltroAlmacen] = useState('Principal');
   const [filtroSeccion, setFiltroSeccion] = useState('Stock');
@@ -4110,7 +4192,7 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
                 className="px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white border border-gray-300 rounded-lg transition-colors"
                 title="Volver a Principal / Stock"
               >
-                ↺ Default
+                {g3 ? 'Restablecer filtros' : '↺ Default'}
               </button>
             )}
           </div>
@@ -4216,7 +4298,7 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
                         {stockBajo && (
                           <span className={`px-2 py-1 text-xs font-semibold rounded ${stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
                             }`}>
-                            {stockCritico ? '⚠️ Stock Crítico' : '⚡ Stock Bajo'}
+                            {stockCritico ? (g3 ? 'Stock crítico' : '⚠️ Stock Crítico') : (g3 ? 'Stock bajo' : '⚡ Stock Bajo')}
                           </span>
                         )}
                       </div>

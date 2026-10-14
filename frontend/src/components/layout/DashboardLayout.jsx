@@ -4,11 +4,14 @@ import Header from './Header';
 import SubPestanasGrupo from './SubPestanasGrupo';
 import { Outlet } from 'react-router-dom';
 import { useCalendario } from '../../context/CalendarioContext';
+import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
+import MarcoPlanta from '../../diseno-3g/MarcoPlanta';
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Cerrado por defecto en móvil
   const [isMobile, setIsMobile] = useState(false);
   const { modoPantallaCompleta } = useCalendario();
+  const diseno3g = useDiseno3G();
 
   // Detectar si es móvil
   useEffect(() => {
@@ -43,6 +46,11 @@ const DashboardLayout = () => {
         <Outlet />
       </main>
     );
+  }
+
+  // Diseño 3G encendido: armazón nuevo (riel por áreas, barra de vidrio). Mismas rutas y permisos.
+  if (diseno3g) {
+    return <MarcoPlanta />;
   }
 
   return (
