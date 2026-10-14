@@ -1,4 +1,5 @@
-/* cuentas3g-cliente 1.1.0 · Cuentas 3G (CTA-08; 1.1.0 suma personas(), CTA-09)
+/* cuentas3g-cliente 1.1.2 · Cuentas 3G (CTA-08; 1.1.0 suma personas(), CTA-09; 1.1.1: personas() no reintenta en cada llamada;
+ *   1.1.2: el reloj ya no se salta un tic y la lista y el catálogo llevan la hora en que se pidieron)
  *
  * Lo que cada sistema de 3G necesita para entrar con Cuentas 3G, en UN solo archivo que se copia SIN
  * CAMBIOS a cada sistema (como el paquete Diseño 3G; las huellas están en VERSION.md):
@@ -27,7 +28,7 @@
  */
 'use strict';
 
-const VERSION = '1.1.0';
+const VERSION = '1.1.2';
 
 const MODOS = ['apagado', 'ambos', 'solo'];
 const EVENTO_DE_BAJA = 'http://schemas.openid.net/event/backchannel-logout';
@@ -298,12 +299,15 @@ function crearCliente(o) {
   let lista = null; // { personas: Map, en (ms, cuando se obtuvo), iat, origen }
   let ultimoError = null;
   let pidiendo = null;
+  let otraLista = null; // 1.1.2: la lista que se pide en cuanto llegue la que viene en camino (ver `forzar`)
   let reloj = null;
   const almacenPersonas = o.almacenPersonas || almacenEnMemoria();
   const personasCadaMs = o.personasCadaMs || 10 * MINUTO;
   let catalogo = null; // { personas, en (ms), origen }
   let ultimoErrorCatalogo = null;
+  let catalogoFallo = 0; // cuándo falló el último intento (ms); 0 = no falló
   let pidiendoCatalogo = null;
+  let otroCatalogo = null;
 
   async function conLimite(url, init) {
     const ctrl = new AbortController();
@@ -465,18 +469,25 @@ function crearCliente(o) {
   /**
    * 3. La lista firmada de versiones. Se pide a lo más una vez por `cadaMs` (o con `forzar`); si Cuentas
    * 3G no responde, se sigue con la última buena. Devuelve lo que hay (o null si nunca hubo).
+   * Desde 1.1.2 la lista lleva la hora en que se PIDIÓ (no la de cuando llegó): una pedida antes de un aviso de
+   * baja que llega después de él nunca cuenta como «pedida después del aviso». Y `forzar` quiere una lista pedida
+   * DESDE AHORA: si hay una en camino (pedida antes), se pide otra en cuanto llegue (una sola para todos).
    */
   async function listaDeVersiones(op) {
     const forzar = op && op.forzar;
     if (!forzar && lista && lista.origen === 'cuentas' && ahora() - lista.en < cadaMs) return lista;
-    if (pidiendo) return pidiendo;
+    if (pidiendo && !forzar) return pidiendo;
+    if (pidiendo) {
+      if (!otraLista) otraLista = pidiendo.then(() => { otraLista = null; return listaDeVersiones({ forzar: true }); });
+      return otraLista;
+    }
     pidiendo = (async () => {
       try {
+        const en = ahora(); // 1.1.2: la hora en que se pidió
         const r = await conLimite(`${emisor}/v1/estado-personas`, { headers: { authorization: basic, accept: 'application/jwt' } });
         if (r.status !== 200) throw new ErrorCuentas3G('lista', `Cuentas 3G no dio la lista (${r.status})`);
         const jws = await r.text();
         const d = await leerListaFirmada(jws, null, { exigirExp: true });
-        const en = ahora();
         usarLista(d.personas, d.iat, en, 'cuentas');
         ultimoError = null;
         try {
@@ -512,8 +523,9 @@ function crearCliente(o) {
     await listaDeVersiones({ forzar: true });
     if (!(op && op.sinReloj)) {
       if (reloj) clearInterval(reloj);
+      // 1.1.2: con `forzar` en cada tic (sin él, la lista de hace casi `cadaMs` se daba por fresca y se pedía cada 2 tics).
       reloj = setInterval(() => {
-        listaDeVersiones().catch(() => {});
+        listaDeVersiones({ forzar: true }).catch(() => {});
       }, cadaMs);
       if (reloj.unref) reloj.unref();
     }
@@ -587,20 +599,30 @@ function crearCliente(o) {
    * demás Cuentas 3G les contesta 403), y cada uno recibe solo sus campos. Se pide a lo más cada
    * `personasCadaMs` (o con `forzar`) y la última copia buena se guarda (con su firma) en `almacenPersonas`.
    * Si Cuentas 3G no responde, sigue con la copia; sin copia devuelve null: el sistema usa su configuración
-   * de hoy (teléfonos y comisionistas de siempre).
+   * de hoy (teléfonos y comisionistas de siempre). Tras un intento fallido no vuelve a pedir antes de un
+   * minuto (salvo `forzar`), para no esperar a Cuentas 3G en cada llamada (1.1.1).
    */
   async function personas(op) {
     const forzar = op && op.forzar;
     if (!forzar && catalogo && catalogo.origen === 'cuentas' && ahora() - catalogo.en < personasCadaMs) return catalogo;
-    if (pidiendoCatalogo) return pidiendoCatalogo;
+    // Si el último intento falló hace menos de un minuto, no se vuelve a esperar a Cuentas 3G en cada llamada:
+    // lo que haya (la copia o null, la configuración de hoy). Así, con Cuentas 3G caída, todo sigue igual de rápido.
+    if (!forzar && catalogoFallo && ahora() - catalogoFallo < MINUTO) return catalogo;
+    if (pidiendoCatalogo && !forzar) return pidiendoCatalogo;
+    if (pidiendoCatalogo) {
+      // 1.1.2: como la lista, `forzar` quiere un catálogo pedido desde ahora.
+      if (!otroCatalogo) otroCatalogo = pidiendoCatalogo.then(() => { otroCatalogo = null; return personas({ forzar: true }); });
+      return otroCatalogo;
+    }
     pidiendoCatalogo = (async () => {
       try {
+        const en = ahora(); // 1.1.2: la hora en que se pidió (como la lista)
         const r = await conLimite(`${emisor}/v1/personas`, { headers: { authorization: basic, accept: 'application/jwt' } });
         if (r.status !== 200) throw new ErrorCuentas3G('personas', `Cuentas 3G no dio el catálogo (${r.status})`);
         const jws = await r.text();
         const d = await leerCatalogoFirmado(jws, null, { exigirExp: true });
-        const en = ahora();
         catalogo = { personas: d.personas, en, origen: 'cuentas' };
+        catalogoFallo = 0;
         ultimoErrorCatalogo = null;
         try {
           await almacenPersonas.guardar(JSON.stringify({ version: 1, jws, llaves: jwks ? jwks.keys : [], en }));
@@ -609,6 +631,7 @@ function crearCliente(o) {
         }
       } catch (e) {
         ultimoErrorCatalogo = e instanceof ErrorCuentas3G ? e.codigo : 'sin_respuesta';
+        catalogoFallo = ahora();
         if (!catalogo) {
           try {
             const t = await almacenPersonas.leer();

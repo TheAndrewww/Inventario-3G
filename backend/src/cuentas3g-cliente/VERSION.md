@@ -1,11 +1,11 @@
 # cuentas3g-cliente
 
-- **Versión:** 1.1.0 (la primera línea de `cuentas3g-cliente.cjs` lo dice).
+- **Versión:** 1.1.2 (la primera línea de `cuentas3g-cliente.cjs` lo dice).
 - **Qué es:** lo que cada sistema de 3G necesita para entrar con Cuentas 3G (CTA-08, PLAN-FINAL §6.1 y §8).
   Se escribió y se probó **una sola vez** aquí, en Cuentas 3G, y se **copia sin cambios** a cada sistema
   (como el paquete Diseño 3G): Planta, Operación, Finanzas, Ventas, el sitio y el Inicio.
 - **Archivos y huella (sha256):**
-  - `cuentas3g-cliente.cjs` — `7f5400c4d7f99720a310531f99ae73593bc48b2f40d2f5b6c0471c093e8a0ca4`
+  - `cuentas3g-cliente.cjs` — `972ce8d1517aa80ca31158ef37288924758a5d6544b077851d1807e5af94e9e5`
   - `cuentas3g-cliente.d.cts` — `4636230029eaf88249d973ed99348e3f7a081c509cb59893e26191e8c5e8258b`
 - `test/cliente.test.ts` de Cuentas 3G revisa que las huellas sigan siendo estas. En cada sistema, copia la
   carpeta completa (con este archivo) y no la edites: si algo falta, se cambia aquí, sube la versión y se
@@ -57,10 +57,13 @@ if (cfg.modo !== 'apagado') {
 }
 
 // Finanzas, Operación y Planta: el catálogo de personas y códigos (C5), con copia en disco (CTA-09, desde 1.1.0).
-// Basta la configuración completa (cfg.cliente), aunque la entrada siga en «apagado».
-const cat = cfg.cliente
-  ? await c3g.crearCliente({ ...cfg.cliente, almacenPersonas: c3g.almacenEnDisco('data/cuentas3g-personas.json') }).personas()
-  : null;                                           // a lo más una consulta cada 10 min por cliente
+// Basta la configuración completa (cfg.cliente), aunque la entrada siga en «apagado». El cliente se crea UNA vez
+// (al arrancar) y se reúsa: a lo más una consulta cada 10 min y, si Cuentas 3G falla, un intento por minuto (1.1.1).
+const catalogo = cfg.cliente
+  ? c3g.crearCliente({ ...cfg.cliente, almacenPersonas: c3g.almacenEnDisco('data/cuentas3g-personas.json') })
+  : null;
+// … cuando se necesite:
+const cat = catalogo ? await catalogo.personas() : null;
 const telefonos = cat ? deCatalogo(cat.personas) : TELEFONOS_DE_HOY;   // sin Cuentas 3G y sin copia: lo de hoy
 ```
 
@@ -93,3 +96,10 @@ La última lista buena se guarda **con su firma** y se vuelve a revisar al arran
 
 - **1.0.0** (14 de octubre de 2026, ronda 3, CTA-08): primera versión.
 - **1.1.0** (14 de octubre de 2026, ronda 3, CTA-09): `personas()` (el catálogo de personas y códigos con copia en disco) y `estado().catalogo`. Lo de 1.0.0 no cambia.
+- **1.1.1** (14 de octubre de 2026, verificación de la ronda 3): `personas()` ya no vuelve a esperar a Cuentas 3G en cada llamada cuando falla: un intento por minuto como mucho (salvo `forzar`); mientras, devuelve la copia o `null`. Los tipos (`.d.cts`) y todo lo demás no cambian. Quien copió la 1.1.0 (sitio, Planta) la cambia por esta al conectar el catálogo; hasta entonces no usa `personas()`.
+- **1.1.2** (14 de octubre de 2026, ajustes del cierre de la ronda 4): tres arreglos, sin cambiar la forma de nada (los tipos `.d.cts` son los mismos):
+  - el reloj del paquete (`arrancar()` sin `sinReloj`) pide la lista con `forzar` en cada tic: la 1.1.1 daba por fresca la lista de hace casi 60 s y en la práctica la pedía cada 120 s (ronda 3, §3.3 punto 4);
+  - la lista y el catálogo llevan la hora en que se **pidieron** (`estado().lista.en`, `estado().catalogo.en`), no la de cuando llegaron: una lista pedida justo antes de un aviso de baja que llega después de él ya no cuenta como «pedida después del aviso» (la carrera que anotó Operación en la ronda 4). Por lo mismo, a quien entró mientras la lista venía en camino no se le corta por no venir en ella;
+  - `listaDeVersiones({ forzar: true })` y `personas({ forzar: true })` quieren algo pedido **desde ahora**: si hay una petición en camino (pedida antes), ya no se quedan con ella; se pide otra en cuanto llegue (una sola para todos los que forzaron mientras). Así, la lista que pide el aviso de baja siempre es posterior al aviso.
+  - Se copia a los 5 que usan el paquete (Planta, Operación, Finanzas, el sitio y el Inicio) sin cambios.
+  - El aviso de baja sigue igual: un `logout_token` repetido (mismo `jti`) se rechaza. Cuentas 3G ahora reintenta el aviso con **el mismo** token, así que un sistema que ya lo tomó no lo hace dos veces.
