@@ -369,10 +369,12 @@ ProduccionProyecto.prototype.completarEtapaActual = async function (usuarioId, o
     }
 
     // Flujo normal para proyectos A, B, C y MTO extensivo
+    // Diseño y Compras sellan SU PROPIO «completado_en», como el tablero (toggleEtapa), la línea de tiempo
+    // y regresarEtapa. Antes cerrar Diseño sellaba Compras y cerrar Compras sellaba Producción.
     const flujo = {
         'pendiente': { siguiente: 'diseno', campo: 'diseno_completado_en', campoPor: 'diseno_completado_por', obs: 'observaciones_diseno' },
-        'diseno': { siguiente: 'compras', campo: 'compras_completado_en', campoPor: 'compras_completado_por', obs: 'observaciones_compras' },
-        'compras': { siguiente: 'produccion', campo: 'produccion_completado_en', campoPor: 'produccion_completado_por', obs: 'observaciones_produccion' },
+        'diseno': { siguiente: 'compras', campo: 'diseno_completado_en', campoPor: 'diseno_completado_por', obs: 'observaciones_diseno' },
+        'compras': { siguiente: 'produccion', campo: 'compras_completado_en', campoPor: 'compras_completado_por', obs: 'observaciones_compras' },
         'produccion': { siguiente: 'instalacion', campo: 'instalacion_completado_en', campoPor: 'instalacion_completado_por', obs: 'observaciones_instalacion' },
         'instalacion': { siguiente: 'completado', campo: null, campoPor: null, obs: null }
     };
