@@ -202,6 +202,16 @@ export const completarEtapa = async (req, res) => {
             });
         }
 
+        // Terminal de Instalación (sin sesión): la obra no se cierra desde aquí. «completado» es solo para las
+        // obras cerradas en el Índice (casilla Entregado): la sincronización con el Excel la regresaría a Diseño
+        // y, al cerrarla, el gancho de ProduccionProyecto anula sus tickets abiertos.
+        if (!req.usuario && proyecto.etapa_actual === 'instalacion') {
+            return res.status(409).json({
+                success: false,
+                message: 'La obra se cierra en el Índice (casilla «Entregado»), no desde la terminal.'
+            });
+        }
+
         if (proyecto.etapa_actual === 'completado') {
             return res.status(400).json({
                 success: false,

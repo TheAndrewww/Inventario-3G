@@ -90,7 +90,7 @@ after(async () => {
     fs.rmSync(socket, { force: true });
 });
 
-for (const [etapa, siguiente] of [['diseno', 'compras'], ['compras', 'produccion'], ['instalacion', 'completado']]) {
+for (const [etapa, siguiente] of [['diseno', 'compras'], ['compras', 'produccion']]) {
     test(`terminal: POST sin cuerpo cierra ${etapa} y avanza a ${siguiente} (antes: 500)`, async () => {
         proyecto = proyectoInventado(etapa);
         llamadas = [];
