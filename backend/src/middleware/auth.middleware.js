@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { Usuario } from '../models/index.js';
 import { piezaCerrada, TEXTO_INCOMPLETA } from '../utils/revisarConfig.js';
+import { rechazoDeSesion } from '../services/cuentas3g.service.js';
 
 /**
  * Middleware para verificar el token JWT
@@ -47,6 +48,18 @@ export const verificarToken = async (req, res, next) => {
             return res.status(401).json({
                 success: false,
                 message: 'Usuario inactivo'
+            });
+        }
+
+        // E1 · PLA-23: con Cuentas 3G encendido, la sesión que viene de una cuenta 3G (c3g_sub) se revisa contra la lista
+        // de versiones y los avisos de baja: una baja o un cambio en Cuentas 3G la cierra en un minuto o menos.
+        // Con CUENTAS3G_MODO apagado no se revisa nada (idéntico a hoy).
+        const rechazo = rechazoDeSesion(decoded);
+        if (rechazo) {
+            return res.status(401).json({
+                success: false,
+                codigo: rechazo.codigo,
+                message: rechazo.message
             });
         }
 
@@ -207,7 +220,8 @@ export const verificarTokenOpcional = async (req, res, next) => {
             attributes: { exclude: ['password'] }
         });
 
-        req.usuario = usuario || null;
+        // E1 · PLA-23: una sesión de cuenta 3G que ya no vale cuenta como sin sesión (con apagado, como hoy).
+        req.usuario = usuario && !rechazoDeSesion(decoded) ? usuario : null;
 
         next();
 

@@ -1,17 +1,29 @@
 import jwt from 'jsonwebtoken';
 import { Usuario } from '../models/index.js';
+import { piezaCerrada, TEXTO_INCOMPLETA } from '../utils/revisarConfig.js';
+import {
+    modoCuentas3g,
+    entrarConFicha,
+    respuestaDeError,
+    anotarEntrada,
+    recibirAviso,
+    avisoSinRespuesta,
+    correoOculto
+} from '../services/cuentas3g.service.js';
 
 /**
  * Genera un token JWT para el usuario
  * @param {Object} usuario - Objeto del usuario
+ * @param {Object} [extra] - Datos de más (E1 · PLA-23: c3g_sub y c3g_ver cuando entra con su cuenta 3G)
  * @returns {string} - Token JWT
  */
-const generarToken = (usuario) => {
+const generarToken = (usuario, extra = {}) => {
     return jwt.sign(
         {
             id: usuario.id,
             email: usuario.email,
-            rol: usuario.rol
+            rol: usuario.rol,
+            ...extra
         },
         process.env.JWT_SECRET,
         {
@@ -177,6 +189,70 @@ export const login = async (req, res) => {
 };
 
 /**
+ * POST /api/auth/cuentas3g (E1 · PLA-23)
+ * Entrar con Cuentas 3G. La pantalla regresa de Cuentas 3G a /entrar/regreso y manda aquí { code, code_verifier, nonce }.
+ * El servidor canjea el código con su secreto, valida la ficha, empata al usuario por su correo o por su «correo en
+ * Planta» y, si está activo, responde EXACTAMENTE como /api/auth/login: { usuario, token }. El JWT es el de siempre
+ * (7 días) más c3g_sub y c3g_ver, que verificarToken revisa contra la lista de versiones.
+ * Con CUENTAS3G_MODO apagado la ruta no existe: responde exactamente como hoy. La cubre el límite de A10 (limiteCuentas3g).
+ */
+export const entrarConCuentas3g = async (req, res) => {
+    const modo = modoCuentas3g();
+    // A15 · PLA-08: sin JWT_SECRET y con FALLA_CERRADA=1 no se firma nada (igual que /api/auth/login).
+    if (await piezaCerrada('sesion')) {
+        return res.status(503).json({ success: false, codigo: 'CONFIGURACION_INCOMPLETA', message: TEXTO_INCOMPLETA });
+    }
+    try {
+        const { code, code_verifier: verificador, nonce } = req.body || {};
+        const { usuario, empate, ficha } = await entrarConFicha({ codigo: code, verificador, nonce });
+
+        await usuario.update({ ultima_conexion: new Date() });
+        const token = generarToken(usuario, { c3g_sub: ficha.sub, c3g_ver: Number(ficha.ver) || 0 });
+        await anotarEntrada({ usuarioId: usuario.id, via: 'cuentas3g', sub: ficha.sub, empate });
+        console.log(`[cuentas3g] entrada · usuario id=${usuario.id} (${correoOculto(usuario.email)}) · empate por ${empate === 'correo_en_planta' ? '«correo en Planta»' : 'correo'} · sub=${ficha.sub} · ver=${Number(ficha.ver) || 0}`);
+
+        const usuarioRespuesta = usuario.toJSON();
+        delete usuarioRespuesta.password;
+
+        return res.status(200).json({
+            success: true,
+            message: 'Inicio de sesión exitoso',
+            data: {
+                usuario: usuarioRespuesta,
+                token
+            }
+        });
+    } catch (error) {
+        const [estado, codigo, message] = respuestaDeError(error, modo);
+        if (estado === 500) console.error('[cuentas3g] error al entrar:', error.message);
+        else console.warn(`[cuentas3g] entrada rechazada · ${codigo} · ip=${req.ip}${error?.codigo ? ` · ${error.codigo}: ${String(error.message).slice(0, 80)}` : ''}`);
+        return res.status(estado).json({ success: false, codigo, message });
+    }
+};
+
+/**
+ * POST /api/auth/cuentas3g/aviso (E1 · PLA-23)
+ * Aviso de baja de Cuentas 3G (OpenID Back-Channel Logout 1.0): `logout_token` en el cuerpo (formulario). Se valida
+ * con las llaves de Cuentas 3G; las sesiones de Planta de esa persona creadas antes del aviso dejan de valer al momento
+ * y se vuelve a pedir la lista de versiones. Responde 204; si el aviso no sirve, 400 { error }.
+ */
+export const avisoCuentas3g = async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+        const token = req.body?.logout_token;
+        if (typeof token !== 'string' || !token) {
+            return res.status(400).json({ error: 'Falta logout_token' });
+        }
+        const sub = await recibirAviso(token);
+        console.log(`[cuentas3g] aviso de baja · sub=${sub} · sus sesiones de Planta se cierran`);
+        return res.status(204).end();
+    } catch (error) {
+        console.warn(`[cuentas3g] aviso de baja rechazado (${error?.codigo || 'error'}${error?.message ? `: ${String(error.message).slice(0, 60)}` : ''})`);
+        return res.status(avisoSinRespuesta(error) ? 503 : 400).json({ error: 'Aviso inválido' });
+    }
+};
+
+/**
  * GET /api/auth/verify
  * Verificar token y obtener datos del usuario actual
  */
@@ -301,5 +377,7 @@ export default {
     login,
     verify,
     getMe,
-    cambiarPassword
+    cambiarPassword,
+    entrarConCuentas3g,
+    avisoCuentas3g
 };

@@ -138,6 +138,7 @@ export const banderasPlanta = async () => {
     const { cancelacionProgramadaEncendida } = await import('../controllers/ordenesCompra.controller.js');
     const { vencidasUsaJulia, llegadaConDatos } = await import('../models/OrdenSeguimiento.js');
     const { empatePorObra } = await import('../services/obraId.service.js');
+    const { modoCuentas3g, emergenciaCuentas3g } = await import('../services/cuentas3g.service.js');
     const terminal = Object.fromEntries(configTerminal().banderas.map((b) => [b.nombre, b.encendida]));
     return [
         { nombre: 'FALLA_CERRADA', encendida: fallaCerradaEncendida() },
@@ -158,7 +159,11 @@ export const banderasPlanta = async () => {
         { nombre: 'VENCIDAS_USA_JULIA', encendida: vencidasUsaJulia() },
         { nombre: 'LLEGADA_CON_DATOS', encendida: llegadaConDatos() },
         // PLA-19 (C1)
-        { nombre: 'EMPATE_POR_OBRA', encendida: empatePorObra() }
+        { nombre: 'EMPATE_POR_OBRA', encendida: empatePorObra() },
+        // PLA-23 y PLA-24 (E1). CUENTAS3G_MODO: «encendida» = el modo que de verdad aplica no es «apagado» (con la
+        // configuración incompleta se queda apagado). CUENTAS3G_EMERGENCIA: la llave está puesta (solo cuenta en «solo»).
+        { nombre: 'CUENTAS3G_MODO', encendida: modoCuentas3g() !== 'apagado' },
+        { nombre: 'CUENTAS3G_EMERGENCIA', encendida: emergenciaCuentas3g() }
     ];
 };
 
@@ -228,6 +233,10 @@ export const cuerpoSalud = async ({ detalle = false, piezasExtra = [] } = {}) =>
         const texto = 'TERMINAL_EXIGIR_CODIGO=1 sin TERMINAL_CODIGOS: no se exige';
         if (t && t.estado === 'ok') { t.estado = 'aviso'; t.mensaje = texto; } else if (t) t.mensaje += ` · ${texto}`;
     }
+    // E1 · PLA-23: la entrada con Cuentas 3G, solo si CUENTAS3G_MODO pide encenderla (apagado: no aparece).
+    const { piezaCuentas3g } = await import('../services/cuentas3g.service.js');
+    const c3g = piezaCuentas3g();
+    if (c3g) piezas.push(c3g);
     piezas.push(...piezasExtra);
     const estado = piezas.reduce((e, p) => (PEOR[p.estado] > PEOR[e] ? p.estado : e), 'ok');
     const primera = piezas.find((p) => p.estado === estado && estado !== 'ok');

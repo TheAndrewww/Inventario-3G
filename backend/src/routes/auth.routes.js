@@ -4,13 +4,16 @@ import {
     login,
     verify,
     getMe,
-    cambiarPassword
+    cambiarPassword,
+    entrarConCuentas3g,
+    avisoCuentas3g
 } from '../controllers/auth.controller.js';
 import {
     verificarToken,
     esAdministrador
 } from '../middleware/auth.middleware.js';
-import { limiteLogin } from '../middleware/limiteLogin.middleware.js';
+import { limiteLogin, limiteCuentas3g } from '../middleware/limiteLogin.middleware.js';
+import { soloConCuentas3g } from '../services/cuentas3g.service.js';
 
 const router = express.Router();
 
@@ -27,6 +30,21 @@ router.post('/register', verificarToken, esAdministrador, register);
  * @access  Public
  */
 router.post('/login', limiteLogin, login);
+
+/**
+ * @route   POST /api/auth/cuentas3g
+ * @desc    Entrar con Cuentas 3G (E1 · PLA-23): { code, code_verifier, nonce } → { usuario, token }, como /login.
+ *          Con CUENTAS3G_MODO apagado no existe (responde como hoy). La cubre el límite de A10.
+ * @access  Public
+ */
+router.post('/cuentas3g', soloConCuentas3g, limiteCuentas3g, entrarConCuentas3g);
+
+/**
+ * @route   POST /api/auth/cuentas3g/aviso
+ * @desc    Aviso de baja de Cuentas 3G (OpenID Back-Channel Logout, logout_token firmado). Con apagado no existe.
+ * @access  Cuentas 3G (se valida la firma)
+ */
+router.post('/cuentas3g/aviso', soloConCuentas3g, avisoCuentas3g);
 
 /**
  * @route   GET /api/auth/verify

@@ -1342,6 +1342,16 @@ const startServer = async () => {
             console.error('⚠️ Error verificando la tabla latidos_sistemas:', latidoErr.message);
         }
 
+        // E1 · PLA-23: entrar con Cuentas 3G. Con CUENTAS3G_MODO apagado (o incompleto) solo lo dice en el registro; si
+        // está encendido crea sus dos tablas (su propio sync, nunca alter), carga la última lista de versiones guardada y
+        // la pide cada minuto sin detener el arranque. Nunca tumba el servidor.
+        try {
+            const { iniciarCuentas3g } = await import('./src/services/cuentas3g.service.js');
+            await iniciarCuentas3g();
+        } catch (c3gErr) {
+            console.error('⚠️ Error preparando la entrada con Cuentas 3G:', c3gErr.message);
+        }
+
         // Tickets de salida ya vistos en la carpeta del proyecto — aplica en dev y prod.
         // Sirve para no repetir el aviso 🎫 al grupo de PRODUCCIÓN en cada barrido.
         try {
