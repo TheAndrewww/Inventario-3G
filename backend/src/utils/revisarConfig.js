@@ -210,7 +210,8 @@ export const cuerpoSalud = async ({ detalle = false, piezasExtra = [] } = {}) =>
     // Exigir el código sin códigos nuevos no exige: se avisa (§3.2).
     if (terminal.avisos.some((a) => a.startsWith('TERMINAL_EXIGIR_CODIGO=1 sin'))) {
         const t = piezas.find((p) => p.id === 'terminal');
-        if (t && t.estado === 'ok') { t.estado = 'aviso'; t.mensaje = 'TERMINAL_EXIGIR_CODIGO=1 sin TERMINAL_CODIGOS: no se exige'; }
+        const texto = 'TERMINAL_EXIGIR_CODIGO=1 sin TERMINAL_CODIGOS: no se exige';
+        if (t && t.estado === 'ok') { t.estado = 'aviso'; t.mensaje = texto; } else if (t) t.mensaje += ` · ${texto}`;
     }
     piezas.push(...piezasExtra);
     const estado = piezas.reduce((e, p) => (PEOR[p.estado] > PEOR[e] ? p.estado : e), 'ok');

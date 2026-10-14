@@ -142,6 +142,52 @@ export const contarTerminal = (clave, detalle = '') => {
     }
 };
 
+// ---------- ¿Ya se puede exigir? (A4 fases B y C · PLA-10) ----------
+// «A la antigua»: pantallas sin código o con el de fábrica (en la terminal o al teclearlo en validar-codigo).
+export const A_LA_ANTIGUA = ['sin_codigo', 'de_fabrica', 'de_fabrica_rechazado', 'validar_de_fabrica'];
+export const DIAS_PARA_EXIGIR = 2;
+const DIA_MS = 86400000;
+const diaMexico = (fecha) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(fecha);
+// Inicio (00:00 de México) de un día 'YYYY-MM-DD': México no tiene horario de verano desde 2022 (UTC-6).
+const inicioDiaMexico = (dia) => new Date(`${dia}T00:00:00-06:00`);
+
+/**
+ * Cuenta los días hábiles seguidos (lunes a sábado, sin festivos; de ayer hacia atrás) en que ninguna pantalla llegó
+ * «a la antigua» y sí hubo terminales con el código nuevo. Un día que el servidor no vio completo (se reinició ese día:
+ * los conteos viven en memoria) o sin uso de la terminal corta la cuenta: no se sabe. Función pura (para probarla).
+ * @returns {{ conCodigosNuevos, exigiendo, diasHabilesEnCero, necesarios, hoyALaAntigua, listo, texto }}
+ */
+export const resumenFaseC = ({ conteos, desde, ahora = new Date(), conCodigosNuevos, exigiendo = false, esFestivo = () => false }) => {
+    const suma = (c) => A_LA_ANTIGUA.reduce((s, k) => s + (c?.[k] || 0), 0);
+    const hoy = diaMexico(ahora);
+    const hoyALaAntigua = suma(conteos[hoy]);
+    let dias = 0;
+    let motivo = null;
+    for (let i = 1; i <= 21 && dias < DIAS_PARA_EXIGIR + 5; i++) {
+        const dia = diaMexico(new Date(inicioDiaMexico(hoy).getTime() - i * DIA_MS + 12 * 3600000));
+        const [y, m, d] = dia.split('-').map(Number);
+        const semana = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+        if (semana === 0 || esFestivo(y, m, d)) continue; // domingo o festivo: ni cuenta ni corta
+        if (new Date(desde) > inicioDiaMexico(dia)) { motivo = 'reinicio'; break; }
+        const c = conteos[dia] || {};
+        if (suma(c) > 0) { motivo = 'a_la_antigua'; break; }
+        if (!(c.propio > 0)) { motivo = 'sin_uso'; break; }
+        dias++;
+    }
+    const listo = !!conCodigosNuevos && !exigiendo && dias >= DIAS_PARA_EXIGIR && hoyALaAntigua === 0;
+    let texto;
+    if (!conCodigosNuevos) texto = 'Todavía no hay códigos nuevos (TERMINAL_CODIGOS, DUE-13): no se puede exigir.';
+    else if (exigiendo) texto = 'La fase C ya está encendida: la terminal exige el código.';
+    else if (listo) texto = `${dias} días hábiles seguidos sin pantallas «a la antigua»: ya se puede exigir (TERMINAL_EXIGIR_CODIGO=1 y TERMINAL_ACEPTAR_CODIGOS_DE_FABRICA=0).`;
+    else {
+        texto = `Van ${Math.min(dias, DIAS_PARA_EXIGIR)} de ${DIAS_PARA_EXIGIR} días hábiles seguidos en cero.`;
+        if (hoyALaAntigua > 0) texto += ` Hoy ya llegaron ${hoyALaAntigua} peticiones sin código o con el de fábrica.`;
+        if (motivo === 'reinicio' && dias < DIAS_PARA_EXIGIR) texto += ' Los conteos empiezan de cero al reiniciar el servidor: hay que esperar días completos.';
+        if (motivo === 'sin_uso' && dias < DIAS_PARA_EXIGIR) texto += ' Un día hábil sin uso de la terminal no cuenta.';
+    }
+    return { conCodigosNuevos: !!conCodigosNuevos, exigiendo: !!exigiendo, diasHabilesEnCero: dias, necesarios: DIAS_PARA_EXIGIR, hoyALaAntigua, listo, texto };
+};
+
 /** Lo que /salud (PLA-08 / PLA-13) y la ruta de administración cuentan de la terminal. Nunca los códigos. */
 export const estadoCodigosTerminal = () => {
     const cfg = configTerminal();
@@ -154,9 +200,23 @@ export const estadoCodigosTerminal = () => {
         avisos: cfg.avisos,
         desde: arrancoEn,
         hoy: porDia.get(hoyMexico()) || {},
-        porDia: Object.fromEntries(dias.map((d) => [d, porDia.get(d)]))
+        porDia: Object.fromEntries(dias.map((d) => [d, porDia.get(d)])),
+        // PLA-10: el conteo que sostiene (o no) el paso a la fase C.
+        paraFaseC: resumenFaseC({
+            conteos: Object.fromEntries(porDia),
+            desde: arrancoEn,
+            conCodigosNuevos: cfg.codigos.size > 0,
+            exigiendo: cfg.exigir,
+            esFestivo: festivoParaConteo
+        })
     };
 };
+
+// Festivos para el conteo de días hábiles: los mismos de calendarioLaboral.js (PLA-07). Se cargan aparte para no
+// atar este intermediario al arranque de aquel módulo.
+let esFestivoCal = null;
+import('../utils/calendarioLaboral.js').then((m) => { esFestivoCal = m.esFestivo; }).catch(() => { /* sin festivos */ });
+const festivoParaConteo = (y, m, d) => { try { return esFestivoCal ? esFestivoCal(y, m, d) : false; } catch { return false; } };
 
 // ---------- Intermediario de las 4 rutas de la terminal ----------
 const rutaDe = (req) => {
