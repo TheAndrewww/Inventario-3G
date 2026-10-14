@@ -4,7 +4,7 @@
 import {
   Package, ClipboardList, ArrowUpDown, ClipboardCheck, Inbox, Layers, PackageOpen, Wand2, AlertCircle, FileText,
   PackageCheck, AlertTriangle, Truck, Factory, Gauge, Flag, CalendarDays, Briefcase, Wrench, UserRound, UserCog,
-  BarChart3, ShoppingCart, History, ShoppingBag,
+  BarChart3, ShoppingCart, History, ShoppingBag, Megaphone,
 } from 'lucide-react';
 import { ALL_MENU_ITEMS, MENU_GRUPOS } from '../components/layout/Sidebar';
 
@@ -53,6 +53,7 @@ export const TITULOS = {
   '/proveedores': 'Proveedores',
   '/produccion': 'Tablero de producción',
   '/avance-produccion': 'Avance por área',
+  '/produccion/avisos': 'Avisos a Producción',
   '/control-campana': 'Campaña de control',
   '/calendario': 'Calendario de instalaciones',
   '/camionetas': 'Equipos',
@@ -126,6 +127,9 @@ export const GRUPOS_RIEL = [
   { id: 'produccion', titulo: 'Producción', items: [
     { path: '/produccion', icono: Factory },
     { path: '/avance-produccion', icono: Gauge },
+    // B1 · PLA-12: pantalla nueva, SOLO con Diseño 3G (no existe en el menú de siempre): sus roles van aquí, los mismos
+    // del tablero de producción.
+    { path: '/produccion/avisos', icono: Megaphone, soloG3: true, roles: ['administrador', 'diseñador', 'almacen'] },
   ] },
   { id: 'calendario', titulo: 'Calendario', items: [
     { path: '/calendario', icono: CalendarDays },
@@ -145,6 +149,9 @@ export const GRUPOS_RIEL = [
 // B6 · PLA-11: el rol ventas ya no ve «Órdenes de compra» ni «Solicitudes de compra». Los permisos de este riel salen
 // de ALL_MENU_ITEMS (Sidebar.jsx), así que el cambio de roles de allí aplica igual al menú de siempre y a este.
 
+// Pantallas que solo existen con Diseño 3G (B1 · PLA-12): ¿este rol la puede abrir? (App.jsx la protege con esto)
+export const rolPuedeVerG3 = (rol, path) => GRUPOS_RIEL.some((g) => g.items.some((it) => it.soloG3 && it.path === path && it.roles.includes(rol)));
+
 // Riel para un rol: solo lo que el rol ve hoy (mismos permisos), sin los paneles que el usuario ocultó.
 export const rielParaRol = (rol, userId, ocultos = new Set()) => GRUPOS_RIEL.map((g) => ({
   ...g,
@@ -154,7 +161,7 @@ export const rielParaRol = (rol, userId, ocultos = new Set()) => GRUPOS_RIEL.map
       if (!pestanas.length) return null;
       return { ...it, clave: it.seccion, destino: pestanas[0].path, rutas: pestanas.map((p) => p.path), oculto: ocultos.has(it.seccion) || pestanas.every((p) => ocultos.has(p.path)) };
     }
-    const base = ALL_MENU_ITEMS.find((i) => i.path === it.path);
+    const base = it.soloG3 ? it : ALL_MENU_ITEMS.find((i) => i.path === it.path);
     if (!base || !base.roles.includes(rol)) return null;
     return { ...it, clave: it.path, destino: it.path, rutas: [it.path], etiqueta: TITULOS[it.path] || base.label, oculto: ocultos.has(it.path) };
   }).filter(Boolean),

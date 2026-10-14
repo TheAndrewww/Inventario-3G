@@ -14,8 +14,82 @@ import { urlSolicitudes } from '../services/barridoCompras.service.js';
 import { crearNotificacion } from '../controllers/notificaciones.controller.js';
 import { getNombresProyectosAbiertos, pedidoEsDeProyectoAbierto, mismosProyectos } from '../controllers/pedidos.controller.js';
 import { enviarEmailEstadoOrden } from '../services/email.service.js';
+import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
+
+/**
+ * GET /api/avisos-whatsapp/produccion/avisos — B1 paso 1 · PLA-12: Planta › Producción › Avisos.
+ * Esta SÍ es para personas (sesión de Planta), no para el bot: va antes del candado del puente.
+ *
+ * Lo que se mandó a Producción, para verlo junto en Planta (la pantalla es de Diseño 3G). Por ahora solo la cola
+ * propia de Planta (avisos_whatsapp, destino 'produccion'); la bitácora de Carla y Julia se suma en PLA-14 con el
+ * mismo formato. Solo lectura. Query: dias (7; máx. 31), dia=AAAA-MM-DD, origen=planta,carla,julia,
+ * destino=produccion,charly,susana,asesor (como la liga del Inicio: ?destino=susana,asesor).
+ * Roles: los del tablero de producción.
+ */
+const DIA_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' });
+const HORA_MX = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false });
+const listaDe = (valor) => String(valor || '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+// Primer renglón del aviso sin emojis ni asteriscos: «📅 *Cambió una instalación*» → «Cambió una instalación»
+const tituloDeAviso = (mensaje) => (String(mensaje || '').split('\n').find(l => l.trim()) || 'Aviso')
+    .replace(/[*_~]/g, '').replace(/^[^\p{L}\p{N}]+/u, '').trim() || 'Aviso';
+
+router.get('/produccion/avisos', verificarToken, verificarRol('administrador', 'diseñador', 'almacen'), async (req, res) => {
+    try {
+        const dias = Math.min(Math.max(parseInt(req.query.dias) || 7, 1), 31);
+        const dia = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.dia || '')) ? req.query.dia : null;
+        const origenes = listaDe(req.query.origen);
+        const destinos = listaDe(req.query.destino);
+        const desde = new Date(Date.now() - dias * 86400000);
+
+        // La cola propia de Planta: lo que Planta deja para el grupo Producción (lo publica Julia)
+        let filas = [];
+        if ((!origenes.length || origenes.includes('planta')) && (!destinos.length || destinos.includes('produccion'))) {
+            filas = await AvisoWhatsApp.findAll({
+                where: { destino: 'produccion', created_at: { [Op.gte]: desde } },
+                attributes: ['id', 'tipo', 'mensaje', 'estado', 'error', 'enviado_at', 'created_at'],
+                order: [['created_at', 'DESC'], ['id', 'DESC']],
+                limit: 300
+            });
+        }
+
+        const avisos = filas.map(a => ({
+            id: `planta-${a.id}`,
+            origen: 'planta',
+            destino: 'produccion',
+            tipo: a.tipo,
+            titulo: tituloDeAviso(a.mensaje),
+            texto: a.mensaje,
+            cuando: a.created_at,
+            dia: DIA_MX.format(a.created_at),
+            hora: HORA_MX.format(a.created_at),
+            estado: a.estado, // pendiente | enviado | error
+            enviadoEn: a.enviado_at,
+            // Sin teléfonos: el error del bot puede traer uno
+            error: a.estado === 'error' ? String(a.error || '').replace(/\d{7,}/g, '•••').slice(0, 160) : null
+        })).filter(a => !dia || a.dia === dia);
+
+        res.json({
+            success: true,
+            data: {
+                avisos,
+                dias,
+                desde: desde.toISOString(),
+                hoy: DIA_MX.format(new Date()),
+                // Qué fuentes ya llegan a esta pantalla (la bitácora de Carla y Julia llega con PLA-14)
+                fuentes: [
+                    { origen: 'planta', conectada: true },
+                    { origen: 'carla', conectada: false },
+                    { origen: 'julia', conectada: false }
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('Error al listar los avisos de Producción:', error);
+        res.status(500).json({ success: false, message: 'Error al listar los avisos de Producción' });
+    }
+});
 
 /** Solo pasa quien traiga el token compartido del puente. */
 const verificarPuente = (req, res, next) => {
