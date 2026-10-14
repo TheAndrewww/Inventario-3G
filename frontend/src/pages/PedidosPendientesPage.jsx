@@ -34,6 +34,11 @@ const PedidosPendientesPage = () => {
   // Borrón y cuenta nueva (admin): { total, solicitudes_a_cancelar, tickets } o null
   const [anulacionMasiva, setAnulacionMasiva] = useState(null);
   const [anulandoTodo, setAnulandoTodo] = useState(false);
+  // A6 · PLA-05: tickets que quedaron abiertos al cerrar su obra (solo existen con CIERRE_OBRA_RESPETA_ENTREGADO).
+  // Sin ellos no se muestra nada nuevo: la pantalla queda igual que siempre.
+  const [soloPorRevisar, setSoloPorRevisar] = useState(false);
+  const porRevisar = pedidos.filter((p) => p.revision_requerida);
+  const pedidosALaVista = soloPorRevisar && porRevisar.length > 0 ? porRevisar : pedidos;
 
   const abrirAnulacionMasiva = async (reabrir = false) => {
     try {
@@ -322,6 +327,23 @@ const PedidosPendientesPage = () => {
             </span>
           </h2>
 
+          {porRevisar.length > 0 && (
+            <div className={g3 ? 'g3-chips mb-4' : 'mb-4 flex flex-wrap gap-2'} role="group" aria-label="Filtrar tickets pendientes">
+              {[[false, 'Todos', pedidos.length], [true, 'Por revisar · cierre de obra', porRevisar.length]].map(([valor, etiqueta, n]) => (
+                <button
+                  key={etiqueta}
+                  type="button"
+                  aria-pressed={soloPorRevisar === valor}
+                  onClick={() => setSoloPorRevisar(valor)}
+                  className={g3 ? 'g3-chip' : `px-3 py-1.5 text-sm font-medium rounded-full border ${soloPorRevisar === valor ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                >
+                  {etiqueta}
+                  <span className={g3 ? 'g3-insignia' : 'ml-1.5 font-semibold'}>{n}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {pedidos.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm p-10 text-center">
               <ClipboardList size={48} className="mx-auto mb-3 text-gray-300" />
@@ -330,7 +352,7 @@ const PedidosPendientesPage = () => {
             </div>
           ) : (
             <div className="space-y-4 max-h-[calc(100vh-220px)] overflow-y-auto pr-2">
-              {pedidos.map((pedido) => (
+              {pedidosALaVista.map((pedido) => (
                 <div
                   key={pedido.id}
                   className="bg-white rounded-xl shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer"
@@ -351,7 +373,17 @@ const PedidosPendientesPage = () => {
                         <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
                           Pendiente
                         </span>
+                        {pedido.revision_requerida && (
+                          <span className={g3 ? 'g3-estado g3-estado--aviso' : 'px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800'}>
+                            Por revisar · cierre de obra
+                          </span>
+                        )}
                       </div>
+                      {pedido.revision_requerida && pedido.revision_motivo && (
+                        <p className="mb-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                          {pedido.revision_motivo}. Decide si se completa o se elimina.
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
                         <div className="flex items-center gap-1">
                           <ClipboardList size={14} />
@@ -491,6 +523,13 @@ const PedidosPendientesPage = () => {
       >
         {pedidoSeleccionado && (
           <div className="space-y-6">
+            {pedidoSeleccionado.revision_requerida && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900" role="note">
+                <p className="font-semibold">Por revisar · cierre de obra</p>
+                {pedidoSeleccionado.revision_motivo && <p className="mt-1">{pedidoSeleccionado.revision_motivo}.</p>}
+                <p className="mt-1">El material ya entregado no regresó solo al almacén. Si ya se entregó todo, complétalo; si no, Dirección lo elimina como siempre (al eliminarlo regresa todo su material).</p>
+              </div>
+            )}
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>

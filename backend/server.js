@@ -411,6 +411,22 @@ app.post('/api/admin/limpiar-db', verificarToken, esAdministrador, async (req, r
     }
 });
 
+// ===== Ensayo del cierre de obras (A6 · PLA-05) =====
+// Solo lectura y solo administración: por cada ticket abierto de una obra, qué pasaría hoy al cerrarse su obra
+// (se anula y regresa todo al almacén) y qué pasaría con CIERRE_OBRA_RESPETA_ENTREGADO (por revisar si ya
+// tenía material entregado o compras recibidas). No escribe nada.
+app.get('/api/admin/ensayo-cierre-obras', verificarToken, esAdministrador, async (req, res) => {
+    try {
+        const { ensayoCierreObras } = await import('./src/services/pedidosCleanup.service.js');
+        const { getNombresProyectosAbiertos } = await import('./src/controllers/pedidos.controller.js');
+        const data = await ensayoCierreObras(await getNombresProyectosAbiertos());
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error en el ensayo de cierre de obras:', error);
+        res.status(500).json({ success: false, message: 'Error al armar el ensayo de cierre de obras' });
+    }
+});
+
 // Manejo de errores
 app.use((err, req, res, next) => {
     console.error(err.stack);
@@ -1261,6 +1277,24 @@ const startServer = async () => {
             console.log('✅ Columnas destino_tipo/destino_area verificadas en movimientos');
         } catch (destErr) {
             console.error('⚠️ Error verificando columnas de destino en movimientos:', destErr.message);
+        }
+
+        // Tickets «Por revisar · cierre de obra» (A6 · PLA-05) — aplica en dev y prod.
+        // Solo agrega columnas (nunca alter): sin la bandera CIERRE_OBRA_RESPETA_ENTREGADO quedan en false/null.
+        try {
+            await sequelize.query(
+                "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS revision_requerida BOOLEAN NOT NULL DEFAULT FALSE"
+            );
+            await sequelize.query(
+                "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS revision_motivo TEXT"
+            );
+            await sequelize.query(
+                "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS revision_desde TIMESTAMP WITH TIME ZONE"
+            );
+            const { cierreRespetaEntregado } = await import('./src/services/pedidosCleanup.service.js');
+            console.log(`✅ Columnas de revisión por cierre de obra verificadas en movimientos (CIERRE_OBRA_RESPETA_ENTREGADO ${cierreRespetaEntregado() ? 'encendida' : 'apagada'})`);
+        } catch (revErr) {
+            console.error('⚠️ Error verificando columnas de revisión en movimientos:', revErr.message);
         }
 
         // Aislamiento por almacén (categorías y ubicaciones) — aplica en dev y prod

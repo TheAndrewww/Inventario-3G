@@ -27,20 +27,57 @@ export function mismosProyectos(a, b) {
     return false;
 }
 
+// ===== A6 · PLA-05: cerrar una obra respeta el material entregado =====
+// Con CIERRE_OBRA_RESPETA_ENTREGADO=1, un ticket con artículos ya entregados (dispersados) o con compras ya
+// recibidas (solicitudes «completada») NO se anula al cerrar su obra: queda abierto y marcado «Por revisar ·
+// cierre de obra» con su motivo, y el material entregado no regresa solo al almacén. El resto se anula como hoy.
+// Apagada (por omisión) todo es como antes. La anulación manual y la masiva no pasan por aquí y no cambian.
+export const BANDERA_CIERRE_OBRA = 'CIERRE_OBRA_RESPETA_ENTREGADO';
+export const cierreRespetaEntregado = () =>
+    ['1', 'true', 'si', 'sí', 'encendida'].includes(String(process.env[BANDERA_CIERRE_OBRA] || '').trim().toLowerCase());
+
+/** Lo ya entregado de un ticket: artículos dispersados y compras recibidas (solicitudes «completada»). */
+export function entregadoDelTicket(pedido) {
+    const detalles = pedido.detalles || [];
+    const solicitudes = pedido.solicitudes_compra || [];
+    return {
+        articulos: detalles.length,
+        dispersados: detalles.filter(d => d.dispersado).length,
+        comprasRecibidas: solicitudes.filter(s => s.estado === 'completada').length
+    };
+}
+
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+const fechaCorta = (fecha) => new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', day: 'numeric', month: 'short' })
+    .format(fecha).replace('.', '').replace(' ', '-');
+
+/** «Obra cerrada el 12-nov: 3 artículos ya entregados, 1 compra recibida» */
+export function motivoRevision({ dispersados, comprasRecibidas }, fecha = new Date()) {
+    const partes = [];
+    if (dispersados) partes.push(plural(dispersados, 'artículo ya entregado', 'artículos ya entregados'));
+    if (comprasRecibidas) partes.push(plural(comprasRecibidas, 'compra recibida', 'compras recibidas'));
+    return `Obra cerrada el ${fechaCorta(fecha)}: ${partes.join(', ')}`;
+}
+
+/** Regla nueva: ¿este ticket queda por revisar en lugar de anularse? */
+export const quedaPorRevisar = (entregado) => entregado.dispersados > 0 || entregado.comprasRecibidas > 0;
+
 /**
  * Anula los pedidos abiertos asociados a un proyecto.
  * Revierte el stock de cada artículo y cancela las solicitudes de compra
  * pendientes/en_orden vinculadas al pedido. No toca pedidos ya entregados.
+ * Con CIERRE_OBRA_RESPETA_ENTREGADO, los que ya tienen material entregado o compras recibidas
+ * no se anulan: quedan «Por revisar · cierre de obra» (A6).
  *
  * @param {Object} params
  * @param {string} params.proyectoNombre - Nombre del proyecto (Movimiento.proyecto)
  * @param {string} [params.motivo] - Motivo registrado en la anulación
  * @param {import('sequelize').Transaction|null} [params.transaction]
  * @param {number|null} [params.usuarioId]
- * @returns {Promise<{anulados: number, ticketIds: string[]}>}
+ * @returns {Promise<{anulados: number, ticketIds: string[], porRevisar: number, ticketIdsPorRevisar: string[]}>}
  */
 export async function anularPedidosDeProyecto({ proyectoNombre, motivo = 'Proyecto cerrado', transaction = null, usuarioId = null }) {
-    if (!proyectoNombre) return { anulados: 0, ticketIds: [] };
+    if (!proyectoNombre) return { anulados: 0, ticketIds: [], porRevisar: 0, ticketIdsPorRevisar: [] };
 
     // Match flexible: traer TODOS los pedidos activos y filtrar en JS, ya que
     // el match SQL (iLike + prefijo) no cubre el caso inverso (proyecto del
@@ -58,14 +95,34 @@ export async function anularPedidosDeProyecto({ proyectoNombre, motivo = 'Proyec
     });
 
     const pedidos = candidatos.filter(p => mismosProyectos(p.proyecto, proyectoNombre));
+    const respetaEntregado = cierreRespetaEntregado();
 
     const ticketIds = [];
+    const ticketIdsPorRevisar = [];
     for (const pedido of pedidos) {
+        const entregado = entregadoDelTicket(pedido);
+        if (respetaEntregado && quedaPorRevisar(entregado)) {
+            await marcarPorRevisar(pedido, entregado, transaction);
+            ticketIdsPorRevisar.push(pedido.ticket_id);
+            continue;
+        }
         await anularPedidoInterno(pedido, motivo, transaction, usuarioId);
         ticketIds.push(pedido.ticket_id);
     }
 
-    return { anulados: pedidos.length, ticketIds };
+    return { anulados: ticketIds.length, ticketIds, porRevisar: ticketIdsPorRevisar.length, ticketIdsPorRevisar };
+}
+
+// El ticket se queda como está (estado, stock y solicitudes); solo se marca con su motivo.
+// Si ya estaba marcado, conserva el motivo y la fecha de la primera vez.
+async function marcarPorRevisar(pedido, entregado, transaction) {
+    if (pedido.revision_requerida) return;
+    const ahora = new Date();
+    await pedido.update({
+        revision_requerida: true,
+        revision_motivo: motivoRevision(entregado, ahora),
+        revision_desde: ahora
+    }, { transaction });
 }
 
 async function anularPedidoInterno(pedido, motivo, transaction, usuarioId) {
@@ -92,4 +149,72 @@ async function anularPedidoInterno(pedido, motivo, transaction, usuarioId) {
         motivo_rechazo: motivo,
         ...(usuarioId ? { aprobado_por_id: usuarioId, fecha_aprobacion: new Date() } : {})
     }, { transaction });
+}
+
+const AREAS_FIJAS = ['manufactura', 'herreria'];
+
+/**
+ * A6 · PLA-05 — Ensayo de solo lectura (GET /api/admin/ensayo-cierre-obras, administración).
+ * Por cada ticket abierto de una obra: qué pasaría hoy al cerrarse su obra y qué pasaría con la regla nueva.
+ * No escribe nada (solo SELECT).
+ *
+ * @param {string[]} nombresAbiertos - Nombres de las obras abiertas en producción (getNombresProyectosAbiertos)
+ */
+export async function ensayoCierreObras(nombresAbiertos = []) {
+    const tickets = await Movimiento.findAll({
+        where: { tipo: 'pedido', estado: { [Op.in]: ESTADOS_ACTIVOS } },
+        include: [
+            { model: DetalleMovimiento, as: 'detalles', include: [{ model: Articulo, as: 'articulo', attributes: ['id', 'nombre', 'unidad', 'stock_actual'] }] },
+            { model: SolicitudCompra, as: 'solicitudes_compra', attributes: ['id', 'ticket_id', 'estado'] }
+        ],
+        order: [['fecha_hora', 'ASC']]
+    });
+
+    const filas = tickets
+        .filter(t => t.proyecto && !AREAS_FIJAS.includes(normalizar(t.proyecto)))
+        .map(t => {
+            const entregado = entregadoDelTicket(t);
+            const porRevisar = quedaPorRevisar(entregado);
+            const regresaria = (t.detalles || []).filter(d => d.articulo).map(d => ({
+                articulo: d.articulo.nombre,
+                unidad: d.articulo.unidad,
+                cantidad: parseFloat(d.cantidad),
+                entregado: !!d.dispersado
+            }));
+            const piezasHoy = regresaria.reduce((s, r) => s + r.cantidad, 0);
+            const obraAbierta = nombresAbiertos.some(n => mismosProyectos(t.proyecto, n));
+            return {
+                ticket: t.ticket_id,
+                estado: t.estado,
+                proyecto: t.proyecto,
+                obra: obraAbierta ? 'abierta' : 'cerrada o sin obra en producción',
+                articulos: entregado.articulos,
+                dispersados: entregado.dispersados,
+                comprasRecibidas: entregado.comprasRecibidas,
+                solicitudesQueSeCancelarianHoy: (t.solicitudes_compra || []).filter(s => ['pendiente', 'en_orden'].includes(s.estado)).length,
+                hoy: { decision: 'se anula', piezasQueRegresan: piezasHoy, detalle: regresaria },
+                reglaNueva: porRevisar
+                    ? { decision: 'por revisar', piezasQueRegresan: 0, motivo: motivoRevision(entregado) }
+                    : { decision: 'se anula', piezasQueRegresan: piezasHoy },
+                yaMarcado: !!t.revision_requerida
+            };
+        });
+
+    const suma = (f) => filas.reduce((s, x) => s + f(x), 0);
+    return {
+        soloLectura: true,
+        generado: new Date().toISOString(),
+        bandera: { nombre: BANDERA_CIERRE_OBRA, encendida: cierreRespetaEntregado() },
+        resumen: {
+            ticketsAbiertosDeObras: filas.length,
+            deObrasYaCerradas: filas.filter(f => f.obra !== 'abierta').length,
+            hoySeAnularian: filas.length,
+            conReglaNuevaSeAnularian: filas.filter(f => f.reglaNueva.decision === 'se anula').length,
+            conReglaNuevaQuedanPorRevisar: filas.filter(f => f.reglaNueva.decision === 'por revisar').length,
+            piezasQueRegresarianHoy: suma(f => f.hoy.piezasQueRegresan),
+            piezasQueRegresarianConReglaNueva: suma(f => f.reglaNueva.piezasQueRegresan),
+            yaMarcadosPorRevisar: filas.filter(f => f.yaMarcado).length
+        },
+        tickets: filas
+    };
 }

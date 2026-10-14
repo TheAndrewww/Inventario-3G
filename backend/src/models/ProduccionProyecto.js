@@ -317,6 +317,10 @@ ProduccionProyecto.addHook('afterUpdate', async (proyecto, options) => {
         if (resultado.anulados > 0) {
             console.log(`🧹 Auto-anulados ${resultado.anulados} pedido(s) del proyecto "${proyecto.nombre}": ${resultado.ticketIds.join(', ')}`);
         }
+        // A6 · PLA-05 (CIERRE_OBRA_RESPETA_ENTREGADO): los que ya tenían material entregado o compras recibidas
+        if (resultado.porRevisar > 0) {
+            console.log(`🔎 Por revisar (cierre de obra) ${resultado.porRevisar} pedido(s) del proyecto "${proyecto.nombre}": ${resultado.ticketIdsPorRevisar.join(', ')}`);
+        }
     } catch (err) {
         console.error('[ProduccionProyecto afterUpdate] Error al limpiar pedidos:', err);
     }

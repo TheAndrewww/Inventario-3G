@@ -999,9 +999,10 @@ export const listarPedidosPendientes = async (req, res) => {
       order: [['fecha_hora', 'ASC']] // Más antiguos primero
     });
 
-    // Solo tickets de proyectos abiertos: cerrado/cancelado/dado de baja = desaparece
+    // Solo tickets de proyectos abiertos: cerrado/cancelado/dado de baja = desaparece.
+    // A6 · PLA-05: los que quedaron «Por revisar · cierre de obra» siguen a la vista aunque su obra ya cerró.
     const nombresAbiertos = await getNombresProyectosAbiertos();
-    const pedidosVisibles = pedidos.filter(p => pedidoEsDeProyectoAbierto(p.proyecto, nombresAbiertos));
+    const pedidosVisibles = pedidos.filter(p => p.revision_requerida || pedidoEsDeProyectoAbierto(p.proyecto, nombresAbiertos));
 
     // Calcular progreso para cada pedido
     const pedidosConProgreso = pedidosVisibles.map(pedido => {
