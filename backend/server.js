@@ -1287,6 +1287,15 @@ const startServer = async () => {
             console.error('⚠️ Error verificando las tablas de las puertas entre sistemas:', puertasErr.message);
         }
 
+        // B1 · PLA-14: bitácora de los avisos de Carla y Julia a Producción (su propio sync: crea si no existe; nunca alter)
+        try {
+            const { default: BitacoraAviso } = await import('./src/models/BitacoraAviso.js');
+            await BitacoraAviso.sync();
+            console.log('✅ Tabla bitacora_avisos verificada');
+        } catch (bitacoraErr) {
+            console.error('⚠️ Error verificando la tabla bitacora_avisos:', bitacoraErr.message);
+        }
+
         // Tickets de salida ya vistos en la carpeta del proyecto — aplica en dev y prod.
         // Sirve para no repetir el aviso 🎫 al grupo de PRODUCCIÓN en cada barrido.
         try {

@@ -7,6 +7,7 @@
  *   GET /api/inicio3g/v1/agenda       alcance «inicio.leer»  los avisos que Planta manda solo (D3, utils/agendaPlanta.js)
  *   GET /api/sistemas/v1/llaves       alcance «llaves.leer»  llaves y enlaces vivos, solo metadatos (B8; lo lee Cuentas 3G)
  *   GET /api/inicio3g/v1/llaves       el mismo de arriba (el contrato acepta los dos prefijos)
+ *   POST /api/sistemas/v1/bitacora-avisos  alcance «bitacora.escribir»  avisos de Carla y Julia a Producción (B1 · PLA-14)
  *
  * Cómo se entra (igual en los cinco sistemas):
  *   - «Authorization: Bearer <llave>» y «X-3G-Origen: <sistema>» (inicio, cuentas, finanzas, ventas…).
@@ -17,7 +18,7 @@
  *   - 60 peticiones por minuto por origen (429 con Retry-After). Registro de hora, origen, ruta, código y duración;
  *     sin IP, sin llaves y sin contenido.
  *   - Por /api/inicio3g/v1 nadie escribe: cualquier método que no sea GET responde 405.
- *   - Las escrituras de /api/sistemas/v1 (llegan en PLA-14, PLA-16, PLA-17 y PLA-20) exigen Idempotency-Key, que se
+ *   - Las escrituras de /api/sistemas/v1 (PLA-14; llegan también en PLA-16, PLA-17 y PLA-20) exigen Idempotency-Key, que se
  *     recuerda 7 días (tabla idempotencia_sistemas): la misma llave con el mismo cuerpo devuelve la misma respuesta sin
  *     volver a escribir; con otro cuerpo, 409.
  *   - Errores { "error": "texto" }; fechas ISO con la zona de México; dinero { monto, moneda: "MXN" }; listas de 50
@@ -31,6 +32,7 @@ import { sequelize } from '../../config/database.js';
 import LlaveSistema from '../../models/LlaveSistema.js';
 import Idempotencia from '../../models/Idempotencia.js';
 import { cuerpoSalud, isoMexico } from '../../utils/revisarConfig.js';
+import { registrarBitacora } from './bitacora.js';
 
 export const PREFIJO_INICIO = '/api/inicio3g/v1';
 export const PREFIJO_SISTEMAS = '/api/sistemas/v1';
@@ -394,7 +396,7 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
     router.use(PREFIJO_INICIO, (req, res, next) => (['GET', 'HEAD'].includes(req.method)
         ? next()
         : error(res, 405, 'Solo lectura: por /api/inicio3g nadie escribe.', { Allow: 'GET' })));
-    // Las escrituras entre sistemas exigen Idempotency-Key (no hay ninguna todavía: llegan con PLA-14 y siguientes)
+    // Las escrituras entre sistemas exigen Idempotency-Key (bitácora de PLA-14; después PLA-16, PLA-17 y PLA-20)
     router.use(PREFIJO_SISTEMAS, idempotente);
 
     const leer = (alcance, fn) => [exigirAlcance(alcance), async (req, res) => {
@@ -403,6 +405,16 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
         } catch (e) {
             console.error(`[puerta] ${req.originalUrl.split('?')[0]}:`, e.message);
             error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo armar la respuesta; intenta de nuevo.');
+        }
+    }];
+    // Escrituras entre sistemas (ya pasaron por la llave y por `idempotente`): fn(req) devuelve { codigo, cuerpo }.
+    const escribirCon = (alcance, fn) => [exigirAlcance(alcance), async (req, res) => {
+        try {
+            const { codigo, cuerpo } = await conTope(fn(req), 2800);
+            res.status(codigo).json(cuerpo);
+        } catch (e) {
+            console.error(`[puerta] ${req.originalUrl.split('?')[0]}:`, e.message);
+            error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo guardar el dato; intenta de nuevo.');
         }
     }];
     const puestoDe = (req) => {
@@ -425,6 +437,9 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
     }));
     router.get(`${PREFIJO_SISTEMAS}/llaves`, ...leer('llaves.leer', async () => llavesPlanta(registro)));
     router.get(`${PREFIJO_INICIO}/llaves`, ...leer('llaves.leer', async () => llavesPlanta(registro)));
+
+    // B1 · PLA-14: la bitácora de los avisos de Carla y Julia a Producción (la escribe Finanzas, FIN-09)
+    router.post(`${PREFIJO_SISTEMAS}/bitacora-avisos`, ...escribirCon('bitacora.escribir', (req) => registrarBitacora(req.body)));
 
     // Cualquier otra ruta de las puertas
     router.use([PREFIJO_INICIO, PREFIJO_SISTEMAS], (req, res) => error(res, 404, 'No existe esa puerta en Planta.'));

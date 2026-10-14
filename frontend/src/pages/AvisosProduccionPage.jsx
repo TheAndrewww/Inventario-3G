@@ -1,8 +1,9 @@
 // B1 paso 1 · PLA-12 — Planta › Producción › Avisos (solo con Diseño 3G; App.jsx la protege con SoloConDiseno3G).
 // Todo lo que se mandó a Producción, en un solo lugar y solo para verlo: los mensajes no cambian.
-// Hoy junta la cola propia de Planta (lo que Planta deja para el grupo Producción y publica Julia); la bitácora de Carla y
-// Julia se suma con PLA-14 en el mismo formato. Filtros por origen, destino y día; la liga puede traer ?destino=…
-// (por ejemplo ?destino=susana,asesor desde Operación › Calendario), ?origen=… y ?dia=AAAA-MM-DD.
+// Junta la cola propia de Planta (lo que Planta deja para el grupo Producción y publica Julia) y, desde PLA-14, la
+// bitácora de Carla y Julia (lo que Finanzas anota después de cada envío que sí salió), en el mismo formato.
+// Filtros por origen, destino y día; la liga puede traer ?destino=… (por ejemplo ?destino=susana,asesor desde
+// Operación › Calendario), ?origen=… y ?dia=AAAA-MM-DD.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Megaphone, RefreshCw } from 'lucide-react';
@@ -83,6 +84,8 @@ export default function AvisosProduccionPage() {
   const diasConAvisos = [...new Set(todos.map((a) => a.dia))].sort().reverse();
   const opcionesDia = hoy ? [...new Set([hoy, restarDia(hoy), ...diasConAvisos, ...(dia ? [dia] : [])])].sort().reverse() : diasConAvisos;
   const filtrando = origenes.length || destinos.length || dia;
+  // PLA-14: qué parte de la bitácora todavía no llega (Finanzas la manda con BITACORA_A_PLANTA)
+  const faltan = ORIGENES.filter((o) => o.id !== 'planta' && !conectadas.has(o.id));
 
   return (
     <div className="p-6">
@@ -130,11 +133,15 @@ export default function AvisosProduccionPage() {
         </div>
       </div>
 
-      {datos && (conectadas.size < ORIGENES.length) && (
+      {datos && faltan.length > 0 && (
         <div className="g3-caja g3-caja--info" style={{ marginBottom: 16 }}>
           <Megaphone aria-hidden="true" />
           <div className="g3-caja-cuerpo">
-            <span>Por ahora se ven los avisos que manda <strong>Planta</strong> al grupo Producción. Los de Carla y Julia (recordatorios, confirmación del calendario y cita confirmada al asesor) se sumarán aquí.</span>
+            {faltan.length === 2 ? (
+              <span>Por ahora se ven los avisos que manda <strong>Planta</strong> al grupo Producción. Los de Carla y Julia (recordatorios, confirmación del calendario y cita confirmada al asesor) se sumarán aquí.</span>
+            ) : (
+              <span>Todavía no llegan aquí los avisos de <strong>{faltan[0].nombre}</strong>; se sumarán en cuanto Finanzas los mande.</span>
+            )}
           </div>
         </div>
       )}
@@ -154,7 +161,7 @@ export default function AvisosProduccionPage() {
         <div className="g3-vacio">
           <Megaphone aria-hidden="true" />
           <b>{filtrando ? 'Sin avisos con estos filtros' : 'Sin avisos en los últimos días'}</b>
-          <p>{filtrando ? 'Prueba con otro día o quita los filtros.' : 'Cuando Planta le avise algo a Producción (etapas, archivos, tickets o cambios de fecha), aparece aquí.'}</p>
+          <p>{filtrando ? 'Prueba con otro día o quita los filtros.' : 'Cuando Planta, Carla o Julia le avisen algo a Producción (etapas, archivos, tickets, cambios de fecha o recordatorios), aparece aquí.'}</p>
           {filtrando ? <button type="button" className="g3-btn g3-btn--tonal" onClick={() => setParams(new URLSearchParams(), { replace: true })}>Quitar filtros</button> : null}
         </div>
       ) : (
@@ -177,6 +184,7 @@ export default function AvisosProduccionPage() {
                   <tr key={a.id}>
                     <td className="g3-celda-titulo">
                       {a.titulo}
+                      {a.proyecto ? <div className="g3-chico g3-tenue" style={{ fontWeight: 400 }}>{a.proyecto}{a.obra ? ` · ${a.obra}` : ''}</div> : null}
                       <details>
                         <summary className="g3-chico g3-tenue" style={{ cursor: 'pointer' }}>Ver el mensaje</summary>
                         <div style={{ whiteSpace: 'pre-wrap', marginTop: 6, fontWeight: 400 }}>{a.texto}</div>

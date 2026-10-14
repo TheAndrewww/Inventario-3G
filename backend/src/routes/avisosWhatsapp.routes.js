@@ -16,6 +16,8 @@ import { getNombresProyectosAbiertos, pedidoEsDeProyectoAbierto, mismosProyectos
 import { enviarEmailEstadoOrden } from '../services/email.service.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 import { ventanaAvisos, dentroDeHorario } from '../utils/horarioAvisos.js';
+import BitacoraAviso from '../models/BitacoraAviso.js';
+import { ORIGENES_BITACORA } from './sistemas/bitacora.js';
 
 const router = express.Router();
 
@@ -23,11 +25,11 @@ const router = express.Router();
  * GET /api/avisos-whatsapp/produccion/avisos — B1 paso 1 · PLA-12: Planta › Producción › Avisos.
  * Esta SÍ es para personas (sesión de Planta), no para el bot: va antes del candado del puente.
  *
- * Lo que se mandó a Producción, para verlo junto en Planta (la pantalla es de Diseño 3G). Por ahora solo la cola
- * propia de Planta (avisos_whatsapp, destino 'produccion'); la bitácora de Carla y Julia se suma en PLA-14 con el
- * mismo formato. Solo lectura. Query: dias (7; máx. 31), dia=AAAA-MM-DD, origen=planta,carla,julia,
- * destino=produccion,charly,susana,asesor (como la liga del Inicio: ?destino=susana,asesor).
- * Roles: los del tablero de producción.
+ * Lo que se mandó a Producción, para verlo junto en Planta (la pantalla es de Diseño 3G): la cola propia de Planta
+ * (avisos_whatsapp, destino 'produccion') y, desde PLA-14, la bitácora de Carla y Julia (bitacora_avisos, la manda
+ * Finanzas por la puerta /api/sistemas/v1/bitacora-avisos), en el mismo formato. Solo lectura. Query: dias (7; máx. 31),
+ * dia=AAAA-MM-DD, origen=planta,carla,julia, destino=produccion,charly,susana,asesor (como la liga del Inicio:
+ * ?destino=susana,asesor). Roles: los del tablero de producción.
  */
 const DIA_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' });
 const HORA_MX = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false });
@@ -69,21 +71,69 @@ router.get('/produccion/avisos', verificarToken, verificarRol('administrador', '
             enviadoEn: a.enviado_at,
             // Sin teléfonos: el error del bot puede traer uno
             error: a.estado === 'error' ? String(a.error || '').replace(/\d{7,}/g, '•••').slice(0, 160) : null
-        })).filter(a => !dia || a.dia === dia);
+        }));
+
+        // B1 · PLA-14: la bitácora de Carla y Julia (solo lo que sí salió). Si la tabla falla, la pantalla sigue con la
+        // cola de Planta, como antes.
+        const fuentes = [
+            { origen: 'planta', conectada: true },
+            { origen: 'carla', conectada: false },
+            { origen: 'julia', conectada: false }
+        ];
+        const origenesBitacora = origenes.length ? origenes.filter(o => ORIGENES_BITACORA.includes(o)) : ORIGENES_BITACORA;
+        try {
+            // «Conectada» = ya llegó al menos un aviso de ese origen (aunque no sea de estos días)
+            const ultimos = await BitacoraAviso.findAll({
+                attributes: ['origen', [BitacoraAviso.sequelize.fn('MAX', BitacoraAviso.sequelize.col('created_at')), 'ultimo']],
+                group: ['origen'],
+                raw: true
+            });
+            for (const u of ultimos) {
+                const f = fuentes.find(x => x.origen === u.origen);
+                if (f) Object.assign(f, { conectada: true, ultimo: u.ultimo });
+            }
+            if (origenesBitacora.length) {
+                const where = { origen: { [Op.in]: origenesBitacora }, enviado_en: { [Op.gte]: desde } };
+                if (destinos.length) where.destino = { [Op.in]: destinos };
+                const bitacora = await BitacoraAviso.findAll({
+                    where,
+                    attributes: ['id', 'origen', 'destino', 'texto', 'enviado_en', 'proyecto', 'obra_id'],
+                    order: [['enviado_en', 'DESC'], ['id', 'DESC']],
+                    limit: 300
+                });
+                for (const b of bitacora) {
+                    avisos.push({
+                        id: `bitacora-${b.id}`,
+                        origen: b.origen,
+                        destino: b.destino,
+                        tipo: 'bitacora',
+                        titulo: tituloDeAviso(b.texto),
+                        texto: b.texto,
+                        cuando: b.enviado_en,
+                        dia: DIA_MX.format(b.enviado_en),
+                        hora: HORA_MX.format(b.enviado_en),
+                        estado: 'enviado', // Finanzas solo anota lo que sí salió
+                        enviadoEn: b.enviado_en,
+                        error: null,
+                        proyecto: b.proyecto,
+                        obra: b.obra_id
+                    });
+                }
+                if (bitacora.length) avisos.sort((x, y) => new Date(y.cuando) - new Date(x.cuando));
+            }
+        } catch (e) {
+            console.error('No se pudo leer la bitácora de avisos (se muestra solo la cola de Planta):', e.message);
+        }
 
         res.json({
             success: true,
             data: {
-                avisos,
+                avisos: avisos.filter(a => !dia || a.dia === dia),
                 dias,
                 desde: desde.toISOString(),
                 hoy: DIA_MX.format(new Date()),
-                // Qué fuentes ya llegan a esta pantalla (la bitácora de Carla y Julia llega con PLA-14)
-                fuentes: [
-                    { origen: 'planta', conectada: true },
-                    { origen: 'carla', conectada: false },
-                    { origen: 'julia', conectada: false }
-                ]
+                // Qué fuentes ya llegan a esta pantalla
+                fuentes
             }
         });
     } catch (error) {
