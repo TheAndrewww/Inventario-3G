@@ -839,14 +839,20 @@ export const cancelacionProgramadaOrdenes = async ({ ensayo = false, ahora = new
   for (const o of seCancelan) {
     if (await anularOrdenPorAntiguedad(o, Math.floor((ahora - new Date(o.created_at)) / DIA_MS))) canceladas++;
   }
+  let encoladas = 0;
   if (aviso) {
     const { enviarWhatsApp } = await import('../services/whatsapp.service.js');
-    await enviarWhatsApp(aviso, 'compras');
-    await sequelize.query('UPDATE ordenes_compra SET cancelacion_avisada_at = :ahora WHERE id IN (:ids)', {
-      replacements: { ahora, ids: seAvisan.map((o) => o.id) }
-    });
+    // Solo cuenta como avisada si el aviso sí quedó en la cola de Compras (sin puente o con error, se avisa mañana).
+    if (await enviarWhatsApp(aviso, 'compras')) {
+      await sequelize.query('UPDATE ordenes_compra SET cancelacion_avisada_at = :ahora WHERE id IN (:ids)', {
+        replacements: { ahora, ids: seAvisan.map((o) => o.id) }
+      });
+      encoladas = seAvisan.length;
+    } else {
+      console.warn('[cancelacion-programada] el aviso a Compras no se encoló: esas órdenes no se cancelan hasta avisar');
+    }
   }
-  console.log(`[cancelacion-programada] ${canceladas} orden(es) cancelada(s), ${seAvisan.length} avisada(s) para la siguiente corrida`);
+  console.log(`[cancelacion-programada] ${canceladas} orden(es) cancelada(s), ${encoladas} avisada(s) para la siguiente corrida`);
   return { ...resultado, canceladas };
 };
 
