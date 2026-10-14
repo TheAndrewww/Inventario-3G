@@ -184,7 +184,8 @@ export const obtenerPorArea = async (req, res) => {
 export const completarEtapa = async (req, res) => {
     try {
         const { id } = req.params;
-        const { observaciones, codigo_area } = req.body;
+        // La terminal manda este POST sin cuerpo y Express 5 deja req.body en undefined.
+        const { observaciones, codigo_area } = req.body || {};
 
         // Si hay código de área, validarlo
         let usuarioId = null;
