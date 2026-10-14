@@ -1222,6 +1222,8 @@ const startServer = async () => {
             // sync no agrega columnas a una tabla que ya existe
             await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS tipo VARCHAR(30) NOT NULL DEFAULT 'informativo'");
             await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS referencia_id INTEGER");
+            // A9 · PLA-06: el aviso de autorización que reemplazó a este (la orden se editó y se volvió a pedir)
+            await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS reemplazado_por_id INTEGER");
             console.log('✅ Tabla avisos_whatsapp verificada');
         } catch (avisosErr) {
             console.error('⚠️ Error verificando tabla avisos_whatsapp:', avisosErr.message);

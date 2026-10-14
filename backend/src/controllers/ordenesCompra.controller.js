@@ -10,7 +10,8 @@ import {
   Movimiento,
   DetalleMovimiento,
   TipoHerramientaRenta,
-  ArticuloProveedor
+  ArticuloProveedor,
+  AvisoWhatsApp
 } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
@@ -37,7 +38,7 @@ const costoDePartida = async (articulo, proveedorId, transaction = undefined) =>
 };
 
 import admin from '../config/firebase-admin.js'; // Importar Firebase Admin
-import { enviarEmailAprobacion, enviarEmailEstadoOrden, enviarEmailOrdenCancelada, verificarTokenAprobacion } from '../services/email.service.js';
+import { enviarEmailAprobacion, enviarEmailEstadoOrden, enviarEmailOrdenCancelada, verificarTokenAprobacion, huellaOrden } from '../services/email.service.js';
 import { pedirAutorizacionOrden } from '../services/whatsapp.service.js';
 import { programarBarridoCompras, consumoDiarioPorArticulo, stockProyectado, siguienteTicket } from '../services/barridoCompras.service.js';
 import { migrarArticuloIndividual } from '../utils/autoMigrate.js';
@@ -1165,7 +1166,10 @@ export const actualizarOrdenCompra = async (req, res) => {
     // (para que los administradores puedan aprobar/rechazar desde el email)
     try {
       await enviarEmailAprobacion(ordenActualizada);
-      pedirAutorizacionOrden(ordenActualizada).catch(e => console.error('Error al encolar autorización:', e.message));
+      // A9 · PLA-06: el mensaje nuevo reemplaza a los anteriores de esta orden (una palomita vieja ya no aprueba)
+      pedirAutorizacionOrden(ordenActualizada)
+        .then((encolado) => encolado && marcarAvisosReemplazados(ordenActualizada.id))
+        .catch(e => console.error('Error al encolar autorización:', e.message));
       console.log(`📧 Email de aprobación enviado para orden ${ordenActualizada.ticket_id} (actualizada desde estado: ${estadoAnterior})`);
     } catch (emailError) {
       console.error('❌ Error al enviar email de aprobación:', emailError);
@@ -3529,44 +3533,95 @@ export const rechazarOrden = async (req, res) => {
 };
 
 /**
- * Aprobar orden de compra por email (link directo con token)
+ * A9 · PLA-06 · Correo de órdenes en dos pasos.
+ *
+ * GET  /api/ordenes-compra/aprobar-email?token=…  → ya NO aprueba: muestra el resumen y el botón «Aprobar» (un revisor
+ *      automático de enlaces que abre la liga ya no aprueba nada).
+ * POST /api/ordenes-compra/aprobar-email (token)  → aprueba como antes, si la orden no cambió desde el correo.
+ * Con OC_CORREO_PIDE_SESION=1 (decisión N5, llega con Cuentas 3G) el correo solo muestra el resumen y manda a aprobar
+ * desde Planta con sesión de administración.
+ */
+const correoPideSesion = () => String(process.env.OC_CORREO_PIDE_SESION ?? '').trim() === '1';
+
+const cargarOrdenDelCorreo = (ordenId) => OrdenCompra.findByPk(ordenId, {
+  include: [
+    { model: Usuario, as: 'creador', attributes: ['id', 'nombre', 'email'] },
+    { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] },
+    {
+      model: DetalleOrdenCompra,
+      as: 'detalles',
+      include: [{
+        model: Articulo,
+        as: 'articulo',
+        include: [{ model: Categoria, as: 'categoria' }]
+      }]
+    }
+  ]
+});
+
+/**
+ * ¿La liga del correo todavía corresponde a la orden como está? La nueva trae la huella; la vieja (sin huella) solo
+ * vale si la orden no se editó después de mandar el correo (5 s de margen: el correo sale justo después de guardar).
+ */
+const ligaDelCorreoVigente = (decoded, orden) => {
+  if (decoded.huella) return decoded.huella === huellaOrden(orden);
+  const editada = orden.updated_at ? new Date(orden.updated_at).getTime() : 0;
+  return editada <= (Number(decoded.iat) + 5) * 1000;
+};
+
+/** Revisa la liga y la orden. Devuelve { orden, decoded } o { pagina, status } para contestar. */
+const revisarLigaDeAprobacion = async (token) => {
+  if (!token) return { pagina: paginaResultado('Error', 'Token no proporcionado', false), status: 400 };
+
+  const decoded = verificarTokenAprobacion(token);
+  if (!decoded || decoded.accion !== 'aprobar') {
+    return { pagina: paginaResultado('Error', 'El enlace ha expirado o es inválido. Ingresa al sistema para aprobar la orden.', false), status: 400 };
+  }
+
+  const orden = await cargarOrdenDelCorreo(decoded.orden_id);
+  if (!orden) return { pagina: paginaResultado('Error', 'Orden no encontrada', false), status: 404 };
+
+  if (orden.estado !== 'pendiente_aprobacion') {
+    return { pagina: paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado === 'enviada' ? 'aprobada y enviada' : orden.estado}.`, orden.estado === 'enviada'), status: 200 };
+  }
+
+  if (!ligaDelCorreoVigente(decoded, orden)) {
+    return {
+      pagina: paginaResultado('La orden cambió', `La orden ${orden.ticket_id} cambió después de este correo (proveedor, artículos, cantidades o precios), así que este enlace ya no la aprueba. Usa el correo más reciente de esa orden o apruébala en Planta › Compras › Órdenes de compra.`, false),
+      status: 409
+    };
+  }
+  return { orden, decoded };
+};
+
+/**
+ * Aprobar orden de compra por email: primer paso (GET). Muestra el resumen y el botón «Aprobar»; no cambia nada.
  */
 export const aprobarPorEmail = async (req, res) => {
   try {
-    const { token } = req.query;
+    const r = await revisarLigaDeAprobacion(req.query.token);
+    if (r.pagina) return enviarHTML(res, r.pagina, r.status);
+    return enviarHTML(res, paginaConfirmarAprobacion(r.orden, req.query.token, { pideSesion: correoPideSesion() }));
+  } catch (error) {
+    console.error('Error al mostrar la aprobación por email:', error);
+    return enviarHTML(res, paginaResultado('Error', 'Ocurrió un error al cargar la orden.', false), 500);
+  }
+};
 
-    if (!token) {
-      return enviarHTML(res, paginaResultado('Error', 'Token no proporcionado', false), 400);
+/**
+ * Aprobar orden de compra por email: segundo paso (POST del botón «Aprobar»). Aprueba como antes si la orden no cambió.
+ */
+export const confirmarAprobacionPorEmail = async (req, res) => {
+  try {
+    if (correoPideSesion()) {
+      return enviarHTML(res, paginaResultado('Aprueba desde Planta', 'Por seguridad, las órdenes ya se aprueban desde Planta con tu sesión: Compras › Órdenes de compra.', false), 403);
     }
 
-    const decoded = verificarTokenAprobacion(token);
-    if (!decoded || decoded.accion !== 'aprobar') {
-      return enviarHTML(res, paginaResultado('Error', 'El enlace ha expirado o es inválido. Ingresa al sistema para aprobar la orden.', false), 400);
-    }
-
-    const orden = await OrdenCompra.findByPk(decoded.orden_id, {
-      include: [
-        { model: Usuario, as: 'creador', attributes: ['id', 'nombre', 'email'] },
-        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'] },
-        {
-          model: DetalleOrdenCompra,
-          as: 'detalles',
-          include: [{
-            model: Articulo,
-            as: 'articulo',
-            include: [{ model: Categoria, as: 'categoria' }]
-          }]
-        }
-      ]
-    });
-
-    if (!orden) {
-      return enviarHTML(res, paginaResultado('Error', 'Orden no encontrada', false), 404);
-    }
-
-    if (orden.estado !== 'pendiente_aprobacion') {
-      return enviarHTML(res, paginaResultado('Ya procesada', `La orden ${orden.ticket_id} ya fue ${orden.estado === 'enviada' ? 'aprobada y enviada' : orden.estado}.`, orden.estado === 'enviada'));
-    }
+    const r = await revisarLigaDeAprobacion(req.body?.token);
+    if (r.pagina) return enviarHTML(res, r.pagina, r.status);
+    const { orden, decoded } = r;
+    // Firma: a qué buzón se mandó el correo (las ligas viejas no lo traen)
+    const firma = decoded.para ? `Administrador (por correo a ${decoded.para})` : 'Administrador (por email)';
 
     await orden.update({
       estado: 'enviada',
@@ -3586,7 +3641,7 @@ export const aprobarPorEmail = async (req, res) => {
       });
     } catch (e) { /* ignore */ }
 
-    enviarEmailEstadoOrden(orden, 'aprobada', null, 'Administrador (por email)').catch(e => {
+    enviarEmailEstadoOrden(orden, 'aprobada', null, firma).catch(e => {
       console.error('❌ [aprobarPorEmail] Error al enviar email:', e.message);
       console.error('   Stack:', e.stack);
     });
@@ -3876,6 +3931,95 @@ export const rechazarPorEmail = async (req, res) => {
     return enviarHTML(res, paginaResultado('Error', 'Error al procesar el rechazo. Intenta nuevamente.', false), 500);
   }
 };
+
+/**
+ * A9 · PLA-06: al volver a pedir la autorización por WhatsApp, los avisos anteriores de la orden quedan
+ * «reemplazados» por el más nuevo. Una palomita sobre uno de ellos ya no aprueba (ver /:id/decision).
+ */
+export const marcarAvisosReemplazados = async (ordenId) => {
+  try {
+    const avisos = await AvisoWhatsApp.findAll({
+      where: { tipo: 'aprobacion_orden', referencia_id: ordenId },
+      attributes: ['id', 'reemplazado_por_id'],
+      order: [['id', 'DESC']]
+    });
+    const [nuevo, ...anteriores] = avisos;
+    const ids = anteriores.filter(a => !a.reemplazado_por_id).map(a => a.id);
+    if (nuevo && ids.length) {
+      await AvisoWhatsApp.update({ reemplazado_por_id: nuevo.id }, { where: { id: ids } });
+      console.log(`🔁 Orden ${ordenId}: ${ids.length} aviso(s) de autorización reemplazado(s) por el ${nuevo.id}`);
+    }
+    return ids.length;
+  } catch (error) {
+    console.error('⚠️ No se pudieron marcar los avisos reemplazados:', error.message);
+    return 0;
+  }
+};
+
+const escHTML = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const pesos = (v) => `$${(Number.parseFloat(v) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// Página del primer paso del correo: resumen de la orden y el botón «Aprobar» (A9 · PLA-06)
+function paginaConfirmarAprobacion(orden, token, { pideSesion = false } = {}) {
+  const renglones = (orden.detalles || []).map(d => `
+            <tr>
+                <td style="padding:10px 8px 10px 0;border-bottom:1px solid #e5e7eb;color:#111827;">${escHTML(d.articulo?.nombre || 'Sin nombre')}<br><span style="font-size:13px;color:#6b7280;">${pesos(d.costo_unitario)} c/u</span></td>
+                <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;color:#374151;">${(Number.parseFloat(d.cantidad_solicitada) || 0).toLocaleString('es-MX')} ${escHTML(d.articulo?.unidad || '')}</td>
+                <td style="padding:10px 0 10px 8px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;font-weight:600;color:#111827;">${pesos(d.subtotal)}</td>
+            </tr>`).join('');
+  const frontend = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+  const accion = pideSesion
+    ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px;color:#1e3a8a;font-size:15px;line-height:1.5;">
+            Por seguridad, esta orden se aprueba desde Planta con tu sesión: <strong>Compras › Órdenes de compra</strong>.
+            ${frontend ? `<br><a href="${escHTML(frontend)}/ordenes-compra" style="color:#1d4ed8;font-weight:600;">Abrir Planta</a>` : ''}
+        </div>`
+    : `<form method="POST" action="/api/ordenes-compra/aprobar-email" style="margin:0;" onsubmit="this.querySelector('button').disabled=true">
+            <input type="hidden" name="token" value="${escHTML(token)}">
+            <button type="submit" style="width:100%;background:#059669;color:white;border:none;padding:16px;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;">
+                ✅ Aprobar
+            </button>
+        </form>
+        <p style="font-size:13px;color:#6b7280;margin:14px 0 0;text-align:center;line-height:1.5;">
+            Al aprobar, la orden pasa a «Enviada» y se avisa a Compras. Si no la quieres aprobar, cierra esta página; para rechazarla usa el botón «Rechazar» del correo.
+        </p>`;
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Aprobar orden ${escHTML(orden.ticket_id)} - 3G Inventario</title>
+</head>
+<body style="margin:0;padding:20px;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;box-sizing:border-box;">
+    <div style="max-width:560px;width:100%;padding:24px;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);box-sizing:border-box;">
+        <p style="margin:0 0 4px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Orden de compra por aprobar</p>
+        <h1 style="font-size:26px;color:#111827;margin:0 0 16px;font-weight:700;">${escHTML(orden.ticket_id)}</h1>
+        <table style="width:100%;margin-bottom:16px;font-size:15px;">
+            <tr><td style="padding:4px 0;color:#6b7280;width:40%;">Proveedor</td><td style="padding:4px 0;color:#111827;font-weight:600;">${escHTML(orden.proveedor?.nombre || 'Sin proveedor')}</td></tr>
+            <tr><td style="padding:4px 0;color:#6b7280;">La pidió</td><td style="padding:4px 0;color:#111827;">${escHTML(orden.creador?.nombre || 'N/A')}</td></tr>
+            ${orden.observaciones ? `<tr><td style="padding:4px 0;color:#6b7280;vertical-align:top;">Observaciones</td><td style="padding:4px 0;color:#111827;">${escHTML(orden.observaciones)}</td></tr>` : ''}
+        </table>
+        <div style="overflow-x:auto;margin-bottom:20px;">
+            <table style="width:100%;border-collapse:collapse;font-size:15px;">
+                <thead>
+                    <tr style="border-bottom:2px solid #e5e7eb;">
+                        <th style="padding:8px 8px 8px 0;text-align:left;color:#6b7280;font-size:13px;">Artículo</th>
+                        <th style="padding:8px;text-align:right;color:#6b7280;font-size:13px;">Cantidad</th>
+                        <th style="padding:8px 0 8px 8px;text-align:right;color:#6b7280;font-size:13px;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>${renglones}</tbody>
+                <tfoot>
+                    <tr><td colspan="2" style="padding:12px 8px 12px 0;text-align:right;font-weight:700;color:#374151;">Total</td><td style="padding:12px 0 12px 8px;text-align:right;font-weight:700;font-size:18px;color:#059669;white-space:nowrap;">${pesos(orden.total_estimado)}</td></tr>
+                </tfoot>
+            </table>
+        </div>
+        ${accion}
+    </div>
+</body>
+</html>`;
+}
 
 // Helper para enviar HTML
 function enviarHTML(res, html, statusCode = 200) {

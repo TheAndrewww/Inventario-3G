@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import jwt from 'jsonwebtoken';
+import { createHash } from 'crypto';
 import { generarPDFOrdenCompra } from '../utils/ordenCompraPDF.js';
 import { Usuario } from '../models/index.js';
 
@@ -13,25 +14,68 @@ const ADMIN_EMAILS = [
 ];
 
 /**
- * Generar token seguro para aprobar por email
+ * Correo de órdenes en dos pasos (A9 · PLA-06).
+ *
+ * Las ligas del correo se firman con OC_CORREO_SECRETO; si falta, con JWT_SECRET como antes (y se avisa una vez).
+ * Así el inicio de sesión unificado puede cambiar JWT_SECRET sin romper los correos que ya salieron.
+ *
+ * La liga de «Aprobar» lleva `typ: 'oc-aprobacion'`, la HUELLA de la orden (proveedor, artículos, cantidades, precios y
+ * total en el momento de pedir la autorización) y `para` (el buzón al que se mandó). Abrirla ya no aprueba: muestra el
+ * resumen y el botón «Aprobar» (POST). Si la orden cambió después del correo, la huella no coincide y no se aprueba.
+ * Las ligas viejas (sin huella, firmadas con JWT_SECRET) valen mientras no expiren y solo si la orden no se editó
+ * después de mandarlas. La liga de «Rechazar» no cambia (ya era de dos pasos).
  */
-export const generarTokenAprobacion = (ordenId, accion) => {
+let avisoSecretoCorreo = false;
+const secretoCorreo = () => {
+    if (process.env.OC_CORREO_SECRETO) return process.env.OC_CORREO_SECRETO;
+    if (!avisoSecretoCorreo) {
+        avisoSecretoCorreo = true;
+        console.warn('⚠️ OC_CORREO_SECRETO no está configurado: las ligas del correo de órdenes se firman con JWT_SECRET');
+    }
+    return process.env.JWT_SECRET;
+};
+
+/**
+ * Huella de lo que se autoriza: proveedor, artículos, cantidades, precios y total. Cambia si alguien edita la orden.
+ * La orden debe venir con `detalles`.
+ */
+export const huellaOrden = (orden) => {
+    const n = (v, d) => (Number.parseFloat(v) || 0).toFixed(d);
+    const detalles = (orden?.detalles || [])
+        .map(d => [Number(d.articulo_id), n(d.cantidad_solicitada, 3), n(d.costo_unitario, 2)])
+        .sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1]) || a[2].localeCompare(b[2]));
+    const base = JSON.stringify({ proveedor: orden?.proveedor_id ?? null, detalles, total: n(orden?.total_estimado, 2) });
+    return createHash('sha256').update(base).digest('hex').slice(0, 32);
+};
+
+/**
+ * Generar token seguro para aprobar por email
+ * @param {Object} [extra] - para «aprobar»: { huella, para }
+ */
+export const generarTokenAprobacion = (ordenId, accion, extra = null) => {
+    const datos = accion === 'aprobar' && extra
+        ? { orden_id: ordenId, accion, typ: 'oc-aprobacion', huella: extra.huella, para: extra.para }
+        : { orden_id: ordenId, accion };
     return jwt.sign(
-        { orden_id: ordenId, accion },
-        process.env.JWT_SECRET,
+        datos,
+        secretoCorreo(),
         { expiresIn: '72h' } // Token válido por 72 horas
     );
 };
 
 /**
- * Verificar token de aprobación por email
+ * Verificar token de aprobación por email.
+ * Acepta las ligas firmadas con OC_CORREO_SECRETO y, mientras no expiren (72 h), las que salieron firmadas con
+ * JWT_SECRET antes de configurarlo.
  */
 export const verificarTokenAprobacion = (token) => {
-    try {
-        return jwt.verify(token, process.env.JWT_SECRET);
-    } catch (error) {
-        return null;
+    const secretos = [...new Set([secretoCorreo(), process.env.JWT_SECRET].filter(Boolean))];
+    for (const secreto of secretos) {
+        try {
+            return jwt.verify(token, secreto);
+        } catch (error) { /* se prueba el siguiente */ }
     }
+    return null;
 };
 
 /**
@@ -164,8 +208,8 @@ const generarEmailAprobacion = (orden, tokenAprobar, frontendUrl) => {
                 </table>
 
                 <p style="font-size: 11px; color: #9ca3af; margin: 16px 0 0;">
-                    Ambos botones funcionan directamente desde el email. Al rechazar, se abrirá un formulario para escribir el motivo.
-                    <br>Estos enlaces expiran en 72 horas.
+                    Los dos botones abren una página para confirmar: al aprobar verás el resumen y el botón «Aprobar»; al rechazar, un formulario para escribir el motivo.
+                    <br>Si la orden cambia después de este correo, este enlace ya no la aprueba. Estos enlaces expiran en 72 horas.
                 </p>
             </div>
         </div>
@@ -195,23 +239,29 @@ export const enviarEmailAprobacion = async (orden) => {
             return false;
         }
 
-        const tokenAprobar = generarTokenAprobacion(orden.id, 'aprobar');
-        const html = generarEmailAprobacion(orden, tokenAprobar);
+        // A9 · PLA-06: un correo por buzón, para que la liga diga a quién se mandó («por correo a <buzón>»)
+        const huella = huellaOrden(orden);
+        let enviados = 0;
+        for (const para of ADMIN_EMAILS) {
+            const tokenAprobar = generarTokenAprobacion(orden.id, 'aprobar', { huella, para });
+            const html = generarEmailAprobacion(orden, tokenAprobar);
 
-        const { data, error } = await resend.emails.send({
-            from: '3G Inventario <notificaciones@3gvelarias.com>',
-            to: ADMIN_EMAILS,
-            subject: `🔔 Orden ${orden.ticket_id} pendiente de aprobación — $${parseFloat(orden.total_estimado || 0).toFixed(2)}`,
-            html
-        });
+            const { data, error } = await resend.emails.send({
+                from: '3G Inventario <notificaciones@3gvelarias.com>',
+                to: [para],
+                subject: `🔔 Orden ${orden.ticket_id} pendiente de aprobación — $${parseFloat(orden.total_estimado || 0).toFixed(2)}`,
+                html
+            });
 
-        if (error) {
-            console.error('❌ [RESEND] Error al enviar email:', error);
-            return false;
+            if (error) {
+                console.error('❌ [RESEND] Error al enviar email:', error);
+                continue;
+            }
+
+            console.log(`📧 [RESEND] ✅ Email enviado exitosamente: ${data.id}`);
+            enviados++;
         }
-
-        console.log(`📧 [RESEND] ✅ Email enviado exitosamente: ${data.id}`);
-        return true;
+        return enviados > 0;
     } catch (error) {
         console.error('❌ [RESEND] Error al enviar email de aprobación:', error.message);
         console.error('❌ [RESEND] Stack:', error.stack);
@@ -571,5 +621,6 @@ export default {
     enviarEmailEstadoOrden,
     enviarEmailOrdenCancelada,
     generarTokenAprobacion,
-    verificarTokenAprobacion
+    verificarTokenAprobacion,
+    huellaOrden
 };

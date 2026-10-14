@@ -58,6 +58,11 @@ const AvisoWhatsApp = sequelize.define('AvisoWhatsApp', {
     enviado_at: {
         type: DataTypes.DATE,
         allowNull: true
+    },
+    reemplazado_por_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: 'A9 · PLA-06: aviso más nuevo de la misma orden (se volvió a pedir la autorización). Una reacción sobre este ya no aprueba'
     }
 }, {
     tableName: 'avisos_whatsapp',

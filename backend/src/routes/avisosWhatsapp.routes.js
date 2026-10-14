@@ -214,6 +214,17 @@ router.post('/:id/decision', async (req, res) => {
             });
         }
 
+        // A9 · PLA-06: la orden se editó y se volvió a pedir la autorización con un mensaje nuevo. Una reacción sobre
+        // el mensaje viejo no mueve la orden; Julia publica este texto y da el mensaje por resuelto (Julia no cambia).
+        if (aviso.reemplazado_por_id) {
+            console.log(`🛒 Reacción sobre el aviso ${aviso.id}, reemplazado por el ${aviso.reemplazado_por_id}: la orden ${orden.ticket_id} no se mueve`);
+            return res.json({
+                success: true,
+                yaProcesada: true,
+                message: `La orden ${orden.ticket_id} cambió después de ese mensaje: autoriza el mensaje más reciente.`
+            });
+        }
+
         if (aprobado) {
             await orden.update({
                 estado: 'enviada',

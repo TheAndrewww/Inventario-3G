@@ -21,6 +21,7 @@ import {
   aprobarOrden,
   rechazarOrden,
   aprobarPorEmail,
+  confirmarAprobacionPorEmail,
   mostrarFormularioRechazo,
   rechazarPorEmail,
   eliminarOrden,
@@ -51,7 +52,9 @@ const uploadFactura = multer({
 });
 
 // Rutas públicas para aprobar/rechazar por email (usan token propio en query string/body)
+// A9 · PLA-06: aprobar es de dos pasos, como rechazar: el GET muestra el resumen y el botón; el POST aprueba.
 router.get('/ordenes-compra/aprobar-email', aprobarPorEmail);
+router.post('/ordenes-compra/aprobar-email', confirmarAprobacionPorEmail);
 router.get('/ordenes-compra/rechazar-email', mostrarFormularioRechazo);
 router.post('/ordenes-compra/rechazar-email', rechazarPorEmail);
 
