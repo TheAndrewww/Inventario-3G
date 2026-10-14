@@ -109,6 +109,7 @@ const PedidosPendientesPage = () => {
     try {
       setLoading(true);
       await Promise.all([cargarPedidosPendientes(), cargarPedidosCompletados()]);
+      setListasCargadas(true); // PLA-13: la liga ?ticket= espera a las dos listas
     } catch (error) {
       console.error('Error al cargar datos:', error);
     } finally {
@@ -142,9 +143,10 @@ const PedidosPendientesPage = () => {
   // folio (o por id) entre los pendientes y los completados ya cargados; el parámetro se quita de la dirección.
   const [searchParams, setSearchParams] = useSearchParams();
   const ligaTicketAtendida = useRef(null);
+  const [listasCargadas, setListasCargadas] = useState(false);
   useEffect(() => {
     const folio = (searchParams.get('ticket') || '').trim();
-    if (loading || !folio || ligaTicketAtendida.current === folio) return;
+    if (!listasCargadas || !folio || ligaTicketAtendida.current === folio) return;
     ligaTicketAtendida.current = folio;
     const igual = (p) => String(p.ticket_id || '').toUpperCase() === folio.toUpperCase() || String(p.id) === folio;
     const pedido = pedidos.find(igual) || pedidosCompletados.find(igual);
@@ -157,7 +159,7 @@ const PedidosPendientesPage = () => {
     }
     handleVerDetalle(pedido).finally(() => setSearchParams(resto, { replace: true }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, loading, pedidos, pedidosCompletados]);
+  }, [searchParams, listasCargadas, pedidos, pedidosCompletados]);
 
   const handleVerDetalle = async (pedido) => {
     try {

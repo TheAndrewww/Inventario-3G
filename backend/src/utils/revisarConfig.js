@@ -231,7 +231,12 @@ export const cuerpoSalud = async ({ detalle = false, piezasExtra = [] } = {}) =>
         mensaje: primera ? `${primera.nombre}: ${primera.mensaje}` : 'Todo en orden',
         revisado: isoMexico()
     };
-    if (!detalle) return base;
+    if (!detalle) {
+        // Sin sesión no se dice qué falta (ni el nombre de la variable): solo si hay algo que revisar.
+        base.mensaje = estado === 'ok' ? 'Todo en orden'
+            : `${estado === 'mal' ? 'Algo no funciona' : 'Hay algo que revisar'}: el detalle se ve con la sesión de administración`;
+        return base;
+    }
     return {
         ...base,
         config: { completa: config.completa, faltan: config.faltan },
