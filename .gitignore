@@ -19,6 +19,8 @@ frontend/build/
 # Logs
 logs/
 *.log
+# Registros exportados del servidor (A5 · PLA-09)
+logs.*.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -54,6 +56,9 @@ backend/backups/
 *.backup
 *.bak
 *.old
+# Respaldos de la base y paquetes sueltos (A5 · PLA-09): nunca al repositorio
+backup_produccion_*.sql
+mac-mini-services.zip
 
 # Testing
 coverage/
