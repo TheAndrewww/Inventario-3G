@@ -14,8 +14,135 @@ import { urlSolicitudes } from '../services/barridoCompras.service.js';
 import { crearNotificacion } from '../controllers/notificaciones.controller.js';
 import { getNombresProyectosAbiertos, pedidoEsDeProyectoAbierto, mismosProyectos } from '../controllers/pedidos.controller.js';
 import { enviarEmailEstadoOrden } from '../services/email.service.js';
+import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
+import { ventanaAvisos, dentroDeHorario } from '../utils/horarioAvisos.js';
+import BitacoraAviso from '../models/BitacoraAviso.js';
+import { ORIGENES_BITACORA } from './sistemas/bitacora.js';
+import { anotarLatido } from './sistemas/latidos.js';
+import { llegadaConDatos } from '../models/OrdenSeguimiento.js';
 
 const router = express.Router();
+
+/**
+ * GET /api/avisos-whatsapp/produccion/avisos — B1 paso 1 · PLA-12: Planta › Producción › Avisos.
+ * Esta SÍ es para personas (sesión de Planta), no para el bot: va antes del candado del puente.
+ *
+ * Lo que se mandó a Producción, para verlo junto en Planta (la pantalla es de Diseño 3G): la cola propia de Planta
+ * (avisos_whatsapp, destino 'produccion') y, desde PLA-14, la bitácora de Carla y Julia (bitacora_avisos, la manda
+ * Finanzas por la puerta /api/sistemas/v1/bitacora-avisos), en el mismo formato. Solo lectura. Query: dias (7; máx. 31),
+ * dia=AAAA-MM-DD, origen=planta,carla,julia, destino=produccion,charly,susana,asesor (como la liga del Inicio:
+ * ?destino=susana,asesor). Roles: los del tablero de producción.
+ */
+const DIA_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' });
+const HORA_MX = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false });
+const listaDe = (valor) => String(valor || '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+// Primer renglón del aviso sin emojis ni asteriscos: «📅 *Cambió una instalación*» → «Cambió una instalación»
+const tituloDeAviso = (mensaje) => (String(mensaje || '').split('\n').find(l => l.trim()) || 'Aviso')
+    .replace(/[*_~]/g, '').replace(/^[^\p{L}\p{N}]+/u, '').trim() || 'Aviso';
+
+router.get('/produccion/avisos', verificarToken, verificarRol('administrador', 'diseñador', 'almacen'), async (req, res) => {
+    try {
+        const dias = Math.min(Math.max(parseInt(req.query.dias) || 7, 1), 31);
+        const dia = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.dia || '')) ? req.query.dia : null;
+        const origenes = listaDe(req.query.origen);
+        const destinos = listaDe(req.query.destino);
+        const desde = new Date(Date.now() - dias * 86400000);
+
+        // La cola propia de Planta: lo que Planta deja para el grupo Producción (lo publica Julia)
+        let filas = [];
+        if ((!origenes.length || origenes.includes('planta')) && (!destinos.length || destinos.includes('produccion'))) {
+            filas = await AvisoWhatsApp.findAll({
+                where: { destino: 'produccion', created_at: { [Op.gte]: desde } },
+                attributes: ['id', 'tipo', 'mensaje', 'estado', 'error', 'enviado_at', 'created_at'],
+                order: [['created_at', 'DESC'], ['id', 'DESC']],
+                limit: 300
+            });
+        }
+
+        const avisos = filas.map(a => ({
+            id: `planta-${a.id}`,
+            origen: 'planta',
+            destino: 'produccion',
+            tipo: a.tipo,
+            titulo: tituloDeAviso(a.mensaje),
+            texto: a.mensaje,
+            cuando: a.created_at,
+            dia: DIA_MX.format(a.created_at),
+            hora: HORA_MX.format(a.created_at),
+            estado: a.estado, // pendiente | enviado | error
+            enviadoEn: a.enviado_at,
+            // Sin teléfonos: el error del bot puede traer uno
+            error: a.estado === 'error' ? String(a.error || '').replace(/\d{7,}/g, '•••').slice(0, 160) : null
+        }));
+
+        // B1 · PLA-14: la bitácora de Carla y Julia (solo lo que sí salió). Si la tabla falla, la pantalla sigue con la
+        // cola de Planta, como antes.
+        const fuentes = [
+            { origen: 'planta', conectada: true },
+            { origen: 'carla', conectada: false },
+            { origen: 'julia', conectada: false }
+        ];
+        const origenesBitacora = origenes.length ? origenes.filter(o => ORIGENES_BITACORA.includes(o)) : ORIGENES_BITACORA;
+        try {
+            // «Conectada» = ya llegó al menos un aviso de ese origen (aunque no sea de estos días)
+            const ultimos = await BitacoraAviso.findAll({
+                attributes: ['origen', [BitacoraAviso.sequelize.fn('MAX', BitacoraAviso.sequelize.col('created_at')), 'ultimo']],
+                group: ['origen'],
+                raw: true
+            });
+            for (const u of ultimos) {
+                const f = fuentes.find(x => x.origen === u.origen);
+                if (f) Object.assign(f, { conectada: true, ultimo: u.ultimo });
+            }
+            if (origenesBitacora.length) {
+                const where = { origen: { [Op.in]: origenesBitacora }, enviado_en: { [Op.gte]: desde } };
+                if (destinos.length) where.destino = { [Op.in]: destinos };
+                const bitacora = await BitacoraAviso.findAll({
+                    where,
+                    attributes: ['id', 'origen', 'destino', 'texto', 'enviado_en', 'proyecto', 'obra_id'],
+                    order: [['enviado_en', 'DESC'], ['id', 'DESC']],
+                    limit: 300
+                });
+                for (const b of bitacora) {
+                    avisos.push({
+                        id: `bitacora-${b.id}`,
+                        origen: b.origen,
+                        destino: b.destino,
+                        tipo: 'bitacora',
+                        titulo: tituloDeAviso(b.texto),
+                        texto: b.texto,
+                        cuando: b.enviado_en,
+                        dia: DIA_MX.format(b.enviado_en),
+                        hora: HORA_MX.format(b.enviado_en),
+                        estado: 'enviado', // Finanzas solo anota lo que sí salió
+                        enviadoEn: b.enviado_en,
+                        error: null,
+                        proyecto: b.proyecto,
+                        obra: b.obra_id
+                    });
+                }
+                if (bitacora.length) avisos.sort((x, y) => new Date(y.cuando) - new Date(x.cuando));
+            }
+        } catch (e) {
+            console.error('No se pudo leer la bitácora de avisos (se muestra solo la cola de Planta):', e.message);
+        }
+
+        res.json({
+            success: true,
+            data: {
+                avisos: avisos.filter(a => !dia || a.dia === dia),
+                dias,
+                desde: desde.toISOString(),
+                hoy: DIA_MX.format(new Date()),
+                // Qué fuentes ya llegan a esta pantalla
+                fuentes
+            }
+        });
+    } catch (error) {
+        console.error('Error al listar los avisos de Producción:', error);
+        res.status(500).json({ success: false, message: 'Error al listar los avisos de Producción' });
+    }
+});
 
 /** Solo pasa quien traiga el token compartido del puente. */
 const verificarPuente = (req, res, next) => {
@@ -39,22 +166,58 @@ router.use(verificarPuente);
 /**
  * GET /api/avisos-whatsapp/pendientes
  * Avisos que faltan por publicar, del más viejo al más nuevo.
+ *
+ * D7 · PLA-18 (HORARIO_AVISOS, apagada por omisión = como hoy): fuera de horario (D-11: lunes a sábado de 8:00 a
+ * 21:00) solo se entregan los avisos `urgente`; los demás esperan en la cola y salen al abrir, en el mismo orden.
+ * Un aviso de autorización que quedó reemplazado (A9) antes de salir se descarta: ya no se publica.
+ * Lo que recibe Julia no cambia de forma.
+ *
+ * D1 · PLA-15: si la consulta trae las cabeceras X-3G-Latido-* (Julia con FIN-08), Planta guarda el latido de la línea
+ * del contable para GET /api/sistemas/v1/latidos (ver routes/sistemas/latidos.js). No cambia ni retrasa la respuesta;
+ * sin cabeceras (Julia de antes) todo sigue igual.
  */
+const descartarReemplazados = async () => {
+    const [n] = await AvisoWhatsApp.update(
+        { estado: 'descartado', error: 'Reemplazado por un aviso más nuevo de la misma orden antes de salir (no se publica)' },
+        { where: { estado: 'pendiente', reemplazado_por_id: { [Op.ne]: null } } }
+    );
+    if (n) console.log(`[horario-avisos] ${n} aviso(s) reemplazado(s) descartado(s) antes de salir`);
+};
+
 router.get('/pendientes', async (req, res) => {
+    anotarLatido(req.headers); // D1 · PLA-15: nunca lanza ni espera
     try {
         const limite = Math.min(parseInt(req.query.limit) || 20, 50);
 
+        const where = {
+            estado: 'pendiente',
+            intentos: { [Op.lt]: 5 } // tras 5 intentos fallidos deja de reintentarse
+        };
+        const ventana = ventanaAvisos();
+        if (ventana) {
+            await descartarReemplazados();
+            where.reemplazado_por_id = null;
+            if (!dentroDeHorario(new Date(), ventana)) where.urgente = true;
+        }
+
+        // C4 paso 3 · PLA-16 (LLEGADA_CON_DATOS): los avisos «Llegó material» (tipo 'llegada') llevan además `datos`
+        // ({ orden, folioFactura, fotos }); los demás salen igual que siempre. Apagada, la consulta es la de hoy.
+        const conDatos = llegadaConDatos();
         const avisos = await AvisoWhatsApp.findAll({
-            where: {
-                estado: 'pendiente',
-                intentos: { [Op.lt]: 5 } // tras 5 intentos fallidos deja de reintentarse
-            },
+            where,
             order: [['id', 'ASC']], // el id autoincremental ya da el orden cronológico
             limit: limite,
-            attributes: ['id', 'destino', 'mensaje', 'intentos', 'tipo', 'referencia_id']
+            attributes: ['id', 'destino', 'mensaje', 'intentos', 'tipo', 'referencia_id', ...(conDatos ? ['datos'] : [])]
         });
 
-        res.json({ success: true, data: { avisos } });
+        res.json({
+            success: true,
+            data: {
+                avisos: conDatos
+                    ? avisos.map(a => { const j = a.toJSON(); if (j.tipo !== 'llegada') delete j.datos; return j; })
+                    : avisos
+            }
+        });
     } catch (error) {
         console.error('Error al listar avisos pendientes:', error);
         // El detalle sí se devuelve: esta ruta solo la ve el bot (va con token),
@@ -211,6 +374,17 @@ router.post('/:id/decision', async (req, res) => {
                 success: true,
                 yaProcesada: true,
                 message: `La orden ${orden.ticket_id} ya estaba ${orden.estado}`
+            });
+        }
+
+        // A9 · PLA-06: la orden se editó y se volvió a pedir la autorización con un mensaje nuevo. Una reacción sobre
+        // el mensaje viejo no mueve la orden; Julia publica este texto y da el mensaje por resuelto (Julia no cambia).
+        if (aviso.reemplazado_por_id) {
+            console.log(`🛒 Reacción sobre el aviso ${aviso.id}, reemplazado por el ${aviso.reemplazado_por_id}: la orden ${orden.ticket_id} no se mueve`);
+            return res.json({
+                success: true,
+                yaProcesada: true,
+                message: `La orden ${orden.ticket_id} cambió después de ese mensaje: autoriza el mensaje más reciente.`
             });
         }
 

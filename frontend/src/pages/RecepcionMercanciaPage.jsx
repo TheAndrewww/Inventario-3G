@@ -44,7 +44,8 @@ const RecepcionMercanciaPage = () => {
   const cargarOrdenesPendientes = async () => {
     try {
       setLoading(true);
-      const response = await ordenesCompraService.listarOrdenes();
+      // B6 · PLA-21: con OC_OCULTA_IMPORTES, almacén recibe importes solo en esta lista (como hoy); sin la bandera no cambia nada
+      const response = await ordenesCompraService.listarOrdenes({ pantalla: 'recepcion' });
       const todasOrdenes = response?.data?.ordenes || [];
       // Filtrar solo órdenes enviadas o parciales
       const ordenesPendientes = todasOrdenes.filter(orden =>

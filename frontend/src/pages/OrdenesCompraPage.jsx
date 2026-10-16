@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, AlertTriangle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit, Clock, User, Check } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import articulosService from '../services/articulos.service';
@@ -15,6 +16,11 @@ import EditarOrdenModal from '../components/ordenes/EditarOrdenModal';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import { cx, etq, g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
+
+// B6 · PLA-21: con OC_OCULTA_IMPORTES el servidor manda los importes vacíos (importesOcultos) a quien no debe verlos;
+// la pantalla muestra «—». Sin la bandera, o para administración y compras, se ve lo de siempre.
+const SIN_IMPORTE = '—';
+const totalOrden = (orden) => (orden?.importesOcultos ? SIN_IMPORTE : `$${parseFloat(orden?.total_estimado || 0).toFixed(2)}`);
 
 // La misma pantalla sirve dos sub-pestañas del menú Compras:
 // /ordenes-compra (vista="ordenes") y /solicitudes-compra (vista="solicitudes")
@@ -73,6 +79,42 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     fetchData();
     fetchEstadisticas();
   }, [vistaActual]);
+
+  // Liga directa a una orden (D2 · PLA-13): /ordenes-compra?orden=OC-0836 abre su detalle (lo usan el Inicio 3G y el
+  // correo de resumen). Se busca por folio (o por id) en la lista ya cargada; la pestaña se cambia a la de su estado
+  // y el parámetro se quita de la dirección para que al cerrar no se vuelva a abrir.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ligaOrdenAtendida = useRef(null);
+  useEffect(() => {
+    const folio = (searchParams.get('orden') || '').trim();
+    if (vistaActual !== 'ordenes' || loading || !folio || ligaOrdenAtendida.current === folio) return;
+    ligaOrdenAtendida.current = folio;
+    const quitarParametro = () => {
+      const resto = new URLSearchParams(searchParams);
+      resto.delete('orden');
+      setSearchParams(resto, { replace: true });
+    };
+    (async () => {
+      const igual = (o) => String(o.ticket_id || '').toUpperCase() === folio.toUpperCase() || String(o.id) === folio;
+      let orden = ordenes.find(igual);
+      if (!orden) {
+        // La lista trae las 50 más recientes: si no está ahí, se busca en una lista más larga una sola vez.
+        try {
+          const data = await ordenesCompraService.listarOrdenes({ limit: 1000 });
+          orden = (data.data?.ordenes || []).find(igual);
+        } catch { /* abajo se avisa */ }
+      }
+      if (!orden) {
+        toast.error(`No se encontró la orden ${folio}`);
+        quitarParametro();
+        return;
+      }
+      setVistaOrdenes(orden.estado === 'cancelada' ? 'canceladas' : orden.estado === 'recibida' ? 'completadas' : 'activas');
+      await handleVerDetalle(orden);
+      quitarParametro();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading, ordenes, vistaActual]);
 
   const fetchData = async () => {
     try {
@@ -196,7 +238,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
       const o = ordenes.find(x => x.id === ordenId) || (ordenSeleccionada?.id === ordenId ? ordenSeleccionada : null);
       if (!(await confirmarG3({
         titulo: '¿Enviar esta orden al proveedor?',
-        datos: o ? [['Orden', o.ticket_id], ['Proveedor', o.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', `$${parseFloat(o.total_estimado || 0).toFixed(2)}`]] : [],
+        datos: o ? [['Orden', o.ticket_id], ['Proveedor', o.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', totalOrden(o)]] : [],
         confirmar: 'Enviar orden', cancelar: 'Regresar',
       }))) return;
     } else if (!window.confirm('¿Está seguro de enviar esta orden al proveedor?')) return;
@@ -759,7 +801,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     if (g3Activo()) {
       if (!(await confirmarG3({
         titulo: `¿Aprobar la orden ${orden.ticket_id}?`,
-        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', `$${parseFloat(orden.total_estimado || 0).toFixed(2)}`]],
+        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', totalOrden(orden)]],
         confirmar: 'Aprobar orden', cancelar: 'Regresar',
       }))) return;
     } else if (!confirm(`¿Aprobar la orden ${orden.ticket_id}?`)) return;
@@ -810,7 +852,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
       if (!(await confirmarG3({
         titulo: `¿Eliminar permanentemente la orden ${orden.ticket_id}?`,
         aviso: 'Esta acción no se puede deshacer.',
-        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', `$${parseFloat(orden.total_estimado || 0).toFixed(2)}`]],
+        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', totalOrden(orden)]],
         confirmar: 'Eliminar orden', cancelar: 'No eliminar', peligro: true,
       }))) return;
     } else if (!confirm(`¿Eliminar permanentemente la orden ${orden.ticket_id}? Esta acción no se puede deshacer.`)) return;
@@ -922,7 +964,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
             <span className="g3-kpi-texto">Esperando entrega</span>
           </div>
           <div className="g3-kpi g3p-kpi-dinero">
-            <span className="g3-kpi-valor">${parseFloat(estadisticas.resumen.totalEstimadoMes).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span className="g3-kpi-valor">{estadisticas.importesOcultos ? SIN_IMPORTE : `$${parseFloat(estadisticas.resumen.totalEstimadoMes).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
             <span className="g3-kpi-texto">Total del mes · {new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })}</span>
           </div>
         </div>
@@ -986,7 +1028,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Total del Mes</p>
                 <p className="text-3xl font-bold text-gray-900">
-                  ${parseFloat(estadisticas.resumen.totalEstimadoMes).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {estadisticas.importesOcultos ? SIN_IMPORTE : `$${parseFloat(estadisticas.resumen.totalEstimadoMes).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })}
@@ -1127,7 +1169,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Total estimado')}>
                           <div className="text-sm font-semibold text-gray-900">
-                            ${parseFloat(orden.total_estimado || 0).toFixed(2)}
+                            {totalOrden(orden)}
                           </div>
                         </td>
                         <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-estado')}>
@@ -2448,6 +2490,61 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
 };
 
 // Modal para ver detalle de orden con trazabilidad
+// C4 · PLA-16: franja «Pago y pedido (Julia)» del detalle (solo con Diseño 3G). La historia la manda Finanzas por la
+// puerta /api/sistemas/v1/ordenes/:folio/seguimiento (FIN-10) y, con LLEGADA_CON_DATOS, la recepción de Planta. Sin
+// historia no se muestra nada.
+const HORA_MX = new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+const DIA_CORTO = new Intl.DateTimeFormat('es-MX', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' });
+const diaDe = (aaaammdd) => DIA_CORTO.format(new Date(`${aaaammdd}T12:00:00Z`)).replace(/\./g, '');
+const horaDe = (iso) => HORA_MX.format(new Date(iso)).replace(/\./g, '');
+const FranjaPagoPedido = ({ ordenId }) => {
+  const [datos, setDatos] = useState(null);
+  useEffect(() => {
+    let vigente = true;
+    ordenesCompraService.obtenerSeguimiento(ordenId)
+      .then((d) => { if (vigente) setDatos(d || null); })
+      .catch(() => { if (vigente) setDatos(null); });
+    return () => { vigente = false; };
+  }, [ordenId]);
+  if (!datos?.seguimiento?.length) return null;
+  const actual = datos.actual;
+  return (
+    <section className="g3-tarjeta" aria-label="Pago y pedido (Julia)" style={{ borderLeft: `4px solid var(--g3-${actual?.tono || 'linea-fuerte'})` }}>
+      <div className="g3-tarjeta-cab">
+        <h3>Pago y pedido (Julia)</h3>
+        {actual ? <span className={`g3-estado g3-estado--${actual.tono}`}>{actual.texto}</span> : null}
+      </div>
+      {actual?.fechaEstimada ? (
+        <p className="g3-chico" style={{ margin: '6px 0 0' }}>Llegada estimada según Julia: <b>{diaDe(actual.fechaEstimada)}</b></p>
+      ) : null}
+      <ol className="g3-linea-tiempo" style={{ marginTop: 12 }}>
+        {datos.seguimiento.map((s) => (
+          <li key={s.id} className="g3-evento">
+            <div>
+              <span>{s.texto}</span>
+              <small>
+                {horaDe(s.fecha)}
+                {s.fechaEstimada ? ` · llega aprox. ${diaDe(s.fechaEstimada)}` : ''}
+                {s.folioFactura ? ` · factura ${s.folioFactura}` : ''}
+              </small>
+              {s.nota ? <small>{s.nota}</small> : null}
+              {s.fotos?.length ? (
+                <small>
+                  {s.fotos.map((u, i) => (
+                    <a key={u} href={u} target="_blank" rel="noopener noreferrer" style={{ marginRight: 12, textDecoration: 'underline' }}>
+                      {s.fotos.length > 1 ? `Ver foto ${i + 1} de la factura` : 'Ver la foto de la factura'}
+                    </a>
+                  ))}
+                </small>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+};
+
 const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, puedeReabrirOrdenes, onAbrirModalAnular, onEnviarOrden, onEditarOrden, esAdmin, onAprobar, onRechazar, onEliminar, loadingAprobacion }) => {
   const [tabActual, setTabActual] = React.useState('detalle'); // 'detalle' o 'historial'
   const esPendienteAprobacion = orden && orden.estado === 'pendiente_aprobacion';
@@ -2497,7 +2594,7 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
             </div>
             <div>
               <p className="text-sm text-gray-500">Total Estimado</p>
-              <p className="font-medium">${parseFloat(orden.total_estimado || 0).toFixed(2)}</p>
+              <p className="font-medium">{totalOrden(orden)}</p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Proveedor</p>
@@ -2508,6 +2605,8 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
               <p className="font-medium">{orden.creador?.nombre}</p>
             </div>
           </div>
+
+          {g3 && <FranjaPagoPedido ordenId={orden.id} />}
 
           {orden.observaciones && (
             <div>
@@ -2578,10 +2677,10 @@ const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAn
                         {parseFloat(detalle.cantidad_solicitada).toFixed(2)} {detalle.articulo?.unidad}
                       </td>
                       <td className="px-4 py-2 text-sm">
-                        ${parseFloat(detalle.costo_unitario || 0).toFixed(2)}
+                        {orden.importesOcultos ? SIN_IMPORTE : `$${parseFloat(detalle.costo_unitario || 0).toFixed(2)}`}
                       </td>
                       <td className="px-4 py-2 text-sm font-medium">
-                        ${parseFloat(detalle.subtotal || 0).toFixed(2)}
+                        {orden.importesOcultos ? SIN_IMPORTE : `$${parseFloat(detalle.subtotal || 0).toFixed(2)}`}
                       </td>
                     </tr>
                   ))}

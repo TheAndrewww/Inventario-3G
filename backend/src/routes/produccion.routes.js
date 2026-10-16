@@ -22,6 +22,7 @@ import {
     obtenerArchivoCarpetaProduccion
 } from '../controllers/produccion.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
+import { codigoDeTerminal, limiteValidarCodigo, estadoCodigosTerminal } from '../middleware/codigoTerminal.middleware.js';
 
 const router = Router();
 
@@ -30,37 +31,40 @@ const router = Router();
 /**
  * POST /api/produccion/validar-codigo
  * Validar código de área para acceso de terminales
- * Acceso: Público
+ * Acceso: Público. A4 · PLA-04: 403 si el código no vale; 10 equivocados cada 15 min por IP (429).
  */
-router.post('/validar-codigo', validarCodigoArea);
+router.post('/validar-codigo', limiteValidarCodigo, validarCodigoArea);
+
+// A4 · PLA-04: las 4 rutas de la terminal pasan por codigoDeTerminal (cabecera X-Codigo-Area). En la fase A solo
+// cuenta; con TERMINAL_EXIGIR_CODIGO=1 (PLA-10) responde 403 sin un código válido.
 
 /**
  * GET /api/produccion/terminal/:area
  * Obtener proyectos para terminal de área específica
  * Acceso: Público (validado por código)
  */
-router.get('/terminal/:area', obtenerPorArea);
+router.get('/terminal/:area', codigoDeTerminal, obtenerPorArea);
 
 /**
  * POST /api/produccion/terminal/:id/completar
  * Completar etapa desde terminal (sin auth)
  * Acceso: Público (validado por código)
  */
-router.post('/terminal/:id/completar', completarEtapa);
+router.post('/terminal/:id/completar', codigoDeTerminal, completarEtapa);
 
 /**
  * POST /api/produccion/terminal/:id/completar-subetapa
  * Completar sub-etapa de producción (manufactura o herrería) desde terminal
  * Acceso: Público (validado por código)
  */
-router.post('/terminal/:id/completar-subetapa', completarSubEtapa);
+router.post('/terminal/:id/completar-subetapa', codigoDeTerminal, completarSubEtapa);
 
 /**
  * GET /api/produccion/terminal/:id/archivos
  * Obtener archivos de Drive para terminal
  * Acceso: Público
  */
-router.get('/terminal/:id/archivos', obtenerArchivosDrive);
+router.get('/terminal/:id/archivos', codigoDeTerminal, obtenerArchivosDrive);
 
 /**
  * GET /api/produccion/dashboard-publico
@@ -73,6 +77,16 @@ router.get('/dashboard-publico', obtenerDashboard);
 
 // Requiere autenticación para todas las siguientes rutas
 router.use(verificarToken);
+
+/**
+ * GET /api/produccion/codigos-terminal
+ * A4 · PLA-04: cómo va la terminal (fase, banderas y conteos por día de peticiones sin código, con código de
+ * fábrica, equivocado o de otra área). Nunca los códigos. Es lo mismo que /salud reporta (PLA-08 / PLA-13).
+ * Acceso: Administrador
+ */
+router.get('/codigos-terminal', verificarRol('administrador'), (req, res) => {
+    res.json({ success: true, data: estadoCodigosTerminal() });
+});
 
 /**
  * GET /api/produccion/dashboard

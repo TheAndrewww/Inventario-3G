@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
+import { esFestivoUTC } from '../utils/calendarioLaboral.js';
 
 /**
  * Modelo: ProduccionProyecto
@@ -311,11 +312,16 @@ ProduccionProyecto.addHook('afterUpdate', async (proyecto, options) => {
         const { anularPedidosDeProyecto } = await import('../services/pedidosCleanup.service.js');
         const resultado = await anularPedidosDeProyecto({
             proyectoNombre: proyecto.nombre,
+            proyectoId: proyecto.id, // C1 · PLA-19: con EMPATE_POR_OBRA busca primero por el ID 3G de la obra
             motivo: `Proyecto "${proyecto.nombre}" marcado como completado`,
             transaction: options?.transaction || null
         });
         if (resultado.anulados > 0) {
             console.log(`🧹 Auto-anulados ${resultado.anulados} pedido(s) del proyecto "${proyecto.nombre}": ${resultado.ticketIds.join(', ')}`);
+        }
+        // A6 · PLA-05 (CIERRE_OBRA_RESPETA_ENTREGADO): los que ya tenían material entregado o compras recibidas
+        if (resultado.porRevisar > 0) {
+            console.log(`🔎 Por revisar (cierre de obra) ${resultado.porRevisar} pedido(s) del proyecto "${proyecto.nombre}": ${resultado.ticketIdsPorRevisar.join(', ')}`);
         }
     } catch (err) {
         console.error('[ProduccionProyecto afterUpdate] Error al limpiar pedidos:', err);
@@ -611,7 +617,8 @@ ProduccionProyecto.prototype.getPorcentajeAvance = function () {
 
 /**
  * Helper: Calcula días hábiles (Lunes a Sábado) entre dos fechas
- * Excluye los domingos.
+ * Excluye los domingos y los festivos (C9 · PLA-07: oficiales calculados y, si Operación los da, los del negocio;
+ * los mismos que usa la pantalla en frontend/src/utils/produccion.js).
  * Retorna negativo si fechaInicio > fechaFin.
  */
 function calcularDiasHabiles(timestampInicio, timestampFin) {
@@ -626,7 +633,7 @@ function calcularDiasHabiles(timestampInicio, timestampFin) {
     while (current.getTime() < end.getTime()) {
         current.setUTCDate(current.getUTCDate() + 1);
         const day = current.getUTCDay();
-        if (day !== 0) { // 0 = Domingo. Excluir Domingo.
+        if (day !== 0 && !esFestivoUTC(current)) { // 0 = Domingo. Excluir Domingo y festivos.
             diasHabiles++;
         }
     }
@@ -819,6 +826,51 @@ ProduccionProyecto.obtenerResumenDashboard = async function () {
         resumen,
         estadisticas
     };
+};
+
+/**
+ * C7 · PLA-17 — El sí o el no de Producción por WhatsApp, en el proyecto.
+ *
+ * Julia (Finanzas, FIN-11, bandera PRONOSTICO_A_PLANTA) le pregunta a Producción a las 14:40 si se completa hoy lo que
+ * se instala mañana y manda la respuesta a POST /api/sistemas/v1/produccion/pronostico. Se guarda en
+ * produccion_proyectos.pronostico_whatsapp (JSONB, la última respuesta). La columna se crea al arrancar con
+ * ADD COLUMN IF NOT EXISTS y NO es atributo del modelo: el JSON de los proyectos (terminal, tablero, Ventas) no cambia;
+ * solo el tablero (dashboard y dashboard-publico) suma el campo `pronostico_whatsapp` en los proyectos que tienen una
+ * respuesta vigente. Guardarla NO cierra nada ni mueve etapas (UPDATE directo, sin los ganchos del modelo); el
+ * encargado decide.
+ */
+export const PRONOSTICO_VIGENCIA_DIAS = 7;
+
+/** Guarda la respuesta si es más nueva que la que había (las respuestas pueden llegar fuera de orden). */
+ProduccionProyecto.guardarPronostico = async function (id, pronostico) {
+    const [filas] = await sequelize.query(
+        `UPDATE produccion_proyectos SET pronostico_whatsapp = CAST(:p AS JSONB)
+          WHERE id = :id AND (pronostico_whatsapp IS NULL
+             OR (pronostico_whatsapp->>'contestadoEn')::timestamptz <= CAST(:c AS timestamptz))
+          RETURNING id`,
+        { replacements: { id, p: JSON.stringify(pronostico), c: pronostico.contestadoEn } }
+    );
+    return filas.length > 0;
+};
+
+/** Map(id → pronóstico) de los proyectos con respuesta de los últimos PRONOSTICO_VIGENCIA_DIAS días. */
+ProduccionProyecto.pronosticosVigentes = async function (ids) {
+    const mapa = new Map();
+    const lista = [...new Set((ids || []).filter(Number.isInteger))];
+    if (!lista.length) return mapa;
+    try {
+        const [filas] = await sequelize.query(
+            `SELECT id, pronostico_whatsapp AS p FROM produccion_proyectos
+              WHERE id IN (:ids) AND pronostico_whatsapp IS NOT NULL
+                AND (pronostico_whatsapp->>'contestadoEn')::timestamptz >= NOW() - (:dias || ' days')::interval`,
+            { replacements: { ids: lista, dias: String(PRONOSTICO_VIGENCIA_DIAS) } }
+        );
+        for (const f of filas) mapa.set(f.id, f.p);
+    } catch (e) {
+        // Sin la columna (o con un dato raro) el tablero sale como siempre
+        console.error('[pronostico] no se pudieron leer los pronósticos:', e.message);
+    }
+    return mapa;
 };
 
 export default ProduccionProyecto;

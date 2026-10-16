@@ -39,10 +39,15 @@ import RentaHerramientasPage from './pages/RentaHerramientasPage';
 import ReportesPage from './pages/ReportesPage';
 import StockBajoPage from './pages/StockBajoPage';
 import EntradasSalidasPage from './pages/EntradasSalidasPage';
+import AvisosProduccionPage from './pages/AvisosProduccionPage';
+import EntrarRegresoPage from './pages/EntrarRegresoPage';
+import { modoCuentas3g } from './services/cuentas3g';
 import RutaDiseno3G from './diseno-3g/RutaDiseno3G';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAuth } from './context/AuthContext';
 import { rolPuedeVer, rutaInicialPorRol } from './components/layout/Sidebar';
+import { rolPuedeVerG3 } from './diseno-3g/menuPlanta';
+import { useDiseno3G } from './diseno-3g/useDiseno3G';
 
 const IndexRedirect = () => {
   const { user } = useAuth();
@@ -53,6 +58,16 @@ const IndexRedirect = () => {
 const SoloConVista = ({ path, children }) => {
   const { user } = useAuth();
   if (!rolPuedeVer(user?.rol, path)) {
+    return <Navigate to={rutaInicialPorRol(user?.rol)} replace />;
+  }
+  return children;
+};
+
+// Pantallas nuevas que solo existen con Diseño 3G (B1 · PLA-12): con el diseño de siempre, o sin el rol, a su inicio
+const SoloConDiseno3G = ({ path, children }) => {
+  const { user } = useAuth();
+  const g3 = useDiseno3G();
+  if (!g3 || !rolPuedeVerG3(user?.rol, path)) {
     return <Navigate to={rutaInicialPorRol(user?.rol)} replace />;
   }
   return children;
@@ -84,6 +99,9 @@ function App() {
         <Route path="/herreria-tv" element={<DashboardHerreriaTVPage />} />
         <Route path="/terminal" element={<TerminalAreaPage />} />
         <Route path="/terminal/:area" element={<TerminalAreaPage />} />
+        {/* Regreso de Cuentas 3G (E1 · PLA-24): pública y fuera del AuthProvider. Solo con VITE_CUENTAS3G_MODO en «ambos»
+            o «solo»; apagado, la ruta no existe (como hoy). */}
+        {modoCuentas3g() !== 'apagado' && <Route path="/entrar/regreso" element={<EntrarRegresoPage />} />}
 
         {/* Resto de la aplicación con autenticación */}
         <Route path="/*" element={
@@ -144,6 +162,7 @@ function App() {
                       <Route path="procesamiento-masivo" element={<ProcesamientoMasivoPage />} />
                       <Route path="mi-equipo" element={<MiEquipoPage />} />
                       <Route path="produccion" element={<DashboardProduccionPage />} />
+                      <Route path="produccion/avisos" element={<SoloConDiseno3G path="/produccion/avisos"><AvisosProduccionPage /></SoloConDiseno3G>} />
                       <Route path="control-campana" element={<ControlCampanaPage />} />
                       <Route path="conteo-ciclico" element={<ConteoCiclicoPage />} />
                       <Route path="descontar-almacen" element={<DescontarAlmacenPage />} />

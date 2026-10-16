@@ -7,6 +7,7 @@ import { avisarTicketSubido, avisarTicketCerrado } from '../services/avisosProdu
 import { registrarError } from '../utils/diagnostico.js';
 import admin from 'firebase-admin';
 import { programarBarridoCompras } from '../services/barridoCompras.service.js';
+import { copiarObraIdAlTicket } from '../services/obraId.service.js';
 
 // Normalización: minúsculas, sin acentos, espacios colapsados.
 function normalizarNombreProyecto(s) {
@@ -482,6 +483,10 @@ export const crearPedido = async (req, res) => {
     }
 
     await transaction.commit();
+
+    // C1 · PLA-19 (EMPATE_POR_OBRA): el ticket nuevo copia el ID 3G de su obra. Ya guardado el ticket y sin lanzar
+    // nunca: si no se puede, queda sin ID y al cerrar la obra se busca por nombre, como hoy. Apagada no hace nada.
+    if (proyecto) await copiarObraIdAlTicket(pedido.id, proyecto);
 
     // Enviar notificaciones según el tipo de pedido y estado
     try {
@@ -999,9 +1004,10 @@ export const listarPedidosPendientes = async (req, res) => {
       order: [['fecha_hora', 'ASC']] // Más antiguos primero
     });
 
-    // Solo tickets de proyectos abiertos: cerrado/cancelado/dado de baja = desaparece
+    // Solo tickets de proyectos abiertos: cerrado/cancelado/dado de baja = desaparece.
+    // A6 · PLA-05: los que quedaron «Por revisar · cierre de obra» siguen a la vista aunque su obra ya cerró.
     const nombresAbiertos = await getNombresProyectosAbiertos();
-    const pedidosVisibles = pedidos.filter(p => pedidoEsDeProyectoAbierto(p.proyecto, nombresAbiertos));
+    const pedidosVisibles = pedidos.filter(p => p.revision_requerida || pedidoEsDeProyectoAbierto(p.proyecto, nombresAbiertos));
 
     // Calcular progreso para cada pedido
     const pedidosConProgreso = pedidosVisibles.map(pedido => {

@@ -64,25 +64,65 @@ const AREAS_CONFIG = {
     }
 };
 
+// A4 · PLA-04: el código validado se guarda en la tableta o pantalla, por área, y va en cada llamada (X-Codigo-Area).
+// Si el navegador no deja guardar (ventana privada), se queda en memoria mientras la página esté abierta.
+const CLAVE_CODIGOS = 'terminal3g-codigos';
+const codigosEnMemoria = {};
+const leerCodigos = () => {
+    try {
+        const guardados = JSON.parse(localStorage.getItem(CLAVE_CODIGOS) || '{}');
+        return { ...codigosEnMemoria, ...(guardados && typeof guardados === 'object' ? guardados : {}) };
+    } catch {
+        return { ...codigosEnMemoria };
+    }
+};
+const codigoGuardado = (area) => (area && leerCodigos()[area]) || null;
+const guardarCodigo = (area, codigo) => {
+    codigosEnMemoria[area] = codigo;
+    try { localStorage.setItem(CLAVE_CODIGOS, JSON.stringify({ ...leerCodigos(), [area]: codigo })); } catch { /* sin almacenamiento */ }
+};
+const olvidarCodigo = (area) => {
+    delete codigosEnMemoria[area];
+    try {
+        const codigos = leerCodigos();
+        delete codigos[area];
+        localStorage.setItem(CLAVE_CODIGOS, JSON.stringify(codigos));
+    } catch { /* sin almacenamiento */ }
+};
+
+// Texto para la pantalla del código según lo que contestó el servidor
+const mensajeDeError = (error) => {
+    if (error.response?.status === 429) return error.response.data?.message || 'Demasiados intentos. Espera unos minutos.';
+    if (error.response?.data?.message && error.response.status < 500) return error.response.data.message;
+    if (!error.response) return 'No hay conexión con el servidor. Revisa el internet de esta pantalla.';
+    return 'Código inválido';
+};
+
 // Pantalla de login con código de área
-const LoginArea = ({ onLogin }) => {
+// A4 · PLA-04: con `areaEsperada` (llegó por /terminal/:area sin código guardado) dice de qué área es y ofrece
+// «Cambiar de área». El error del código se queda escrito en la pantalla (código equivocado o la espera del límite).
+const LoginArea = ({ onLogin, areaEsperada = null, aviso = null, onCambiarArea }) => {
     const tv = useTvG3(); // Diseño 3G para TV (solo con ?diseno=3g en la liga de la terminal)
     const [codigo, setCodigo] = useState('');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const nombreArea = AREAS_CONFIG[areaEsperada]?.nombre || null;
+    const textoAviso = error || aviso;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!codigo.trim()) return;
 
         setLoading(true);
+        setError(null);
         try {
             const response = await produccionService.validarCodigoArea(codigo);
             if (response.success) {
-                onLogin(response.data.area);
+                onLogin(response.data.area, codigo.trim().toUpperCase());
                 toast.success(`Acceso a ${response.data.info.nombre}`);
             }
         } catch (error) {
-            toast.error('Código inválido');
+            setError(mensajeDeError(error));
         } finally {
             setLoading(false);
         }
@@ -94,8 +134,8 @@ const LoginArea = ({ onLogin }) => {
             <div className="g3tv-acceso">
                 <div className="g3tv-acceso-tarjeta">
                     <span className="g3tv-marca" aria-hidden="true">3G</span>
-                    <h1>Terminal de producción</h1>
-                    <p>Ingresa el código de tu área</p>
+                    <h1>{nombreArea ? `Terminal de ${nombreArea}` : 'Terminal de producción'}</h1>
+                    <p>{nombreArea ? `Ingresa el código de ${nombreArea}` : 'Ingresa el código de tu área'}</p>
                     <form onSubmit={handleSubmit}>
                         <label htmlFor="g3tv-codigo">Código del área</label>
                         <input
@@ -105,13 +145,23 @@ const LoginArea = ({ onLogin }) => {
                             onChange={(e) => setCodigo(e.target.value.toUpperCase())}
                             className="g3tv-codigo"
                             placeholder="XXX-0000"
-                            maxLength={8}
+                            maxLength={20}
                             autoComplete="off"
                             autoFocus
+                            aria-invalid={error ? true : undefined}
+                            aria-describedby={textoAviso ? 'g3tv-codigo-aviso' : undefined}
                         />
+                        {textoAviso && (
+                            <p id="g3tv-codigo-aviso" role="alert" style={{ color: 'var(--g3-mal)', fontWeight: 600 }}>{textoAviso}</p>
+                        )}
                         <button type="submit" disabled={loading || !codigo.trim()} className="g3tv-btn g3tv-btn--primario g3tv-btn--grande">
                             {loading ? 'Validando…' : 'Entrar'}
                         </button>
+                        {areaEsperada && (
+                            <button type="button" onClick={onCambiarArea} className="g3tv-btn g3tv-btn--contorno">
+                                Cambiar de área
+                            </button>
+                        )}
                     </form>
                     <p className="g3tv-pie-texto">3G Velarias · Sistema de producción</p>
                 </div>
@@ -127,10 +177,10 @@ const LoginArea = ({ onLogin }) => {
                 </div>
 
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    Terminal de Producción
+                    {nombreArea ? `Terminal de ${nombreArea}` : 'Terminal de Producción'}
                 </h1>
                 <p className="text-gray-500 mb-8">
-                    Ingresa el código de tu área
+                    {nombreArea ? `Ingresa el código de ${nombreArea}` : 'Ingresa el código de tu área'}
                 </p>
 
                 <form onSubmit={handleSubmit}>
@@ -140,9 +190,17 @@ const LoginArea = ({ onLogin }) => {
                         onChange={(e) => setCodigo(e.target.value.toUpperCase())}
                         className="w-full text-center text-3xl font-mono tracking-widest px-6 py-4 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-violet-200 focus:border-violet-500 mb-6"
                         placeholder="XXX-0000"
-                        maxLength={8}
+                        maxLength={20}
                         autoFocus
+                        aria-invalid={error ? true : undefined}
+                        aria-describedby={textoAviso ? 'terminal-codigo-aviso' : undefined}
                     />
+
+                    {textoAviso && (
+                        <p id="terminal-codigo-aviso" role="alert" className="-mt-3 mb-5 text-base font-semibold text-red-600">
+                            {textoAviso}
+                        </p>
+                    )}
 
                     <button
                         type="submit"
@@ -151,6 +209,16 @@ const LoginArea = ({ onLogin }) => {
                     >
                         {loading ? 'Validando...' : 'Ingresar'}
                     </button>
+
+                    {areaEsperada && (
+                        <button
+                            type="button"
+                            onClick={onCambiarArea}
+                            className="w-full mt-4 py-3 text-lg font-semibold text-gray-600 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                        >
+                            Cambiar de área
+                        </button>
+                    )}
                 </form>
 
                 <p className="text-sm text-gray-400 mt-8">
@@ -219,7 +287,7 @@ const PDFViewerModal = ({ archivo, onClose }) => {
 };
 
 // Tarjeta de proyecto para terminal (grande y simple)
-const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: globalLoading, area }) => {
+const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: globalLoading, area, codigo }) => {
     const tv = useTvG3();
     const [loading, setLoading] = useState(false);
     const [archivosLoading, setArchivosLoading] = useState(false);
@@ -238,7 +306,7 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
 
             setArchivosLoading(true);
             try {
-                const response = await produccionService.obtenerArchivosDriveTerminal(proyecto.id);
+                const response = await produccionService.obtenerArchivosDriveTerminal(proyecto.id, codigo);
                 if (response.success) {
                     setArchivos(response.data);
                 }
@@ -250,7 +318,7 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
         };
 
         cargarArchivos();
-    }, [proyecto.id, area]);
+    }, [proyecto.id, area, codigo]);
 
     const handleCompletar = async () => {
         if (loading || globalLoading) return;
@@ -454,7 +522,7 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
 };
 
 // Pantalla principal del terminal
-const TerminalView = ({ area, onLogout }) => {
+const TerminalView = ({ area, codigo, onLogout, onCodigoRechazado }) => {
     const tv = useTvG3(); // Diseño 3G para TV: mismos datos, misma actualización cada 15 s
     const areaConfig = AREAS_CONFIG[area];
     const Icon = areaConfig?.icon || Package;
@@ -468,18 +536,23 @@ const TerminalView = ({ area, onLogout }) => {
             if (showLoader) setLoading(true);
             else setActualizando(true);
 
-            const response = await produccionService.obtenerProyectosArea(area);
+            const response = await produccionService.obtenerProyectosArea(area, codigo);
             if (response.success) {
                 setProyectos(response.data.proyectos);
             }
         } catch (error) {
+            // A4 · PLA-04 (fase C): el servidor ya no acepta el código de esta pantalla → se vuelve a pedir.
+            if (error.response?.status === 403 && error.response.data?.codigo === 'CODIGO_TERMINAL') {
+                onCodigoRechazado?.(error.response.data.message);
+                return;
+            }
             console.error('Error al cargar proyectos:', error);
             toast.error('Error al cargar proyectos');
         } finally {
             setLoading(false);
             setActualizando(false);
         }
-    }, [area]);
+    }, [area, codigo, onCodigoRechazado]);
 
     useEffect(() => {
         cargarProyectos();
@@ -497,7 +570,8 @@ const TerminalView = ({ area, onLogout }) => {
             if (areaConfig?.esSubEtapa && areaConfig?.subEtapa) {
                 response = await produccionService.completarSubEtapaTerminal(
                     proyectoId,
-                    areaConfig.subEtapa
+                    areaConfig.subEtapa,
+                    codigo
                 );
 
                 if (response.success) {
@@ -533,7 +607,7 @@ const TerminalView = ({ area, onLogout }) => {
                 }
             } else {
                 // Áreas normales (diseño, compras, instalación)
-                response = await produccionService.completarEtapaTerminal(proyectoId);
+                response = await produccionService.completarEtapaTerminal(proyectoId, codigo);
 
                 if (response.success) {
                     toast.success(
@@ -552,6 +626,10 @@ const TerminalView = ({ area, onLogout }) => {
 
             cargarProyectos(false);
         } catch (error) {
+            if (error.response?.status === 403 && error.response.data?.codigo === 'CODIGO_TERMINAL') {
+                onCodigoRechazado?.(error.response.data.message);
+                return;
+            }
             console.error('Error al completar:', error);
             toast.error(error.response?.data?.message || 'Error al completar');
         }
@@ -592,7 +670,7 @@ const TerminalView = ({ area, onLogout }) => {
                                     </button>
                                     <button type="button" onClick={onLogout} className="g3tv-btn g3tv-btn--contorno">
                                         <LogOut aria-hidden="true" />
-                                        Salir
+                                        Cambiar de área
                                     </button>
                                 </>
                             )}
@@ -613,6 +691,7 @@ const TerminalView = ({ area, onLogout }) => {
                                         areaConfig={areaConfig}
                                         loading={actualizando}
                                         area={area}
+                                        codigo={codigo}
                                     />
                                 ))}
                             </div>
@@ -652,6 +731,8 @@ const TerminalView = ({ area, onLogout }) => {
                     </button>
                     <button
                         onClick={onLogout}
+                        title="Cambiar de área"
+                        aria-label="Cambiar de área"
                         className="p-4 bg-white/10 hover:bg-red-500/50 rounded-xl text-white transition-colors"
                     >
                         <LogOut size={28} />
@@ -678,6 +759,7 @@ const TerminalView = ({ area, onLogout }) => {
                             areaConfig={areaConfig}
                             loading={actualizando}
                             area={area}
+                            codigo={codigo}
                         />
                     ))}
                 </div>
@@ -699,24 +781,42 @@ const TerminalAreaPage = () => {
     const tv = useTvG3();
     // Diseño 3G para TV: la liga conserva ?diseno=3g al entrar y salir del área, para que la tableta siga igual si se recarga.
     const sufijoTv = tv ? `?diseno=3g${tv === 'oscuro' ? '&tema=oscuro' : ''}` : '';
-    const [area, setArea] = useState(areaParam || null);
+    // A4 · PLA-04: la liga del área ya no entra sola: solo si esta pantalla tiene guardado el código de esa área.
+    const [area, setArea] = useState(() => (areaParam && codigoGuardado(areaParam) ? areaParam : null));
+    const [codigo, setCodigo] = useState(() => codigoGuardado(areaParam));
+    const [aviso, setAviso] = useState(null);
 
-    // Si llega con área en la URL, usarla directamente
+    // Si llega con área en la URL y ya tiene su código, entrar directo; si no, pedir el código de esa área
     useEffect(() => {
         if (areaParam && AREAS_CONFIG[areaParam]) {
-            setArea(areaParam);
+            const guardado = codigoGuardado(areaParam);
+            setCodigo(guardado);
+            setArea(guardado ? areaParam : null);
         }
     }, [areaParam]);
 
-    const handleLogin = (areaValidada) => {
+    const handleLogin = (areaValidada, codigoValidado) => {
+        guardarCodigo(areaValidada, codigoValidado);
+        setAviso(null);
+        setCodigo(codigoValidado);
         setArea(areaValidada);
         navigate(`/terminal/${areaValidada}${sufijoTv}`, { replace: true });
     };
 
+    // «Cambiar de área»: regresa a la pantalla del código; los códigos guardados se quedan en la pantalla
     const handleLogout = () => {
+        setAviso(null);
         setArea(null);
         navigate(`/terminal${sufijoTv}`, { replace: true });
     };
+
+    // El servidor ya no acepta el código guardado (fase C): se olvida y se vuelve a pedir el de esa área
+    const handleCodigoRechazado = useCallback((mensaje) => {
+        if (area) olvidarCodigo(area);
+        setCodigo(null);
+        setAviso(mensaje || 'El código de esta pantalla ya no vale. Escribe el código de tu área.');
+        setArea(null);
+    }, [area]);
 
     return (
         <>
@@ -733,9 +833,15 @@ const TerminalAreaPage = () => {
             />
 
             {area && AREAS_CONFIG[area] ? (
-                <TerminalView area={area} onLogout={handleLogout} />
+                <TerminalView area={area} codigo={codigo} onLogout={handleLogout} onCodigoRechazado={handleCodigoRechazado} />
             ) : (
-                <LoginArea onLogin={handleLogin} />
+                <LoginArea
+                    key={areaParam || 'todas'}
+                    onLogin={handleLogin}
+                    areaEsperada={areaParam && AREAS_CONFIG[areaParam] ? areaParam : null}
+                    aviso={aviso}
+                    onCambiarArea={handleLogout}
+                />
             )}
         </>
     );

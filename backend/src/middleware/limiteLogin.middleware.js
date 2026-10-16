@@ -121,4 +121,26 @@ const despuesDeEntrar = (req, res, next) => {
 
 export const limiteLogin = [porIp, porIpYCorreo, despuesDeEntrar];
 
+/**
+ * E1 · PLA-23: la entrada con Cuentas 3G (POST /api/auth/cuentas3g) también pasa por el límite de A10, con la misma
+ * bandera. Cuenta en el MISMO límite por IP que la contraseña (30 fallidos cada 15 min entre las dos). Antes del canje
+ * no hay correo, así que no lleva el de IP y correo. Solo cuentan los 401 (ficha que no sirve, sin usuario en Planta,
+ * usuario inactivo); un 503 porque Cuentas 3G no responde no cuenta.
+ */
+const despuesDeCuentas3g = (req, res, next) => {
+    if (modoLimiteLogin() !== 'medir') return next();
+    res.on('finish', async () => {
+        if (res.statusCode !== 401) return;
+        try {
+            const b = await porIp.getKey(ipDe(req));
+            console.log(`[login-limite] medir · intento fallido (cuenta 3G) · ip=${req.ip} saltos=${saltos(req)} · ${b?.totalHits ?? 0} de ${LIMITE_IP} por IP`);
+        } catch (error) {
+            console.error('[login-limite] no se pudo anotar el intento:', error.message);
+        }
+    });
+    next();
+};
+
+export const limiteCuentas3g = [porIp, despuesDeCuentas3g];
+
 console.log(`[login-limite] modo ${modoLimiteLogin()} (LOGIN_LIMITE): ${LIMITE_IP_CORREO} fallidos por IP y correo, ${LIMITE_IP} por IP, cada 15 min`);

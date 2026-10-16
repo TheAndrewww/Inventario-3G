@@ -106,7 +106,11 @@ const citasPorNombre = (citas) => {
         const key = normalizarNombre(cp.nombre);
         if (!key || key.includes('cimentacion') || !cp.fecha) continue;
         const lista = (mapa[key] = mapa[key] || []);
-        if (!lista.some(c => c.fecha === cp.fecha)) lista.push({ fecha: cp.fecha, retiro: esCitaRetiro(key) });
+        // D8 · PLA-22: un día con hora (en cualquiera de sus renglones) es una cita agendada; sin hora es la fecha
+        // límite que escribe Operación. Solo se anota: qué fecha manda no cambia.
+        const previa = lista.find(c => c.fecha === cp.fecha);
+        if (previa) { if (cp.hora) previa.conHora = true; }
+        else lista.push({ fecha: cp.fecha, retiro: esCitaRetiro(key), conHora: !!cp.hora });
     }
     return mapa;
 };
@@ -203,10 +207,11 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico()) =
 
     // 1) Cruce normal, el mismo del dashboard.
     const fechasDeProyecto = new Map();   // id → Set(fechas)
+    const nombresDeProyecto = new Map();  // id → nombres del calendario que le tocaron (D8 · PLA-22: para saber si su día tiene hora)
     const reclamados = new Set();
     for (const p of proyectos) {
         const r = buscarFechaInstalacion(p.nombre, mapa);
-        if (r) { fechasDeProyecto.set(p.id, r.fechas); r.nombres.forEach(n => reclamados.add(n)); }
+        if (r) { fechasDeProyecto.set(p.id, r.fechas); nombresDeProyecto.set(p.id, r.nombres); r.nombres.forEach(n => reclamados.add(n)); }
     }
 
     // 2) Respaldo por número. El cruce normal nunca liga "X / SECCIÓN 3" con "X" (el número
@@ -230,6 +235,7 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico()) =
     for (const [n, ids] of candidatos) {
         if (ids.length !== 1 || fechasDeProyecto.has(ids[0])) continue;
         fechasDeProyecto.set(ids[0], fechasDe([n], mapa));
+        nombresDeProyecto.set(ids[0], [n]);
         reclamados.add(n);
     }
 
@@ -255,6 +261,7 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico()) =
         const previas = fechasDeProyecto.get(id) || new Set();
         for (const f of fechasDe([n], mapa)) previas.add(f);
         fechasDeProyecto.set(id, previas);
+        nombresDeProyecto.set(id, [...(nombresDeProyecto.get(id) || []), n]);
         reclamados.add(n);
     }
 
@@ -270,7 +277,9 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico()) =
         const cita = citaDe.get(p.id) || null;
         const soloCalendario = String(p.tipo_proyecto || '').toUpperCase() === 'MTO';
         if (cita && (soloCalendario || !indice || cita <= indice || cita.slice(0, 7) <= mesEnCurso)) {
-            res.set(p.id, { fecha: cita, fuente: 'calendario' });
+            // conHora (D8 · PLA-22): ese día tiene una cita con hora, no solo la fecha límite. Nadie más lo lee.
+            const conHora = (nombresDeProyecto.get(p.id) || []).some(n => (mapa[n] || []).some(c => c.fecha === cita && !c.retiro && c.conHora));
+            res.set(p.id, { fecha: cita, fuente: 'calendario', conHora });
         } else {
             res.set(p.id, { fecha: indice, fuente: 'indice' });
         }
@@ -352,6 +361,80 @@ export const clasificarCambio = ({ anterior, nueva, hoy }) => {
 };
 
 /**
+ * D8 · PLA-22 — «Sin hora» quiere decir fecha límite. Bandera SIN_HORA_ES_LIMITE (apagada por omisión).
+ *
+ * Desde el 28-sep Operación escribe cada pedido nuevo en el calendario en su fecha máxima y SIN hora («hay que
+ * agendarlo a más tardar este día»). Cuando Oficina agenda la cita de verdad (CON hora), la fecha de la obra se
+ * mueve y el grupo recibía «Cambió una instalación», aunque solo era el primer agendado.
+ *  · sin poner o «0»: como siempre; no guarda ni cuenta nada.
+ *  · «medir»: avisa como siempre, pero guarda si la fecha de cada obra tenía hora y anota cada «Cambió una
+ *    instalación» que con la bandera en «1» no habría salido (registro «[sin-hora]» y la clave
+ *    produccion_sin_hora_reporte de configuracion). Es la semana del reporte que pide D8 antes de encenderla.
+ *  · «1»: no avisa «Cambió una instalación» cuando la fecha anterior era del calendario SIN hora y la nueva es la
+ *    PRIMERA cita con hora de esa obra. «Se adelantó una instalación» (a hoy o mañana) sale igual, y cualquier otro
+ *    cambio (una cita con hora que se mueve, una fecha límite que se recorre, una cita que se quita) también.
+ * Lo que no se sabe se avisa como hoy: la primera pasada después de encenderla no tiene con qué comparar.
+ */
+export const modoSinHoraEsLimite = () => {
+    const valor = String(process.env.SIN_HORA_ES_LIMITE ?? '').trim().toLowerCase();
+    if (valor === '1') return 'exigir';
+    if (valor === 'medir') return 'medir';
+    return 'apagado';
+};
+
+/**
+ * ¿La fecha nueva es el primer agendado de una fecha límite?
+ * @param {{h: boolean|null, a: boolean}|undefined} previo - lo guardado en la pasada anterior: h = la fecha tenía
+ *   hora (true), era del calendario sin hora (false) o del Índice / sin fecha (null); a = la obra ya tuvo una cita con hora.
+ */
+export const esPrimerAgendado = ({ previo, nueva, nuevaConHora }) =>
+    !!previo && previo.h === false && !previo.a && !!nueva && nuevaConHora === true;
+
+const CLAVE_HORA = 'produccion_fechas_instalacion_hora';
+const CLAVE_REPORTE_SIN_HORA = 'produccion_sin_hora_reporte';
+const DIAS_REPORTE = 30;
+
+const cargarDetalleHora = async () => {
+    const detalle = new Map();
+    try {
+        const fila = await Configuracion.findOne({ where: { clave: CLAVE_HORA } });
+        const obj = fila?.valor ? JSON.parse(fila.valor) : {};
+        for (const [id, [h, a]] of Object.entries(obj)) detalle.set(Number(id), { h: h === null ? null : h === 1, a: a === 1 });
+    } catch (e) {
+        console.error('⚠️ No se pudo leer si las fechas de instalación tenían hora:', e.message);
+    }
+    return detalle;
+};
+
+const guardarClave = async (clave, valor, descripcion) => {
+    const [fila, creada] = await Configuracion.findOrCreate({ where: { clave }, defaults: { valor, descripcion } });
+    if (!creada && fila.valor !== valor) await fila.update({ valor });
+};
+
+const guardarDetalleHora = (detalle) => guardarClave(
+    CLAVE_HORA,
+    JSON.stringify(Object.fromEntries([...detalle].map(([id, { h, a }]) => [id, [h === null ? null : (h ? 1 : 0), a ? 1 : 0]]))),
+    'D8 · PLA-22: si la fecha de instalación de cada obra tenía hora y si ya tuvo una cita con hora (SIN_HORA_ES_LIMITE)'
+);
+
+/** Suma al reporte los avisos que la regla calla (o callaría, en «medir»). Solo los últimos 30 días. */
+const anotarSinHora = async (casos) => {
+    try {
+        const fila = await Configuracion.findOne({ where: { clave: CLAVE_REPORTE_SIN_HORA } });
+        const previo = fila?.valor ? JSON.parse(fila.valor) : {};
+        const limite = new Date(Date.now() - DIAS_REPORTE * 86400000).toISOString();
+        const reporte = {
+            desde: previo.desde || new Date().toISOString(),
+            casos: [...(previo.casos || []), ...casos].filter(c => c.cuando >= limite).slice(-300)
+        };
+        await guardarClave(CLAVE_REPORTE_SIN_HORA, JSON.stringify(reporte),
+            'D8 · PLA-22: «Cambió una instalación» que eran el primer agendado de una fecha sin hora (SIN_HORA_ES_LIMITE)');
+    } catch (e) {
+        console.error('⚠️ No se pudo anotar el reporte de fechas sin hora:', e.message);
+    }
+};
+
+/**
  * El día en que producción tiene que entregar: el anterior a la instalación; si cae en
  * domingo, el sábado (que es cuando de verdad se puede entregar).
  */
@@ -421,12 +504,22 @@ const revisarCambiosUnaVez = async () => {
     // Sin foto guardada (la primera vez que corre) no se sabe qué cambió: solo se toma.
     const primeraPasada = foto.size === 0;
     const vistos = new Map();
+    // D8 · PLA-22: con SIN_HORA_ES_LIMITE en «medir» o «1» se guarda, junto a la fecha, si tenía hora.
+    const modoSinHora = modoSinHoraEsLimite();
+    const detalleHora = modoSinHora === 'apagado' ? null : await cargarDetalleHora();
+    const detalleNuevo = new Map();
+    const sinHora = [];
 
     let avisados = 0;
     for (const p of proyectos) {
         const nueva = fechas.get(p.id)?.fecha || null;
         const anterior = foto.get(p.id);
         vistos.set(p.id, nueva);
+        if (detalleHora) {
+            const info = fechas.get(p.id);
+            const h = info?.fecha && info.fuente === 'calendario' ? !!info.conHora : null;
+            detalleNuevo.set(p.id, { h, a: !!detalleHora.get(p.id)?.a || h === true });
+        }
         if (primeraPasada || !anterior || nueva === anterior) continue;
 
         const r = resumenProduccion(p);
@@ -445,6 +538,14 @@ const revisarCambiosUnaVez = async () => {
             where: { tipo, referencia_id: p.id, mensaje: { [Op.like]: `%${marca}%` } }
         });
         if (yaAvisado) continue;
+
+        // D8 · PLA-22: la fecha límite sin hora recibió su primera cita con hora. No cambió nada: es el primer agendado.
+        if (cambio === 'cambio' && detalleHora && esPrimerAgendado({ previo: detalleHora.get(p.id), nueva, nuevaConHora: detalleNuevo.get(p.id)?.h })) {
+            const callar = modoSinHora === 'exigir';
+            sinHora.push({ cuando: new Date().toISOString(), id: p.id, proyecto: p.nombre, anterior, nueva, modo: callar ? 'callado' : 'medir' });
+            console.log(`[sin-hora] ${callar ? 'no se avisa' : 'medir · con la bandera en 1 no se avisaría'} «Cambió una instalación» de "${p.nombre}": ${anterior} (sin hora) → ${nueva} (primera cita con hora)`);
+            if (callar) continue;
+        }
 
         const falta = r.pendientes.length
             ? `falta ${r.pendientes.map(a => AREAS[a] || a).join(' y ')}`
@@ -479,5 +580,10 @@ const revisarCambiosUnaVez = async () => {
     // La foto se queda solo con los proyectos abiertos: los cerrados salen solos.
     ultimaFecha = vistos;
     try { await guardarFoto(vistos); } catch (e) { console.error('⚠️ No se pudo guardar la foto de fechas de instalación:', e.message); }
+    if (detalleHora) {
+        try { await guardarDetalleHora(detalleNuevo); } catch (e) { console.error('⚠️ No se pudo guardar si las fechas tenían hora:', e.message); }
+        if (sinHora.length) await anotarSinHora(sinHora);
+        return { avisados, primeraPasada, sinHora: sinHora.length };
+    }
     return { avisados, primeraPasada };
 };

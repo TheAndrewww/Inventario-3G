@@ -85,6 +85,8 @@ const TimelineHistorial = ({ ordenId }) => {
   }
 
   const { timeline, arbolDependencias, estadisticas } = historial;
+  // B6 · PLA-21: con OC_OCULTA_IMPORTES el servidor manda los importes vacíos a quien no debe verlos; aquí se ve «—»
+  const sinImportes = historial.importesOcultos === true;
 
   return (
     <div className="space-y-6">
@@ -229,11 +231,11 @@ const TimelineHistorial = ({ ordenId }) => {
                               <span className="font-medium text-gray-900">{evento.datos.proveedor}</span>
                             </div>
                           )}
-                          {evento.datos.total_estimado && (
+                          {(evento.datos.total_estimado || (sinImportes && 'total_estimado' in evento.datos)) && (
                             <div>
                               <span className="text-gray-500">Total: </span>
                               <span className="font-medium text-gray-900">
-                                ${parseFloat(evento.datos.total_estimado).toFixed(2)}
+                                {sinImportes ? '—' : `$${parseFloat(evento.datos.total_estimado).toFixed(2)}`}
                               </span>
                             </div>
                           )}
@@ -279,7 +281,7 @@ const TimelineHistorial = ({ ordenId }) => {
                       Orden de Compra {arbolDependencias.orden.ticket_id}
                     </h4>
                     <p className="text-sm text-purple-700">
-                      Estado: {arbolDependencias.orden.estado} • Total: ${parseFloat(arbolDependencias.orden.total_estimado).toFixed(2)}
+                      Estado: {arbolDependencias.orden.estado} • Total: {sinImportes ? '—' : `$${parseFloat(arbolDependencias.orden.total_estimado).toFixed(2)}`}
                     </p>
                     <p className="text-xs text-purple-600 mt-1">
                       Proveedor: {arbolDependencias.orden.proveedor}

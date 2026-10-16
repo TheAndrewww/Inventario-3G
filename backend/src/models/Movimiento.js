@@ -153,6 +153,25 @@ const Movimiento = sequelize.define('Movimiento', {
         type: DataTypes.STRING(50),
         allowNull: true,
         comment: 'Área destino cuando destino_tipo = area (manufactura, herreria, pintura)'
+    },
+    // A6 · PLA-05: al cerrar la obra, un ticket con material ya entregado o compras ya recibidas no se anula
+    // (con CIERRE_OBRA_RESPETA_ENTREGADO): queda abierto y marcado «Por revisar · cierre de obra».
+    // Las columnas se agregan al arrancar con ADD COLUMN IF NOT EXISTS (server.js).
+    revision_requerida: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: 'Ticket abierto que quedó por revisar al cerrar su obra (no se anuló solo)'
+    },
+    revision_motivo: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: 'Por qué quedó por revisar, p. ej. «Obra cerrada el 12-nov: 3 artículos ya entregados, 1 compra recibida»'
+    },
+    revision_desde: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Cuándo quedó por revisar'
     }
 }, {
     tableName: 'movimientos',
@@ -174,6 +193,15 @@ const Movimiento = sequelize.define('Movimiento', {
             fields: ['estado']
         }
     ]
+});
+
+// A6 · PLA-05: al resolver el ticket (entregado, cancelado, rechazado…) la marca «Por revisar» se limpia.
+// El motivo y la fecha se quedan como historia. Con la marca en false (lo normal) no hace nada.
+const ESTADOS_TICKET_ABIERTO = ['pendiente', 'pendiente_aprobacion', 'aprobado', 'listo_para_entrega'];
+Movimiento.addHook('beforeUpdate', (movimiento) => {
+    if (movimiento.revision_requerida && movimiento.changed('estado') && !ESTADOS_TICKET_ABIERTO.includes(movimiento.estado)) {
+        movimiento.revision_requerida = false;
+    }
 });
 
 export default Movimiento;

@@ -24,8 +24,23 @@ export const obtenerEstadisticas = async () => {
 };
 
 // Áreas / Terminales
-export const obtenerProyectosArea = async (area) => {
-    const response = await api.get(`/produccion/terminal/${area}`);
+// A4 · PLA-04: las 4 llamadas de la terminal mandan el código validado del área en la cabecera X-Codigo-Area
+// (misma petición de siempre más la cabecera; sin código no se agrega nada).
+const conCodigo = (codigo) => (codigo ? { headers: { 'X-Codigo-Area': codigo } } : undefined);
+// Si la pantalla se publica antes que el servidor, el servidor viejo no acepta la cabecera y el navegador corta la
+// consulta sin respuesta: solo en las consultas (GET) se vuelve a pedir una vez sin la cabecera. Cerrar etapas nunca
+// se repite solo.
+const consultarTerminal = async (url, codigo) => {
+    try {
+        return await api.get(url, conCodigo(codigo));
+    } catch (error) {
+        if (codigo && !error.response) return api.get(url);
+        throw error;
+    }
+};
+
+export const obtenerProyectosArea = async (area, codigo) => {
+    const response = await consultarTerminal(`/produccion/terminal/${area}`, codigo);
     return response.data;
 };
 
@@ -34,8 +49,8 @@ export const validarCodigoArea = async (codigo) => {
     return response.data;
 };
 
-export const completarEtapaTerminal = async (proyectoId) => {
-    const response = await api.post(`/produccion/terminal/${proyectoId}/completar`);
+export const completarEtapaTerminal = async (proyectoId, codigo) => {
+    const response = await api.post(`/produccion/terminal/${proyectoId}/completar`, undefined, conCodigo(codigo));
     return response.data;
 };
 
@@ -76,8 +91,8 @@ export const togglePausa = async (proyectoId, motivo = '') => {
     return response.data;
 };
 
-export const completarSubEtapaTerminal = async (proyectoId, subEtapa) => {
-    const response = await api.post(`/produccion/terminal/${proyectoId}/completar-subetapa`, { subEtapa });
+export const completarSubEtapaTerminal = async (proyectoId, subEtapa, codigo) => {
+    const response = await api.post(`/produccion/terminal/${proyectoId}/completar-subetapa`, { subEtapa }, conCodigo(codigo));
     return response.data;
 };
 
@@ -110,8 +125,8 @@ export const obtenerArchivosDrive = async (proyectoId) => {
 /**
  * Obtener archivos de Drive de un proyecto (para terminales públicas)
  */
-export const obtenerArchivosDriveTerminal = async (proyectoId) => {
-    const response = await api.get(`/produccion/terminal/${proyectoId}/archivos`);
+export const obtenerArchivosDriveTerminal = async (proyectoId, codigo) => {
+    const response = await consultarTerminal(`/produccion/terminal/${proyectoId}/archivos`, codigo);
     return response.data;
 };
 

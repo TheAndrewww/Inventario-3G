@@ -71,6 +71,12 @@ const ordenesCompraService = {
     return response.data;
   },
 
+  // C4 · PLA-16: historia de la orden según Julia (pagada, pedida, llegó…) para la franja del detalle (Diseño 3G)
+  obtenerSeguimiento: async (id) => {
+    const response = await api.get(`/ordenes-compra/${id}/seguimiento`);
+    return response.data?.data;
+  },
+
   // Anular orden de compra (CON reversión completa de stock y solicitudes)
   anular: async (id, motivo) => {
     const response = await api.put(`/ordenes-compra/${id}/anular`, { motivo });

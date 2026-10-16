@@ -1,6 +1,10 @@
 import { ProduccionProyecto, Usuario, sequelize } from '../models/index.js';
 import { Op } from 'sequelize';
 import produccionSheetsService from '../services/produccionSheets.service.js';
+import { festivosNegocio } from '../utils/calendarioLaboral.js';
+import { pronosticoParaTablero } from '../routes/sistemas/pronostico.js';
+import { obraIdsDeProyectos } from '../services/obraId.service.js';
+import { clasificarCodigo, contarTerminal, revisarAreaDeEtapa } from '../middleware/codigoTerminal.middleware.js';
 import {
     avisarArchivosNuevos,
     avisarTicketSubido,
@@ -17,14 +21,8 @@ const COLORES_AREAS = {
     instalacion: { nombre: 'Instalación', color: '#3B82F6', bgClass: 'bg-blue-500' }
 };
 
-// Códigos de acceso por área (para terminales)
-const CODIGOS_AREA = {
-    'DIS-2026': 'diseno',
-    'COM-2026': 'compras',
-    'MAN-2026': 'manufactura',
-    'HER-2026': 'herreria',
-    'INS-2026': 'instalacion'
-};
+// Códigos de acceso por área (para terminales): A4 · PLA-04, ahora en middleware/codigoTerminal.middleware.js
+// (los de fábrica, más los nuevos de TERMINAL_CODIGOS).
 
 /**
  * Avisa al grupo de PRODUCCIÓN lo que acaba de pasar con un proyecto: la etapa
@@ -59,6 +57,13 @@ export const obtenerDashboard = async (req, res) => {
     try {
         const resultado = await ProduccionProyecto.obtenerResumenDashboard();
 
+        // C7 · PLA-17: el sí o el no de Producción por WhatsApp (de los últimos días). Solo los proyectos que lo tienen
+        // suman `pronostico_whatsapp`; sin respuestas, la respuesta queda igual que antes.
+        const pronosticos = await ProduccionProyecto.pronosticosVigentes(resultado.proyectos.map(p => p.id));
+        const ahora = new Date();
+        // C1 · PLA-19: el ID 3G de la obra, solo en los proyectos que ya lo tienen (sin ID, la respuesta de siempre)
+        const obras = await obraIdsDeProyectos(resultado.proyectos.map(p => p.id));
+
         // Agregar información de colores y sub-etapas
         const resumenConColores = {};
         Object.keys(resultado.resumen).forEach(etapa => {
@@ -68,18 +73,25 @@ export const obtenerDashboard = async (req, res) => {
                     diasRestantes: p.getDiasRestantes(),
                     porcentaje: p.getPorcentajeAvance(),
                     estadoSubEtapas: p.getEstadoSubEtapas(),
-                    estadoRetraso: p.getEstadoRetraso()
+                    estadoRetraso: p.getEstadoRetraso(),
+                    ...(pronosticos.has(p.id) ? { pronostico_whatsapp: pronosticoParaTablero(pronosticos.get(p.id), ahora) } : {}),
+                    ...(obras.has(p.id) ? { obra_id: obras.get(p.id) } : {})
                 })),
                 info: COLORES_AREAS[etapa] || { nombre: etapa, color: '#6B7280' }
             };
         });
+
+        // C9 · PLA-07: los festivos del negocio (de Operación) para que la pantalla cuente los mismos días que el
+        // servidor. Solo cuando hay: sin ellos la respuesta queda igual que antes.
+        const negocio = festivosNegocio();
 
         res.json({
             success: true,
             data: {
                 resumen: resumenConColores,
                 estadisticas: resultado.estadisticas,
-                coloresAreas: COLORES_AREAS
+                coloresAreas: COLORES_AREAS,
+                ...(negocio.length ? { calendarioLaboral: { festivosNegocio: negocio } } : {})
             }
         });
     } catch (error) {
@@ -219,6 +231,10 @@ export const completarEtapa = async (req, res) => {
             });
         }
 
+        // Desde la terminal (A4 · PLA-04, decisión 4): con TERMINAL_CODIGO_DEL_AREA apagada solo se cuenta.
+        const otraArea = revisarAreaDeEtapa(req, proyecto.etapa_actual);
+        if (otraArea) return res.status(403).json(otraArea);
+
         const etapaAnterior = proyecto.etapa_actual;
         await proyecto.completarEtapaActual(usuarioId, observaciones);
 
@@ -335,6 +351,10 @@ export const completarSubEtapa = async (req, res) => {
         // no está formalmente en 'produccion' (ej: archivos subidos antes de terminar diseño)
         // Ya no validamos etapa_actual === 'produccion'
 
+        // Desde la terminal (A4 · PLA-04, decisión 4): con TERMINAL_CODIGO_DEL_AREA apagada solo se cuenta.
+        const otraArea = revisarAreaDeEtapa(req, subEtapa);
+        if (otraArea) return res.status(403).json(otraArea);
+
         let usuarioId = null;
         if (req.usuario) {
             usuarioId = req.usuario.id;
@@ -390,16 +410,21 @@ export const completarSubEtapa = async (req, res) => {
  */
 export const validarCodigoArea = async (req, res) => {
     try {
-        const { codigo } = req.body;
+        // A4 · PLA-04: 403 con texto (un 401 hacía que la tableta cerrara la sesión y se fuera a /login, error 30).
+        // Los equivocados cuentan para el límite de 10 cada 15 min por IP (limiteValidarCodigo, en la ruta).
+        const c = clasificarCodigo(req.body?.codigo);
+        contarTerminal(c.valido ? `validar_${c.tipo}` : 'validar_incorrecto');
 
-        const area = CODIGOS_AREA[codigo?.toUpperCase()];
-
-        if (!area) {
-            return res.status(401).json({
+        if (!c.valido) {
+            return res.status(403).json({
                 success: false,
-                message: 'Código de área inválido'
+                codigo: 'CODIGO_INCORRECTO',
+                message: c.tipo === 'de_fabrica'
+                    ? 'Ese código ya no se usa. Pide a Dirección el código nuevo de tu área.'
+                    : 'Ese código no es de ninguna área. Revísalo y vuelve a escribirlo.'
             });
         }
+        const area = c.area;
 
         res.json({
             success: true,

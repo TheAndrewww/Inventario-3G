@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
+import { esUrgente } from '../utils/horarioAvisos.js';
 
 /**
  * Cola de avisos que deben publicarse en WhatsApp.
@@ -32,7 +33,7 @@ const AvisoWhatsApp = sequelize.define('AvisoWhatsApp', {
         type: DataTypes.STRING(30),
         allowNull: false,
         defaultValue: 'informativo',
-        comment: 'informativo | aprobacion_orden. Los de aprobación esperan una reacción'
+        comment: 'informativo | aprobacion_orden | orden_aprobada | llegada (C4 paso 3). Los de aprobación esperan una reacción'
     },
     referencia_id: {
         type: DataTypes.INTEGER,
@@ -43,7 +44,7 @@ const AvisoWhatsApp = sequelize.define('AvisoWhatsApp', {
         type: DataTypes.STRING(20),
         allowNull: false,
         defaultValue: 'pendiente',
-        comment: 'pendiente | enviado | error'
+        comment: 'pendiente | enviado | error | descartado (D7 · PLA-18: reemplazado antes de salir)'
     },
     intentos: {
         type: DataTypes.INTEGER,
@@ -58,6 +59,22 @@ const AvisoWhatsApp = sequelize.define('AvisoWhatsApp', {
     enviado_at: {
         type: DataTypes.DATE,
         allowNull: true
+    },
+    reemplazado_por_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: 'A9 · PLA-06: aviso más nuevo de la misma orden (se volvió a pedir la autorización). Una reacción sobre este ya no aprueba'
+    },
+    urgente: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: 'D7 · PLA-18: con HORARIO_AVISOS, solo los urgentes salen de noche y en domingo. Se marca al encolar con AVISOS_URGENTES (vacía = ninguno)'
+    },
+    datos: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+        comment: 'C4 paso 3 · PLA-16 (LLEGADA_CON_DATOS): datos del aviso «Llegó material» (tipo llegada): { orden, folioFactura, fotos }. El texto no cambia'
     }
 }, {
     tableName: 'avisos_whatsapp',
@@ -69,7 +86,13 @@ const AvisoWhatsApp = sequelize.define('AvisoWhatsApp', {
     updatedAt: 'updated_at',
     indexes: [
         { fields: ['estado'] }
-    ]
+    ],
+    hooks: {
+        // D7 · PLA-18: el aviso nace urgente si su tipo o su destino están en AVISOS_URGENTES (vacía por omisión).
+        beforeCreate(aviso) {
+            if (!aviso.urgente) aviso.urgente = esUrgente({ tipo: aviso.tipo, destino: aviso.destino });
+        }
+    }
 });
 
 export default AvisoWhatsApp;

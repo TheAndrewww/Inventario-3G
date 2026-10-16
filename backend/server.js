@@ -14,7 +14,9 @@ import { registrarError, ultimosErrores } from './src/utils/diagnostico.js';
 import './src/models/index.js'; // Importar modelos y relaciones
 import { iniciarCronJobs } from './src/utils/cronJobs.js';
 import { ejecutarAutoMigracion } from './src/utils/autoMigrate.js';
-import { verificarToken, esAdministrador } from './src/middleware/auth.middleware.js';
+import { verificarToken, esAdministrador, verificarTokenOpcional } from './src/middleware/auth.middleware.js';
+import { avisarConfigAlArrancar, cerrarSiFalta, cerrarTerminalSiFalta, cuerpoSalud } from './src/utils/revisarConfig.js';
+import crearPuertas from './src/routes/sistemas/index.js';
 
 // Cargar variables de entorno solo en desarrollo
 // En producción (Railway, Heroku), las variables están en process.env directamente
@@ -82,7 +84,8 @@ app.use(cors({
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    // X-Codigo-Area: el código de la terminal de producción (A4 · PLA-04). Sin esto el navegador corta la petición.
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Codigo-Area']
 }));
 
 app.use(express.json());
@@ -103,6 +106,19 @@ app.use((req, res, next) => {
     }
     next();
 });
+
+// A15 · PLA-08: con FALLA_CERRADA=1, cada llave que falta cierra SOLO lo que protege (503 «configuración
+// incompleta»); el proceso no se apaga. Sin la bandera todo sigue como hoy (ver src/utils/revisarConfig.js).
+// JWT_SECRET: la entrada (aquí) y todo lo que pide sesión (en verificarToken). TERMINAL_CODIGOS: la terminal.
+// OC_CORREO_SECRETO: las ligas del correo de órdenes. WHATSAPP_PUENTE_TOKEN: el puente ya responde 503 sin ella.
+app.use('/api/auth/login', cerrarSiFalta('sesion'));
+app.use('/api/produccion', cerrarTerminalSiFalta);
+app.use(['/api/ordenes-compra/aprobar-email', '/api/ordenes-compra/rechazar-email'], cerrarSiFalta('correo', { html: true }));
+
+// Puertas entre sistemas (D2, D3, B8 · PLA-13): /api/inicio3g/v1 y /api/sistemas/v1, con su propia llave por origen
+// (huella SHA-256 y alcances en variables). Van antes de todas las rutas con sesión: ninguna pasa por verificarToken.
+// Sin llaves configuradas responden 503 «puerta sin configurar»; lo demás de Planta no cambia.
+app.use(crearPuertas());
 
 // Importar rutas
 import authRoutes from './src/routes/auth.routes.js';
@@ -179,6 +195,21 @@ app.get('/', (req, res) => {
  */
 app.get('/api/estado-sistema', (req, res) => {
     res.json({ ok: true });
+});
+
+/**
+ * Salud de Planta (A15 · PLA-08), forma del contrato del Inicio v2 (§2.1 y plan §7.3).
+ * Sin sesión: solo sistema, versión, estado (ok · aviso · mal), mensaje y hora; basta para un vigilante.
+ * Con sesión de administración: además config { completa, faltan } (solo nombres), banderas [{ nombre, encendida }],
+ * piezas y los conteos de la terminal (A4). Nunca un valor, una llave ni un código.
+ */
+app.get('/salud', verificarTokenOpcional, async (req, res) => {
+    try {
+        const detalle = !!(req.usuario && req.usuario.activo && req.usuario.rol === 'administrador');
+        res.json(await cuerpoSalud({ detalle }));
+    } catch (error) {
+        res.status(500).json({ sistema: 'planta', estado: 'mal', mensaje: 'No se pudo revisar la salud' });
+    }
 });
 
 /**
@@ -411,6 +442,51 @@ app.post('/api/admin/limpiar-db', verificarToken, esAdministrador, async (req, r
     }
 });
 
+// ===== Ensayo del cierre de obras (A6 · PLA-05) =====
+// Solo lectura y solo administración: por cada ticket abierto de una obra, qué pasaría hoy al cerrarse su obra
+// (se anula y regresa todo al almacén) y qué pasaría con CIERRE_OBRA_RESPETA_ENTREGADO (por revisar si ya
+// tenía material entregado o compras recibidas). No escribe nada.
+app.get('/api/admin/ensayo-cierre-obras', verificarToken, esAdministrador, async (req, res) => {
+    try {
+        const { ensayoCierreObras } = await import('./src/services/pedidosCleanup.service.js');
+        const { getNombresProyectosAbiertos } = await import('./src/controllers/pedidos.controller.js');
+        const data = await ensayoCierreObras(await getNombresProyectosAbiertos());
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error en el ensayo de cierre de obras:', error);
+        res.status(500).json({ success: false, message: 'Error al armar el ensayo de cierre de obras' });
+    }
+});
+
+// ===== Ensayo de la cancelación programada de órdenes (D6 · PLA-18) =====
+// Solo lectura y solo administración: qué cancelaría y a cuáles avisaría hoy la tarea de las 8:15 con
+// CANCELACION_PROGRAMADA, y si la regla de siempre (al abrir la lista) funciona en esta base. No escribe nada.
+app.get('/api/admin/ensayo-cancelacion-ordenes', verificarToken, esAdministrador, async (req, res) => {
+    try {
+        const { ensayoCancelacionProgramada } = await import('./src/controllers/ordenesCompra.controller.js');
+        res.json({ success: true, data: await ensayoCancelacionProgramada() });
+    } catch (error) {
+        console.error('Error en el ensayo de la cancelación programada:', error);
+        res.status(500).json({ success: false, message: 'Error al armar el ensayo de la cancelación programada' });
+    }
+});
+
+// ===== Ensayo del ID 3G (C1 · PLA-19) =====
+// Solo lectura y solo administración: lee el libro de obras como lo haría la sincronización con EMPATE_POR_OBRA
+// (columna «ID 3G» por su encabezado), comprueba que lo de B a K sale igual que hoy y dice qué guardaría, qué ID
+// copiaría un ticket nuevo y qué cambiaría al cerrar cada obra. No escribe nada. `limpio: true` = se puede encender.
+app.get('/api/admin/ensayo-id3g', verificarToken, esAdministrador, async (req, res) => {
+    try {
+        const { ensayoId3g } = await import('./src/services/obraId.service.js');
+        const { leerMesParaEnsayoId3g, mesesDeLaSincronizacion } = await import('./src/services/produccionSheets.service.js');
+        const data = await ensayoId3g({ leerHoja: leerMesParaEnsayoId3g, meses: mesesDeLaSincronizacion() });
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error en el ensayo del ID 3G:', error);
+        res.status(500).json({ success: false, message: 'Error al armar el ensayo del ID 3G' });
+    }
+});
+
 // Manejo de errores
 app.use((err, req, res, next) => {
     console.error(err.stack);
@@ -423,6 +499,8 @@ app.use((err, req, res, next) => {
 
 // Función para iniciar el servidor
 const startServer = async () => {
+    // A15 · PLA-08: qué llaves faltan (solo nombres) y qué queda cerrado con FALLA_CERRADA. Nunca apaga el proceso.
+    await avisarConfigAlArrancar();
     try {
         // Verificar conexión a base de datos con reintentos
         let retries = 5;
@@ -1205,9 +1283,73 @@ const startServer = async () => {
             // sync no agrega columnas a una tabla que ya existe
             await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS tipo VARCHAR(30) NOT NULL DEFAULT 'informativo'");
             await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS referencia_id INTEGER");
+            // A9 · PLA-06: el aviso de autorización que reemplazó a este (la orden se editó y se volvió a pedir)
+            await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS reemplazado_por_id INTEGER");
+            // D7 · PLA-18: los avisos que pasan de noche y en domingo con HORARIO_AVISOS (AVISOS_URGENTES vacía = ninguno)
+            await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS urgente BOOLEAN NOT NULL DEFAULT FALSE");
+            // C4 paso 3 · PLA-16: datos del aviso «Llegó material» (orden, folio de la factura y foto) con LLEGADA_CON_DATOS
+            await sequelize.query("ALTER TABLE avisos_whatsapp ADD COLUMN IF NOT EXISTS datos JSONB");
             console.log('✅ Tabla avisos_whatsapp verificada');
         } catch (avisosErr) {
             console.error('⚠️ Error verificando tabla avisos_whatsapp:', avisosErr.message);
+        }
+
+        // Puertas entre sistemas (PLA-13): tablas nuevas, cada una con su propio sync (crea si no existe; nunca alter).
+        try {
+            const { default: LlaveSistema } = await import('./src/models/LlaveSistema.js');
+            const { default: Idempotencia } = await import('./src/models/Idempotencia.js');
+            await LlaveSistema.sync();
+            await Idempotencia.sync();
+            console.log('✅ Tablas de las puertas entre sistemas verificadas (llaves_sistemas, idempotencia_sistemas)');
+        } catch (puertasErr) {
+            console.error('⚠️ Error verificando las tablas de las puertas entre sistemas:', puertasErr.message);
+        }
+
+        // B1 · PLA-14: bitácora de los avisos de Carla y Julia a Producción (su propio sync: crea si no existe; nunca alter)
+        try {
+            const { default: BitacoraAviso } = await import('./src/models/BitacoraAviso.js');
+            await BitacoraAviso.sync();
+            console.log('✅ Tabla bitacora_avisos verificada');
+        } catch (bitacoraErr) {
+            console.error('⚠️ Error verificando la tabla bitacora_avisos:', bitacoraErr.message);
+        }
+
+        // C4 · PLA-16: la historia de la orden de compra (su propio sync: crea si no existe; nunca alter)
+        try {
+            const { default: OrdenSeguimiento } = await import('./src/models/OrdenSeguimiento.js');
+            await OrdenSeguimiento.sync();
+            console.log('✅ Tabla orden_seguimiento verificada');
+        } catch (seguimientoErr) {
+            console.error('⚠️ Error verificando la tabla orden_seguimiento:', seguimientoErr.message);
+        }
+
+        // B3 · PLA-20: ficha maestra de proveedores y crédito de CTAS CRÉDITO (su propio sync: crea si no existe; nunca alter)
+        try {
+            const { ProveedorFicha, ProveedorCredito } = await import('./src/models/Proveedor.js');
+            await ProveedorFicha.sync();
+            await ProveedorCredito.sync();
+            console.log('✅ Tablas proveedores_ficha y proveedores_credito verificadas');
+        } catch (fichaErr) {
+            console.error('⚠️ Error verificando las tablas de la ficha de proveedores:', fichaErr.message);
+        }
+
+        // D1 · PLA-15: último latido de la línea del contable (su propio sync: crea si no existe; nunca alter)
+        try {
+            const { default: LatidoSistema } = await import('./src/models/LatidoSistema.js');
+            await LatidoSistema.sync();
+            console.log('✅ Tabla latidos_sistemas verificada');
+        } catch (latidoErr) {
+            console.error('⚠️ Error verificando la tabla latidos_sistemas:', latidoErr.message);
+        }
+
+        // E1 · PLA-23: entrar con Cuentas 3G. Con CUENTAS3G_MODO apagado (o incompleto) solo lo dice en el registro; si
+        // está encendido crea sus dos tablas (su propio sync, nunca alter), carga la última lista de versiones guardada y
+        // la pide cada minuto sin detener el arranque. Nunca tumba el servidor.
+        try {
+            const { iniciarCuentas3g } = await import('./src/services/cuentas3g.service.js');
+            await iniciarCuentas3g();
+        } catch (c3gErr) {
+            console.error('⚠️ Error preparando la entrada con Cuentas 3G:', c3gErr.message);
         }
 
         // Tickets de salida ya vistos en la carpeta del proyecto — aplica en dev y prod.
@@ -1221,6 +1363,28 @@ const startServer = async () => {
             console.error('⚠️ Error verificando archivos_ticket:', ticketColErr.message);
         }
 
+        // C7 · PLA-17: el sí o el no de Producción por WhatsApp (la manda Finanzas). Fuera del modelo: el JSON de los
+        // proyectos no cambia; solo el tablero lo suma cuando hay uno vigente.
+        try {
+            await sequelize.query(
+                "ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS pronostico_whatsapp JSONB"
+            );
+            console.log('✅ Columna pronostico_whatsapp verificada en produccion_proyectos');
+        } catch (pronosticoErr) {
+            console.error('⚠️ Error verificando pronostico_whatsapp:', pronosticoErr.message);
+        }
+
+        // C1 · PLA-19: el ID 3G de la obra (dato, nunca llave) en el proyecto y en sus tickets. Fuera de los modelos: el
+        // JSON de proyectos y tickets no cambia. Sin EMPATE_POR_OBRA quedan vacías.
+        try {
+            await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS obra_id VARCHAR(16)");
+            await sequelize.query("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS obra_id VARCHAR(16)");
+            const { empatePorObra } = await import('./src/services/obraId.service.js');
+            console.log(`✅ Columnas obra_id (ID 3G) verificadas en produccion_proyectos y movimientos (EMPATE_POR_OBRA ${empatePorObra() ? 'encendida' : 'apagada'})`);
+        } catch (obraIdErr) {
+            console.error('⚠️ Error verificando las columnas obra_id:', obraIdErr.message);
+        }
+
         // Ventana de conteo de 7 días en órdenes de compra — aplica en dev y prod
         try {
             await sequelize.query(
@@ -1231,6 +1395,11 @@ const startServer = async () => {
             );
             await sequelize.query(
                 "ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS cierre_incompleto JSONB"
+            );
+            // D6 · PLA-18: cuándo se avisó en Compras que la orden se cancela al día siguiente (CANCELACION_PROGRAMADA).
+            // No está en el modelo: solo la lee y la escribe la tarea programada, así el JSON de las órdenes no cambia.
+            await sequelize.query(
+                "ALTER TABLE ordenes_compra ADD COLUMN IF NOT EXISTS cancelacion_avisada_at TIMESTAMP WITH TIME ZONE"
             );
             console.log('✅ Columnas de ventana de conteo verificadas en ordenes_compra');
         } catch (conteoErr) {
@@ -1261,6 +1430,24 @@ const startServer = async () => {
             console.log('✅ Columnas destino_tipo/destino_area verificadas en movimientos');
         } catch (destErr) {
             console.error('⚠️ Error verificando columnas de destino en movimientos:', destErr.message);
+        }
+
+        // Tickets «Por revisar · cierre de obra» (A6 · PLA-05) — aplica en dev y prod.
+        // Solo agrega columnas (nunca alter): sin la bandera CIERRE_OBRA_RESPETA_ENTREGADO quedan en false/null.
+        try {
+            await sequelize.query(
+                "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS revision_requerida BOOLEAN NOT NULL DEFAULT FALSE"
+            );
+            await sequelize.query(
+                "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS revision_motivo TEXT"
+            );
+            await sequelize.query(
+                "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS revision_desde TIMESTAMP WITH TIME ZONE"
+            );
+            const { cierreRespetaEntregado } = await import('./src/services/pedidosCleanup.service.js');
+            console.log(`✅ Columnas de revisión por cierre de obra verificadas en movimientos (CIERRE_OBRA_RESPETA_ENTREGADO ${cierreRespetaEntregado() ? 'encendida' : 'apagada'})`);
+        } catch (revErr) {
+            console.error('⚠️ Error verificando columnas de revisión en movimientos:', revErr.message);
         }
 
         // Aislamiento por almacén (categorías y ubicaciones) — aplica en dev y prod

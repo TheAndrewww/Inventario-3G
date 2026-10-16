@@ -25,6 +25,43 @@ import { generarTicketID } from '../utils/ticket-generator.js';
 // Debajo de esta confianza el renglón se le muestra a almacén para que confirme
 const UMBRAL_CONFIANZA = 0.85;
 
+/**
+ * C4 paso 3 · PLA-16 (LLEGADA_CON_DATOS): la foto de la factura se guarda (Cloudinary de Planta, carpeta
+ * inventario-3g/facturas, nombre al azar) para que quede en la historia de la orden y viaje en el aviso «Llegó
+ * material». Apagada, la foto se sigue leyendo en memoria y no se guarda, como hoy. Si Cloudinary no está configurado o
+ * falla, la lectura sigue sin foto. `subir` se puede cambiar en las pruebas.
+ */
+const cloudinaryConfigurado = () => ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET']
+    .every(v => String(process.env[v] || '').trim());
+
+const subirFotoFactura = async (archivo) => {
+    const { cloudinary } = await import('../config/cloudinary.js');
+    const { randomBytes } = await import('crypto');
+    return new Promise((resolver, fallar) => {
+        cloudinary.uploader.upload_stream(
+            { folder: 'inventario-3g/facturas', public_id: `factura_${randomBytes(12).toString('hex')}`, resource_type: 'image', transformation: [{ width: 2000, height: 2000, crop: 'limit' }], format: 'jpg' },
+            (error, resultado) => (error ? fallar(error) : resolver(resultado.secure_url))
+        ).end(archivo.buffer);
+    });
+};
+
+export const guardarFotosFactura = async (archivos, { subir = subirFotoFactura, configurado = cloudinaryConfigurado } = {}) => {
+    if (!configurado()) {
+        console.log('ℹ️ Cloudinary no está configurado: la foto de la factura no se guarda');
+        return [];
+    }
+    const urls = [];
+    for (const archivo of (archivos || []).slice(0, 5)) {
+        try {
+            const url = await subir(archivo);
+            if (typeof url === 'string' && url.startsWith('https://res.cloudinary.com/')) urls.push(url);
+        } catch (e) {
+            console.error('No se pudo guardar la foto de la factura (la recepción sigue):', e.message);
+        }
+    }
+    return urls;
+};
+
 const normalizar = (texto) => (texto || '')
     .toString()
     .toUpperCase()
@@ -108,6 +145,10 @@ export const analizarFactura = async (req, res) => {
         const imagenes = req.files.map(f => ({ buffer: f.buffer, mimetype: f.mimetype }));
         const lectura = await leerFacturaProveedor(imagenes, articulosOrden, aprendidos);
 
+        // C4 paso 3 · PLA-16: con LLEGADA_CON_DATOS la foto se guarda; apagada, la respuesta es la de siempre.
+        const { llegadaConDatos } = await import('../models/OrdenSeguimiento.js');
+        const fotos = llegadaConDatos() ? await guardarFotosFactura(imagenes) : null;
+
         // Refuerzo determinista: lo que la IA dejó suelto, se intenta cruzar por
         // equivalencia aprendida o por código de barras antes de darlo por perdido.
         const renglones = lectura.renglones.map(r => {
@@ -170,7 +211,8 @@ export const analizarFactura = async (req, res) => {
                     proveedor: lectura.proveedor,
                     folio: lectura.folio,
                     fecha: lectura.fecha,
-                    total: lectura.total
+                    total: lectura.total,
+                    ...(fotos ? { fotos } : {})
                 },
                 articulos_orden: articulosOrden,
                 renglones,
