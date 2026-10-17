@@ -225,4 +225,12 @@ describe('riel nuevo: hereda los paneles ocultos y el orden del menú de siempre
     assert.match(armazon, /useState\(\(\) => \{ heredarAjustesDelMenu\(user\?\.id\); return new Set\(leerJSON\(claveOcultosG3/);
     assert.match(armazon, /useEffect\(\(\) => \{ heredarAjustesDelMenu\(user\?\.id\);/);
   });
+
+  it('el ojo de «Personalizar menú» destapa completas Compras y Tickets aunque la herencia las dejara ocultas por sus rutas', () => {
+    // Diseñador (solo ve Orden de salida e Historial) o Almacén (solo Tickets pendientes) con esas pantallas ocultas en el menú
+    // de siempre: la herencia guarda las rutas y Tickets se ve oculta; «Mostrar» tiene que borrar la clave y esas rutas.
+    const armazon = leer('src/rediseno2/fundacion/armazon/Armazon.jsx');
+    assert.match(armazon, /\(clave === 'compras' \|\| clave === 'tickets'\) && grupos\.flatMap/);
+    assert.match(armazon, /if \(seccion && seccion\.oculto\) \{ n\.delete\(clave\); seccion\.rutas\.forEach\(\(r\) => n\.delete\(r\)\); \}/);
+  });
 });

@@ -69,10 +69,11 @@ export default function Armazon() {
 
   const alternarOculto = (clave) => setOcultos((prev) => {
     const n = new Set(prev);
-    // Compras es una sola entrada, pero también se ve oculta cuando lo están todas sus pestañas (así la deja la herencia
-    // del menú de siempre, que guarda las cinco). «Mostrar» la destapa completa; si no, el ojo no la podría regresar.
-    const compras = clave === 'compras' && grupos.flatMap((g) => g.items).find((it) => it.clave === 'compras');
-    if (compras && compras.oculto) { n.delete('compras'); compras.rutas.forEach((r) => n.delete(r)); }
+    // Compras y Tickets son una sola entrada, pero también se ven ocultas cuando lo están todas las pestañas que el rol ve
+    // (así las deja la herencia del menú de siempre: Compras guarda las cinco y Tickets, si el rol solo ve una o dos, esas
+    // rutas). «Mostrar» la destapa completa; si no, el ojo no la podría regresar.
+    const seccion = (clave === 'compras' || clave === 'tickets') && grupos.flatMap((g) => g.items).find((it) => it.clave === clave);
+    if (seccion && seccion.oculto) { n.delete(clave); seccion.rutas.forEach((r) => n.delete(r)); }
     else if (n.has(clave)) n.delete(clave); else n.add(clave);
     guardarJSON(claveOcultosG3(user?.id), [...n]);
     return n;
