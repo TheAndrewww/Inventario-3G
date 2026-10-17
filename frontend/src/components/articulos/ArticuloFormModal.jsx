@@ -13,6 +13,9 @@ import { useAuth } from '../../context/AuthContext';
 import { getImageUrl } from '../../utils/imageUtils';
 import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
 import { g3Activo } from '../../diseno-3g/dialogosG3';
+// Rediseño 2: encendido el formulario es un cajón ancho por secciones (rediseno2/inventario/CajonFormArticulo)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CajonFormArticulo from '../../rediseno2/inventario/CajonFormArticulo';
 
 // Unidades que admiten decimales; cualquier otra (piezas, cajas, unidades…) es entera.
 // La comparación es case-insensitive porque la unidad se guarda en MAYÚSCULAS
@@ -30,6 +33,7 @@ const sanitizarCantidad = (value, unidad) => {
 
 const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigoInicial = null, nombreInicial = null, permisosAlmacenAbiertos = false, mantenerPendiente = false }) => {
   const g3 = useDiseno3G(); // Diseño 3G: solo textos sin emojis (apagado, el DOM de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2 encendido: cajón por secciones
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState([]);
@@ -833,6 +837,37 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
       onClose();
     }
   };
+
+  // Rediseño 2 encendido: las mismas piezas de estado y manejadores, pintadas en un cajón. Las tres ayudas de abajo son
+  // los mismos cambios que hoy hacen los campos (almacén, «Es herramienta» y cantidad del ingreso), con nombre.
+  if (d3) {
+    const cambiarAlmacenForm = (nuevoId) => {
+      setAlmacenSeleccionadoForm(nuevoId);
+      // Si la ubicación actual no pertenece al nuevo almacén, limpiarla
+      const ubicActual = ubicaciones.find(u => String(u.id) === String(formData.ubicacion_id));
+      const ubicAlmId = ubicActual?.almacen_id || ubicActual?.almacen_ref?.id;
+      if (!nuevoId || (ubicAlmId && String(ubicAlmId) !== String(nuevoId))) {
+        setFormData(prev => ({ ...prev, ubicacion_id: '' }));
+      }
+    };
+    return (
+      <CajonFormArticulo f={{
+        isOpen, handleClose, isEdit, esEdicionLimitada, modoIngreso, esAlmacen, almacenLimitado, esAdministrador: user?.rol === 'administrador',
+        loading, formData, handleChange, handleSubmit, handleIngresoInventario, handleEAN13Change, handleTypeDetected, tiposCodigo,
+        articulosFiltrados, mostrarAutocomplete, setMostrarAutocomplete, handleSeleccionarArticulo,
+        articuloSeleccionado, cantidadIngreso, observacionesIngreso, setObservacionesIngreso, handleCancelarModoIngreso, unidadEsEntera,
+        cambiarCantidadIngreso: (v) => setCantidadIngreso(sanitizarCantidad(v, articuloSeleccionado?.unidad)),
+        currentImageUrl, handleImageSelect, handleImageRemove, selectedImage, articulo,
+        categorias, ubicaciones, almacenes, almacenSeleccionadoForm, cambiarAlmacenForm,
+        cambiarEsHerramienta: (marcada) => setFormData(prev => ({ ...prev, es_herramienta: marcada })),
+        showNuevaCategoria, nuevaCategoriaData, setNuevaCategoriaData, creandoCategoria, handleCrearCategoriaRapido, handleCancelarNuevaCategoria,
+        showNuevaUbicacion, nuevaUbicacionData, setNuevaUbicacionData, creandoUbicacion, handleCrearUbicacionRapido, handleCancelarNuevaUbicacion,
+        proveedores, proveedoresSeleccionados, handleAgregarProveedor, handleEliminarProveedor, handleProveedorChange, handleMarcarPreferido,
+        showNuevoProveedor, setShowNuevoProveedor, nuevoProveedorNombre, setNuevoProveedorNombre, creandoProveedor,
+        handleCrearProveedorRapido, handleCancelarNuevoProveedor, puedeCrearProveedores,
+      }} />
+    );
+  }
 
   return (
     <Modal

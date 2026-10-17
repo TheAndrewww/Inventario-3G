@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import Modal from '../common/Modal';
 import { AlertTriangle, RotateCcw, Package, FileText, XCircle } from 'lucide-react';
+// Rediseño 2 · vista encendida (apagado no la usa)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CajonAnularOrdenR2 from '../../rediseno2/compras/CajonAnularOrden';
 
 const AnularOrdenCompraModal = ({ isOpen, onClose, orden, onAnular }) => {
   const [motivo, setMotivo] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resultado, setResultado] = useState(null);
+  const d3 = useDiseno3GR2(); // Rediseño 2: cajón encendido
 
   const handleAnular = async () => {
     if (!motivo || motivo.trim().length === 0) {
@@ -45,6 +49,26 @@ const AnularOrdenCompraModal = ({ isOpen, onClose, orden, onAnular }) => {
   };
 
   if (!orden) return null;
+
+  // Rediseño 2 · encendido: el mismo motivo, la misma anulación y el mismo resultado en un cajón (el JSX de hoy sigue abajo)
+  if (d3) {
+    if (!isOpen) return null;
+    return (
+      <CajonAnularOrdenR2
+        onClose={handleClose}
+        orden={orden}
+        motivo={motivo}
+        alCambiarMotivo={(valor) => {
+          setMotivo(valor);
+          setError('');
+        }}
+        error={error}
+        loading={loading}
+        resultado={resultado}
+        handleAnular={handleAnular}
+      />
+    );
+  }
 
   return (
     <Modal

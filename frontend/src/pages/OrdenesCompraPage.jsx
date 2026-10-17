@@ -16,6 +16,16 @@ import EditarOrdenModal from '../components/ordenes/EditarOrdenModal';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import { cx, etq, g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
+// Rediseño 2 · vistas encendidas (apagado no las usa)
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaOrdenesR2 from '../rediseno2/compras/VistaOrdenes';
+import VistaSolicitudesR2 from '../rediseno2/compras/VistaSolicitudes';
+import CajonNuevaOrdenR2 from '../rediseno2/compras/CajonNuevaOrden';
+import CajonArmarOrdenR2 from '../rediseno2/compras/CajonArmarOrden';
+import CajonNuevoArticuloR2 from '../rediseno2/compras/CajonNuevoArticulo';
+import DialogoCancelarSolicitudR2 from '../rediseno2/compras/DialogoCancelarSolicitud';
+import { CajonBajoStockR2, BotonSolicitudR2, UltimoMovimientoR2 } from '../rediseno2/compras/CajonBajoStock';
+import PagoPedidoR2 from '../rediseno2/compras/PagoPedido';
 
 // B6 · PLA-21: con OC_OCULTA_IMPORTES el servidor manda los importes vacíos (importesOcultos) a quien no debe verlos;
 // la pantalla muestra «—». Sin la bandera, o para administración y compras, se ve lo de siempre.
@@ -33,6 +43,8 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
   const [vistaOrdenes, setVistaOrdenes] = useState('activas'); // 'activas', 'completadas', 'canceladas'
   const vistaActual = vista; // 'solicitudes' o 'ordenes' (la decide la ruta)
   const g3 = useDiseno3G(); // Diseño 3G: encabezado, números, estados y tablas en tarjetas (apagado, lo de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+  const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
   const [modalNuevaOrden, setModalNuevaOrden] = useState(false);
   const [modalDetalle, setModalDetalle] = useState(false);
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
@@ -128,9 +140,11 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
         setSolicitudesSeleccionadas([]); // Limpiar selección al cambiar vista
         setCantidadesSolicitudesEditadas({}); // Limpiar cantidades editadas
       }
+      setErrorCargaR2(null);
     } catch (error) {
       console.error('Error al cargar datos:', error);
       toast.error('Error al cargar los datos');
+      setErrorCargaR2(error?.response?.data?.message || error?.message || 'Error al cargar los datos');
     } finally {
       setLoading(false);
     }
@@ -921,6 +935,182 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     );
   };
 
+  // Rediseño 2 · vista ENCENDIDA. Mismo estado, mismas peticiones y mismos manejadores; los diálogos se montan con las
+  // mismas props de abajo (cada uno pinta su versión nueva encendido). El JSX de hoy sigue intacto debajo.
+  if (d3) {
+    const modalesR2 = (
+      <>
+        {modalNuevaOrden && (
+          <ModalNuevaOrden
+            isOpen={modalNuevaOrden}
+            onClose={() => setModalNuevaOrden(false)}
+            onSuccess={() => {
+              setModalNuevaOrden(false);
+              fetchData();
+            }}
+            esDiseñador={esDiseñador}
+          />
+        )}
+        {modalCrearDesdeSeleccion && (
+          <ModalCrearOrdenDesdeSolicitudes
+            isOpen={modalCrearDesdeSeleccion}
+            solicitudes={solicitudes.filter(s => solicitudesSeleccionadas.includes(s.id))}
+            cantidadesIniciales={cantidadesSolicitudesEditadas}
+            generarPDFOrden={generarPDFOrden}
+            onClose={() => setModalCrearDesdeSeleccion(false)}
+            onSuccess={() => {
+              setModalCrearDesdeSeleccion(false);
+              setSolicitudesSeleccionadas([]);
+              fetchData();
+            }}
+          />
+        )}
+        {modalAnular && ordenAAnular && (
+          <AnularOrdenCompraModal
+            isOpen={modalAnular}
+            onClose={() => {
+              setModalAnular(false);
+              setOrdenAAnular(null);
+            }}
+            orden={ordenAAnular}
+            onAnular={handleAnularOrden}
+          />
+        )}
+        {modalCancelarSolicitud && solicitudACancelar && (
+          <CancelarSolicitudModal
+            isOpen={modalCancelarSolicitud}
+            onClose={() => {
+              setModalCancelarSolicitud(false);
+              setSolicitudACancelar(null);
+            }}
+            solicitud={solicitudACancelar}
+            onCancelar={handleCancelarSolicitud}
+          />
+        )}
+        {modalEditarOrden && ordenAEditar && (
+          <EditarOrdenModal
+            isOpen={modalEditarOrden}
+            onClose={() => {
+              setModalEditarOrden(false);
+              setOrdenAEditar(null);
+            }}
+            orden={ordenAEditar}
+            onSuccess={handleEdicionExitosa}
+          />
+        )}
+        <ModalArticulosEncontrados
+          isOpen={modalArticulosEncontrados}
+          onClose={() => {
+            setModalArticulosEncontrados(false);
+            setArticulosBuscados([]);
+            setMostrandoBajoStock(false);
+          }}
+          articulos={articulosBuscados}
+          articulosConSolicitudIds={articulosConSolicitudIds}
+          onCrearSolicitud={async (articulo) => {
+            const stockFaltante = Math.max(0, parseFloat(articulo.stock_maximo || articulo.stock_minimo * 2) - parseFloat(articulo.stock_actual));
+            const cantidad = Math.ceil(stockFaltante) || 1;
+            const prioridad = parseFloat(articulo.stock_actual) < parseFloat(articulo.stock_minimo) ? 'alta' : 'media';
+            const motivo = `Reposición de stock. Stock actual: ${articulo.stock_actual} ${articulo.unidad}, Stock mínimo: ${articulo.stock_minimo} ${articulo.unidad}`;
+            await ordenesCompraService.crearSolicitudManual(articulo.id, cantidad, prioridad, motivo);
+            setArticulosConSolicitudIds(prev => [...prev, articulo.id]);
+            // Quitar el artículo de la lista para reflejar que ya se agregó,
+            // SIN cerrar la ventana: así se pueden agregar varios seguidos.
+            setArticulosBuscados(prev => prev.filter(a => a.id !== articulo.id));
+            // Refrescar solicitudes en segundo plano (no cierra el modal de bajo stock)
+            fetchData();
+          }}
+          titulo={mostrandoBajoStock ? 'Artículos bajo stock mínimo' : 'Resultados de búsqueda'}
+        />
+      </>
+    );
+    const comunesR2 = { loading, errorCarga: errorCargaR2, recargar: fetchData, estadisticas, esAdmin, esDiseñador, children: modalesR2 };
+    if (vistaActual === 'solicitudes') {
+      return (
+        <VistaSolicitudesR2
+          {...comunesR2}
+          solicitudes={solicitudes}
+          cantidadesSolicitudesEditadas={cantidadesSolicitudesEditadas}
+          cambiarCantidad={handleCantidadSolicitudChange}
+          obtenerProveedorSolicitud={obtenerProveedorSolicitud}
+          armarOrden={handleClickSolicitud}
+          abrirCancelar={handleAbrirModalCancelarSolicitud}
+          categoriasUnicas={categoriasUnicas}
+          abrirBajoStock={handleMostrarBajoStockMinimo}
+          buscandoArticulos={buscandoArticulos}
+          busquedaArticulo={busquedaArticulo}
+          setBusquedaArticulo={setBusquedaArticulo}
+          articulosBuscados={articulosBuscados}
+          elegirArticulo={(articulo) => {
+            handleAbrirModalCrearSolicitudArticulo(articulo);
+            setBusquedaArticulo('');
+            setArticulosBuscados([]);
+          }}
+          crear={{
+            abierto: modalCrearSolicitud,
+            articulo: articuloSeleccionado,
+            cantidad: cantidadSolicitud,
+            setCantidad: setCantidadSolicitud,
+            prioridad: prioridadSolicitud,
+            setPrioridad: setPrioridadSolicitud,
+            motivo: motivoSolicitud,
+            setMotivo: setMotivoSolicitud,
+            enviar: handleCrearSolicitudManual,
+            cargando: loading,
+            cerrar: () => {
+              setModalCrearSolicitud(false);
+              setArticuloSeleccionado(null);
+              setCantidadSolicitud('');
+              setPrioridadSolicitud('media');
+              setMotivoSolicitud('');
+            },
+          }}
+        />
+      );
+    }
+    return (
+      <VistaOrdenesR2
+        {...comunesR2}
+        ordenes={ordenes}
+        filteredOrdenes={filteredOrdenes}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        filterEstado={filterEstado}
+        setFilterEstado={setFilterEstado}
+        vistaOrdenes={vistaOrdenes}
+        setVistaOrdenes={setVistaOrdenes}
+        puedeCrearOrdenes={puedeCrearOrdenes}
+        puedeAnularOrdenes={puedeAnularOrdenes}
+        puedeReabrirOrdenes={puedeReabrirOrdenes}
+        abrirNueva={() => setModalNuevaOrden(true)}
+        verDetalle={handleVerDetalle}
+        generarPDFOrden={generarPDFOrden}
+        aprobar={handleAprobarOrden}
+        abrirRechazo={handleAbrirRechazo}
+        eliminar={handleEliminarOrden}
+        abrirAnular={handleAbrirModalAnular}
+        abrirEditar={handleAbrirModalEditar}
+        loadingAprobacion={loadingAprobacion}
+        ordenSeleccionada={ordenSeleccionada}
+        detalleAbierto={modalDetalle}
+        cerrarDetalle={() => {
+          setModalDetalle(false);
+          setOrdenSeleccionada(null);
+        }}
+        franjaPago={modalDetalle && ordenSeleccionada ? <FranjaPagoPedido ordenId={ordenSeleccionada.id} /> : null}
+        rechazo={{
+          abierto: modalRechazo,
+          orden: ordenParaRechazo,
+          motivo: motivoRechazo,
+          setMotivo: setMotivoRechazo,
+          confirmar: handleConfirmarRechazo,
+          cerrar: () => setModalRechazo(false),
+          cargando: loadingAprobacion,
+        }}
+      />
+    );
+  }
+
   if (loading) {
     return <Loader fullScreen />;
   }
@@ -1638,6 +1828,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
 // Modal para crear nueva orden
 const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
   const g3 = useDiseno3G(); // Diseño 3G: textos sin emojis (apagado, los de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2: cajón extra encendido
   const { user } = useAuth();
   const esAdmin = user?.rol === 'administrador';
 
@@ -1942,6 +2133,66 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
       return total + (parseFloat(item.cantidad) * parseFloat(item.costo_unitario || 0));
     }, 0);
   };
+
+  // Rediseño 2 · encendido: el mismo estado y el mismo envío en un cajón de dos zonas (el JSX de hoy sigue abajo)
+  if (d3) {
+    if (!isOpen) return null;
+    return (
+      <CajonNuevaOrdenR2
+        onClose={onClose}
+        esDiseñador={esDiseñador}
+        esAdmin={esAdmin}
+        proveedores={proveedores}
+        proveedorId={proveedorId}
+        setProveedorId={setProveedorId}
+        articulos={articulos}
+        articulosFiltrados={articulosFiltrados}
+        articulosPorCategoria={articulosPorCategoria}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        mostrarCatalogo={mostrarCatalogo}
+        setMostrarCatalogo={setMostrarCatalogo}
+        articulosSeleccionados={articulosSeleccionados}
+        handleSeleccionarArticulo={handleSeleccionarArticulo}
+        handleRemoverArticulo={handleRemoverArticulo}
+        handleCantidadChange={handleCantidadChange}
+        handleCostoChange={handleCostoChange}
+        articulosOrdenes={articulosOrdenes}
+        articulosSolicitudes={articulosSolicitudes}
+        articulosBajoStock={articulosBajoStock}
+        ordenesSeleccionadas={ordenesSeleccionadas}
+        setOrdenesSeleccionadas={setOrdenesSeleccionadas}
+        loadingPendientes={loadingPendientes}
+        handleAgregarDesdeSugerencias={handleAgregarDesdeSugerencias}
+        fechaLlegadaEstimada={fechaLlegadaEstimada}
+        setFechaLlegadaEstimada={setFechaLlegadaEstimada}
+        observaciones={observaciones}
+        setObservaciones={setObservaciones}
+        loading={loading}
+        handleSubmit={handleSubmit}
+        calcularTotal={calcularTotal}
+        abrirNuevoArticulo={() => setMostrarModalNuevoArticulo(true)}
+        nuevoArticulo={mostrarModalNuevoArticulo && (
+          <ModalNuevoArticulo
+            isOpen={mostrarModalNuevoArticulo}
+            onClose={() => setMostrarModalNuevoArticulo(false)}
+            categorias={categorias}
+            ubicaciones={ubicaciones}
+            proveedores={proveedores}
+            nombreInicial={searchTerm}
+            proveedorInicial={proveedorId}
+            onSuccess={(nuevoArticulo) => {
+              setArticulos([...articulos, nuevoArticulo]);
+              setMostrarModalNuevoArticulo(false);
+              // Agregar automáticamente el nuevo artículo a la orden
+              handleSeleccionarArticulo(nuevoArticulo);
+              toast.success('Artículo creado y agregado a la orden');
+            }}
+          />
+        )}
+      />
+    );
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Nueva Orden de Compra">
@@ -2499,6 +2750,7 @@ const diaDe = (aaaammdd) => DIA_CORTO.format(new Date(`${aaaammdd}T12:00:00Z`)).
 const horaDe = (iso) => HORA_MX.format(new Date(iso)).replace(/\./g, '');
 const FranjaPagoPedido = ({ ordenId }) => {
   const [datos, setDatos] = useState(null);
+  const d3 = useDiseno3GR2(); // Rediseño 2: sección del cajón encendido (la misma petición)
   useEffect(() => {
     let vigente = true;
     ordenesCompraService.obtenerSeguimiento(ordenId)
@@ -2507,6 +2759,7 @@ const FranjaPagoPedido = ({ ordenId }) => {
     return () => { vigente = false; };
   }, [ordenId]);
   if (!datos?.seguimiento?.length) return null;
+  if (d3) return <PagoPedidoR2 datos={datos} />;
   const actual = datos.actual;
   return (
     <section className="g3-tarjeta" aria-label="Pago y pedido (Julia)" style={{ borderLeft: `4px solid var(--g3-${actual?.tono || 'linea-fuerte'})` }}>
@@ -2885,6 +3138,7 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
   // Artículos que se darán de alta como herramienta al crear la orden
   const [marcadosHerramienta, setMarcadosHerramienta] = useState(new Set());
   const g3 = useDiseno3G(); // Diseño 3G: textos sin emojis (apagado, los de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2: cajón ancho encendido
 
   // Helper: Obtener el proveedor correcto (de artículo o herramienta)
   const obtenerProveedorSolicitud = (solicitud) => {
@@ -3189,6 +3443,48 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
     );
   };
 
+  // Rediseño 2 · encendido: mismo estado y mismo envío en un cajón ancho (el JSX de hoy sigue abajo)
+  if (d3) {
+    if (!isOpen) return null;
+    const preferidosR2 = solicitudes
+      .map(s => obtenerProveedorSolicitud(s)?.id)
+      .filter(id => id !== null && id !== undefined);
+    const mismoR2 = preferidosR2.length > 0 && preferidosR2.every(id => id === preferidosR2[0]);
+    const preferidoR2 = proveedorId && mismoR2 && preferidosR2[0].toString() === proveedorId
+      ? proveedores.find(p => p.id.toString() === proveedorId)?.nombre
+      : null;
+    return (
+      <CajonArmarOrdenR2
+        onClose={onClose}
+        solicitudes={solicitudes}
+        proveedores={proveedores}
+        proveedorId={proveedorId}
+        setProveedorId={setProveedorId}
+        preferido={preferidoR2}
+        fechaLlegadaEstimada={fechaLlegadaEstimada}
+        setFechaLlegadaEstimada={setFechaLlegadaEstimada}
+        observaciones={observaciones}
+        setObservaciones={setObservaciones}
+        loading={loading}
+        articulosAgrupados={articulosAgrupados}
+        cantidadesEditadas={cantidadesEditadas}
+        handleCantidadChange={handleCantidadChange}
+        handleEliminarArticulo={handleEliminarArticulo}
+        articulosExtra={articulosExtra}
+        handleCantidadExtraChange={handleCantidadExtraChange}
+        handleQuitarExtra={handleQuitarExtra}
+        marcadosHerramienta={marcadosHerramienta}
+        toggleHerramienta={toggleHerramienta}
+        busqueda={busqueda}
+        setBusqueda={setBusqueda}
+        resultadosBusqueda={resultadosBusqueda}
+        handleAgregarArticulo={handleAgregarArticulo}
+        calcularTotal={calcularTotal}
+        handleSubmit={handleSubmit}
+      />
+    );
+  }
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Crear Orden desde Solicitudes" size="xl">
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -3460,6 +3756,7 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
 // Modal para crear nuevo artículo desde la orden de compra
 const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedores, onSuccess, nombreInicial = '', proveedorInicial = '' }) => {
   const g3 = useDiseno3G(); // Diseño 3G: textos sin emojis (apagado, los de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2: cajón encendido
   const [formData, setFormData] = useState({
     nombre: nombreInicial || '',
     descripcion: '',
@@ -3585,6 +3882,28 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
       setLoading(false);
     }
   };
+
+  // Rediseño 2 · encendido: mismos campos y mismo envío en un cajón (el JSX de hoy sigue abajo)
+  if (d3) {
+    if (!isOpen) return null;
+    return (
+      <CajonNuevoArticuloR2
+        onClose={onClose}
+        formData={formData}
+        handleChange={handleChange}
+        categorias={categorias}
+        ubicaciones={ubicaciones}
+        proveedoresList={proveedoresList}
+        modoNuevoProveedor={modoNuevoProveedor}
+        nuevoProveedorNombre={nuevoProveedorNombre}
+        setNuevoProveedorNombre={setNuevoProveedorNombre}
+        handleCrearProveedorRapido={handleCrearProveedorRapido}
+        handleCancelarNuevoProveedor={handleCancelarNuevoProveedor}
+        loading={loading}
+        handleSubmit={handleSubmit}
+      />
+    );
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Crear Nuevo Artículo">
@@ -3829,6 +4148,7 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
 const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
   const [motivo, setMotivo] = useState('');
   const g3 = useDiseno3G(); // Diseño 3G: aviso sin emoji
+  const d3 = useDiseno3GR2(); // Rediseño 2: diálogo de confirmación encendido
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -3849,6 +4169,15 @@ const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
       setLoading(false);
     }
   };
+
+  // Rediseño 2 · encendido: el mismo motivo y el mismo envío en un diálogo corto (el JSX de hoy sigue abajo)
+  if (d3) {
+    if (!isOpen) return null;
+    return (
+      <DialogoCancelarSolicitudR2 onClose={onClose} solicitud={solicitud} motivo={motivo} setMotivo={setMotivo}
+        loading={loading} handleSubmit={handleSubmit} />
+    );
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Cancelar Solicitud de Compra" size="md">
@@ -3922,9 +4251,27 @@ const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
 };
 
 // Sub-componente botón para crear solicitud directamente
-const ArticuloSolicitudBtn = ({ articulo, onCrearSolicitud, tieneSolicitud }) => {
+const ArticuloSolicitudBtn = ({ articulo, onCrearSolicitud, tieneSolicitud, corto }) => {
   const [loading, setLoading] = useState(false);
   const [creada, setCreada] = useState(false);
+  const d3 = useDiseno3GR2(); // Rediseño 2: botón tonal encendido
+
+  // Rediseño 2 · encendido: el mismo clic de abajo (crear la solicitud y avisar), con el botón de la vista nueva
+  if (d3) {
+    const crearR2 = async () => {
+      setLoading(true);
+      try {
+        await onCrearSolicitud(articulo);
+        setCreada(true);
+        toast.success(g3Activo() ? `Solicitud creada: ${articulo.nombre}` : `✅ Solicitud creada: ${articulo.nombre}`);
+      } catch (error) {
+        toast.error(error.response?.data?.message || error.message || 'Error al crear solicitud');
+      } finally {
+        setLoading(false);
+      }
+    };
+    return <BotonSolicitudR2 loading={loading} creada={creada} tieneSolicitud={tieneSolicitud} alCrear={crearR2} nombre={articulo.nombre} corto={corto} />;
+  }
 
   if (tieneSolicitud || creada) {
     return (
@@ -3968,8 +4315,9 @@ const ArticuloSolicitudBtn = ({ articulo, onCrearSolicitud, tieneSolicitud }) =>
 
 // Modal de Artículos Encontrados
 // Sub-componente para mostrar último movimiento de un artículo
-const UltimoMovimientoInfo = ({ articuloId }) => {
+const UltimoMovimientoInfo = ({ articuloId, soloFecha }) => {
   const g3 = useDiseno3G(); // Diseño 3G: sin emoji
+  const d3 = useDiseno3GR2(); // Rediseño 2: fecha legible encendido (la misma petición)
   const [mov, setMov] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -3987,6 +4335,7 @@ const UltimoMovimientoInfo = ({ articuloId }) => {
     fetchMov();
   }, [articuloId]);
 
+  if (d3) return <UltimoMovimientoR2 loading={loading} mov={mov} soloFecha={soloFecha} />;
   if (loading) return <span className="text-xs text-gray-400">Cargando...</span>;
   if (!mov) return <span className="text-xs text-gray-400 italic">Sin movimientos</span>;
 
@@ -4009,6 +4358,7 @@ const UltimoMovimientoInfo = ({ articuloId }) => {
 
 const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitud, titulo, articulosConSolicitudIds = [] }) => {
   const g3 = useDiseno3G(); // Diseño 3G: estado del stock con texto, sin emoji
+  const d3 = useDiseno3GR2(); // Rediseño 2: cajón con tabla encendido
   // Filtros por Almacén y Sección (default Principal / Stock).
   const [filtroAlmacen, setFiltroAlmacen] = useState('Principal');
   const [filtroSeccion, setFiltroSeccion] = useState('Stock');
@@ -4218,6 +4568,29 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
       toast.error('Error al generar PDF', { id: 'pdf-loading' });
     }
   };
+
+  // Rediseño 2 · encendido: los mismos filtros, el mismo PDF y los mismos renglones (con su «última actualización») en tabla
+  if (d3) {
+    return (
+      <CajonBajoStockR2
+        onClose={onClose}
+        titulo={titulo}
+        articulos={articulos}
+        articulosFiltrados={articulosFiltrados}
+        filtroAlmacen={filtroAlmacen}
+        setFiltroAlmacen={setFiltroAlmacen}
+        filtroSeccion={filtroSeccion}
+        setFiltroSeccion={setFiltroSeccion}
+        almacenesUnicos={almacenesUnicos}
+        seccionesUnicas={seccionesUnicas}
+        generarPDFBajoStock={generarPDFBajoStock}
+        BotonSolicitud={ArticuloSolicitudBtn}
+        UltimoMovimiento={UltimoMovimientoInfo}
+        onCrearSolicitud={onCrearSolicitud}
+        articulosConSolicitudIds={articulosConSolicitudIds}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

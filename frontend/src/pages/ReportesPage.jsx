@@ -6,6 +6,9 @@ import toast from 'react-hot-toast';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import { g3Activo, confirmarG3, cx, etq } from '../diseno-3g/dialogosG3';
+// Rediseño 2 · vista encendida (apagado no la usa): mismo reporte, misma selección y la misma petición de aplicar
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaReportes from '../rediseno2/gestion/VistaReportes';
 
 const formatCurrency = (n) => `$${(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatNumber = (n) => (n || 0).toLocaleString('es-MX');
@@ -134,6 +137,8 @@ const ReportesPage = () => {
     const [filtroAccion, setFiltroAccion] = useState('todos');
     // Mín/máx escritos a mano en la tabla: id → { min, max } (texto del input)
     const [valores, setValores] = useState({});
+    const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+    const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
     const cargar = async () => {
         try {
@@ -142,9 +147,11 @@ const ReportesPage = () => {
             setData(res);
             setSeleccion(new Set());
             setValores({});
+            setErrorCargaR2(null);
         } catch (err) {
             console.error(err);
             toast.error('Error al cargar el reporte');
+            setErrorCargaR2(err.response?.data?.message || err.message || 'Error al cargar el reporte');
         } finally {
             setLoading(false);
         }
@@ -253,6 +260,16 @@ const ReportesPage = () => {
             setAplicando(false);
         }
     };
+
+    // Rediseño 2 · vista ENCENDIDA: los mismos datos y los mismos manejadores (el JSX de hoy sigue intacto debajo)
+    if (d3) {
+        return (
+            <VistaReportes data={data} loading={loading} errorCarga={errorCargaR2} dias={dias} setDias={setDias} cargar={cargar}
+                filtroAccion={filtroAccion} setFiltroAccion={setFiltroAccion} seleccion={seleccion} setSeleccion={setSeleccion}
+                aplicando={aplicando} aplicar={aplicar} sugerenciasFiltradas={sugerenciasFiltradas} propuesta={propuesta}
+                editarValor={editarValor} valores={valores} toggleSeleccion={toggleSeleccion} seleccionarTodos={seleccionarTodos} />
+        );
+    }
 
     if (loading && !data) return <Loader fullScreen />;
 

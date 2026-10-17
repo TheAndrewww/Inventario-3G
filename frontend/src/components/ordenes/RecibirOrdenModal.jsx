@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, PackageCheck, AlertCircle, Info, CheckCircle, Check, Pencil, MessageSquarePlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ordenesCompraService from '../../services/ordenesCompra.service';
+// Rediseño 2 · vista encendida (apagado no la usa)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import { Cajon as CajonR2, CajonCabecera as CajonCabeceraR2 } from '../../rediseno2/fundacion';
+import RecibirManoR2 from '../../rediseno2/compras/RecibirMano';
 
 const formatCantidad = (n) => {
   const v = parseFloat(n) || 0;
@@ -17,7 +21,8 @@ const MOTIVOS_FALTANTE = [
   { valor: 'otro', texto: 'Otro' }
 ];
 
-const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
+const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess, incrustado = false, alPie = null, alOcupado = null }) => {
+  const d3 = useDiseno3GR2(); // Rediseño 2: «Capturar a mano» dentro del cajón «Recibir» encendido
   const [articulos, setArticulos] = useState([]);
   const [observacionesGenerales, setObservacionesGenerales] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -27,6 +32,12 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
   // Motivo por SKU que quedó corto: { [detalle_id]: 'incompleto' | 'calidad' | ... }
   const [motivosFaltante, setMotivosFaltante] = useState({});
   const [completando, setCompletando] = useState(false);
+  // Rediseño 2: avisa al cajón «Recibir» que se está registrando, para que no se cierre a medias (hoy tampoco se puede)
+  useEffect(() => {
+    if (!alOcupado) return undefined;
+    alOcupado(guardando || completando);
+    return () => alOcupado(false); // al cerrarse (también tras registrar) el cajón queda libre
+  }, [alOcupado, guardando, completando]);
   const inputsCantidad = useRef({});
 
   useEffect(() => {
@@ -316,6 +327,56 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
   const progreso = calcularProgreso();
 
   if (!isOpen) return null;
+
+  // Rediseño 2 · encendido: el mismo estado y las mismas peticiones en una tabla (el JSX de hoy sigue abajo)
+  if (d3) {
+    const contenidoR2 = (
+      <RecibirManoR2
+        articulos={articulos}
+        observacionesGenerales={observacionesGenerales}
+        setObservacionesGenerales={setObservacionesGenerales}
+        guardando={guardando}
+        errores={errores}
+        togglePalomear={togglePalomear}
+        marcarCompleto={marcarCompleto}
+        activarOtraCantidad={activarOtraCantidad}
+        handleCantidadChange={handleCantidadChange}
+        handleObservacionChange={handleObservacionChange}
+        actualizarArticulo={actualizarArticulo}
+        togglePalomearTodo={togglePalomearTodo}
+        todoPalomeado={todoPalomeado}
+        palomeados={palomeados}
+        recibiblesIds={recibiblesIds}
+        hayArticulosPendientes={hayArticulosPendientes}
+        progreso={progreso}
+        handleSubmit={handleSubmit}
+        onClose={onClose}
+        abrirCerrarIncompleta={abrirCerrarIncompleta}
+        inputsCantidad={inputsCantidad}
+        alPie={alPie}
+        mostrarModalCompletar={mostrarModalCompletar}
+        cerrarDialogoCompletar={() => {
+          setMostrarModalCompletar(false);
+          setMotivoCompletar('');
+        }}
+        faltantesAlCerrar={faltantesAlCerrar}
+        motivosFaltante={motivosFaltante}
+        setMotivosFaltante={setMotivosFaltante}
+        motivoCompletar={motivoCompletar}
+        setMotivoCompletar={setMotivoCompletar}
+        completando={completando}
+        handleCompletarManualmente={handleCompletarManualmente}
+        motivos={MOTIVOS_FALTANTE}
+      />
+    );
+    if (incrustado) return contenidoR2;
+    return (
+      <CajonR2 abierto alCerrar={guardando ? () => {} : onClose} ancho="ancho" etiqueta={`Recibir ${orden?.ticket_id || ''}`}>
+        <CajonCabeceraR2 titulo={`Recibir ${orden?.ticket_id || ''}`} dato={orden?.proveedor?.nombre} alCerrar={guardando ? undefined : onClose} />
+        {contenidoR2}
+      </CajonR2>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

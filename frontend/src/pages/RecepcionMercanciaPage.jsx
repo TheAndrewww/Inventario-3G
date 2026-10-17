@@ -12,6 +12,9 @@ import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import MasAcciones from '../diseno-3g/MasAcciones';
 import { cx, etq } from '../diseno-3g/dialogosG3';
+// Rediseño 2 · vista encendida (apagado no la usa)
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaRecepcionR2 from '../rediseno2/compras/VistaRecepcion';
 
 const RecepcionMercanciaPage = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -26,6 +29,8 @@ const RecepcionMercanciaPage = () => {
   const [conteoActivo, setConteoActivo] = useState(null);
   const { user: usuario } = useAuth();
   const g3 = useDiseno3G(); // Diseño 3G: encabezado, estados, tabla en tarjetas y un botón principal por renglón (apagado, lo de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+  const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
   useEffect(() => {
     cargarOrdenesPendientes();
@@ -52,9 +57,11 @@ const RecepcionMercanciaPage = () => {
         orden.estado === 'enviada' || orden.estado === 'parcial'
       );
       setOrdenes(ordenesPendientes);
+      setErrorCargaR2(null);
     } catch (error) {
       console.error('Error al cargar órdenes:', error);
       toast.error('Error al cargar las órdenes pendientes');
+      setErrorCargaR2(error?.response?.data?.message || error?.message || 'Error al cargar las órdenes pendientes');
     } finally {
       setLoading(false);
     }
@@ -126,6 +133,57 @@ const RecepcionMercanciaPage = () => {
 
   // Verificar permisos
   const puedeRecibir = ['administrador', 'admin', 'almacen', 'compras'].includes(usuario?.rol);
+
+  // Rediseño 2 · vista ENCENDIDA. Mismo estado, mismas peticiones y mismos manejadores; el conteo y el historial se montan
+  // con las mismas props de abajo (cada uno pinta su versión nueva encendido). El JSX de hoy sigue intacto debajo.
+  if (d3) {
+    return (
+      <VistaRecepcionR2
+        ordenes={ordenes}
+        filteredOrdenes={filteredOrdenes}
+        loading={loading}
+        errorCarga={errorCargaR2}
+        recargar={cargarOrdenesPendientes}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        conteosAbiertos={conteosAbiertos}
+        abrirConteo={setConteoActivo}
+        puedeRecibir={puedeRecibir}
+        ordenMano={modalRecibirOrden ? ordenARecibir : null}
+        ordenFactura={ordenConFactura}
+        abrirMano={handleAbrirModalRecibir}
+        cerrarMano={handleCerrarModalRecibir}
+        alExitoMano={handleRecepcionExitosa}
+        abrirFactura={setOrdenConFactura}
+        cerrarFactura={() => setOrdenConFactura(null)}
+        alExitoFactura={(data) => {
+          if (data?.orden) handleRecepcionExitosa(data.orden);
+          setOrdenConFactura(null);
+          cargarConteosAbiertos();
+        }}
+        abrirHistorial={handleAbrirHistorial}
+      >
+        {conteoActivo && (
+          <ConteoRecepcionModal
+            isOpen={!!conteoActivo}
+            onClose={() => setConteoActivo(null)}
+            conteo={conteoActivo}
+            onSuccess={() => {
+              cargarConteosAbiertos();
+              cargarOrdenesPendientes();
+            }}
+          />
+        )}
+        {modalHistorialRecepciones && ordenParaHistorial && (
+          <HistorialRecepcionesOrden
+            isOpen={modalHistorialRecepciones}
+            onClose={handleCerrarHistorial}
+            orden={ordenParaHistorial}
+          />
+        )}
+      </VistaRecepcionR2>
+    );
+  }
 
   if (loading) {
     return (

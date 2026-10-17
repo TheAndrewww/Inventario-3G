@@ -2,12 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle, Package, X } from 'lucide-react';
 import { getImageUrl } from '../../utils/imageUtils';
 import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
+import { useDiseno3G as useRediseno2 } from '../../rediseno2/fundacion/useDiseno3G';
+import { AvisoLecturaR2 } from '../../rediseno2/tickets/PiezasEscaner';
 
 /**
  * Componente de notificación visual cuando se escanea y agrega un artículo exitosamente
  */
 const ScanSuccessNotification = ({ articulo, onClose }) => {
   const g3 = useDiseno3G(); // Diseño 3G: sin emoji (ya lleva el ícono de palomita)
+  const d3 = useRediseno2(); // Rediseño 2: encendido, el aviso común de lectura (mismo tiempo y mismo cierre)
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
@@ -23,6 +26,15 @@ const ScanSuccessNotification = ({ articulo, onClose }) => {
   if (!articulo) return null;
 
   const imagenUrl = articulo.imagen_url ? getImageUrl(articulo.imagen_url) : null;
+
+  if (d3) {
+    return (
+      <AvisoLecturaR2 articulo={articulo} visible={visible} alCerrar={() => {
+        setVisible(false);
+        setTimeout(onClose, 300);
+      }} />
+    );
+  }
 
   return (
     <div

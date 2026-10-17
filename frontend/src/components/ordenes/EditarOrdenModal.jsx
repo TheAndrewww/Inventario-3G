@@ -4,6 +4,9 @@ import toast from 'react-hot-toast';
 import articulosService from '../../services/articulos.service';
 import proveedoresService from '../../services/proveedores.service';
 import ordenesCompraService from '../../services/ordenesCompra.service';
+// Rediseño 2 · vista encendida (apagado no la usa)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CajonEditarOrdenR2 from '../../rediseno2/compras/CajonEditarOrden';
 
 const EditarOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
   const [articulos, setArticulos] = useState([]);
@@ -15,6 +18,7 @@ const EditarOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [mostrarCatalogo, setMostrarCatalogo] = useState(false);
+  const d3 = useDiseno3GR2(); // Rediseño 2: cajón ancho encendido
 
   useEffect(() => {
     if (isOpen && orden) {
@@ -161,6 +165,36 @@ const EditarOrdenModal = ({ isOpen, onClose, orden, onSuccess }) => {
   };
 
   if (!isOpen) return null;
+
+  // Rediseño 2 · encendido: el mismo estado y el mismo envío en un cajón (el JSX de hoy sigue abajo)
+  if (d3) {
+    return (
+      <CajonEditarOrdenR2
+        onClose={onClose}
+        orden={orden}
+        proveedores={proveedores}
+        proveedorId={proveedorId}
+        setProveedorId={setProveedorId}
+        fechaLlegadaEstimada={fechaLlegadaEstimada}
+        setFechaLlegadaEstimada={setFechaLlegadaEstimada}
+        observaciones={observaciones}
+        setObservaciones={setObservaciones}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        mostrarCatalogo={mostrarCatalogo}
+        setMostrarCatalogo={setMostrarCatalogo}
+        articulosFiltrados={articulosFiltrados}
+        handleSeleccionarArticulo={handleSeleccionarArticulo}
+        articulosSeleccionados={articulosSeleccionados}
+        handleRemoverArticulo={handleRemoverArticulo}
+        handleCantidadChange={handleCantidadChange}
+        handleCostoChange={handleCostoChange}
+        loading={loading}
+        handleSubmit={handleSubmit}
+        calcularTotal={calcularTotal}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

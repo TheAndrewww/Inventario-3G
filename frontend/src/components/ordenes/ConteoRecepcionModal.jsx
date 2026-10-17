@@ -3,6 +3,9 @@ import { X, ClipboardCheck, AlertTriangle, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ordenesCompraService from '../../services/ordenesCompra.service';
 import { g3Activo, confirmarG3 } from '../../diseno-3g/dialogosG3';
+// Rediseño 2 · vista encendida (apagado no la usa)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CajonConteoR2 from '../../rediseno2/compras/CajonConteo';
 
 const formatCantidad = (n) => {
     const v = parseFloat(n) || 0;
@@ -20,6 +23,7 @@ const ConteoRecepcionModal = ({ isOpen, onClose, conteo, onSuccess }) => {
         return inicial;
     });
     const [guardando, setGuardando] = useState(false);
+    const d3 = useDiseno3GR2(); // Rediseño 2: cajón del conteo encendido
 
     if (!isOpen || !conteo) return null;
 
@@ -72,6 +76,14 @@ const ConteoRecepcionModal = ({ isOpen, onClose, conteo, onSuccess }) => {
             setGuardando(false);
         }
     };
+
+    // Rediseño 2 · encendido: lo mismo en un cajón con tabla (el JSX de hoy sigue abajo)
+    if (d3) {
+        return (
+            <CajonConteoR2 onClose={onClose} conteo={conteo} contados={contados} setContados={setContados}
+                faltantes={faltantes} sobrantes={sobrantes} guardando={guardando} cerrarConteo={cerrar} />
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">

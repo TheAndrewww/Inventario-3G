@@ -4,6 +4,9 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
+// Rediseño 2: encendido, rediseno2/inventario/VistaDescontar (mismo estado, mismas peticiones)
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaDescontar from '../rediseno2/inventario/VistaDescontar';
 
 const API = '/descontar-almacen';
 const API_ROLLOS = '/rollos-membrana';
@@ -36,6 +39,8 @@ const DescontarAlmacenPage = () => {
     const cantidadRolloRef = useRef(null);
     const searchRef = useRef(null);
     const g3 = useDiseno3G(); // Diseño 3G: encabezado, botones de acción y textos sin emojis (apagado, lo de siempre)
+    const d3 = useDiseno3GR2(); // Rediseño 2 encendido
+    const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de carga para la vista nueva (avisos y consola de siempre)
 
     useEffect(() => {
         cargarAlmacenes();
@@ -46,7 +51,9 @@ const DescontarAlmacenPage = () => {
         try {
             const res = await api.get(`${API}/almacenes`);
             setAlmacenes(res.data.data || []);
+            setErrorCargaR2(null);
         } catch (error) {
+            setErrorCargaR2({ de: 'almacenes', motivo: error?.response?.data?.message || error?.message || 'Error al cargar almacenes' });
             toast.error('Error al cargar almacenes');
         } finally {
             setLoading(false);
@@ -66,7 +73,9 @@ const DescontarAlmacenPage = () => {
             const params = search ? `?search=${encodeURIComponent(search)}` : '';
             const res = await api.get(`${API}/${encodeURIComponent(almacen)}/articulos${params}`);
             setArticulos(res.data.data || []);
+            setErrorCargaR2(null);
         } catch (error) {
+            setErrorCargaR2({ de: 'articulos', motivo: error?.response?.data?.message || error?.message || 'Error cargando artículos' });
             console.error('Error cargando artículos:', error);
         } finally {
             setLoadingArticulos(false);
@@ -216,6 +225,20 @@ const DescontarAlmacenPage = () => {
     };
 
     const barColor = (pct) => pct > 50 ? 'bg-emerald-500' : pct > 20 ? 'bg-amber-500' : 'bg-red-500';
+
+    // Rediseño 2 encendido: el almacén como filtro y «Descontar» con texto en cada renglón (mismo estado y mismos manejadores)
+    if (d3) {
+        return (
+            <VistaDescontar d={{
+                almacenes, almacenSeleccionado, articulos, busqueda, setBusqueda, loading, loadingArticulos,
+                articuloDescuento, setArticuloDescuento, cantidad, setCantidad, observaciones, setObservaciones, descontando,
+                esMembranas, rollosArticulo, rollos, loadingRollos, rolloSeleccionado, setRolloSeleccionado, cantidadRollo, setCantidadRollo,
+                obsRollo, setObsRollo, descontandoRollo, cantidadRef, cantidadRolloRef,
+                seleccionarAlmacen, abrirDescuento, confirmarDescuento, seleccionarRollo, confirmarDescuentoRollo, cerrarRollos, volverAAlmacenes,
+                errorCargaR2, cargarAlmacenes, cargarArticulos,
+            }} />
+        );
+    }
 
     if (loading) {
         return (

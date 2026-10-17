@@ -8,6 +8,9 @@ import toast from 'react-hot-toast';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import { g3Activo, confirmarG3, pedirTextoG3, cx, siG3 } from '../diseno-3g/dialogosG3';
+// Rediseño 2: encendido, rediseno2/inventario/VistaSolicitudesCambio (mismo estado, mismas peticiones)
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaSolicitudesCambio from '../rediseno2/inventario/VistaSolicitudesCambio';
 
 const TIPO_LABEL = {
   cambio_ubicacion: 'Cambio de ubicación',
@@ -42,6 +45,7 @@ const SolicitudesCambioPage = () => {
   // Quién puede resolver una solicitud: admin todas; compras solo reactivaciones.
   const puedeResolver = (s) => esAdmin || (esCompras && s.tipo === 'reactivar_articulo');
   const g3 = useDiseno3G(); // Diseño 3G: encabezado, pestañas, estados y confirmaciones del paquete (apagado, lo de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2 encendido
 
   const [solicitudes, setSolicitudes] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
@@ -50,6 +54,7 @@ const SolicitudesCambioPage = () => {
   const [procesandoId, setProcesandoId] = useState(null);
   const [ajusteDirecto, setAjusteDirecto] = useState(false);
   const [cambiandoAjuste, setCambiandoAjuste] = useState(false);
+  const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de carga para la vista nueva (el aviso de siempre no cambia)
 
   const cargar = async (opts = {}) => {
     const { silent = false } = opts;
@@ -61,8 +66,10 @@ const SolicitudesCambioPage = () => {
       ]);
       setSolicitudes(resSol?.data?.solicitudes || []);
       setUbicaciones(Array.isArray(resUb) ? resUb : []);
+      setErrorCargaR2(null);
     } catch (e) {
       console.error(e);
+      if (!silent) setErrorCargaR2(e?.response?.data?.message || e?.message || 'Error al cargar solicitudes');
       if (!silent) toast.error('Error al cargar solicitudes');
     } finally {
       if (!silent) setLoading(false);
@@ -217,6 +224,15 @@ const SolicitudesCambioPage = () => {
     if (!fecha) return '';
     return new Date(fecha).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
   };
+
+  if (d3) {
+    return (
+      <VistaSolicitudesCambio s={{
+        esAdmin, esCompras, puedeResolver, solicitudes, filtradas, tabActivo, setTabActivo, loading, procesandoId,
+        ajusteDirecto, cambiandoAjuste, toggleAjusteDirecto, cargar, aprobar, rechazar, describirCambio, TIPO_LABEL, errorCargaR2,
+      }} />
+    );
+  }
 
   return (
     <div className="p-4 md:p-6">

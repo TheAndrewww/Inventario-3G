@@ -8,6 +8,9 @@ import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import MasAcciones from '../diseno-3g/MasAcciones';
 import { g3Activo, confirmarG3, pedirTextoG3, cx, etq } from '../diseno-3g/dialogosG3';
+// Rediseño 2 · vista encendida (apagado no la usa): mismo estado, mismas confirmaciones y las mismas peticiones
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaUsuarios from '../rediseno2/gestion/VistaUsuarios';
 
 const UsuariosPage = () => {
   const [usuarios, setUsuarios] = useState([]);
@@ -18,6 +21,8 @@ const UsuariosPage = () => {
   const [filtroRol, setFiltroRol] = useState('');
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const g3 = useDiseno3G(); // Diseño 3G: encabezado, tabla en tarjetas, acciones y confirmación del paquete (apagado, lo de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+  const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
@@ -53,9 +58,11 @@ const UsuariosPage = () => {
       setCargando(true);
       const response = await usuariosService.obtenerTodos();
       setUsuarios(response.data.usuarios || []);
+      setErrorCargaR2(null);
     } catch (error) {
       console.error('Error al cargar usuarios:', error);
       toast.error('Error al cargar usuarios');
+      setErrorCargaR2(error?.response?.data?.message || error?.message || 'Error al cargar usuarios');
     } finally {
       setCargando(false);
     }
@@ -260,6 +267,20 @@ const UsuariosPage = () => {
     const matchEstado = mostrarInactivos ? !usuario.activo : usuario.activo;
     return matchBusqueda && matchRol && matchEstado;
   });
+
+  // Rediseño 2 · vista ENCENDIDA: los mismos datos y los mismos manejadores (el JSX de hoy sigue intacto debajo)
+  if (d3) {
+    return (
+      <VistaUsuarios
+        usuarios={usuarios} cargando={cargando} errorCarga={errorCargaR2} recargar={cargarUsuarios} busqueda={busqueda} setBusqueda={setBusqueda}
+        filtroRol={filtroRol} setFiltroRol={setFiltroRol} mostrarInactivos={mostrarInactivos} setMostrarInactivos={setMostrarInactivos}
+        usuariosFiltrados={usuariosFiltrados} totalInactivos={totalInactivos} mostrarModal={mostrarModal} usuarioEditando={usuarioEditando}
+        formData={formData} setFormData={setFormData} abrirModalNuevo={abrirModalNuevo} abrirModalEditar={abrirModalEditar} cerrarModal={cerrarModal}
+        handleSubmit={handleSubmit} handleEliminar={handleEliminar} handleReactivar={handleReactivar} handleEliminarPermanente={handleEliminarPermanente}
+        reporteC3g={g3 ? reporteC3g : null}
+      />
+    );
+  }
 
   if (cargando) {
     return (

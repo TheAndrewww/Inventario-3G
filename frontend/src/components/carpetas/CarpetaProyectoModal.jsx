@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
 import api from '../../services/api';
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import VistaCarpeta from '../../rediseno2/produccion/VistaCarpeta';
 
 const ICONOS = {
   imagen: ImageIcon,
@@ -65,9 +67,31 @@ const useArchivoBlob = (ruta, activo = true) => {
 
 const Miniatura = ({ archivo, ruta, onClick }) => {
   const g3 = useDiseno3G(); // Diseño 3G: ícono en vez de emoji y letra de 12 px como mínimo
+  const d3 = useDiseno3GR2(); // Rediseño 2: encendido, la miniatura nueva
   const esImagen = archivo.tipo === 'imagen';
   const { url, error } = useArchivoBlob(ruta, esImagen);
   const Icono = ICONOS[archivo.tipo] || File;
+
+  // Rediseño 2 (encendido): misma miniatura (la misma petición de la imagen), con el aspecto nuevo
+  if (d3) {
+    return (
+      <button type="button" onClick={onClick} className="r2-prod-archivo" title={archivo.nombre}>
+        <span className="r2-prod-archivo-vista">
+          {esImagen && url ? (
+            <img src={url} alt="" />
+          ) : esImagen && !error ? (
+            <span className="r2-hueso r2-prod-archivo-hueso" aria-hidden="true" />
+          ) : (
+            <Icono size={32} aria-hidden="true" className={archivo.tipo === 'pdf' ? 'r2-tono--mal' : undefined} />
+          )}
+        </span>
+        <span className="r2-prod-archivo-nombre">{archivo.nombre}</span>
+        {archivo.subcarpeta && (
+          <span className="r2-prod-archivo-sub"><Folder size={14} aria-hidden="true" />{archivo.subcarpeta}</span>
+        )}
+      </button>
+    );
+  }
 
   return (
     <button
@@ -102,6 +126,41 @@ const Miniatura = ({ archivo, ruta, onClick }) => {
 
 const Visor = ({ archivo, ruta, onVolver }) => {
   const { url, error } = useArchivoBlob(ruta);
+  const d3 = useDiseno3GR2(); // Rediseño 2: encendido, el mismo visor con el aspecto nuevo (misma petición del archivo)
+
+  if (d3) {
+    return (
+      <div className="r2-prod-visor">
+        <div className="r2-prod-visor-cab">
+          <button type="button" onClick={onVolver} className="r2-boton r2-boton--fantasma r2-boton--normal">
+            <ArrowLeft size={18} aria-hidden="true" className="r2-boton-svg" /><span className="r2-boton-texto">Volver a la carpeta</span>
+          </button>
+          <span className="r2-prod-visor-nombre">{archivo.nombre}</span>
+        </div>
+        <div className="r2-prod-visor-marco">
+          {error ? (
+            <div className="r2-vacio" role="alert">
+              <AlertCircle size={24} aria-hidden="true" className="r2-tono--mal" />
+              <p className="r2-vacio-titulo">No se pudo abrir el archivo</p>
+            </div>
+          ) : !url ? (
+            <span className="r2-hueso r2-prod-visor-hueso" role="status" aria-label="Abriendo archivo…" />
+          ) : archivo.tipo === 'imagen' ? (
+            <img src={url} alt={archivo.nombre} />
+          ) : archivo.tipo === 'video' ? (
+            <video src={url} controls />
+          ) : archivo.tipo === 'pdf' ? (
+            <iframe src={url} title={archivo.nombre} />
+          ) : (
+            <div className="r2-vacio">
+              <File size={24} aria-hidden="true" className="r2-vacio-icono" />
+              <p className="r2-vacio-titulo">Este tipo de archivo no se puede ver aquí.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -143,7 +202,16 @@ const Visor = ({ archivo, ruta, onVolver }) => {
 };
 
 export const Dato = ({ icono, etiqueta, valor }) => {
+  const d3 = useDiseno3GR2(); // Rediseño 2: encendido, etiqueta arriba (13 px) y valor (15 px), sin ícono ni mayúsculas
   if (!valor) return null;
+  if (d3) {
+    return (
+      <div className="r2-dato">
+        <dt>{etiqueta}</dt>
+        <dd>{valor}</dd>
+      </div>
+    );
+  }
   return (
     <div className="flex items-start gap-2">
       <span className="text-gray-400 mt-0.5 flex-shrink-0">{icono}</span>
@@ -184,6 +252,7 @@ const CarpetaProyectoModal = ({
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState(null);
   const [archivoAbierto, setArchivoAbierto] = useState(null);
+  const d3 = useDiseno3GR2(); // Rediseño 2: encendido, la carpeta en un cajón (abajo, antes del return de siempre)
 
   const ejecutar = useCallback(async () => {
     setCargando(true);
@@ -238,6 +307,23 @@ const CarpetaProyectoModal = ({
         }
       ].filter(s => s.archivos.length > 0)
     : [{ titulo: `Archivos (${archivos.length})`, archivos }];
+
+  // Rediseño 2 (encendido): mismo contenido y mismas peticiones, en un cajón lateral
+  if (d3) {
+    return (
+      <VistaCarpeta
+        titulo={titulo} subtitulo={subtitulo} textoCargando={textoCargando} cargando={cargando} error={error} datos={datos}
+        archivoAbierto={archivoAbierto} ejecutar={ejecutar} onClose={onClose} datosProyecto={datosProyecto} grupos={grupos}
+        secciones={grupos ? secciones : [{ titulo: `Archivos · ${archivos.length}`, archivos }]} archivos={archivos}
+        pintarMiniatura={(archivo) => (
+          <Miniatura archivo={archivo} ruta={rutaArchivo(archivo.id)} onClick={() => setArchivoAbierto(archivo)} />
+        )}
+        pintarVisor={() => (
+          <Visor archivo={archivoAbierto} ruta={rutaArchivo(archivoAbierto.id)} onVolver={() => setArchivoAbierto(null)} />
+        )}
+      />
+    );
+  }
 
   return (
     <div

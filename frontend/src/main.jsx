@@ -8,6 +8,9 @@ import './diseno-3g/planta-3g.css'
 // Diseño 3G para las pantallas públicas de TV (todo bajo html[data-g3-tv]; solo con ?diseno=3g en esa carga). Ver src/diseno-3g/tvG3.js
 import './diseno-3g/planta-tv-mapa.css'
 import './diseno-3g/planta-tv-3g.css'
+// Rediseño 2 (todo bajo :root[data-diseno="3g"]; apagado no cambia nada). Ver src/rediseno2/fundacion/index.js
+import './rediseno2/fundacion/r2.css'
+import './rediseno2/fundacion/r2-piso.css'
 import './diseno-3g/diseno-3g.js'
 import App from './App.jsx'
 

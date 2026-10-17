@@ -4,11 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+// Rediseño 2 · vista encendida (apagado no la usa): los mismos datos y el mismo cerrar sesión
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaPerfil from '../rediseno2/gestion/VistaPerfil';
 
 const PerfilPage = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const g3 = useDiseno3G(); // Diseño 3G: textos en oración y colores del paquete (apagado, lo de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
 
   const handleLogout = () => {
     logout();
@@ -23,6 +27,9 @@ const PerfilPage = () => {
       ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
       : nombre.substring(0, 2).toUpperCase();
   };
+
+  // Rediseño 2 · vista ENCENDIDA (el JSX de hoy sigue intacto debajo)
+  if (d3) return <VistaPerfil user={user} handleLogout={handleLogout} />;
 
   return (
     <div className="p-6 max-w-4xl mx-auto">

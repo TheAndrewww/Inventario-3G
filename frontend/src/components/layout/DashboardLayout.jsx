@@ -4,8 +4,8 @@ import Header from './Header';
 import SubPestanasGrupo from './SubPestanasGrupo';
 import { Outlet } from 'react-router-dom';
 import { useCalendario } from '../../context/CalendarioContext';
-import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
-import MarcoPlanta from '../../diseno-3g/MarcoPlanta';
+import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
+import Armazon from '../../rediseno2/fundacion/armazon/Armazon';
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Cerrado por defecto en móvil
@@ -48,9 +48,9 @@ const DashboardLayout = () => {
     );
   }
 
-  // Diseño 3G encendido: armazón nuevo (riel por áreas, barra de vidrio). Mismas rutas y permisos.
+  // Diseño encendido: armazón del rediseño 2 (riel por áreas, barra de 56 px, barra inferior por rol). Mismas rutas y permisos.
   if (diseno3g) {
-    return <MarcoPlanta />;
+    return <Armazon />;
   }
 
   return (

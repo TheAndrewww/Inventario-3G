@@ -4,6 +4,8 @@ import { obtenerAnunciosHoy, incrementarVistaAnuncio, regenerarAnuncio, leerAnun
 import { toast, Toaster } from 'react-hot-toast';
 import { Maximize2, Minimize2, RefreshCw, Settings, X, RotateCcw, Sparkles, FileText, ImageOff, Check, Loader2, AlertTriangle } from 'lucide-react';
 import { useTvG3 } from '../diseno-3g/tvG3';
+import { useDiseno3G } from '../rediseno2/fundacion';
+import VistaAnuncios from '../rediseno2/publicas/VistaAnuncios';
 
 /**
  * Página pública para mostrar anuncios en pantallas
@@ -14,6 +16,8 @@ const AnunciosPublicosPage = () => {
   // Diseño 3G para TV: solo si la liga trae ?diseno=3g (ver diseno-3g/tvG3.js). Mismos anuncios, mismos botones, misma
   // actualización (cada hora); el carrusel de imágenes es el de siempre, sobre negro.
   const tv = useTvG3();
+  // Rediseño 2: encendido, la vista nueva (rediseno2/publicas/VistaAnuncios) con este mismo estado y estos manejadores
+  const d3 = useDiseno3G();
   const [anuncios, setAnuncios] = useState([]);
   const [anunciosCalendario, setAnunciosCalendario] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -384,6 +388,33 @@ const AnunciosPublicosPage = () => {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (d3) {
+    return (
+      <VistaAnuncios
+        anuncios={anuncios}
+        anunciosCalendario={anunciosCalendario}
+        loading={loading}
+        error={error}
+        ultimaActualizacion={ultimaActualizacion}
+        isFullscreen={isFullscreen}
+        showControls={showControls}
+        showAdminMenu={showAdminMenu}
+        setShowAdminMenu={setShowAdminMenu}
+        regenerandoId={regenerandoId}
+        sincronizando={sincronizando}
+        generandoIndividual={generandoIndividual}
+        progresoGeneracion={progresoGeneracion}
+        isAdmin={isAdmin}
+        cargarAnuncios={cargarAnuncios}
+        handleSincronizarYGenerar={handleSincronizarYGenerar}
+        handleSoloSincronizar={handleSoloSincronizar}
+        handleRegenerar={handleRegenerar}
+        handleGenerarIndividual={handleGenerarIndividual}
+        toggleFullscreen={toggleFullscreen}
+      />
+    );
+  }
 
   if (loading && anuncios.length === 0 && tv) {
     return (

@@ -5,6 +5,9 @@ import checklistService from '../../services/checklist.service';
 import ImportarChecklistModal from './ImportarChecklistModal';
 import EnlazarArticulosModal from './EnlazarArticulosModal';
 import { g3Activo, confirmarG3 } from '../../diseno-3g/dialogosG3';
+// Rediseño 2 · encendido: el mismo catálogo en un cajón (rediseno2/gestion/CajonesChecklist)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import { CajonCatalogoChecklist } from '../../rediseno2/gestion/CajonesChecklist';
 
 const ChecklistManager = ({ isOpen, onClose }) => {
   const [items, setItems] = useState([]);
@@ -13,6 +16,7 @@ const ChecklistManager = ({ isOpen, onClose }) => {
   const [modalEnlazar, setModalEnlazar] = useState(null);
   const [seccionesAbiertas, setSeccionesAbiertas] = useState(new Set());
   const [tabActiva, setTabActiva] = useState('herramienta');
+  const d3 = useDiseno3GR2();
 
   useEffect(() => {
     if (isOpen) cargarItems();
@@ -70,6 +74,19 @@ const ChecklistManager = ({ isOpen, onClose }) => {
     acc[sec].push(item);
     return acc;
   }, {});
+
+  // Rediseño 2 · encendido: mismo estado y mismos sub-diálogos (importar y enlazar pintan su propia vista nueva)
+  if (d3) {
+    return (
+      <>
+        <CajonCatalogoChecklist onClose={onClose} items={items} cargando={cargando} tabActiva={tabActiva} setTabActiva={setTabActiva}
+          itemsHerramienta={itemsHerramienta} itemsMaterial={itemsMaterial} porSeccion={porSeccion}
+          abrirImportar={() => setModalImportar(true)} abrirEnlazar={setModalEnlazar} handleEliminar={handleEliminar} />
+        <ImportarChecklistModal isOpen={modalImportar} onClose={() => setModalImportar(false)} onImportado={cargarItems} />
+        <EnlazarArticulosModal isOpen={!!modalEnlazar} onClose={() => setModalEnlazar(null)} item={modalEnlazar} onEnlazado={cargarItems} />
+      </>
+    );
+  }
 
   return (
     <>

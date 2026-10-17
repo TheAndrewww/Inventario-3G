@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Search, Link2, Check, Package, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
 import checklistService from '../../services/checklist.service';
+// Rediseño 2 · encendido: la misma búsqueda y los mismos enlaces en un cajón (rediseno2/gestion/CajonesChecklist)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import { CajonEnlazarArticulos } from '../../rediseno2/gestion/CajonesChecklist';
 
 const EnlazarArticulosModal = ({ isOpen, onClose, item, onEnlazado }) => {
   const [sugerencias, setSugerencias] = useState([]);
@@ -11,6 +14,7 @@ const EnlazarArticulosModal = ({ isOpen, onClose, item, onEnlazado }) => {
   const [cargando, setCargando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [buscando, setBuscando] = useState(false);
+  const d3 = useDiseno3GR2();
 
   useEffect(() => {
     if (isOpen && item?.id) {
@@ -91,6 +95,15 @@ const EnlazarArticulosModal = ({ isOpen, onClose, item, onEnlazado }) => {
   if (!isOpen || !item) return null;
 
   const articulosAMostrar = busqueda.trim() ? resultadosBusqueda : sugerencias;
+
+  // Rediseño 2 · encendido: mismo estado y mismos manejadores
+  if (d3) {
+    return (
+      <CajonEnlazarArticulos item={item} onClose={onClose} cargando={cargando} buscando={buscando} busqueda={busqueda} setBusqueda={setBusqueda}
+        articulosAMostrar={articulosAMostrar} sugerencias={sugerencias} seleccionados={seleccionados} toggleArticulo={toggleArticulo}
+        guardando={guardando} handleGuardar={handleGuardar} />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

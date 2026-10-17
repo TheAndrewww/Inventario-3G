@@ -8,6 +8,9 @@ import { getImageUrl } from '../../utils/imageUtils';
 import articulosService from '../../services/articulos.service';
 import herramientasRentaService from '../../services/herramientasRenta.service';
 import { g3Activo, confirmarG3, avisoG3 } from '../../diseno-3g/dialogosG3';
+// Rediseño 2: el detalle encendido es un cajón lateral (mismas peticiones; ver rediseno2/inventario/CajonDetalleArticulo)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CajonDetalleArticulo from '../../rediseno2/inventario/CajonDetalleArticulo';
 
 const ArticuloDetalleModal = ({
   articulo,
@@ -19,9 +22,11 @@ const ArticuloDetalleModal = ({
   onEntrada,
   onSalida,
   puedeGestionarInventario = false,
-  puedeRegistrarSalida = false
+  puedeRegistrarSalida = false,
+  r2 // Rediseño 2: datos y manejadores extra que solo usa el cajón encendido (Inventario los pasa; apagado no se usan)
 }) => {
   const g3 = useDiseno3G(); // Diseño 3G: íconos en vez de emojis (apagado, el DOM de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2 encendido: cajón lateral
   const [imagenExpandida, setImagenExpandida] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
 
@@ -149,6 +154,22 @@ const ArticuloDetalleModal = ({
       setReprocessing(false);
     }
   };
+
+  // Rediseño 2 encendido: el detalle en un cajón lateral, con el mismo estado y las mismas peticiones de arriba
+  if (d3) {
+    return (
+      <CajonDetalleArticulo articulo={articulo} abierto={isOpen} alCerrar={onClose} imagenUrl={imagenUrl} canEdit={canEdit} onEdit={onEdit}
+        onEntrada={onEntrada} onSalida={onSalida} puedeGestionarInventario={puedeGestionarInventario} puedeRegistrarSalida={puedeRegistrarSalida}
+        reprocessing={reprocessing} alMejorarFoto={handleReprocessImage} ultimoMovimiento={ultimoMovimiento} cargandoMovimiento={loadingUltimoMov}
+        unidadesLista={unidadesHerramienta} cargandoUnidades={loadingUnidades} alVerUnidad={handleVerUnidad}
+        codigoBarras={!articulo.es_herramienta ? <BarcodeDisplay articuloId={articulo.id} codigoEAN13={articulo.codigo_ean13} /> : null}
+        detalleUnidad={modalUnidadOpen && unidadSeleccionada ? (
+          <UnidadHerramientaDetalleModal unidad={unidadSeleccionada} tipoHerramienta={tipoHerramienta} isOpen={modalUnidadOpen}
+            onClose={() => { setModalUnidadOpen(false); setUnidadSeleccionada(null); }} />
+        ) : null}
+        r2={r2} />
+    );
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Detalles del Artículo">

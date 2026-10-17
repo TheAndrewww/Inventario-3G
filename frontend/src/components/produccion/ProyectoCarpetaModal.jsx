@@ -3,6 +3,9 @@ import { FolderOpen, Calendar, User, FileText, AlertCircle, Factory, Hammer } fr
 import CarpetaProyectoModal, { Dato } from '../carpetas/CarpetaProyectoModal';
 import { obtenerCarpetaProduccion } from '../../services/produccion.service';
 import { ETAPAS_CONFIG } from './constants';
+import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
+import { estadoDe, tipoTrabajo } from '../../rediseno2/fundacion/vocabulario';
+import { fechaExacta } from '../../rediseno2/fundacion/formato';
 
 const rutaArchivo = (id) => `/produccion/carpeta/archivo/${id}`;
 
@@ -28,6 +31,7 @@ const formatearFecha = (valor) => {
  */
 const ProyectoCarpetaModal = ({ isOpen, onClose, proyecto }) => {
   const proyectoId = proyecto?.id;
+  const d3 = useDiseno3G(); // Rediseño 2: encendido, los mismos datos con las palabras del sistema (etapa, tipo, fecha)
 
   const cargar = useCallback(async () => {
     const respuesta = await obtenerCarpetaProduccion(proyectoId);
@@ -36,13 +40,16 @@ const ProyectoCarpetaModal = ({ isOpen, onClose, proyecto }) => {
 
   const datosProyecto = (datos) => {
     const info = datos?.proyecto || proyecto || {};
-    const etapa = ETAPAS_CONFIG[info.etapa_actual]?.nombre || info.etapa_actual;
-    const fechaEntrega = formatearFecha(proyecto?._fechaInstalacion || info.fecha_limite);
+    const etapa = d3 ? estadoDe('etapa', info.etapa_actual).texto : (ETAPAS_CONFIG[info.etapa_actual]?.nombre || info.etapa_actual);
+    const fechaEntrega = d3
+      ? (proyecto?._fechaInstalacion || info.fecha_limite ? fechaExacta(String(proyecto?._fechaInstalacion || info.fecha_limite).slice(0, 10)) || null : null)
+      : formatearFecha(proyecto?._fechaInstalacion || info.fecha_limite);
+    const tipo = d3 ? (tipoTrabajo(info.tipo_proyecto)?.texto || null) : info.tipo_proyecto;
 
     return (
       <>
         <Dato icono={<User size={14} />} etiqueta="Cliente" valor={info.cliente} />
-        <Dato icono={<FolderOpen size={14} />} etiqueta="Tipo" valor={info.tipo_proyecto} />
+        <Dato icono={<FolderOpen size={14} />} etiqueta="Tipo" valor={tipo} />
         <Dato icono={<FolderOpen size={14} />} etiqueta="Etapa" valor={etapa} />
         <Dato icono={<Calendar size={14} />} etiqueta="Entrega" valor={fechaEntrega} />
         <Dato
@@ -56,7 +63,7 @@ const ProyectoCarpetaModal = ({ isOpen, onClose, proyecto }) => {
           valor={info.tiene_herreria ? (info.herreria_completado ? 'Terminada' : 'Pendiente') : null}
         />
         {info.pausado && (
-          <Dato icono={<AlertCircle size={14} />} etiqueta="Pausado" valor={info.pausado_motivo || 'Sí'} />
+          <Dato icono={<AlertCircle size={14} />} etiqueta={d3 ? 'Pausada' : 'Pausado'} valor={info.pausado_motivo || 'Sí'} />
         )}
         <Dato icono={<FileText size={14} />} etiqueta="Notas" valor={info.descripcion} />
       </>

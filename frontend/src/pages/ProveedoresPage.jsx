@@ -12,6 +12,9 @@ import { SeccionFicha, ReporteSinRfc } from '../components/proveedores/FichaProv
 import {
   fichaVacia, fichaAFormulario, fichaParaGuardar, tieneRfc, creditoDe, textoCredito
 } from '../components/proveedores/fichaDatos';
+// Rediseño 2 · vista encendida (apagado no la usa): mismos datos, mismas fichas y el mismo guardado
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaProveedores from '../rediseno2/gestion/VistaProveedores';
 
 // B3 paso 1 · PLA-11 (solo con Diseño 3G): liga a la otra mitad de «Proveedores», que vive en Finanzas.
 // La dirección de Finanzas es privada: Planta no la escribe en su JS público. Si una página con sesión la configuró
@@ -67,6 +70,8 @@ const ProveedoresPage = () => {
   // null = las fichas no han llegado (o fallaron): el formulario se guarda como siempre y no pisa ninguna ficha
   const [fichaForm, setFichaForm] = useState(null);
   const [fichasListas, setFichasListas] = useState(false);
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+  const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
   const [formData, setFormData] = useState({
     nombre: '',
     rfc: '',
@@ -122,9 +127,11 @@ const ProveedoresPage = () => {
       setLoading(true);
       const data = await proveedoresService.listar({ activo: true });
       setProveedores(data.data?.proveedores || []);
+      setErrorCargaR2(null);
     } catch (error) {
       console.error('Error al cargar proveedores:', error);
       toast.error('Error al cargar proveedores');
+      setErrorCargaR2(error?.message || 'Error al cargar proveedores');
       setProveedores([]);
     } finally {
       setLoading(false);
@@ -270,6 +277,21 @@ const ProveedoresPage = () => {
     proveedor.rfc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     proveedor.contacto?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Rediseño 2 · vista ENCENDIDA: los mismos datos y los mismos manejadores (el JSX de hoy sigue intacto debajo)
+  if (d3) {
+    return (
+      <VistaProveedores
+        proveedores={proveedores} loading={loading} errorCarga={errorCargaR2} recargar={fetchProveedores} searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm} filteredProveedores={filteredProveedores} showModal={showModal} editingProveedor={editingProveedor}
+        formData={formData} handleInputChange={handleInputChange} handleOpenModal={handleOpenModal} handleCloseModal={handleCloseModal}
+        handleSubmit={handleSubmit} handleDelete={handleDelete} puedeEditar={puedeEditar} fichas={fichas} credito={credito}
+        fichasListas={fichasListas} vista={vista} verVista={verVista} reporte={reporte} cargandoReporte={cargandoReporte}
+        errorReporte={errorReporte} cargarReporte={cargarReporte} abrirFicha={abrirFicha} fichaForm={fichaForm} setFichaForm={setFichaForm}
+        urlFinanzas={urlFinanzas}
+      />
+    );
+  }
 
   if (loading) {
     return <Loader fullScreen />;

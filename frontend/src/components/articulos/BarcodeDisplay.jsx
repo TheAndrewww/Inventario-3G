@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Printer, Loader2 } from 'lucide-react';
+// Rediseño 2: encendido se pinta con rediseno2/inventario/CodigoBarrasR2 (la misma imagen, la misma petición)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CodigoBarrasR2 from '../../rediseno2/inventario/CodigoBarrasR2';
 
 const BarcodeDisplay = ({ articuloId, codigoEAN13, className = '' }) => {
   const [imageUrl, setImageUrl] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const d3 = useDiseno3GR2();
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
   const barcodeUrl = `${API_URL}/articulos/${articuloId}/barcode`;
@@ -130,6 +134,13 @@ const BarcodeDisplay = ({ articuloId, codigoEAN13, className = '' }) => {
     `);
     printWindow.document.close();
   };
+
+  if (d3) {
+    return (
+      <CodigoBarrasR2 imagen={imageUrl} cargando={loading} error={imageError} codigo={codigoEAN13}
+        alCargar={() => { setImageLoaded(true); setLoading(false); }} alDescargar={handleDownload} alImprimir={handlePrint} />
+    );
+  }
 
   return (
     <div className={`flex flex-col items-center gap-3 ${className}`}>

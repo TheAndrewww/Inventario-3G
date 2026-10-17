@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
+import { useDiseno3G } from '../../rediseno2/fundacion';
+import CarruselAnunciosR2 from '../../rediseno2/publicas/CarruselAnunciosR2';
 
 /**
  * Componente de carousel para mostrar anuncios
@@ -7,6 +9,8 @@ import PropTypes from 'prop-types';
  */
 const CarouselAnuncios = ({ anuncios = [] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Rediseño 2: encendido, la misma rotación (16 s) y el mismo índice, pintados por rediseno2/publicas/CarruselAnunciosR2
+  const d3 = useDiseno3G();
 
   // Rotar anuncios cada 8 segundos
   useEffect(() => {
@@ -25,6 +29,8 @@ const CarouselAnuncios = ({ anuncios = [] }) => {
       setCurrentIndex(0);
     }
   }, [anuncios.length, currentIndex]);
+
+  if (d3) return <CarruselAnunciosR2 anuncios={anuncios} actual={currentIndex} />;
 
   if (anuncios.length === 0) {
     return (

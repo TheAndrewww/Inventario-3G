@@ -1,7 +1,11 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
+import { Dialogo } from '../../rediseno2/fundacion/piezas/Dialogo';
+import { ZonaHeredada } from '../../rediseno2/fundacion/piezas/Miniatura';
 
 const Modal = ({ isOpen, onClose, title, children, size = 'md', closeOnBackdropClick = true }) => {
+  const d3 = useDiseno3G(); // Rediseño 2: encendido, el diálogo centrado de la fundación (mismo título, mismos hijos)
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -15,6 +19,15 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md', closeOnBackdropC
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  if (d3) {
+    return (
+      <Dialogo abierto titulo={title} tamano={size} alCerrar={onClose} cerrarConVelo={closeOnBackdropClick}>
+        {/* El contenido de un Modal es marcado de siempre: se ve como hoy encendido (zona heredada), también dentro de una vista nueva */}
+        <ZonaHeredada>{children}</ZonaHeredada>
+      </Dialogo>
+    );
+  }
 
   const sizes = {
     sm: 'max-w-md',

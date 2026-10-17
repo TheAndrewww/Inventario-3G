@@ -4,6 +4,9 @@ import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import checklistService from '../../services/checklist.service';
 import camionetasService from '../../services/camionetas.service';
+// Rediseño 2 · encendido: el mismo flujo de importar en un cajón (rediseno2/gestion/CajonesChecklist)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import { CajonImportarChecklist } from '../../rediseno2/gestion/CajonesChecklist';
 
 /**
  * Parsea una hoja individual del Excel.
@@ -101,6 +104,7 @@ const ImportarChecklistModal = ({ isOpen, onClose, onImportado }) => {
   const [paso, setPaso] = useState(1); // 1: seleccionar, 2: mapear hojas, 3: preview
   const [equipos, setEquipos] = useState([]);
   const [cargandoEquipos, setCargandoEquipos] = useState(false);
+  const d3 = useDiseno3GR2();
 
   useEffect(() => {
     if (isOpen) {
@@ -253,6 +257,16 @@ const ImportarChecklistModal = ({ isOpen, onClose, onImportado }) => {
   const hojasMaterial = hojas.filter(h => h.tipo === 'material');
   const totalItems = hojas.reduce((s, h) => s + h.items.length, 0);
   const hojasConEquipo = hojas.filter(h => h.equipoId);
+
+  // Rediseño 2 · encendido: mismo estado, misma lectura del archivo y mismo envío
+  if (d3) {
+    return (
+      <CajonImportarChecklist onClose={() => { resetear(); onClose(); }} paso={paso} hojas={hojas} totalItems={totalItems}
+        hojasHerramienta={hojasHerramienta} hojasMaterial={hojasMaterial} hojasConEquipo={hojasConEquipo} equipos={equipos}
+        importando={importando} handleFileChange={handleFileChange} setEquipoParaHoja={setEquipoParaHoja}
+        toggleHojaExpanded={toggleHojaExpanded} handleImportar={handleImportar} resetear={resetear} />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

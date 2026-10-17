@@ -5,10 +5,23 @@ import conteosCiclicosService from '../services/conteosCiclicos.service';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import { cx, etq, siG3 } from '../diseno-3g/dialogosG3';
+// Rediseño 2: encendido, las vistas de rediseno2/inventario/VistaConteoCiclico (mismo estado, mismas peticiones)
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import { VistaConteoCiclico, VistaConteoHoy, VistaReportesConteo } from '../rediseno2/inventario/VistaConteoCiclico';
 
 const ConteoCiclicoPage = () => {
     const [tab, setTab] = useState('conteo'); // 'conteo' | 'reportes'
     const g3 = useDiseno3G(); // Diseño 3G: encabezado y pestañas del paquete (apagado, lo de siempre)
+    const d3 = useDiseno3GR2(); // Rediseño 2 encendido
+
+    if (d3) {
+        return (
+            <VistaConteoCiclico tab={tab} setTab={setTab}>
+                {tab === 'conteo' && <TabConteo />}
+                {tab === 'reportes' && <TabReportes />}
+            </VistaConteoCiclico>
+        );
+    }
 
     return (
         <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -78,6 +91,7 @@ const TabConteo = () => {
     const searchInputRef = useRef(null);
     const cantidadInputRef = useRef(null);
     const g3 = useDiseno3G(); // Diseño 3G: colores de acción y textos sin emojis (apagado, lo de siempre)
+    const d3 = useDiseno3GR2(); // Rediseño 2 encendido
 
     useEffect(() => {
         cargarConteoHoy();
@@ -202,6 +216,17 @@ const TabConteo = () => {
     const progreso = conteo
         ? Math.round((conteo.articulos_contados / conteo.total_asignados) * 100) || 0
         : 0;
+
+    // Rediseño 2 encendido: captura en el renglón (mismo estado y mismos manejadores)
+    if (d3) {
+        return (
+            <VistaConteoHoy c={{
+                conteo, pendientes, busqueda, setBusqueda, loading, loadingPendientes, adelantando,
+                articuloSeleccionado, setArticuloSeleccionado, cantidadFisica, setCantidadFisica, observaciones, setObservaciones, registrando,
+                searchInputRef, cantidadInputRef, seleccionarArticulo, registrarConteo, handleAdelantarConteo, cargarConteoHoy, progreso,
+            }} />
+        );
+    }
 
     if (loading) {
         return (
@@ -448,6 +473,8 @@ const TabReportes = () => {
     // Filtros de fecha
     const [desde, setDesde] = useState('');
     const [hasta, setHasta] = useState('');
+    const d3 = useDiseno3GR2(); // Rediseño 2 encendido
+    const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de carga para la vista nueva (el aviso de siempre no cambia)
 
     useEffect(() => {
         cargarReportes();
@@ -460,7 +487,9 @@ const TabReportes = () => {
             setReportes(res.data || []);
             setEstadisticas(res.estadisticas_globales);
             setPagination(res.pagination);
+            setErrorCargaR2(null);
         } catch (error) {
+            setErrorCargaR2(error?.response?.data?.message || error?.message || 'Error al cargar reportes');
             toast.error('Error al cargar reportes');
         } finally {
             setLoading(false);
@@ -488,6 +517,18 @@ const TabReportes = () => {
             setLoadingResumen(false);
         }
     };
+
+    // Rediseño 2 encendido: tabla por día y diferencias en un cajón (mismo estado y mismas peticiones)
+    if (d3) {
+        return (
+            <VistaReportesConteo r={{
+                reportes, estadisticas, pagination, loading, expandido, resumen, loadingResumen, desde, setDesde, hasta, setHasta, errorCargaR2,
+                cargarReportes, aplicarFiltros, toggleResumen,
+                // «Limpiar» de siempre: borra las fechas y vuelve a cargar la primera página
+                limpiarFechas: () => { setDesde(''); setHasta(''); setTimeout(() => cargarReportes(1), 100); },
+            }} />
+        );
+    }
 
     if (loading) {
         return (

@@ -7,6 +7,8 @@ import { sortProyectosPorUrgencia, calcularDiasPorEtapa, calcularDiasHabiles, ge
 import { px } from '../utils/produccion';
 import { useTvG3, tipoTv } from '../diseno-3g/tvG3';
 import { BarraTv, VivoTv, ControlesTv, CargandoTv } from '../diseno-3g/PiezasTv';
+import { useDiseno3G } from '../rediseno2/fundacion/useDiseno3G';
+import VistaTvArea from '../rediseno2/piso/VistaTvArea';
 
 /**
  * Tarjeta grande de proyecto para el TV de Manufactura
@@ -144,6 +146,8 @@ const DashboardManufacturaTVPage = () => {
     });
     // Diseño 3G para TV: solo si la liga de esta pantalla trae ?diseno=3g (ver diseno-3g/tvG3.js). Mismos datos y misma frecuencia.
     const tv = useTvG3();
+    // Rediseño 2: encendido, la vista nueva (abajo, antes del return de siempre). Mismos datos, manejadores y claves.
+    const d3 = useDiseno3G();
 
     const [zoomLevel, setZoomLevel] = useState(() => {
         const saved = localStorage.getItem('manufacturaTVScale');
@@ -216,6 +220,17 @@ const DashboardManufacturaTVPage = () => {
             return aDias - bDias;
         });
     }, [proyectos]);
+
+    // Rediseño 2 (encendido): tablero de renglones agrupado por entrega; el filtro y el orden son los de arriba
+    if (d3) {
+        return (
+            <VistaTvArea
+                area="manufactura" proyectos={proyectos} lista={enProduccion}
+                cargando={loading && proyectos.length === 0} zoom={zoomLevel} rotacion={rotacion} controlesVisibles={controlsVisible}
+                alReducir={handleZoomOut} alAumentar={handleZoomIn} alRotar={rotar}
+            />
+        );
+    }
 
     if (loading && proyectos.length === 0) {
         if (tv) return <CargandoTv>Cargando proyectos…</CargandoTv>;

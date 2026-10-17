@@ -2,12 +2,16 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Loader } from '../common';
+import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
+import { EsqueletoArmazon } from '../../rediseno2/fundacion/armazon/EsqueletoArmazon';
 
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
+  const d3 = useDiseno3G(); // Rediseño 2: encendido, esqueleto del armazón en lugar de la rueda
 
   if (loading) {
+    if (d3) return <EsqueletoArmazon />;
     return <Loader fullScreen />;
   }
 

@@ -5,6 +5,9 @@ import { campanaControlService } from '../services/campanaControl.service';
 import { useAuth } from '../context/AuthContext';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
+// Rediseño 2 · vista encendida (apagado no la usa): mismos datos, el mismo diálogo de celda y las mismas peticiones
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaCampana from '../rediseno2/gestion/VistaCampana';
 
 const QUARTERS = [
     { id: 1, name: '1ER TRIMESTRE', weeks: Array.from({ length: 13 }, (_, i) => i + 1) },
@@ -69,6 +72,8 @@ const ControlCampanaPage = () => {
     const [modalData, setModalData] = useState({ status: null, note: '' });
     const [saving, setSaving] = useState(false);
     const [ocultos, setOcultos] = useState(leerOcultos);
+    const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+    const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
     const guardarOcultos = (lista) => {
         setOcultos(lista);
@@ -103,9 +108,11 @@ const ControlCampanaPage = () => {
             if (totalsData.success) {
                 setTotals(totalsData.totals);
             }
+            setErrorCargaR2(null);
         } catch (error) {
             console.error('Error cargando datos:', error);
             toast.error('Error al cargar datos de campaña');
+            setErrorCargaR2(error?.response?.data?.message || error?.message || 'Error al cargar datos de campaña');
         } finally {
             setLoading(false);
         }
@@ -263,6 +270,20 @@ const ControlCampanaPage = () => {
         if (pct >= 50) return 'bg-yellow-50 text-yellow-700';
         return 'bg-red-50 text-red-700';
     };
+
+    // Rediseño 2 · vista ENCENDIDA: los mismos datos y los mismos manejadores (el JSX de hoy sigue intacto debajo)
+    if (d3) {
+        return (
+            <VistaCampana
+                esSoloLectura={esSoloLectura} data={data} loading={loading} errorCarga={errorCargaR2} recargar={loadData} modalOpen={modalOpen}
+                setModalOpen={setModalOpen} selectedCell={selectedCell} modalData={modalData} setModalData={setModalData} saving={saving}
+                ocultos={ocultos} toggleTrimestre={toggleTrimestre} soloActual={soloActual} guardarOcultos={guardarOcultos}
+                handleCellClick={handleCellClick} handleSave={handleSave} handleDelete={handleDelete} exportarComentarios={exportarComentarios}
+                getCellKey={getCellKey} getQuarterTotal={getQuarterTotal} getAreaSubtotal={getAreaSubtotal} getPct={getPct} formatCalif={formatCalif}
+                QUARTERS={QUARTERS} AREAS={AREAS} semanaHoy={semanaActual()} trimestreHoy={trimestreActual()}
+            />
+        );
+    }
 
     if (loading) {
         return (

@@ -9,6 +9,8 @@ import { sortProyectosPorUrgencia } from '../utils/produccion';
 import { px } from '../utils/produccion';
 import { useTvG3 } from '../diseno-3g/tvG3';
 import { BarraTv, VivoTv, ControlesTv, CargandoTv } from '../diseno-3g/PiezasTv';
+import { useDiseno3G } from '../rediseno2/fundacion/useDiseno3G';
+import VistaTvPreparados from '../rediseno2/piso/VistaTvPreparados';
 
 const DashboardPreparadosTVPage = () => {
     // Hook para datos (modo público, refresh cada 1 min)
@@ -19,6 +21,8 @@ const DashboardPreparadosTVPage = () => {
     });
     // Diseño 3G para TV: solo si la liga de esta pantalla trae ?diseno=3g (ver diseno-3g/tvG3.js). Mismos datos y misma frecuencia.
     const tv = useTvG3();
+    // Rediseño 2: encendido, la vista nueva (abajo, antes del return de siempre). Mismos datos, manejadores y claves.
+    const d3 = useDiseno3G();
 
     // Zoom y Orientación (persistidos en localStorage con key diferente)
     const [zoomLevel, setZoomLevel] = useState(() => {
@@ -103,6 +107,17 @@ const DashboardPreparadosTVPage = () => {
         ),
         [proyectos]
     );
+
+    // Rediseño 2 (encendido): la cita al frente y las fallas arriba; los filtros y el orden son los de arriba
+    if (d3) {
+        return (
+            <VistaTvPreparados
+                proyectos={proyectos} preparados={proyectosPreparados} pausadas={proyectosCongelados}
+                cargando={loading && proyectos.length === 0} zoom={zoomLevel} rotacion={rotacion} controlesVisibles={controlsVisible}
+                alReducir={handleZoomOut} alAumentar={handleZoomIn} alRotar={rotar}
+            />
+        );
+    }
 
     if (loading && proyectos.length === 0) {
         if (tv) return <CargandoTv>Cargando proyectos…</CargandoTv>;

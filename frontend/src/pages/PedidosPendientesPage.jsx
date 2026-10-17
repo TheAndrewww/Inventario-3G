@@ -7,6 +7,8 @@ import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
+import { useDiseno3G as useRediseno2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaTicketsPendientes from '../rediseno2/tickets/VistaTicketsPendientes';
 
 // Devuelve solo las observaciones originales del ticket (recorta anotaciones
 // auto-añadidas: [ANULADO], [CANCELADO], [RECHAZADO]... y el placeholder
@@ -22,6 +24,7 @@ const obsOriginales = (texto) => {
 const PedidosPendientesPage = () => {
   const { user } = useAuth();
   const g3 = useDiseno3G(); // Diseño 3G: solo textos e íconos (apagado, el DOM de siempre)
+  const d3 = useRediseno2(); // Rediseño 2: encendido se pinta VistaTicketsPendientes con este mismo estado y manejadores
   const esAdmin = user?.rol === 'administrador';
 
   const [pedidos, setPedidos] = useState([]);
@@ -35,6 +38,9 @@ const PedidosPendientesPage = () => {
   // Borrón y cuenta nueva (admin): { total, solicitudes_a_cancelar, tickets } o null
   const [anulacionMasiva, setAnulacionMasiva] = useState(null);
   const [anulandoTodo, setAnulandoTodo] = useState(false);
+  // Rediseño 2: la vista nueva enseña el error de carga con «Reintentar» (el aviso flotante de siempre no cambia)
+  const [errorPendientesR2, setErrorPendientesR2] = useState(null);
+  const [errorCompletadosR2, setErrorCompletadosR2] = useState(null);
   // A6 · PLA-05: tickets que quedaron abiertos al cerrar su obra (solo existen con CIERRE_OBRA_RESPETA_ENTREGADO).
   // Sin ellos no se muestra nada nuevo: la pantalla queda igual que siempre.
   const [soloPorRevisar, setSoloPorRevisar] = useState(false);
@@ -121,7 +127,9 @@ const PedidosPendientesPage = () => {
     try {
       const response = await pedidosService.listarPendientes();
       setPedidos(response.data?.pedidos || []);
+      setErrorPendientesR2(null);
     } catch (error) {
+      setErrorPendientesR2(error);
       console.error('Error al cargar tickets pendientes:', error);
       toast.error('Error al cargar tickets pendientes');
     } finally {
@@ -133,7 +141,9 @@ const PedidosPendientesPage = () => {
     try {
       const response = await pedidosService.listarCompletados();
       setPedidosCompletados(response.data?.pedidos || []);
+      setErrorCompletadosR2(null);
     } catch (error) {
+      setErrorCompletadosR2(error);
       console.error('Error al cargar tickets completados:', error);
       toast.error('Error al cargar tickets completados');
     }
@@ -306,6 +316,36 @@ const PedidosPendientesPage = () => {
     if (porcentaje < 100) return 'bg-yellow-500';
     return 'bg-green-500';
   };
+
+  // Rediseño 2 encendido: misma página, otra vista (con su esqueleto de carga en lugar de la rueda). Lo que hoy va escrito
+  // dentro del JSX (− y + de «Editar cantidad», «Cancelar», cerrar la anulación masiva) se repite igual aquí.
+  if (d3) {
+    return (
+      <VistaTicketsPendientes t={{
+        esAdmin, pedidos, pedidosCompletados, loading, listasCargadas, cargarDatos,
+        errorPendientes: errorPendientesR2, errorCompletados: errorCompletadosR2,
+        porRevisar, soloPorRevisar, setSoloPorRevisar, pedidosALaVista,
+        handleVerDetalle, handleEliminarTicket, eliminandoId,
+        abrirAnulacionMasiva, anulandoTodo, anulacionMasiva, confirmarAnulacionMasiva,
+        cerrarAnulacion: () => !anulandoTodo && setAnulacionMasiva(null),
+        showModal, pedidoSeleccionado, handleCloseModal, procesando, obsOriginales,
+        handleMarcarArticulo, handleEditarCantidad, editandoCantidad, handleGuardarCantidad, handleEliminarArticulo, handleCompletarTicket,
+        cantidadMenos: () => setEditandoCantidad({
+          ...editandoCantidad,
+          cantidad: Math.max(1, editandoCantidad.cantidad - 1)
+        }),
+        cantidadMas: () => setEditandoCantidad({
+          ...editandoCantidad,
+          cantidad: editandoCantidad.cantidad + 1
+        }),
+        cantidadEscrita: (valor) => setEditandoCantidad({
+          ...editandoCantidad,
+          cantidad: parseInt(valor) || 1
+        }),
+        cancelarEdicion: () => setEditandoCantidad(null),
+      }} />
+    );
+  }
 
   if (loading && pedidos.length === 0) {
     return <Loader fullScreen />;

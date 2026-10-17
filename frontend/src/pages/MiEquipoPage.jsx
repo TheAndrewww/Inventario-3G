@@ -19,6 +19,9 @@ import { getImageUrl } from '../utils/imageUtils';
 import toast from 'react-hot-toast';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
+// Rediseño 2 · vista encendida (apagado no la usa): mismos datos y mismos manejadores
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaMiEquipo from '../rediseno2/gestion/VistaMiEquipo';
 
 const MiEquipoPage = () => {
     const { user } = useAuth();
@@ -29,6 +32,8 @@ const MiEquipoPage = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [usuariosDisponibles, setUsuariosDisponibles] = useState([]);
     const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(''); // '' = mi propio equipo
+    const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+    const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
     useEffect(() => {
         fetchData(usuarioSeleccionado || null);
@@ -48,9 +53,11 @@ const MiEquipoPage = () => {
             setLoading(true);
             const response = await miEquipoService.obtenerMiEquipo(usuarioId);
             setData(response);
+            setErrorCargaR2(null);
         } catch (error) {
             console.error('Error al cargar datos:', error);
             toast.error('Error al cargar los datos');
+            setErrorCargaR2(error?.message || 'Error al cargar los datos');
         } finally {
             setLoading(false);
         }
@@ -82,6 +89,15 @@ const MiEquipoPage = () => {
             </span>
         );
     };
+
+    // Rediseño 2 · vista ENCENDIDA: los mismos datos y los mismos manejadores (el JSX de hoy sigue intacto debajo)
+    if (d3) {
+        return (
+            <VistaMiEquipo user={user} esAdmin={esAdmin} loading={loading} data={data} refreshing={refreshing} handleRefresh={handleRefresh}
+                usuariosDisponibles={usuariosDisponibles} usuarioSeleccionado={usuarioSeleccionado} setUsuarioSeleccionado={setUsuarioSeleccionado}
+                errorCarga={errorCargaR2} recargar={() => fetchData(usuarioSeleccionado || null)} />
+        );
+    }
 
     if (loading) {
         return <Loader fullScreen />;

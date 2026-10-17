@@ -48,6 +48,8 @@ import { useAuth } from './context/AuthContext';
 import { rolPuedeVer, rutaInicialPorRol } from './components/layout/Sidebar';
 import { rolPuedeVerG3 } from './diseno-3g/menuPlanta';
 import { useDiseno3G } from './diseno-3g/useDiseno3G';
+import { useDiseno3G as useDiseno3GR2 } from './rediseno2/fundacion/useDiseno3G';
+import { AvisosFlotantes } from './rediseno2/fundacion/armazon/AvisosFlotantes';
 
 const IndexRedirect = () => {
   const { user } = useAuth();
@@ -86,6 +88,8 @@ const OrdenesCompraRuta = () => {
 function App() {
   // Auto-reload cuando se detecta nueva versión en producción
   useVersionCheck();
+  // Rediseño 2: encendido, los avisos flotantes de siempre (react-hot-toast) abajo a la izquierda y con el diseño nuevo
+  const d3 = useDiseno3GR2();
   return (
     <Router>
       <RutaDiseno3G />
@@ -109,7 +113,7 @@ function App() {
             <NotificacionesProvider>
               <CalendarioProvider>
                 <PedidoProvider>
-                  <Toaster
+                  {d3 ? <AvisosFlotantes /> : <Toaster
                     position="top-right"
                     toastOptions={{
                       duration: 3000,
@@ -130,7 +134,7 @@ function App() {
                         },
                       },
                     }}
-                  />
+                  />}
 
                   <Routes>
                     {/* Ruta de login */}

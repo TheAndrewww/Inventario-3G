@@ -1,6 +1,16 @@
 import React from 'react';
+import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
+import { Cargando } from '../../rediseno2/fundacion/piezas/Estados';
 
 const Loader = ({ size = 'md', fullScreen = false }) => {
+  const d3 = useDiseno3G();
+  // Rediseño 2: encendido, esqueleto (sin rueda en medio). Chico: una línea; normal: lista corta; grande o pantalla completa: tabla.
+  if (d3) {
+    const forma = fullScreen || size === 'lg' ? 'tabla' : size === 'sm' ? 'texto' : 'lista';
+    const esqueleto = <Cargando forma={forma} filas={size === 'sm' ? 1 : fullScreen ? 8 : 4} columnas={4} />;
+    if (fullScreen) return <div className="r2-cargando-pantalla">{esqueleto}</div>;
+    return <div className={`r2-cargando-bloque r2-cargando-bloque--${size}`}>{esqueleto}</div>;
+  }
   const sizes = {
     sm: 'w-6 h-6 border-2',
     md: 'w-10 h-10 border-3',

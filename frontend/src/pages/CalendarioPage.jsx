@@ -16,6 +16,9 @@ import { toast } from 'react-hot-toast';
 import { useCalendario } from '../context/CalendarioContext';
 import ProyectoVentasModal from '../components/calendario/ProyectoVentasModal';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+// Rediseño 2 · vista encendida (apagado no la usa): mismos meses, mismo sondeo y los mismos manejadores
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaCalendario from '../rediseno2/gestion/VistaCalendario';
 
 const MESES = [
   'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
@@ -70,6 +73,8 @@ const CalendarioPage = () => {
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState(null);
   const { modoPantallaCompleta, togglePantallaCompleta, setModoPantallaCompleta } = useCalendario();
   const g3 = useDiseno3G(); // Diseño 3G: título en oración y barra de controles del paquete (apagado, lo de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+  const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
   // Cargar datos del calendario
   const cargarCalendario = async (mostrarToast = true) => {
@@ -101,6 +106,7 @@ const CalendarioPage = () => {
       }
       setDistribucionEquipos(distribucion);
       setUltimaActualizacion(new Date());
+      setErrorCargaR2(null);
 
       if (mostrarToast) {
         toast.success('Calendario actualizado');
@@ -108,6 +114,7 @@ const CalendarioPage = () => {
     } catch (error) {
       console.error('Error al cargar calendario:', error);
       toast.error('Error al cargar calendario');
+      setErrorCargaR2(error?.response?.data?.message || error?.message || 'Error al cargar calendario');
     } finally {
       setLoading(false);
     }
@@ -222,6 +229,22 @@ const CalendarioPage = () => {
       }
     };
   }, [modoPantallaCompleta]);
+
+  // Rediseño 2 · vista ENCENDIDA: los mismos datos, el mismo cambio de mes y la misma pantalla completa (el JSX de hoy sigue
+  // intacto debajo)
+  if (d3) {
+    return (
+      <VistaCalendario
+        mesActual={mesActual} setMesActual={setMesActual} cambiarMes={cambiarMes}
+        calendario={calendario} calendarioSiguienteMes={calendarioSiguienteMes} calendarioMesAnterior={calendarioMesAnterior}
+        distribucionEquipos={distribucionEquipos} loading={loading} errorCarga={errorCargaR2} ultimaActualizacion={ultimaActualizacion}
+        horaActual={horaActual} escala={escala} escalaNormal={escalaNormal} aumentarEscala={aumentarEscala} reducirEscala={reducirEscala}
+        aumentarEscalaNormal={aumentarEscalaNormal} reducirEscalaNormal={reducirEscalaNormal} mostrarControles={mostrarControles}
+        proyectoSeleccionado={proyectoSeleccionado} setProyectoSeleccionado={setProyectoSeleccionado}
+        modoPantallaCompleta={modoPantallaCompleta} togglePantallaCompleta={togglePantallaCompleta} cargarCalendario={cargarCalendario}
+      />
+    );
+  }
 
   if (loading && !calendario) {
     return (

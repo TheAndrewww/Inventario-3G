@@ -2,10 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { X, Package, AlertTriangle, CheckCircle, XCircle, Wrench } from 'lucide-react';
 import camionetasService from '../../services/camionetas.service';
 import toast from 'react-hot-toast';
+// Rediseño 2 · encendido: el mismo resumen en un cajón (rediseno2/gestion/CajonInventarioEquipo)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CajonInventarioEquipo from '../../rediseno2/gestion/CajonInventarioEquipo';
 
 const InventarioCamionetaModal = ({ camioneta, onClose }) => {
   const [resumen, setResumen] = useState(null);
   const [cargando, setCargando] = useState(false);
+  const d3 = useDiseno3GR2();
+  const [errorR2, setErrorR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
   useEffect(() => {
     if (camioneta) {
@@ -18,9 +23,11 @@ const InventarioCamionetaModal = ({ camioneta, onClose }) => {
       setCargando(true);
       const response = await camionetasService.obtenerResumenInventario(camioneta.id);
       setResumen(response.data);
+      setErrorR2(null);
     } catch (error) {
       console.error('Error al cargar resumen:', error);
       toast.error('Error al cargar inventario');
+      setErrorR2(error?.response?.data?.message || error?.message || 'Error al cargar inventario');
     } finally {
       setCargando(false);
     }
@@ -70,6 +77,10 @@ const InventarioCamionetaModal = ({ camioneta, onClose }) => {
   };
 
   if (!camioneta) return null;
+
+  if (d3) {
+    return <CajonInventarioEquipo camioneta={camioneta} onClose={onClose} resumen={resumen} cargando={cargando} error={errorR2} reintentar={cargarResumen} />;
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

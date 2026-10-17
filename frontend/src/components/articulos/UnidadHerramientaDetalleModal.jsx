@@ -3,11 +3,15 @@ import { X, Download, Printer, Package, Hash } from 'lucide-react';
 import { Modal } from '../common';
 import herramientasRentaService from '../../services/herramientasRenta.service';
 import { g3Activo, avisoG3 } from '../../diseno-3g/dialogosG3';
+// Rediseño 2: encendido, la unidad se ve en un cajón (rediseno2/inventario/CajonUnidadHerramienta)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CajonUnidadHerramienta from '../../rediseno2/inventario/CajonUnidadHerramienta';
 
 const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClose }) => {
   const barcodeRef = useRef(null);
   const [qrImageUrl, setQrImageUrl] = useState(null);
   const [loadingQr, setLoadingQr] = useState(true);
+  const d3 = useDiseno3GR2(); // Rediseño 2 encendido: cajón (se llama antes del return de abajo para no cambiar el orden de los hooks)
 
   if (!unidad || !tipoHerramienta) return null;
 
@@ -191,6 +195,13 @@ const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClos
   };
 
   const estadoBadge = getEstadoBadge(unidad.estado);
+
+  if (d3) {
+    return (
+      <CajonUnidadHerramienta unidad={unidad} tipoHerramienta={tipoHerramienta} abierto={isOpen} alCerrar={onClose}
+        etiquetaEstado={estadoBadge.label} qr={qrImageUrl} cargandoQr={loadingQr} alDescargar={handleDescargar} alImprimir={handleImprimir} />
+    );
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Detalles de la Unidad">

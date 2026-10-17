@@ -9,6 +9,8 @@ import { getImageUrl } from '../utils/imageUtils';
 import { Loader } from '../components/common';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
+import { useDiseno3G as useRediseno2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaEntradasSalidas from '../rediseno2/tickets/VistaEntradasSalidas';
 
 // Áreas de planta que reciben material sin pasar por un ticket de diseño
 const AREAS = [
@@ -35,6 +37,9 @@ const EntradasSalidasPage = () => {
 
     const inputBusquedaRef = useRef(null);
     const g3 = useDiseno3G(); // Diseño 3G: encabezado, colores de selección y textos (apagado, lo de siempre)
+    const d3 = useRediseno2(); // Rediseño 2: encendido se pinta VistaEntradasSalidas con este mismo estado y manejadores
+    // Rediseño 2: la vista nueva enseña el error de carga (el aviso flotante de siempre no cambia)
+    const [errorCargaR2, setErrorCargaR2] = useState(null);
 
     useEffect(() => {
         const cargar = async () => {
@@ -47,6 +52,7 @@ const EntradasSalidasPage = () => {
                 setArticulos((arts || []).filter(a => a.activo !== false && !a.es_herramienta));
                 setCamionetas((cams?.data?.camionetas || []).filter(c => c.activo !== false));
             } catch (error) {
+                setErrorCargaR2(error);
                 console.error('Error al cargar datos:', error);
                 toast.error('Error al cargar artículos');
             } finally {
@@ -200,6 +206,18 @@ const EntradasSalidasPage = () => {
             setGuardando(false);
         }
     };
+
+    // Rediseño 2 encendido: misma página, otra vista (con su esqueleto de carga en lugar de la rueda)
+    if (d3) {
+        return (
+            <VistaEntradasSalidas s={{
+                camionetas, cargando, errorCarga: errorCargaR2, AREAS, formatCantidad,
+                destino, setDestino, operacion, setOperacion, seleccionados, busqueda, setBusqueda, guardando,
+                inputBusquedaRef, handleEnterBusqueda, resultados, agregarArticulo, cambiarCantidad, fijarCantidad, quitar,
+                totalPiezas, sinStock, confirmar,
+            }} />
+        );
+    }
 
     if (cargando) return <Loader fullScreen />;
 

@@ -15,11 +15,15 @@ import {
 import ordenesCompraService from '../../services/ordenesCompra.service';
 import { Loader } from './index';
 import toast from 'react-hot-toast';
+// Rediseño 2 · vista encendida (apagado no la usa)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import HistorialOrdenR2 from '../../rediseno2/compras/HistorialOrden';
 
 const TimelineHistorial = ({ ordenId }) => {
   const [historial, setHistorial] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mostrarArbolDependencias, setMostrarArbolDependencias] = useState(false);
+  const d3 = useDiseno3GR2(); // Rediseño 2: línea de tiempo sin tarjetas encendido (la misma petición)
 
   useEffect(() => {
     if (ordenId) {
@@ -66,6 +70,13 @@ const TimelineHistorial = ({ ordenId }) => {
       })
     };
   };
+
+  if (d3) {
+    return (
+      <HistorialOrdenR2 loading={loading} historial={historial} recargar={fetchHistorial}
+        mostrarArbol={mostrarArbolDependencias} setMostrarArbol={setMostrarArbolDependencias} />
+    );
+  }
 
   if (loading) {
     return (

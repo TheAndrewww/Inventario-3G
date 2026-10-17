@@ -6,6 +6,8 @@ import toast from 'react-hot-toast';
 import { generateTicketPDF } from '../utils/pdfGenerator';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import { cx, etq } from '../diseno-3g/dialogosG3';
+import { useDiseno3G as useRediseno2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaHistorial from '../rediseno2/tickets/VistaHistorial';
 
 // Diseño 3G: estado del movimiento con color y texto
 const ESTADO_G3 = {
@@ -21,6 +23,9 @@ const HistorialPage = () => {
   const [selectedMovimiento, setSelectedMovimiento] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const g3 = useDiseno3G(); // Diseño 3G: tabla en tarjetas y estados con texto (apagado, lo de siempre)
+  const d3 = useRediseno2(); // Rediseño 2: encendido se pinta VistaHistorial con este mismo estado y manejadores
+  // Rediseño 2: la vista nueva enseña el error de carga con «Reintentar» (el aviso flotante de siempre no cambia)
+  const [errorCargaR2, setErrorCargaR2] = useState(null);
 
   useEffect(() => {
     fetchHistorial();
@@ -43,7 +48,9 @@ const HistorialPage = () => {
       // Extraer el array de movimientos de la respuesta
       const movimientosArray = data?.data?.movimientos || data?.movimientos || data || [];
       setMovimientos(Array.isArray(movimientosArray) ? movimientosArray : []);
+      setErrorCargaR2(null);
     } catch (error) {
+      setErrorCargaR2(error);
       console.error('Error al cargar historial:', error);
       toast.error('Error al cargar el historial');
       setMovimientos([]);
@@ -57,6 +64,16 @@ const HistorialPage = () => {
     item.usuario?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.proyecto?.toLowerCase().includes(searchTerm.toLowerCase())
   ) : [];
+
+  // Rediseño 2 encendido: misma página, otra vista (con su esqueleto de carga en lugar de la rueda)
+  if (d3) {
+    return (
+      <VistaHistorial h={{
+        movimientos, filteredMovimientos, loading, searchTerm, setSearchTerm, fetchHistorial, errorCarga: errorCargaR2,
+        selectedMovimiento, showModal, handleVerDetalles, handleCloseModal, descargarPDF: generateTicketPDF,
+      }} />
+    );
+  }
 
   if (loading) {
     return <Loader fullScreen />;

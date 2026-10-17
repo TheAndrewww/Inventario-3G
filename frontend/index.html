@@ -3,12 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <!-- Diseño 3G: interruptor (apagado por omisión). Va antes de cualquier CSS para que no parpadee (G3.fragmentoHead v1.1.0). Ver src/diseno-3g/LEEME.md
-         Las pantallas públicas (TV, terminal, anuncios, calendario público) nunca llevan el diseño nuevo ni piden su letra. -->
-    <script>window.G3_RUTAS_SIN_DISENO=['/anuncios','/calendario-publico','/produccion-tv','/preparados-tv','/manufactura-tv','/herreria-tv','/terminal']</script>
+         Rediseño 2 (decisión del dueño, 16-oct): las pantallas públicas (TV, terminal, anuncios, calendario público) YA NO están
+         excluidas: con el diseño encendido también llevan el rediseño. Apagado siguen idénticas. -->
+    <script>window.G3_RUTAS_SIN_DISENO=[]</script>
     <style>:root:not([data-diseno='3g']) .g3-si{display:none!important}</style><script>(function(d,k){try{var x=d.hasAttribute('data-g3-excluir'),r=window.G3_RUTAS_SIN_DISENO||[],p=location.pathname,i,s;for(i=0;i<r.length&&!x;i++){s=r[i];x=s instanceof RegExp?s.test(p):(s=String(s),s.slice(-1)==='/'&&(s=s.slice(0,-1)),p===s||p.indexOf(s+'/')===0)}if(x){d.removeAttribute('data-diseno');return}var q=new URLSearchParams(location.search).get('diseno');if(q==='3g'||q==='actual')localStorage.setItem(k,q);else q=localStorage.getItem(k);if(q==='3g'){d.setAttribute('data-diseno','3g');var t=localStorage.getItem(k+'-tema');if(/^(auto|claro|oscuro)$/.test(t))d.setAttribute('data-g3-tema',t)}else if(q==='actual')d.removeAttribute('data-diseno')}catch(e){}})(document.documentElement,'diseno-3g')</script>
-    <!-- Diseño 3G para TV (ola 3, ver src/diseno-3g/tvG3.js): las pantallas públicas llevan su diseño de TV SOLO si la URL de ESTA carga
-         trae ?diseno=3g (&tema=oscuro para fondo oscuro). No se guarda ni se lee nada guardado (equipos compartidos). Sin el parámetro, igual que siempre. -->
-    <script>(function(d){try{var q=new URLSearchParams(location.search);if(q.get('diseno')!=='3g'||!/^\/(produccion-tv|preparados-tv|manufactura-tv|herreria-tv|anuncios|calendario-publico|terminal)(\/|$)/.test(location.pathname))return;var t=q.get('tema')==='oscuro'?'oscuro':'claro',l=document.createElement('link');window.G3_TV=t;d.setAttribute('data-g3-tv',t);l.id='g3-fuentes';l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap';document.head.appendChild(l)}catch(e){}})(document.documentElement)</script>
+    <!-- Rediseño 2 · pantallas de piso: ya no se pone data-g3-tv (el diseño de TV de la ola 3 no se usa). Solo se anota ?tema=claro|oscuro
+         de ESTA carga para useTemaPiso() (src/rediseno2/fundacion/piso/usePiso.js). Apagado no hace nada. -->
+    <script>(function(d){try{if(d.getAttribute('data-diseno')!=='3g')return;var t=new URLSearchParams(location.search).get('tema');if(t==='claro'||t==='oscuro')window.G3_TEMA_PISO=t}catch(e){}})(document.documentElement)</script>
     <link rel="icon" type="image/png" href="https://res.cloudinary.com/dd93jrilg/image/upload/v1762289946/logo-page_qhpoey.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 

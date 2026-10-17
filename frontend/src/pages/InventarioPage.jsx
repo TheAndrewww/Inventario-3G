@@ -26,6 +26,9 @@ import { Link } from 'react-router-dom';
 import { rolPuedeVer } from '../components/layout/Sidebar';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
+// Rediseño 2: con el diseño encendido la pantalla se pinta con rediseno2/inventario/VistaInventario (misma lógica, mismas peticiones)
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaInventario from '../rediseno2/inventario/VistaInventario';
 
 /**
  * Formatea la cantidad según la unidad de medida
@@ -265,6 +268,8 @@ const InventarioPage = () => {
   const { agregarArticulo } = usePedido();
   const { user } = useAuth();
   const diseno3g = useDiseno3G(); // Diseño 3G: textos, íconos y encabezados nuevos solo se montan encendido
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (antes de los return, junto a los demás hooks)
+  const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de carga para la vista nueva (el aviso de siempre no cambia)
   const sinEmojiG3 = (t) => (diseno3g && typeof t === 'string' ? t.replace(/^[^\p{L}\p{N}]+/u, '') : t);
 
   // Verificar permisos según el rol
@@ -709,8 +714,10 @@ const InventarioPage = () => {
       if (!silent) setLoading(true);
       const data = await articulosService.getAll();
       setArticulos(Array.isArray(data) ? data : []);
+      setErrorCargaR2(null);
     } catch (error) {
       console.error('Error al cargar artículos:', error);
+      if (!silent) setErrorCargaR2(error?.message || 'Error al cargar el inventario');
       if (!silent) toast.error('Error al cargar el inventario');
       if (!silent) setArticulos([]);
     } finally {
@@ -2158,6 +2165,102 @@ const InventarioPage = () => {
       setLoadingEtiquetas(false);
     }
   };
+
+  // ===== Rediseño 2 (encendido): la misma pantalla, pintada por VistaInventario con el estado y los manejadores de arriba =====
+  if (d3) {
+    // Las mismas acciones que hoy viven en el JSX (cantidad sin decimales en piezas; categorías por almacén), con nombre
+    const cambiarCantidadEntradaR2 = (v) => setCantidadEntrada(sanitizarCantidad(v, articuloParaEntrada?.unidad));
+    const cambiarCantidadSalidaR2 = (v) => setCantidadSalida(sanitizarCantidad(v, articuloParaSalida?.unidad));
+    const alternarCategoriasAlmacenR2 = async (almacen) => {
+      if (almacenCategoriasExpandido === almacen.id) {
+        setAlmacenCategoriasExpandido(null);
+      } else {
+        // Cargar todas las categorías del sistema si no se han cargado
+        if (todasLasCategorias.length === 0) {
+          try {
+            const data = await categoriasService.getAll();
+            setTodasLasCategorias(Array.isArray(data) ? data : []);
+          } catch (e) { console.error(e); }
+        }
+        setAlmacenCategoriasExpandido(almacen.id);
+      }
+    };
+    const cambiarCategoriaDeAlmacenR2 = async (almacen, cat, isAssigned) => {
+      setLoadingToggleCategoria(true);
+      try {
+        if (isAssigned) {
+          await almacenesService.desasignarCategoria(almacen.id, cat.id);
+        } else {
+          await almacenesService.asignarCategoria(almacen.id, cat.id);
+        }
+        // Recargar almacenes para reflejar cambio
+        await fetchAlmacenes();
+      } catch (err) {
+        toast.error(err.message || 'Error al actualizar categoría');
+      } finally {
+        setLoadingToggleCategoria(false);
+      }
+    };
+    return (
+      <VistaInventario p={{
+        // datos
+        articulos, loading, errorCargaR2, fetchArticulos, almacenesDisponibles, filteredArticulos, resultadosInicio, articulosPendientesRevision,
+        articulosEnConteo, secciones, todasSecciones, todasCategorias, todasUbicaciones, categoriasAlmacenSel, ubicacionesAlmacenSel,
+        // navegación y filtros
+        almacenSeleccionado, setAlmacenSeleccionado, seccionSeleccionada, setSeccionSeleccionada, setTabActivo,
+        categoriaSeleccionada, setCategoriaSeleccionada, ubicacionSeleccionada, setUbicacionSeleccionada,
+        searchTerm, setSearchTerm, busquedaInicio, setBusquedaInicio, ordenamiento, setOrdenamiento,
+        mostrarDesactivados, setMostrarDesactivados, modoNuevosRegistros, buscandoGlobalActivo, esDeOtroAlmacen, nombreAlmacenDe,
+        abrirDesdeBusquedaInicio, isScanning,
+        // permisos
+        user, rolPuedeVer, esAdministrador, esAlmacen, puedeCrearArticulos, puedeEditarArticulos, puedeAgregarAlPedido, puedeGestionarInventario,
+        puedeRegistrarSalida, puedeGestionarTaxonomia, puedeAjustarStock, permisosAlmacenAbiertos, cambiandoPermisosAlmacen, togglePermisosAlmacen,
+        // tabla
+        getImageUrl, colWidths, setColWidths, colWidthsPorOmision: DEFAULT_COL_WIDTHS, resetColWidths, recienActualizados, articuloEncontradoPorCodigo,
+        herramientasExpandidas, unidadesHerramientas, loadingUnidades, handleToggleHerramienta, handleVerDetalleUnidad,
+        handleDescargarCodigoBarras, handleImprimirCodigoBarras,
+        // ajuste rápido
+        modoAjusteStock, setModoAjusteStock, stocksEditados, handleStockEditChange, guardandoStocks, cambiosStockPendientes,
+        handleGuardarAjustesStock, handleCancelarAjusteStock, unidadEsEntera,
+        // acciones del artículo
+        handleVerDetalle, handleAgregarAlPedido, handleAbrirEntrada, handleAbrirSalida, handleEliminar, handleReactivar, handleEliminarPermanente,
+        handleNuevoArticulo, handleEditar, handleQuickUpdate, actualizandoArt, categoriasParaArticulo, ubicacionesParaArticulo,
+        getSeccionArticulo, setSeccionArticulo,
+        // detalle, formulario y escáner
+        articuloSeleccionado, modalDetalleOpen, setModalDetalleOpen, modalFormOpen, handleCloseForm, handleFormSuccess, articuloAEditar, codigoEscaneado,
+        showScanner, setShowScanner,
+        // entrada y salida
+        modalEntradaOpen, articuloParaEntrada, cantidadEntrada, cambiarCantidadEntradaR2, observacionesEntrada, setObservacionesEntrada,
+        loadingEntrada, handleCerrarEntrada, handleGuardarEntrada,
+        modalSalidaOpen, articuloParaSalida, cantidadSalida, cambiarCantidadSalidaR2, observacionesSalida, setObservacionesSalida,
+        loadingSalida, handleCerrarSalida, handleGuardarSalida,
+        // nuevos por autorizar
+        almacenNuevoDe, ubicacionesDeAlmacen, seccionesDeAlmacen, categoriasDeAlmacen, handleNuevoAlmacenChange, setNuevosAlmacenSel,
+        handleAutorizarNuevo, autorizandoNuevos,
+        // etiquetas
+        modalEtiquetasOpen, setModalEtiquetasOpen, handleAbrirModalEtiquetas, busquedaEtiquetas, setBusquedaEtiquetas,
+        filtroTipoEtiquetas, setFiltroTipoEtiquetas, filtroUbicacionEtiquetas, setFiltroUbicacionEtiquetas, filtroEstadoEtiquetado, setFiltroEstadoEtiquetado,
+        articulosSeleccionadosEtiquetas, unidadesSeleccionadasEtiquetas, herramientasExpandidasEtiquetas, unidadesCargadasEtiquetas, loadingEtiquetas,
+        handleSeleccionarTodosEtiquetas, handleToggleArticuloEtiqueta, handleToggleHerramientaEtiquetas, handleToggleUnidadEtiqueta,
+        handleSeleccionarTodasUnidades, handleGenerarEtiquetas,
+        // unidad de herramienta
+        modalUnidadOpen, setModalUnidadOpen, unidadSeleccionada, setUnidadSeleccionada, tipoHerramientaSeleccionado, setTipoHerramientaSeleccionado,
+        // almacenes
+        modalAlmacenesOpen, setModalAlmacenesOpen, almacenEditando, setAlmacenEditando, nuevoNombreAlmacen, setNuevoNombreAlmacen, loadingAlmacenes,
+        handleCrearAlmacen, handleRenombrarAlmacen, handleEliminarAlmacen, almacenCategoriasExpandido, todasLasCategorias, loadingToggleCategoria,
+        alternarCategoriasAlmacenR2, cambiarCategoriaDeAlmacenR2,
+        // categorías, ubicaciones y secciones
+        modalCategoriaOpen, categoriaEditando, nombreCategoria, setNombreCategoria, loadingCategoria,
+        handleAbrirModalCategoria, handleCerrarModalCategoria, handleGuardarCategoria, handleEliminarCategoria,
+        modalUbicacionOpen, ubicacionEditando, codigoUbicacion, setCodigoUbicacion, almacenUbicacion, setAlmacenUbicacion,
+        pasilloUbicacion, setPasilloUbicacion, estanteUbicacion, setEstanteUbicacion, nivelUbicacion, setNivelUbicacion,
+        descripcionUbicacion, setDescripcionUbicacion, loadingUbicacion,
+        handleAbrirModalUbicacion, handleCerrarModalUbicacion, handleGuardarUbicacion, handleEliminarUbicacion,
+        modalSeccionOpen, seccionEditando, nombreSeccion, setNombreSeccion, loadingSeccion, almacenSeccionForm,
+        handleAbrirModalSeccion, handleCerrarModalSeccion, handleGuardarSeccion, handleEliminarSeccion,
+      }} />
+    );
+  }
 
   if (loading) {
     return <Loader fullScreen />;

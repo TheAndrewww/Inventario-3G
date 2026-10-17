@@ -9,6 +9,8 @@ import { useSearchParams } from 'react-router-dom';
 import { Megaphone, RefreshCw } from 'lucide-react';
 import api from '../services/api';
 import CabG3 from '../diseno-3g/CabG3';
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaAvisos from '../rediseno2/produccion/VistaAvisos';
 
 const ORIGENES = [
   { id: 'planta', nombre: 'Planta' },
@@ -44,6 +46,7 @@ export default function AvisosProduccionPage() {
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+  const d3 = useDiseno3GR2(); // Rediseño 2: encendido, la vista nueva (abajo, antes del return de siempre)
 
   const origenes = lista(params.get('origen'));
   const destinos = lista(params.get('destino'));
@@ -86,6 +89,18 @@ export default function AvisosProduccionPage() {
   const filtrando = origenes.length || destinos.length || dia;
   // PLA-14: qué parte de la bitácora todavía no llega (Finanzas la manda con BITACORA_A_PLANTA)
   const faltan = ORIGENES.filter((o) => o.id !== 'planta' && !conectadas.has(o.id));
+
+  // Rediseño 2 (encendido): mismos datos, mismos filtros en la liga y misma carga; otra vista
+  if (d3) {
+    return (
+      <VistaAvisos
+        datos={datos} cargando={cargando} error={error} cargar={cargar} origenes={origenes} destinos={destinos} dia={dia}
+        cambiar={cambiar} alternar={alternar} setParams={setParams} todos={todos} hoy={hoy} visibles={visibles} cuenta={cuenta}
+        opcionesDia={opcionesDia} filtrando={filtrando} faltan={faltan} pasaOrigen={pasaOrigen} pasaDestino={pasaDestino} pasaDia={pasaDia}
+        ORIGENES={ORIGENES} DESTINOS={DESTINOS} NOMBRE_ORIGEN={NOMBRE_ORIGEN} NOMBRE_DESTINO={NOMBRE_DESTINO} nombreDia={nombreDia}
+      />
+    );
+  }
 
   return (
     <div className="p-6">

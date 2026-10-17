@@ -6,6 +6,9 @@ import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import MasAcciones from '../diseno-3g/MasAcciones';
 import { g3Activo, confirmarG3, cx } from '../diseno-3g/dialogosG3';
+// Rediseño 2: encendido, rediseno2/inventario/VistaRollos (mismo estado, mismas peticiones)
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaRollos from '../rediseno2/inventario/VistaRollos';
 
 const API = '/rollos-membrana';
 
@@ -44,6 +47,8 @@ const RollosMembranasPage = () => {
     const cantidadRef = useRef(null);
     const idRef = useRef(null);
     const g3 = useDiseno3G(); // Diseño 3G: encabezado, filtros, acciones por renglón y confirmación del paquete (apagado, lo de siempre)
+    const d3 = useDiseno3GR2(); // Rediseño 2 encendido
+    const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de carga para la vista nueva (el aviso de siempre no cambia)
 
     // === CARGAR ARTÍCULOS ===
     useEffect(() => {
@@ -63,7 +68,9 @@ const RollosMembranasPage = () => {
             const params = search ? `?search=${encodeURIComponent(search)}` : '';
             const res = await api.get(`${API}/articulos${params}`);
             setArticulos(res.data.data || []);
+            setErrorCargaR2(null);
         } catch (error) {
+            setErrorCargaR2(error?.response?.data?.message || error?.message || 'Error al cargar artículos de membrana');
             toast.error('Error al cargar artículos de membrana');
         } finally {
             setLoading(false);
@@ -237,6 +244,19 @@ const RollosMembranasPage = () => {
     };
 
     // === RENDER ===
+    // Rediseño 2 encendido: tabla ordenada por metros y los rollos en un cajón (mismo estado y mismos manejadores)
+    if (d3) {
+        return (
+            <VistaRollos r={{
+                vista, articuloSeleccionado, articulos, busqueda, setBusqueda, loading, rollos, loadingRollos, filtroEstado, setFiltroEstado,
+                modalRollo, setModalRollo, formRollo, setFormRollo, guardando, rolloDescuento, setRolloDescuento,
+                cantidadDescuento, setCantidadDescuento, obsDescuento, setObsDescuento, descontando, cantidadRef, idRef,
+                seleccionarArticulo, volverAArticulos, abrirCrearRollo, abrirEditarRollo, guardarRollo, eliminarRollo, abrirDescuento, confirmarDescuento,
+                errorCargaR2, cargarArticulos,
+            }} />
+        );
+    }
+
     if (loading && vista === 'articulos') {
         return (
             <div className="flex items-center justify-center h-full min-h-[60vh]">

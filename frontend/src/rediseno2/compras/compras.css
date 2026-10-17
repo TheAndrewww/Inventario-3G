@@ -1,0 +1,215 @@
+/* Rediseño 2 · Compras (Solicitudes, Órdenes, Recepción, Stock bajo y sus cajones).
+   TODO bajo :root[data-diseno="3g"]: apagado este archivo no cambia nada. Clases propias r2c-*; usa los tokens del paquete
+   (--g3-*) y del rediseño (--r2-*). Sin colores sueltos, sin tarjetas dentro de tarjetas, sin borde + sombra + fondo a la vez. */
+
+/* ───────── Texto dentro de celdas ───────── */
+:root[data-diseno="3g"] .r2c-fuerte { font-weight: 600; margin: 0; }
+:root[data-diseno="3g"] .r2c-fuerte:not([class*="r2-tono--"]) { color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2c-sec { font: var(--r2-t-secundario); color: var(--g3-tinta-2); margin: 0; }
+:root[data-diseno="3g"] .r2c-tenue { color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2c-num, :root[data-diseno="3g"] .r2c-importe { font-variant-numeric: tabular-nums; white-space: nowrap; }
+:root[data-diseno="3g"] .r2c-importe { font-weight: 600; color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2c-folio { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2c-celda-doble { display: inline-grid; gap: 2px; min-width: 0; vertical-align: middle; }
+:root[data-diseno="3g"] .r2c-celda-doble--der { justify-items: end; text-align: right; }
+:root[data-diseno="3g"] .r2c-parrafo { margin: 0; font: var(--r2-t-dato); color: var(--g3-tinta); max-width: 75ch; overflow-wrap: anywhere; }
+:root[data-diseno="3g"] .r2c-motivo {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font: var(--r2-t-secundario); color: var(--g3-tinta-2); max-width: 32ch;
+}
+:root[data-diseno="3g"] .r2c-tachado { text-decoration: line-through; color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2c-comprar { font-weight: 700; color: var(--g3-tinta); font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2c-enlace { margin-left: 12px; color: var(--g3-primario); text-decoration: underline; text-underline-offset: 2px; }
+:root[data-diseno="3g"] .r2c-oculto { display: none; }
+:root[data-diseno="3g"] .r2c-empuja-derecha { margin-left: auto; }
+:root[data-diseno="3g"] .r2c-error-celda { font: 500 0.8125rem/1.125rem var(--g3-f-texto); color: var(--g3-mal); }
+:root[data-diseno="3g"] .r2c-total-seccion { font: 600 0.9375rem/1.25rem var(--g3-f-texto); font-variant-numeric: tabular-nums; color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2c-resumen-linea { margin: 0; font: var(--r2-t-secundario); color: var(--g3-tinta-2); font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2c-linea-ok { display: flex; align-items: center; gap: 8px; margin: 0; font: var(--r2-t-estado); color: var(--g3-ok); }
+:root[data-diseno="3g"] .r2c-linea-ok--grande { font: 600 1rem/1.5rem var(--g3-f-texto); }
+:root[data-diseno="3g"] .r2c-hecho { display: inline-flex; align-items: center; gap: 6px; font: var(--r2-t-estado); white-space: nowrap; }
+:root[data-diseno="3g"] .r2c-nota-pie { margin-top: 12px; }
+:root[data-diseno="3g"] .r2c-pie-nota { display: inline-flex; align-items: center; gap: 6px; font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+
+/* Cajitas de aviso (una sola superficie de color, sin borde ni sombra) */
+:root[data-diseno="3g"] .r2c-caja { margin: 0; padding: 12px 14px; border-radius: 12px; font: var(--r2-t-dato); color: var(--g3-tinta); overflow-wrap: anywhere; }
+:root[data-diseno="3g"] .r2c-caja--mal { background: var(--g3-mal-suave); }
+:root[data-diseno="3g"] .r2c-caja--aviso { background: var(--g3-aviso-suave); }
+:root[data-diseno="3g"] .r2c-caja--info { background: var(--g3-info-suave); }
+
+/* Listas sencillas dentro de cajones */
+:root[data-diseno="3g"] .r2c-lista-simple { list-style: disc; margin: 0; padding-left: 20px; display: grid; gap: 6px; font: var(--r2-t-dato); color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2c-lista-pasos { gap: 8px; }
+:root[data-diseno="3g"] .r2c-lista-filas { list-style: none; margin: 0; padding: 0; }
+:root[data-diseno="3g"] .r2c-lista-filas > li {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--g3-linea);
+}
+:root[data-diseno="3g"] .r2c-lista-filas > li:last-child { border-bottom: 0; }
+
+/* ───────── Página ───────── */
+:root[data-diseno="3g"] .r2c-titulo-lista { margin: 24px 0 4px; font: var(--r2-t-seccion); color: var(--g3-tinta); display: flex; align-items: baseline; gap: 10px; }
+:root[data-diseno="3g"] .r2c-seccion-primera { margin-top: 4px; }
+:root[data-diseno="3g"] .r2c-seccion-primera .r2-seccion-cab { margin-bottom: 4px; }
+:root[data-diseno="3g"] .r2c-grupo-nota { font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+/* La decisión del renglón de grupo (Solicitudes: «Armar orden con N») va a la derecha del título del grupo */
+:root[data-diseno="3g"] .r2c-tabla-solicitudes .r2-grupo th { position: relative; }
+:root[data-diseno="3g"] .r2c-grupo-accion { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+:root[data-diseno="3g"] .r2c-tabla-solicitudes .r2-grupo th { height: 48px; }
+:root[data-diseno="3g"] .r2c-tabla-celular .r2c-grupo-accion, :root[data-diseno="3g"] .r2-tabla-celular .r2c-grupo-accion { position: static; transform: none; display: block; }
+:root[data-diseno="3g"] .r2-tabla-celular p.r2-grupo-nota { margin: 8px 0; }
+
+/* Cantidad editable en la celda */
+:root[data-diseno="3g"] .r2c-cantidad-celda { display: inline-flex; align-items: center; gap: 8px; }
+:root[data-diseno="3g"] .r2c-entrada-num { width: 96px; height: 36px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 10px; }
+:root[data-diseno="3g"] .r2c-unidad { font: var(--r2-t-secundario); color: var(--g3-tinta-2); white-space: nowrap; }
+:root[data-diseno="3g"] .r2c-entrada-media { max-width: 240px; }
+@media (pointer: coarse) { :root[data-diseno="3g"] .r2c-entrada-num { height: 44px; } }
+@media (max-width: 720px) {
+  :root[data-diseno="3g"] .r2c-entrada-num { width: 84px; height: 44px; }
+  :root[data-diseno="3g"] .r2-fila-derecha .r2c-cantidad-celda { gap: 6px; }
+  :root[data-diseno="3g"] .r2c-tabla-factura .r2-fila-secundario,
+  :root[data-diseno="3g"] .r2c-tabla-recibir .r2-fila-secundario { white-space: normal; overflow: visible; }
+  :root[data-diseno="3g"] .r2c-tabla-factura .r2-fila-derecha,
+  :root[data-diseno="3g"] .r2c-tabla-recibir .r2-fila-derecha { max-width: 52%; }
+}
+
+/* ───────── Cajones ───────── */
+/* Formulario que envuelve cuerpo y pie sin romper el acomodo del cajón */
+:root[data-diseno="3g"] .r2c-forma { display: contents; }
+:root[data-diseno="3g"] .r2c-cajon-pestanas { flex: none; padding: 0 24px; }
+:root[data-diseno="3g"] .r2c-decision-sola { flex: none; padding: 0 24px 12px; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2c-camino { flex: none; padding: 0 24px 16px; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2c-camino .r2-segmentado { min-height: 48px; }
+:root[data-diseno="3g"] .r2c-camino .r2-segmento { min-height: 44px; font-size: 0.9375rem; }
+:root[data-diseno="3g"] .r2c-cajon-buscar { flex: none; padding: 0 24px 12px; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2c-nota-lista { margin: 12px 0 0; }
+:root[data-diseno="3g"] .r2c-historial { padding-top: 16px; }
+@media (max-width: 720px) {
+  :root[data-diseno="3g"] :is(.r2c-cajon-pestanas, .r2c-decision-sola, .r2c-camino, .r2c-cajon-buscar) { padding-left: 16px; padding-right: 16px; }
+}
+:root[data-diseno="3g"] .r2c-articulo-cab { display: flex; align-items: center; gap: 12px; }
+:root[data-diseno="3g"] .r2c-articulo-cab-texto { display: grid; gap: 2px; min-width: 0; }
+:root[data-diseno="3g"] .r2c-datos-tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+:root[data-diseno="3g"] .r2c-articulo-celda { display: flex; align-items: center; gap: 12px; min-width: 0; }
+:root[data-diseno="3g"] .r2c-formulario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; }
+:root[data-diseno="3g"] .r2c-campo-doble { grid-column: 1 / -1; }
+:root[data-diseno="3g"] .r2c-fila-campo { display: flex; align-items: center; gap: 8px; }
+:root[data-diseno="3g"] .r2c-fila-campo > .r2-entrada { flex: 1; }
+@media (max-width: 720px) {
+  :root[data-diseno="3g"] .r2c-formulario { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Barra de progreso fina (avance real de una recepción) */
+:root[data-diseno="3g"] .r2c-progreso-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+:root[data-diseno="3g"] .r2c-progreso { height: 6px; border-radius: 3px; background: var(--g3-contenedor-alto); overflow: hidden; }
+:root[data-diseno="3g"] .r2c-progreso > span { display: block; height: 100%; border-radius: 3px; background: var(--g3-primario); transition: width var(--g3-normal) var(--g3-curva); }
+
+/* Plegables (historial de recepciones al pie, origen de la orden, recepciones) */
+:root[data-diseno="3g"] .r2c-plegable {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; margin: 0; padding: 0 4px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--g3-tinta); font: var(--r2-t-grupo); text-align: left; cursor: pointer;
+}
+:root[data-diseno="3g"] .r2c-plegable:hover { background: var(--g3-hover); }
+:root[data-diseno="3g"] .r2c-plegable > svg { flex: none; color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2c-plegable--fila { min-height: 56px; font: var(--r2-t-dato); }
+:root[data-diseno="3g"] .r2c-plegado-pie { border-top: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2c-recepciones { list-style: none; margin: 0; padding: 0; }
+:root[data-diseno="3g"] .r2c-recepcion { border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2c-recepcion:last-child { border-bottom: 0; }
+:root[data-diseno="3g"] .r2c-recepcion-cuerpo { display: grid; gap: 8px; padding: 0 4px 12px 30px; }
+:root[data-diseno="3g"] .r2c-historial-orden { display: grid; gap: 16px; }
+:root[data-diseno="3g"] .r2c-origen { border-top: 1px solid var(--g3-linea); padding-top: 8px; }
+:root[data-diseno="3g"] .r2c-origen-cuerpo { display: grid; gap: 10px; padding: 4px 4px 0 30px; }
+:root[data-diseno="3g"] .r2c-origen-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+/* ───────── Nueva orden: dos zonas ───────── */
+:root[data-diseno="3g"] .r2c-nueva-proveedor { flex: none; padding: 0 24px 16px; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2c-nueva-proveedor .r2-campo { max-width: 480px; }
+:root[data-diseno="3g"] .r2c-nueva-segmento { flex: none; padding: 12px 16px; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2c-nueva-cuerpo { padding: 0; }
+@media (min-width: 721px) {
+  :root[data-diseno="3g"] .r2c-nueva-cuerpo { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-content: stretch; overflow: hidden; }
+  :root[data-diseno="3g"] .r2c-nueva-zona { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  :root[data-diseno="3g"] .r2c-nueva-zona--orden { border-left: 1px solid var(--g3-linea); background: var(--g3-fondo); }
+}
+:root[data-diseno="3g"] .r2c-nueva-zona { padding: 16px 24px 24px; display: grid; align-content: start; gap: 12px; }
+@media (max-width: 720px) { :root[data-diseno="3g"] .r2c-nueva-zona { padding: 12px 16px 24px; } }
+:root[data-diseno="3g"] .r2c-zona-titulo { margin: 0; font: var(--r2-t-grupo); color: var(--g3-tinta); display: flex; align-items: baseline; gap: 8px; }
+:root[data-diseno="3g"] .r2c-zona-agregar { display: grid; gap: 12px; min-width: 0; }
+:root[data-diseno="3g"] .r2c-fila-buscar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+:root[data-diseno="3g"] .r2c-busqueda-flex { flex: 1 1 220px; max-width: none; }
+:root[data-diseno="3g"] .r2c-busqueda-ancha { max-width: none; flex: none; width: 100%; }
+:root[data-diseno="3g"] .r2c-cuenta-resultados { margin: 0; font: var(--r2-t-etiqueta); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2c-grupo-opciones { display: grid; gap: 4px; }
+:root[data-diseno="3g"] .r2c-grupo-opciones-titulo {
+  margin: 8px 0 0; padding: 8px 4px; font: var(--r2-t-grupo); color: var(--g3-tinta); border-bottom: 1px solid var(--g3-linea-fuerte);
+  display: flex; align-items: baseline; gap: 8px;
+}
+:root[data-diseno="3g"] .r2c-opciones { list-style: none; margin: 0; padding: 0; }
+:root[data-diseno="3g"] .r2c-opciones > li { border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2c-opcion {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; margin: 0; padding: 6px 8px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--g3-tinta); font: var(--r2-t-dato); text-align: left; cursor: pointer;
+}
+:root[data-diseno="3g"] .r2c-opcion:hover:not(:disabled) { background: var(--g3-hover); }
+:root[data-diseno="3g"] .r2c-opcion:disabled { cursor: default; }
+:root[data-diseno="3g"] .r2c-opcion:disabled .r2c-opcion-lineas { opacity: 0.6; }
+:root[data-diseno="3g"] .r2c-opcion-lineas { flex: 1; min-width: 0; display: grid; gap: 2px; }
+:root[data-diseno="3g"] .r2c-opcion-lineas > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-diseno="3g"] .r2c-opcion-derecha { display: grid; justify-items: end; gap: 2px; flex: none; text-align: right; }
+:root[data-diseno="3g"] .r2c-opcion-accion { flex: none; display: inline-grid; place-items: center; min-width: 32px; color: var(--g3-primario); font: var(--r2-t-secundario); }
+:root[data-diseno="3g"] .r2c-opcion:disabled .r2c-opcion-accion { color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2c-sugerencias { list-style: none; margin: 0; padding: 0; }
+:root[data-diseno="3g"] .r2c-sugerencia { display: flex; align-items: flex-start; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2c-sugerencia-texto { flex: 1; min-width: 0; display: grid; gap: 4px; }
+:root[data-diseno="3g"] .r2c-consolidar { display: grid; }
+:root[data-diseno="3g"] .r2c-consolidar .r2-casilla { font: var(--r2-t-secundario); }
+:root[data-diseno="3g"] .r2c-sub-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2c-sub-lista li { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+:root[data-diseno="3g"] .r2c-en-orden { list-style: none; margin: 0; padding: 0; }
+:root[data-diseno="3g"] .r2c-en-orden-fila { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2c-en-orden-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+:root[data-diseno="3g"] .r2c-en-orden-campos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: end; }
+:root[data-diseno="3g"] .r2c-mini-campo { display: grid; gap: 4px; min-width: 0; }
+:root[data-diseno="3g"] .r2c-mini-campo > span:first-child { font: var(--r2-t-etiqueta); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2c-mini-campo .r2c-entrada-num { width: 100%; }
+:root[data-diseno="3g"] .r2c-mini-campo--total { justify-items: end; }
+:root[data-diseno="3g"] .r2c-mini-campo--total > .r2c-num { min-height: 36px; display: inline-flex; align-items: center; }
+:root[data-diseno="3g"] .r2c-revisar { display: grid; gap: 12px; padding-top: 8px; }
+:root[data-diseno="3g"] .r2c-boton-inicio { justify-self: start; }
+
+/* ───────── Recepción ───────── */
+:root[data-diseno="3g"] .r2c-llego { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+:root[data-diseno="3g"] .r2c-nota-renglon { margin-top: 6px; min-height: 64px; width: 100%; max-width: 420px; }
+:root[data-diseno="3g"] .r2c-tabla-recibir td, :root[data-diseno="3g"] .r2c-tabla-factura td { vertical-align: top; padding-top: 10px; padding-bottom: 10px; }
+:root[data-diseno="3g"] .r2c-celda-cruce { width: 100%; min-width: 220px; }
+:root[data-diseno="3g"] .r2c-celda-cruce .r2-selector-caja { width: 100%; }
+:root[data-diseno="3g"] .r2c-estados-linea { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+:root[data-diseno="3g"] .r2c-zona-foto {
+  display: flex; align-items: center; gap: 16px; width: 100%; min-height: 88px; margin: 0; padding: 16px 20px; text-align: left;
+  border: 1px dashed var(--g3-linea-fuerte); border-radius: 14px; background: transparent; color: var(--g3-tinta); cursor: pointer;
+}
+:root[data-diseno="3g"] .r2c-zona-foto:hover { background: var(--g3-hover); border-color: var(--g3-primario); }
+:root[data-diseno="3g"] .r2c-zona-foto > svg { flex: none; color: var(--g3-primario); }
+:root[data-diseno="3g"] .r2c-fotos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 12px; }
+:root[data-diseno="3g"] .r2c-foto { position: relative; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; border: 1px solid var(--g3-linea); background: var(--g3-contenedor); }
+:root[data-diseno="3g"] .r2c-foto > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+:root[data-diseno="3g"] .r2c-foto-quitar { position: absolute; top: 6px; right: 6px; }
+
+/* Ajustes de la primera revisión */
+:root[data-diseno="3g"] .r2c-celda-corta { display: grid; width: 100%; max-width: 100%; }
+:root[data-diseno="3g"] .r2c-una-linea { display: block; width: 0; min-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-diseno="3g"] .r2c-articulo-celda > .r2c-celda-corta { flex: 1; min-width: 0; }
+:root[data-diseno="3g"] .r2c-zona-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; }
+:root[data-diseno="3g"] .r2c-articulo-celda--arriba { align-items: flex-start; }
+/* La zona de la nueva orden se desplaza sola: sus renglones miden lo que su contenido (si no, las pestañas se encogen a 1 px) */
+:root[data-diseno="3g"] .r2c-nueva-zona { grid-auto-rows: max-content; }
+
+/* Objetivos táctiles de 44 px (segmentos y cifras de la tira): ya los pone la fundación (revisión final) */
+/* Revisión · en celular la fila de filtros de Solicitudes lleva búsqueda, Filtros, «⋯» y «Nueva»: la búsqueda cede para que
+   «Nueva» no se salga del margen de 16 px */
+@media (max-width: 720px) {
+  :root[data-diseno="3g"] .r2c-pagina .r2-filtros-fila > .r2-busqueda { min-width: 0; }
+}
+/* Revisión final: en celular la vista (Activas · Completadas · Canceladas) va debajo de la búsqueda, a lo ancho */
+:root[data-diseno="3g"] .r2c-vistas-celular { margin: 4px 0 8px; }
