@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 // B1 paso 1 · PLA-12 — Planta › Producción › Avisos (solo con Diseño 3G; App.jsx la protege con SoloConDiseno3G).
 // Todo lo que se mandó a Producción, en un solo lugar y solo para verlo: los mensajes no cambian.
 // Junta la cola propia de Planta (lo que Planta deja para el grupo Producción y publica Julia) y, desde PLA-14, la
@@ -91,6 +94,7 @@ export default function AvisosProduccionPage() {
   const faltan = ORIGENES.filter((o) => o.id !== 'planta' && !conectadas.has(o.id));
 
   // Rediseño 2 (encendido): mismos datos, mismos filtros en la liga y misma carga; otra vista
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <VistaAvisos

@@ -1,3 +1,5 @@
+// VIEJO: se borra a partir del 24-oct-2026 — todo el archivo: barra del menú de siempre. Solo la usaba DashboardLayout con el
+// diseño apagado; desde el 16-oct-2026 todos ven el armazón del rediseño 2.
 import React from 'react';
 import { Settings, Menu } from 'lucide-react';
 import { useLocation } from 'react-router-dom';

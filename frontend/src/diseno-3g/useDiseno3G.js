@@ -1,11 +1,12 @@
-// Diseño 3G — saber en React si el interruptor está encendido (html[data-diseno="3g"]).
-// El atributo lo pone el fragmento de index.html antes de que cargue React; diseno-3g.js avisa si cambia.
+// Diseño 3G — saber en React si el diseño nuevo está encendido.
+// Solo el diseño nuevo (decisión del dueño, 16-oct-2026): siempre está encendido para todos, así que devuelve true desde
+// el primer pintado (sin parpadeo de lo viejo). index.html pone html[data-diseno="3g"] fijo y forzarDiseno3G.js lo
+// mantiene. VIEJO: se borra a partir del 24-oct-2026 — las ramas con este valor en false (ver LEEME.md).
 import { useSyncExternalStore } from 'react';
 
 const suscribir = (cb) => (window.G3 ? window.G3.alCambiar(cb) : () => {});
-const leer = () => document.documentElement.getAttribute('data-diseno') === '3g';
 
-export const useDiseno3G = () => useSyncExternalStore(suscribir, leer, () => false);
+export const useDiseno3G = () => true;
 
 // Tema de Diseño 3G: 'claro' | 'oscuro' | 'auto' (Planta no tenía modo oscuro: por omisión, claro)
 const leerTema = () => document.documentElement.getAttribute('data-g3-tema') || 'claro';

@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -326,6 +329,7 @@ const EAN13Scanner = ({ onClose }) => {
 
   // Rediseño 2 encendido: la cámara arriba y los escaneados abajo, en el mismo lugar donde la abre cada pantalla (sin el
   // panel lateral aparte). «Vaciar» repite tal cual lo que hoy va escrito dentro del botón «Vaciar Carrito».
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <EscanerCamaraR2 c={{

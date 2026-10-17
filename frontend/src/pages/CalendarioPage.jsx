@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import { useState, useEffect } from 'react';
 import {
   Calendar,
@@ -232,6 +235,7 @@ const CalendarioPage = () => {
 
   // Rediseño 2 · vista ENCENDIDA: los mismos datos, el mismo cambio de mes y la misma pantalla completa (el JSX de hoy sigue
   // intacto debajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <VistaCalendario

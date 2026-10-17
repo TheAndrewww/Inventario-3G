@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, Clock, AlertCircle, MapPin, PackagePlus, PackageMinus, Plus, Trash2, RefreshCw, RotateCcw } from 'lucide-react';
 import solicitudesCambioService from '../services/solicitudesCambio.service';
@@ -225,6 +228,7 @@ const SolicitudesCambioPage = () => {
     return new Date(fecha).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
   };
 
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <VistaSolicitudesCambio s={{

@@ -1,3 +1,5 @@
+// VIEJO: se borra a partir del 24-oct-2026 — todo el archivo: pestañas de grupo del menú de siempre. Solo las usaba
+// DashboardLayout con el diseño apagado; desde el 16-oct-2026 todos ven el armazón del rediseño 2.
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';

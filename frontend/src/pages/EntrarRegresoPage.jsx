@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { regresoDeCuentas3g } from '../services/cuentas3g';
@@ -34,6 +37,7 @@ const EntrarRegresoPage = () => {
   }, [navigate]);
 
   // Rediseño 2 · vista ENCENDIDA (el JSX de hoy sigue intacto debajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) return <VistaEntrando texto={texto} />;
 
   return (

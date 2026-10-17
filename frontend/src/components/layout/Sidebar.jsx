@@ -138,6 +138,9 @@ const aplicarOrdenGuardado = (defaultItems, savedPaths) => {
   return ordenados;
 };
 
+// VIEJO: se borra a partir del 24-oct-2026 — el componente Sidebar (menú de siempre; desde aquí hasta «export default»). Solo lo
+// usaba DashboardLayout con el diseño apagado. Lo de arriba (ALL_MENU_ITEMS, MENU_GRUPOS, rolPuedeVer, rutaInicialPorRol,
+// subPestanasGrupo…) SE QUEDA: el riel nuevo y las rutas salen de ahí.
 const Sidebar = ({ isOpen, toggleSidebar, isMobile, onNavigate }) => {
   const location = useLocation();
   const { user } = useAuth();

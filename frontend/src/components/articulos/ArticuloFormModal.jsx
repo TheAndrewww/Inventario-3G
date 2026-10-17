@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { X, Save, Loader2, Check } from 'lucide-react';
 import { Modal, ImageUpload } from '../common';
@@ -840,6 +843,7 @@ const ArticuloFormModal = ({ isOpen, onClose, onSuccess, articulo = null, codigo
 
   // Rediseño 2 encendido: las mismas piezas de estado y manejadores, pintadas en un cajón. Las tres ayudas de abajo son
   // los mismos cambios que hoy hacen los campos (almacén, «Es herramienta» y cantidad del ingreso), con nombre.
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     const cambiarAlmacenForm = (nuevoId) => {
       setAlmacenSeleccionadoForm(nuevoId);

@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import {
     Wrench,
@@ -77,6 +80,7 @@ const MiEquipoPage = () => {
             malo: { color: 'bg-red-100 text-red-800 border-red-200', icon: '🔴' }
         };
         const badge = badges[condicion] || badges.bueno;
+        // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
         if (g3) {
             // Mismo texto que hoy (la condición tal cual, «Bueno» si no trae); el color sigue al estado
             const g3c = { bueno: ['ok', 'Bueno'], regular: ['aviso', 'Regular'], malo: ['mal', 'Malo'] }[condicion]
@@ -91,6 +95,7 @@ const MiEquipoPage = () => {
     };
 
     // Rediseño 2 · vista ENCENDIDA: los mismos datos y los mismos manejadores (el JSX de hoy sigue intacto debajo)
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <VistaMiEquipo user={user} esAdmin={esAdmin} loading={loading} data={data} refreshing={refreshing} handleRefresh={handleRefresh}

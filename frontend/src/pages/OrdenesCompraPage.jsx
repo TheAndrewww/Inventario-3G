@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, AlertTriangle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit, Clock, User, Check } from 'lucide-react';
@@ -897,6 +900,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     const config = estados[estado] || estados.pendiente_aprobacion;
     const IconComponent = config.icon;
 
+    // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
     if (g3) {
       const g3e = {
         pendiente_aprobacion: ['aviso', 'Pendiente de aprobación'], enviada: ['info', 'Enviada'], parcial: ['aviso', 'Recibida en parte'],
@@ -921,6 +925,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
       urgente: 'bg-red-100 text-red-800'
     };
 
+    // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
     if (g3) {
       // Mismo texto que hoy (la prioridad tal cual; sin prioridad, nada)
       if (!prioridad) return null;
@@ -937,6 +942,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
 
   // Rediseño 2 · vista ENCENDIDA. Mismo estado, mismas peticiones y mismos manejadores; los diálogos se montan con las
   // mismas props de abajo (cada uno pinta su versión nueva encendido). El JSX de hoy sigue intacto debajo.
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     const modalesR2 = (
       <>
@@ -2135,6 +2141,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
   };
 
   // Rediseño 2 · encendido: el mismo estado y el mismo envío en un cajón de dos zonas (el JSX de hoy sigue abajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     if (!isOpen) return null;
     return (
@@ -2759,6 +2766,7 @@ const FranjaPagoPedido = ({ ordenId }) => {
     return () => { vigente = false; };
   }, [ordenId]);
   if (!datos?.seguimiento?.length) return null;
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) return <PagoPedidoR2 datos={datos} />;
   const actual = datos.actual;
   return (
@@ -3444,6 +3452,7 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
   };
 
   // Rediseño 2 · encendido: mismo estado y mismo envío en un cajón ancho (el JSX de hoy sigue abajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     if (!isOpen) return null;
     const preferidosR2 = solicitudes
@@ -3884,6 +3893,7 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
   };
 
   // Rediseño 2 · encendido: mismos campos y mismo envío en un cajón (el JSX de hoy sigue abajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     if (!isOpen) return null;
     return (
@@ -4171,6 +4181,7 @@ const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
   };
 
   // Rediseño 2 · encendido: el mismo motivo y el mismo envío en un diálogo corto (el JSX de hoy sigue abajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     if (!isOpen) return null;
     return (
@@ -4257,6 +4268,7 @@ const ArticuloSolicitudBtn = ({ articulo, onCrearSolicitud, tieneSolicitud, cort
   const d3 = useDiseno3GR2(); // Rediseño 2: botón tonal encendido
 
   // Rediseño 2 · encendido: el mismo clic de abajo (crear la solicitud y avisar), con el botón de la vista nueva
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     const crearR2 = async () => {
       setLoading(true);
@@ -4335,6 +4347,7 @@ const UltimoMovimientoInfo = ({ articuloId, soloFecha }) => {
     fetchMov();
   }, [articuloId]);
 
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) return <UltimoMovimientoR2 loading={loading} mov={mov} soloFecha={soloFecha} />;
   if (loading) return <span className="text-xs text-gray-400">Cargando...</span>;
   if (!mov) return <span className="text-xs text-gray-400 italic">Sin movimientos</span>;
@@ -4570,6 +4583,7 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
   };
 
   // Rediseño 2 · encendido: los mismos filtros, el mismo PDF y los mismos renglones (con su «última actualización») en tabla
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <CajonBajoStockR2

@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   X,
@@ -73,6 +76,7 @@ const Miniatura = ({ archivo, ruta, onClick }) => {
   const Icono = ICONOS[archivo.tipo] || File;
 
   // Rediseño 2 (encendido): misma miniatura (la misma petición de la imagen), con el aspecto nuevo
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <button type="button" onClick={onClick} className="r2-prod-archivo" title={archivo.nombre}>
@@ -128,6 +132,7 @@ const Visor = ({ archivo, ruta, onVolver }) => {
   const { url, error } = useArchivoBlob(ruta);
   const d3 = useDiseno3GR2(); // Rediseño 2: encendido, el mismo visor con el aspecto nuevo (misma petición del archivo)
 
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <div className="r2-prod-visor">
@@ -204,6 +209,7 @@ const Visor = ({ archivo, ruta, onVolver }) => {
 export const Dato = ({ icono, etiqueta, valor }) => {
   const d3 = useDiseno3GR2(); // Rediseño 2: encendido, etiqueta arriba (13 px) y valor (15 px), sin ícono ni mayúsculas
   if (!valor) return null;
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <div className="r2-dato">
@@ -309,6 +315,7 @@ const CarpetaProyectoModal = ({
     : [{ titulo: `Archivos (${archivos.length})`, archivos }];
 
   // Rediseño 2 (encendido): mismo contenido y mismas peticiones, en un cajón lateral
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <VistaCarpeta

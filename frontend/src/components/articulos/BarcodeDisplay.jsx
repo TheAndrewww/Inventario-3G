@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { Download, Printer, Loader2 } from 'lucide-react';
 // Rediseño 2: encendido se pinta con rediseno2/inventario/CodigoBarrasR2 (la misma imagen, la misma petición)
@@ -135,6 +138,7 @@ const BarcodeDisplay = ({ articuloId, codigoEAN13, className = '' }) => {
     printWindow.document.close();
   };
 
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <CodigoBarrasR2 imagen={imageUrl} cargando={loading} error={imageError} codigo={codigoEAN13}

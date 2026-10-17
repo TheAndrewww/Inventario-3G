@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con diseno3g en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -49,6 +52,7 @@ const DashboardLayout = () => {
   }
 
   // Diseño encendido: armazón del rediseño 2 (riel por áreas, barra de 56 px, barra inferior por rol). Mismas rutas y permisos.
+  // VIEJO: se borra a partir del 24-oct-2026 — diseno3g siempre es true; lo que corre con diseno3g en false (después de este if o en su else) es lo viejo.
   if (diseno3g) {
     return <Armazon />;
   }

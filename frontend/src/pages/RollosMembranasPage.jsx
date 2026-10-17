@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useRef } from 'react';
 import { Layers, Search, Package, ArrowLeft, X, Plus, Minus, Edit2, Trash2, CheckCircle2, AlertTriangle, Ruler, CircleDot, Palette, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -245,6 +248,7 @@ const RollosMembranasPage = () => {
 
     // === RENDER ===
     // Rediseño 2 encendido: tabla ordenada por metros y los rollos en un cajón (mismo estado y mismos manejadores)
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <VistaRollos r={{

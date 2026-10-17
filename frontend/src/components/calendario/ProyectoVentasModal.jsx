@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useCallback } from 'react';
 import { FolderOpen, Calendar, Clock, User, FileText, AlertCircle } from 'lucide-react';
 import CarpetaProyectoModal, { Dato } from '../carpetas/CarpetaProyectoModal';
@@ -35,6 +38,7 @@ const ProyectoVentasModal = ({ isOpen, onClose, proyecto, mes, dia }) => {
 
   const datosProyecto = (datos) => {
     const info = datos?.proyecto;
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
       // Rediseño 2: «16 de octubre», «Mantenimiento», «Lista para instalar», «Equipo I» y la falla con su motivo
       const tipo = info?.tipo_proyecto || proyecto?.tipoProyecto;

@@ -1,3 +1,7 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve. Las ramas con tv
+// (useTvG3) en true son el diseño de TV de la ola 3, que tampoco se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ZoomIn, ZoomOut, RotateCw, Snowflake, CheckCircle2 } from 'lucide-react';
 import { Loader } from '../components/common';
@@ -103,6 +107,7 @@ const DashboardProduccionTVPage = () => {
     );
 
     // Rediseño 2 (encendido): tablero de renglones con páginas automáticas; la carga, el orden y los filtros son los de arriba
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <VistaTvProduccion

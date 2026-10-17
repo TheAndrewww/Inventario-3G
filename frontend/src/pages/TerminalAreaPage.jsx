@@ -1,3 +1,7 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve. Las ramas con tv
+// (useTvG3) en true son el diseño de TV de la ola 3, que tampoco se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -133,6 +137,7 @@ const LoginArea = ({ onLogin, areaEsperada = null, aviso = null, onCambiarArea }
         }
     };
 
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <VistaTerminalCodigo
@@ -355,6 +360,7 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
     const archivosRelevantes = archivos?.archivos?.[area] || [];
     const tieneArchivos = archivosRelevantes.length > 0;
 
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) return null;
 
     if (tv) {
@@ -603,6 +609,7 @@ const TerminalView = ({ area, codigo, onLogout, onCodigoRechazado }) => {
                         ? `${areaConfig.nombre} completada ✅ ¡Listo para Instalación!`
                         : `${areaConfig.nombre} completada ✅`;
 
+                    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
                     if (d3) {
                         // Rediseño 2: el mismo aviso, sin emojis y diciendo qué sigue
                         toast.success(
@@ -671,6 +678,7 @@ const TerminalView = ({ area, codigo, onLogout, onCodigoRechazado }) => {
 
     // Rediseño 2 (encendido): la cola del área + la ficha de la obra elegida. Cada obra conserva su cargador de planos de
     // hoy (ProyectoCardTerminal con la misma llave), que en encendido no pinta nada.
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <VistaTerminalArea
@@ -876,6 +884,7 @@ const TerminalAreaPage = () => {
         setArea(null);
     }, [area]);
 
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <>

@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useCallback } from 'react';
 import { FolderOpen, Calendar, User, FileText, AlertCircle, Factory, Hammer } from 'lucide-react';
 import CarpetaProyectoModal, { Dato } from '../carpetas/CarpetaProyectoModal';

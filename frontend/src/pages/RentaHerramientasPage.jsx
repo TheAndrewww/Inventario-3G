@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -154,6 +157,7 @@ const RentaHerramientasPage = () => {
         };
         const badge = badges[condicion] || badges.bueno;
         const Icon = badge.icon;
+        // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
         if (g3) {
             const g3c = { bueno: ['ok', 'Bueno'], regular: ['aviso', 'Regular'], malo: ['mal', 'Malo'], perdido: ['neutro', 'Perdido'], baja: ['neutro', 'Baja'] }[condicion] || ['ok', 'Bueno'];
             return <span className={`g3-estado g3-estado--${g3c[0]}`}>{g3c[1]}</span>;
@@ -177,6 +181,7 @@ const RentaHerramientasPage = () => {
             en_transito: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', texto: 'En tránsito' }
         };
         const badge = badges[estatus] || badges.disponible;
+        // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
         if (g3) {
             const tono = { disponible: 'ok', asignado: 'info', en_reparacion: 'aviso', en_transito: 'info' }[estatus] || 'ok';
             return <span className={`g3-estado g3-estado--${tono}`}>{badge.texto}</span>;
@@ -209,6 +214,7 @@ const RentaHerramientasPage = () => {
 
     // Rediseño 2 · vista ENCENDIDA: los mismos datos, los mismos manejadores y los mismos diálogos (el JSX de hoy sigue intacto
     // debajo). Los diálogos son los de siempre: cada uno pinta su cajón nuevo encendido.
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <VistaRenta
@@ -746,6 +752,7 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
         }
     };
 
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <CajonAsignar unidad={unidad} onClose={onClose} tipoAsignacion={tipoAsignacion} setTipoAsignacion={setTipoAsignacion}
@@ -907,6 +914,7 @@ const ModalDevolver = ({ isOpen, unidad, onClose, onSuccess }) => {
         }
     };
 
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return <CajonDevolver unidad={unidad} onClose={onClose} observaciones={observaciones} setObservaciones={setObservaciones} loading={loading} handleSubmit={handleSubmit} />;
     }
@@ -1065,6 +1073,7 @@ const ModalNuevoTipo = ({ isOpen, onClose, onSuccess }) => {
         }
     };
 
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <CajonNuevoTipo onClose={onClose} formData={formData} handleChange={handleChange} categorias={categorias} ubicaciones={ubicaciones}
@@ -1337,6 +1346,7 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
     const condicionActual = unidad.condicion || mapearEstadoACondicion(unidad.estado);
     const estatusActual = unidad.estatus || (unidad.estado === 'asignada' ? 'asignado' : 'disponible');
 
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <CajonCondicion unidad={unidad} onClose={onClose} condicionesDisponibles={condicionesDisponibles} nuevaCondicion={nuevaCondicion}

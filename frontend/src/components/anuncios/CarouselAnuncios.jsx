@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useDiseno3G } from '../../rediseno2/fundacion';
@@ -30,6 +33,7 @@ const CarouselAnuncios = ({ anuncios = [] }) => {
     }
   }, [anuncios.length, currentIndex]);
 
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) return <CarruselAnunciosR2 anuncios={anuncios} actual={currentIndex} />;
 
   if (anuncios.length === 0) {

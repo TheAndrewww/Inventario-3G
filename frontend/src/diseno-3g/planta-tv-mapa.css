@@ -1,3 +1,5 @@
+/* VIEJO: se borra a partir del 24-oct-2026 — todo el archivo (diseño de TV de la ola 3, bajo html[data-g3-tv], que ya nunca se
+   pone). También su import en main.jsx. */
 /* Diseño 3G para TV — planta-tv-mapa.css (GENERADO por generar-mapa-tailwind.mjs --tv; no lo edites a mano)
    Re-pinta con tokens --g3-* las 53 clases de color de Tailwind de las tarjetas de producción (ProyectoTimeline),
    solo dentro de .g3tv-mapa y bajo html[data-g3-tv] (las pantallas de TV con ?diseno=3g). Tokens en planta-tv-3g.css.

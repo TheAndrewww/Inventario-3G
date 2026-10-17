@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useRef, useEffect } from 'react';
 import {
   ShoppingCart,
@@ -159,6 +162,7 @@ const NotificacionesDropdown = () => {
 
   // Rediseño 2: encendido, el panel de avisos de la fundación con LOS MISMOS datos y manejadores (mismas peticiones y el
   // mismo sondeo del contexto). Sin dropdownRef: el panel cierra con su velo, con Esc o con la campana.
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <PanelAvisos

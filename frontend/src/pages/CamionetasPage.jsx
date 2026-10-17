@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { Briefcase, Plus, Edit, Trash2, Package, Settings, ClipboardList, ClipboardCheck } from 'lucide-react';
 import camionetasService from '../services/camionetas.service';
@@ -220,6 +223,7 @@ const CamionetasPage = () => {
 
   // Rediseño 2 · vista ENCENDIDA: los mismos datos, los mismos manejadores y los mismos diálogos (el JSX de hoy sigue intacto
   // debajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <VistaEquipos

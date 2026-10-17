@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useRef } from 'react';
 import { Warehouse, Search, Package, Minus, ArrowLeft, X, CheckCircle2, AlertTriangle, Layers, Ruler, Palette } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -227,6 +230,7 @@ const DescontarAlmacenPage = () => {
     const barColor = (pct) => pct > 50 ? 'bg-emerald-500' : pct > 20 ? 'bg-amber-500' : 'bg-red-500';
 
     // Rediseño 2 encendido: el almacén como filtro y «Descontar» con texto en cada renglón (mismo estado y mismos manejadores)
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <VistaDescontar d={{

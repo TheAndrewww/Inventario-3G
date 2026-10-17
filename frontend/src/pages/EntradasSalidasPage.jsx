@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Truck, Factory, Hammer, PaintBucket, ArrowUpFromLine, ArrowDownToLine, Search, X, Plus, Minus, Check, ScanLine, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -208,6 +211,7 @@ const EntradasSalidasPage = () => {
     };
 
     // Rediseño 2 encendido: misma página, otra vista (con su esqueleto de carga en lugar de la rueda)
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <VistaEntradasSalidas s={{

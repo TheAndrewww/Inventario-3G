@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React from 'react';
 import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
 import { Campo, Entrada } from '../../rediseno2/fundacion/piezas/Campos';
@@ -44,6 +47,7 @@ const Input = ({
 
   // Rediseño 2: encendido, campo de la fundación (etiqueta arriba, error abajo). La MISMA conversión a mayúsculas del valor
   // (handleChange); solo el texto de ejemplo deja de verse en mayúsculas.
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <Campo etiqueta={label} error={error} requerido={required} id={name} icono={Icon} className={className || undefined}>

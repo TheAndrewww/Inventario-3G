@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { X, Package, Clock, User, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -64,6 +67,7 @@ const HistorialRecepcionesOrden = ({ isOpen, onClose, orden, incrustado = false 
   if (!isOpen) return null;
 
   // Rediseño 2 · encendido: las mismas dos peticiones al abrir; avance en tabla y recepciones que se despliegan
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <HistorialRecepcionesR2 orden={orden} onClose={onClose} incrustado={incrustado} loading={loading} progreso={progreso}

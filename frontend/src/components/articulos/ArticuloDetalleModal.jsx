@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { X, Package, MapPin, DollarSign, Hash, Box, Edit, Sparkles, Eye, PackagePlus, PackageMinus, Clock, Wrench, User, Users } from 'lucide-react';
 import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
@@ -156,6 +159,7 @@ const ArticuloDetalleModal = ({
   };
 
   // Rediseño 2 encendido: el detalle en un cajón lateral, con el mismo estado y las mismas peticiones de arriba
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <CajonDetalleArticulo articulo={articulo} abierto={isOpen} alCerrar={onClose} imagenUrl={imagenUrl} canEdit={canEdit} onEdit={onEdit}

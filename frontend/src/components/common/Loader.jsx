@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React from 'react';
 import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
 import { Cargando } from '../../rediseno2/fundacion/piezas/Estados';
@@ -5,6 +8,7 @@ import { Cargando } from '../../rediseno2/fundacion/piezas/Estados';
 const Loader = ({ size = 'md', fullScreen = false }) => {
   const d3 = useDiseno3G();
   // Rediseño 2: encendido, esqueleto (sin rueda en medio). Chico: una línea; normal: lista corta; grande o pantalla completa: tabla.
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     const forma = fullScreen || size === 'lg' ? 'tabla' : size === 'sm' ? 'texto' : 'lista';
     const esqueleto = <Cargando forma={forma} filas={size === 'sm' ? 1 : fullScreen ? 8 : 4} columnas={4} />;

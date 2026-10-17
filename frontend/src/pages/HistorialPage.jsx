@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { Search, Download } from 'lucide-react';
 import movimientosService from '../services/movimientos.service';
@@ -66,6 +69,7 @@ const HistorialPage = () => {
   ) : [];
 
   // Rediseño 2 encendido: misma página, otra vista (con su esqueleto de carga en lugar de la rueda)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <VistaHistorial h={{

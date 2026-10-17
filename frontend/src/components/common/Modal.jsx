@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
@@ -20,6 +23,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md', closeOnBackdropC
 
   if (!isOpen) return null;
 
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <Dialogo abierto titulo={title} tamano={size} alCerrar={onClose} cerrarConVelo={closeOnBackdropClick}>

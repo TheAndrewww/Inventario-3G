@@ -1,3 +1,5 @@
+/* VIEJO: se borra a partir del 24-oct-2026 — todo el archivo (diseño de TV de la ola 3, bajo html[data-g3-tv], que ya nunca se
+   pone). También su import en main.jsx. */
 /* Diseño 3G para las pantallas públicas de Planta: TV de producción, preparados, manufactura y herrería, terminal de
    área, anuncios y calendario público (ola 3).
    - Todo vive bajo html[data-g3-tv] (lo pone index.html SOLO si la URL de esa carga trae ?diseno=3g; ver tvG3.js).

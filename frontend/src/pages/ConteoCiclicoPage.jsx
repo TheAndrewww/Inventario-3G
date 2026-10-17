@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useRef } from 'react';
 import { ClipboardCheck, Search, Package, CheckCircle2, AlertTriangle, ArrowRight, BarChart3, RefreshCw, X, Calendar, TrendingUp, ChevronDown, ChevronUp, FastForward } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -14,6 +17,7 @@ const ConteoCiclicoPage = () => {
     const g3 = useDiseno3G(); // Diseño 3G: encabezado y pestañas del paquete (apagado, lo de siempre)
     const d3 = useDiseno3GR2(); // Rediseño 2 encendido
 
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <VistaConteoCiclico tab={tab} setTab={setTab}>
@@ -218,6 +222,7 @@ const TabConteo = () => {
         : 0;
 
     // Rediseño 2 encendido: captura en el renglón (mismo estado y mismos manejadores)
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <VistaConteoHoy c={{
@@ -519,6 +524,7 @@ const TabReportes = () => {
     };
 
     // Rediseño 2 encendido: tabla por día y diferencias en un cajón (mismo estado y mismas peticiones)
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
     if (d3) {
         return (
             <VistaReportesConteo r={{

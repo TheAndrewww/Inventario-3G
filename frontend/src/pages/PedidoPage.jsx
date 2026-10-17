@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Plus, Minus, Trash2, Package, Users, Truck, Search, Barcode, PlusCircle } from 'lucide-react';
 import { usePedido } from '../context/PedidoContext';
@@ -471,6 +474,7 @@ const PedidoPage = () => {
 
   // Rediseño 2 encendido: misma página, otra vista. Los manejadores son los de arriba; lo que hoy va escrito dentro del
   // JSX (buscar en mayúsculas, «Crear nuevo artículo», «Ver inventario», cerrar el aviso de lectura) se repite igual aquí.
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <VistaOrdenSalida e={{

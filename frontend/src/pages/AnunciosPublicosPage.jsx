@@ -1,3 +1,7 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve. Las ramas con tv
+// (useTvG3) en true son el diseño de TV de la ola 3, que tampoco se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import { useEffect, useState, useCallback } from 'react';
 import CarouselAnuncios from '../components/anuncios/CarouselAnuncios';
 import { obtenerAnunciosHoy, incrementarVistaAnuncio, regenerarAnuncio, leerAnunciosCalendario, generarAnuncioIndividual } from '../services/anuncios.service';
@@ -389,6 +393,7 @@ const AnunciosPublicosPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
   if (d3) {
     return (
       <VistaAnuncios
