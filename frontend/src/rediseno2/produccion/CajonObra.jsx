@@ -1,3 +1,5 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): las ramas con g3Activo() en false
+// (window.prompt / window.confirm de Pausar y Regresar) ya nunca corren. Ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 // Rediseño 2 · Producción · cajón de una obra (se abre al tocar el renglón del tablero).
 // Arriba la decisión (completar la etapa que sigue, pausar o reanudar, ver la carpeta; «Regresar» en «Más acciones»);
 // abajo el paso a paso con los MISMOS interruptores de hoy (un toque, mismo onToggleEtapa), las fechas y los datos.

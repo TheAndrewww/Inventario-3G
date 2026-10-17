@@ -1,3 +1,5 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): g3Activo() ya siempre da true, así que la
+// rama APAGADO (confirm()/alert()/prompt() del navegador) de cada pantalla ya nunca corre. Ver src/diseno-3g/LEEME.md.
 // Diseño 3G — confirmaciones y avisos de las pantallas de siempre.
 // ENCENDIDO: G3.confirmar (vista previa con «Qué va a pasar», armada SOLO con datos que la pantalla ya tiene) y G3.aviso.
 // APAGADO: la pantalla sigue llamando a su confirm()/alert()/prompt() de siempre, en el mismo punto y con el mismo texto.
