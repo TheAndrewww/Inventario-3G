@@ -106,7 +106,7 @@
 :root[data-diseno="3g"] .r2-pub-estado-tv {
   flex: 1; display: grid; place-content: center; justify-items: center; gap: calc(16px * var(--r2-e)); text-align: center; padding: calc(48px * var(--r2-e));
 }
-:root[data-diseno="3g"] :is(.r2-pub-estado-tv, .r2-pub-estado, .r2-pub-estado-movil) p { margin: 0; }
+:root[data-diseno="3g"] .r2-pub-estado-tv p, :root[data-diseno="3g"] .r2-pub-estado p, :root[data-diseno="3g"] .r2-pub-estado-movil p { margin: 0; }
 :root[data-diseno="3g"] .r2-pub-estado-titulo { font: 600 calc(36px * var(--r2-e, 1)) / 1.2 var(--g3-f-titulo); color: var(--g3-tinta); }
 :root[data-diseno="3g"] .r2-pub-estado-texto { max-width: 40ch; font: 400 calc(26px * var(--r2-e, 1)) / 1.4 var(--g3-f-texto); color: var(--g3-tinta-2); }
 
