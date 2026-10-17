@@ -1,8 +1,15 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useMemo, useRef, useState } from 'react';
 import { X, Camera, Upload, Sparkles, AlertTriangle, CheckCircle2, HelpCircle, Trash2, PackageCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ordenesCompraService from '../../services/ordenesCompra.service';
 import { g3Activo } from '../../diseno-3g/dialogosG3';
+// Rediseño 2 · vista encendida (apagado no la usa)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import { Cajon as CajonR2, CajonCabecera as CajonCabeceraR2 } from '../../rediseno2/fundacion';
+import RecibirFacturaR2 from '../../rediseno2/compras/RecibirFactura';
 
 const ESTADOS = {
     identificado: { texto: 'Identificado', clase: 'bg-green-100 text-green-800 border-green-200', Icono: CheckCircle2 },
@@ -15,7 +22,8 @@ const formatCantidad = (n) => {
     return Number.isInteger(v) ? v : parseFloat(v.toFixed(2));
 };
 
-const RecibirConFacturaModal = ({ isOpen, onClose, orden, onSuccess }) => {
+const RecibirConFacturaModal = ({ isOpen, onClose, orden, onSuccess, incrustado = false, alPie = null }) => {
+    const d3 = useDiseno3GR2(); // Rediseño 2: «Con foto de la factura» dentro del cajón «Recibir» encendido
     const [archivos, setArchivos] = useState([]);
     const [analizando, setAnalizando] = useState(false);
     const [registrando, setRegistrando] = useState(false);
@@ -152,6 +160,38 @@ const RecibirConFacturaModal = ({ isOpen, onClose, orden, onSuccess }) => {
             setRegistrando(false);
         }
     };
+
+    // Rediseño 2 · encendido: la misma lectura, el mismo cruce y el mismo registro (el JSX de hoy sigue abajo)
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        const contenidoR2 = (
+            <RecibirFacturaR2
+                archivos={archivos}
+                setArchivos={setArchivos}
+                agregarArchivos={agregarArchivos}
+                inputArchivoRef={inputArchivoRef}
+                analizando={analizando}
+                analizar={analizar}
+                lectura={lectura}
+                renglones={renglones}
+                actualizarRenglon={actualizarRenglon}
+                asignarArticulo={asignarArticulo}
+                incluidos={incluidos}
+                excedidos={excedidos}
+                registrando={registrando}
+                registrar={registrar}
+                onClose={onClose}
+                alPie={alPie}
+            />
+        );
+        if (incrustado) return contenidoR2;
+        return (
+            <CajonR2 abierto alCerrar={onClose} ancho="ancho" etiqueta={`Recibir ${orden.ticket_id} con factura`}>
+                <CajonCabeceraR2 titulo={`Recibir ${orden.ticket_id}`} dato={orden.proveedor?.nombre || 'Sin proveedor'} alCerrar={onClose} />
+                {contenidoR2}
+            </CajonR2>
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">

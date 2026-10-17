@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { ClipboardList, Upload, Link2, Trash2, Package, ChevronDown, ChevronRight, Loader, Wrench, Box } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -5,6 +8,9 @@ import checklistService from '../../services/checklist.service';
 import ImportarChecklistModal from './ImportarChecklistModal';
 import EnlazarArticulosModal from './EnlazarArticulosModal';
 import { g3Activo, confirmarG3 } from '../../diseno-3g/dialogosG3';
+// Rediseño 2 · encendido: el mismo catálogo en un cajón (rediseno2/gestion/CajonesChecklist)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import { CajonCatalogoChecklist } from '../../rediseno2/gestion/CajonesChecklist';
 
 const ChecklistManager = ({ isOpen, onClose }) => {
   const [items, setItems] = useState([]);
@@ -13,6 +19,7 @@ const ChecklistManager = ({ isOpen, onClose }) => {
   const [modalEnlazar, setModalEnlazar] = useState(null);
   const [seccionesAbiertas, setSeccionesAbiertas] = useState(new Set());
   const [tabActiva, setTabActiva] = useState('herramienta');
+  const d3 = useDiseno3GR2();
 
   useEffect(() => {
     if (isOpen) cargarItems();
@@ -70,6 +77,20 @@ const ChecklistManager = ({ isOpen, onClose }) => {
     acc[sec].push(item);
     return acc;
   }, {});
+
+  // Rediseño 2 · encendido: mismo estado y mismos sub-diálogos (importar y enlazar pintan su propia vista nueva)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <>
+        <CajonCatalogoChecklist onClose={onClose} items={items} cargando={cargando} tabActiva={tabActiva} setTabActiva={setTabActiva}
+          itemsHerramienta={itemsHerramienta} itemsMaterial={itemsMaterial} porSeccion={porSeccion}
+          abrirImportar={() => setModalImportar(true)} abrirEnlazar={setModalEnlazar} handleEliminar={handleEliminar} />
+        <ImportarChecklistModal isOpen={modalImportar} onClose={() => setModalImportar(false)} onImportado={cargarItems} />
+        <EnlazarArticulosModal isOpen={!!modalEnlazar} onClose={() => setModalEnlazar(null)} item={modalEnlazar} onEnlazado={cargarItems} />
+      </>
+    );
+  }
 
   return (
     <>

@@ -1,3 +1,7 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve. Las ramas con tv
+// (useTvG3) en true son el diseño de TV de la ola 3, que tampoco se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import { useState, useEffect } from 'react';
 import {
   Calendar,
@@ -14,6 +18,8 @@ import {
 import { obtenerCalendarioMesPublico, obtenerDistribucionEquiposPublico } from '../services/calendario.service';
 import { toast, Toaster } from 'react-hot-toast';
 import { useTvG3 } from '../diseno-3g/tvG3';
+import { useDiseno3G } from '../rediseno2/fundacion';
+import VistaCalendarioPublico from '../rediseno2/publicas/VistaCalendarioPublico';
 
 const MESES = [
   'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
@@ -43,6 +49,8 @@ const CalendarioPublicoPage = () => {
   // Diseño 3G para TV: solo si la liga trae ?diseno=3g (ver diseno-3g/tvG3.js). Mismas consultas, misma actualización
   // (cada 2 minutos) y mismos colores de cada equipo; la letra nunca baja de 12 px.
   const tv = useTvG3();
+  // Rediseño 2: encendido, la vista nueva (rediseno2/publicas/VistaCalendarioPublico) con este mismo estado y estos manejadores
+  const d3 = useDiseno3G();
   const fz = (rem) => (tv ? `max(0.75rem, calc(${rem}rem * var(--escala, 1)))` : `calc(${rem}rem * var(--escala, 1))`);
   const [mesActual, setMesActual] = useState(MESES[new Date().getMonth()]);
   const [calendario, setCalendario] = useState(null);
@@ -202,6 +210,30 @@ const CalendarioPublicoPage = () => {
       }
     };
   }, [modoPantallaCompleta]);
+
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <VistaCalendarioPublico
+        meses={MESES}
+        mesActual={mesActual}
+        calendario={calendario}
+        calendarioSiguienteMes={calendarioSiguienteMes}
+        calendarioMesAnterior={calendarioMesAnterior}
+        distribucionEquipos={distribucionEquipos}
+        loading={loading}
+        ultimaActualizacion={ultimaActualizacion}
+        horaActual={horaActual}
+        escala={escala}
+        mostrarControles={mostrarControles}
+        cargarCalendario={cargarCalendario}
+        cambiarMes={cambiarMes}
+        aumentarEscala={aumentarEscala}
+        reducirEscala={reducirEscala}
+        togglePantallaCompleta={togglePantallaCompleta}
+      />
+    );
+  }
 
   if (loading && !calendario) {
     return (

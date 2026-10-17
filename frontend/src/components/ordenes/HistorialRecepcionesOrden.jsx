@@ -1,11 +1,18 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { X, Package, Clock, User, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ordenesCompraService from '../../services/ordenesCompra.service';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+// Rediseño 2 · vista encendida (apagado no la usa)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import HistorialRecepcionesR2 from '../../rediseno2/compras/HistorialRecepciones';
 
-const HistorialRecepcionesOrden = ({ isOpen, onClose, orden }) => {
+const HistorialRecepcionesOrden = ({ isOpen, onClose, orden, incrustado = false }) => {
+  const d3 = useDiseno3GR2(); // Rediseño 2: cajón (o plegado dentro de «Recibir») encendido
   const [recepciones, setRecepciones] = useState([]);
   const [progreso, setProgreso] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -58,6 +65,15 @@ const HistorialRecepcionesOrden = ({ isOpen, onClose, orden }) => {
   };
 
   if (!isOpen) return null;
+
+  // Rediseño 2 · encendido: las mismas dos peticiones al abrir; avance en tabla y recepciones que se despliegan
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <HistorialRecepcionesR2 orden={orden} onClose={onClose} incrustado={incrustado} loading={loading} progreso={progreso}
+        recepciones={recepciones} expandidos={expandidos} toggleExpandir={toggleExpandir} />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

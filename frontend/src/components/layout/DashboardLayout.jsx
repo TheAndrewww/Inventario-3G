@@ -1,11 +1,14 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con diseno3g en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import SubPestanasGrupo from './SubPestanasGrupo';
 import { Outlet } from 'react-router-dom';
 import { useCalendario } from '../../context/CalendarioContext';
-import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
-import MarcoPlanta from '../../diseno-3g/MarcoPlanta';
+import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
+import Armazon from '../../rediseno2/fundacion/armazon/Armazon';
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Cerrado por defecto en móvil
@@ -48,9 +51,10 @@ const DashboardLayout = () => {
     );
   }
 
-  // Diseño 3G encendido: armazón nuevo (riel por áreas, barra de vidrio). Mismas rutas y permisos.
+  // Diseño encendido: armazón del rediseño 2 (riel por áreas, barra de 56 px, barra inferior por rol). Mismas rutas y permisos.
+  // VIEJO: se borra a partir del 24-oct-2026 — diseno3g siempre es true; lo que corre con diseno3g en false (después de este if o en su else) es lo viejo.
   if (diseno3g) {
-    return <MarcoPlanta />;
+    return <Armazon />;
   }
 
   return (

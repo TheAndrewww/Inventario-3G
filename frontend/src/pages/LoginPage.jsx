@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, AlertCircle, LogIn } from 'lucide-react';
@@ -6,6 +9,9 @@ import { rutaInicialPorRol } from '../components/layout/Sidebar';
 import { Input, Button } from '../components/common';
 import toast from 'react-hot-toast';
 import { modoCuentas3g, irACuentas3g, estadoServidorCuentas3g } from '../services/cuentas3g';
+// Rediseño 2 · vista encendida (apagado no la usa): el mismo formulario, el mismo envío y los mismos mensajes
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaEntrar from '../rediseno2/gestion/VistaEntrar';
 
 // Entrar con tu cuenta 3G (E1 · PLA-24). VITE_CUENTAS3G_MODO apagado (o sin poner) = esta pantalla exactamente como
 // siempre, sin ninguna petición nueva. «ambos»: el botón arriba y el acceso de siempre abajo. «solo»: solo el botón; el
@@ -26,6 +32,7 @@ const LoginPage = () => {
   const conC3g = MODO_C3G !== 'apagado';
   const [servidorC3g, setServidorC3g] = useState(null); // { modo, emergencia } · null mientras llega o sin respuesta
   const [yendoC3g, setYendoC3g] = useState(false);
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
 
   // Cuentas 3G: qué modo tiene de verdad el servidor (y si hay emergencia), y el motivo si el regreso falló.
   useEffect(() => {
@@ -99,6 +106,15 @@ const LoginPage = () => {
       setLoading(false);
     }
   };
+
+  // Rediseño 2 · vista ENCENDIDA (el JSX de hoy sigue intacto debajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <VistaEntrar formData={formData} handleChange={handleChange} handleSubmit={handleSubmit} loading={loading} error={error} conC3g={conC3g}
+        botonC3g={botonC3g} conFormulario={conFormulario} emergenciaC3g={emergenciaC3g} yendoC3g={yendoC3g} entrarConC3g={entrarConC3g} />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100 flex items-center justify-center p-4 g3-fondo-lanzador">

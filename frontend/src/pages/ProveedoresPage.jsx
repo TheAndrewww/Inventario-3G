@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, Package, Landmark } from 'lucide-react';
 import proveedoresService from '../services/proveedores.service';
@@ -12,6 +15,9 @@ import { SeccionFicha, ReporteSinRfc } from '../components/proveedores/FichaProv
 import {
   fichaVacia, fichaAFormulario, fichaParaGuardar, tieneRfc, creditoDe, textoCredito
 } from '../components/proveedores/fichaDatos';
+// Rediseño 2 · vista encendida (apagado no la usa): mismos datos, mismas fichas y el mismo guardado
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaProveedores from '../rediseno2/gestion/VistaProveedores';
 
 // B3 paso 1 · PLA-11 (solo con Diseño 3G): liga a la otra mitad de «Proveedores», que vive en Finanzas.
 // La dirección de Finanzas es privada: Planta no la escribe en su JS público. Si una página con sesión la configuró
@@ -67,6 +73,8 @@ const ProveedoresPage = () => {
   // null = las fichas no han llegado (o fallaron): el formulario se guarda como siempre y no pisa ninguna ficha
   const [fichaForm, setFichaForm] = useState(null);
   const [fichasListas, setFichasListas] = useState(false);
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+  const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
   const [formData, setFormData] = useState({
     nombre: '',
     rfc: '',
@@ -96,6 +104,7 @@ const ProveedoresPage = () => {
     }
   };
   useEffect(() => {
+    // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
     if (g3) cargarFichas();
   }, [g3]);
 
@@ -122,9 +131,11 @@ const ProveedoresPage = () => {
       setLoading(true);
       const data = await proveedoresService.listar({ activo: true });
       setProveedores(data.data?.proveedores || []);
+      setErrorCargaR2(null);
     } catch (error) {
       console.error('Error al cargar proveedores:', error);
       toast.error('Error al cargar proveedores');
+      setErrorCargaR2(error?.message || 'Error al cargar proveedores');
       setProveedores([]);
     } finally {
       setLoading(false);
@@ -270,6 +281,22 @@ const ProveedoresPage = () => {
     proveedor.rfc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     proveedor.contacto?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Rediseño 2 · vista ENCENDIDA: los mismos datos y los mismos manejadores (el JSX de hoy sigue intacto debajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <VistaProveedores
+        proveedores={proveedores} loading={loading} errorCarga={errorCargaR2} recargar={fetchProveedores} searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm} filteredProveedores={filteredProveedores} showModal={showModal} editingProveedor={editingProveedor}
+        formData={formData} handleInputChange={handleInputChange} handleOpenModal={handleOpenModal} handleCloseModal={handleCloseModal}
+        handleSubmit={handleSubmit} handleDelete={handleDelete} puedeEditar={puedeEditar} fichas={fichas} credito={credito}
+        fichasListas={fichasListas} vista={vista} verVista={verVista} reporte={reporte} cargandoReporte={cargandoReporte}
+        errorReporte={errorReporte} cargarReporte={cargarReporte} abrirFicha={abrirFicha} fichaForm={fichaForm} setFichaForm={setFichaForm}
+        urlFinanzas={urlFinanzas}
+      />
+    );
+  }
 
   if (loading) {
     return <Loader fullScreen />;

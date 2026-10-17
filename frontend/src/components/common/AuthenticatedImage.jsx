@@ -1,6 +1,10 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
-import { Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon, ImageOff } from 'lucide-react';
+import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
 
 /**
  * Componente que carga imágenes que requieren autenticación
@@ -17,6 +21,7 @@ const AuthenticatedImage = ({
   const [dataUrl, setDataUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const d3 = useDiseno3G();
 
   useEffect(() => {
     const loadImage = async () => {
@@ -50,6 +55,19 @@ const AuthenticatedImage = ({
       loadImage();
     }
   }, [src]);
+
+  // Rediseño 2: encendido, el hueco de la foto con la forma real (sin texto gris) y el error con su ícono y su motivo.
+  // La petición es la misma de siempre.
+  if (d3 && loading) {
+    return <div className={`${placeholderClassName || className || 'r2-foto-hueco'} r2-foto-cargando`} role="status" aria-label={placeholderText || 'Cargando foto'} />;
+  }
+  if (d3 && (error || !dataUrl)) {
+    return (
+      <div className={`${placeholderClassName || className || 'r2-foto-hueco'} r2-foto-error`} role="img" aria-label="No se pudo cargar la foto" title="No se pudo cargar la foto">
+        <ImageOff size={16} aria-hidden="true" />
+      </div>
+    );
+  }
 
   if (loading) {
     return (

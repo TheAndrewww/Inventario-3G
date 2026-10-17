@@ -1,12 +1,17 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, X, Camera } from 'lucide-react';
 import CameraCapture from './CameraCapture';
 import { g3Activo, avisoG3 } from '../../diseno-3g/dialogosG3';
+import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
 
 const ImageUpload = ({ currentImage, onImageSelect, onImageRemove, disabled = false }) => {
   const [preview, setPreview] = useState(currentImage || null);
   const [showCameraModal, setShowCameraModal] = useState(false);
   const fileInputRef = useRef(null);
+  const d3 = useDiseno3G();
 
   // Actualizar preview cuando cambie currentImage (para modo edición)
   useEffect(() => {
@@ -94,6 +99,40 @@ const ImageUpload = ({ currentImage, onImageSelect, onImageRemove, disabled = fa
       setShowCameraModal(true);
     }
   };
+
+  // Rediseño 2: encendido, mismos manejadores (archivo, cámara, quitar) con las piezas de la fundación.
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <>
+        <div className="r2-subir-foto">
+          <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={handleFileSelect} hidden disabled={disabled} />
+          {preview ? (
+            <div className="r2-subir-foto-vista">
+              <img src={preview} alt="Foto elegida" />
+              {!disabled && (
+                <button type="button" onClick={handleRemove} className="r2-boton r2-boton--contorno r2-boton--chico r2-subir-foto-quitar">
+                  <X size={16} aria-hidden="true" /><span className="r2-boton-texto">Quitar foto</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="r2-subir-foto-opciones">
+              <button type="button" onClick={handleFileClick} disabled={disabled} className="r2-subir-foto-opcion">
+                <Upload size={22} aria-hidden="true" />
+                <span className="r2-subir-foto-texto">Subir desde archivo<small>JPEG, PNG o WEBP, hasta 5 MB</small></span>
+              </button>
+              <button type="button" onClick={handleCameraClick} disabled={disabled} className="r2-subir-foto-opcion">
+                <Camera size={22} aria-hidden="true" />
+                <span className="r2-subir-foto-texto">Tomar fotografía<small>Con la cámara del equipo</small></span>
+              </button>
+            </div>
+          )}
+        </div>
+        <CameraCapture isOpen={showCameraModal} onClose={() => setShowCameraModal(false)} onCapture={handleCameraCapture} />
+      </>
+    );
+  }
 
   return (
     <>

@@ -1,0 +1,292 @@
+/* Rediseño 2 · grupo inventario (Inventario, Conteo cíclico, Cambios por autorizar, Rollos, Descuento, Fotos con IA).
+   TODO vive bajo :root[data-diseno="3g"]: apagado este archivo no cambia nada. Clases propias r2-inv-*; usa los tokens
+   del paquete (--g3-*) y del rediseño (--r2-*). */
+
+:root[data-diseno="3g"] {
+  /* Placa del código de barras y del QR: es la imagen del código (se lee igual en claro y en oscuro), no la interfaz */
+  --r2-inv-placa: #ffffff;
+  --r2-inv-placa-error: #8c1d18; /* texto de error sobre la placa blanca (6.8:1) */
+}
+
+/* Lo pegado arriba (--r2-tope): ya lo calcula la fundación en .r2-pagina (revisión final) */
+
+/* ───────── Celdas de la tabla de artículos ───────── */
+:root[data-diseno="3g"] .r2-inv-articulo { display: flex; align-items: center; gap: 12px; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-articulo-texto { display: grid; gap: 1px; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-nombre { font: 600 0.875rem/1.25rem var(--g3-f-texto); color: var(--g3-tinta); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: break-word; }
+:root[data-diseno="3g"] .r2-inv-desc { font: 400 0.875rem/1.25rem var(--g3-f-texto); color: var(--g3-tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-diseno="3g"] .r2-inv-desc--otro { color: var(--g3-info); font-weight: 500; }
+:root[data-diseno="3g"] .r2-inv-texto-celda { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-diseno="3g"] .r2-inv-clave { display: grid; gap: 1px; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-clave > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-diseno="3g"] .r2-inv-ubicacion { display: grid; gap: 1px; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-existencia { display: inline-grid; justify-items: end; gap: 1px; }
+:root[data-diseno="3g"] .r2-inv-existencia-valor { font: 600 0.9375rem/1.25rem var(--g3-f-texto); font-variant-numeric: tabular-nums; color: var(--g3-tinta); white-space: nowrap; }
+:root[data-diseno="3g"] .r2-inv-existencia-estado .r2-estado-linea { font-size: 0.875rem; line-height: 1.125rem; }
+:root[data-diseno="3g"] .r2-inv-cifra { font-weight: 600; font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2-inv-almacen-celda { display: inline-flex; align-items: center; gap: 12px; font: var(--r2-t-principal); }
+:root[data-diseno="3g"] .r2-inv-almacen-celda > svg { color: var(--g3-tinta-2); flex: none; }
+
+/* Herramientas: el número de unidades despliega sus unidades */
+:root[data-diseno="3g"] .r2-inv-unidades-boton {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; margin: 0; padding: 2px 6px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--g3-tinta); cursor: pointer; text-align: right; font: inherit;
+}
+:root[data-diseno="3g"] .r2-inv-unidades-boton:hover { background: var(--g3-hover); }
+:root[data-diseno="3g"] .r2-inv-unidades-boton > svg { color: var(--g3-tinta-2); flex: none; }
+:root[data-diseno="3g"] .r2-inv-unidades-texto { display: grid; justify-items: end; gap: 1px; }
+:root[data-diseno="3g"] .r2-inv-unidades-texto > .r2-num { font: 600 0.9375rem/1.25rem var(--g3-f-texto); font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2-inv-unidades-libres { font: 400 0.875rem/1.25rem var(--g3-f-texto); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-unidades-libres.r2-tono--mal { color: var(--g3-mal); font-weight: 500; }
+
+/* Ajuste rápido de existencias: el número se vuelve campo */
+:root[data-diseno="3g"] .r2-inv-ajuste { display: inline-grid; justify-items: end; gap: 2px; }
+:root[data-diseno="3g"] .r2-inv-ajuste-campo { width: 104px; height: 36px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+:root[data-diseno="3g"] .r2-inv-ajuste-campo--editado { border-color: var(--g3-primario); background: var(--g3-primario-tinte); }
+:root[data-diseno="3g"] .r2-inv-ajuste-antes { font: 400 0.875rem/1.125rem var(--g3-f-texto); color: var(--g3-tinta-2); white-space: nowrap; }
+
+/* Filtros de Inventario: la búsqueda cede espacio para que los cinco filtros quepan en una fila a 1440 px */
+@media (min-width: 721px) {
+  :root[data-diseno="3g"] .r2-inv .r2-filtros-fila > .r2-busqueda { flex: 1 1 200px; max-width: 420px; min-width: 180px; }
+}
+/* Si la fila de filtros deja poco ancho, el ejemplo de la búsqueda termina en «…» en vez de cortarse a media letra */
+:root[data-diseno="3g"] .r2-inv .r2-busqueda-campo { text-overflow: ellipsis; }
+/* Las acciones del renglón son secundarias: texto neutro (azul al pasar), para que lo que se lea primero sea el dato */
+:root[data-diseno="3g"] .r2-inv-tabla .r2-celda-acciones .r2-boton--fantasma { color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-inv-tabla .r2-celda-acciones .r2-boton--fantasma .r2-boton-svg { color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-tabla .r2-celda-acciones .r2-boton--fantasma:hover,
+:root[data-diseno="3g"] .r2-inv-tabla .r2-celda-acciones .r2-boton--fantasma:hover .r2-boton-svg { color: var(--g3-primario); }
+
+/* Tabla propia de Inventario (mismas clases que la Tabla común + columnas ajustables y renglones hijos) */
+:root[data-diseno="3g"] .r2-inv-tabla { table-layout: fixed; }
+:root[data-diseno="3g"] .r2-inv-tabla td { overflow: hidden; }
+:root[data-diseno="3g"] .r2-inv-tabla td.r2-celda-acciones { overflow: visible; }
+:root[data-diseno="3g"] .r2-inv-tabla tbody tr.r2-renglon td { height: 56px; }
+:root[data-diseno="3g"] .r2-inv-th-ajustable { position: relative; }
+:root[data-diseno="3g"] .r2-inv-th-texto { display: block; overflow: hidden; text-overflow: ellipsis; }
+:root[data-diseno="3g"] .r2-inv-th-asa { position: absolute; top: 8px; bottom: 8px; right: 0; width: 7px; cursor: col-resize; border-right: 2px solid transparent; }
+:root[data-diseno="3g"] .r2-inv-th-ajustable:hover .r2-inv-th-asa { border-right-color: var(--g3-linea-fuerte); }
+:root[data-diseno="3g"] .r2-inv-th-asa:hover, :root[data-diseno="3g"] .r2-inv-th-asa:active { border-right-color: var(--g3-primario); }
+/* Recién actualizado: lo dice la celda de existencia («Actualizado», con su color); sin franja de color a la izquierda (revisión final) */
+:root[data-diseno="3g"] .r2-inv-subrenglon td { background: var(--g3-fondo); }
+:root[data-diseno="3g"] .r2-inv-tabla .r2-inv-subrenglon td { height: 52px; }
+:root[data-diseno="3g"] .r2-inv-subrenglon td:first-child { padding-left: 60px; }
+:root[data-diseno="3g"] .r2-inv-unidad-abrir { display: grid; gap: 1px; }
+:root[data-diseno="3g"] .r2-inv-unidad-codigo { font: 600 0.875rem/1.25rem var(--g3-f-mono, ui-monospace, monospace); color: var(--g3-tinta); letter-spacing: 0.01em; }
+:root[data-diseno="3g"] .r2-inv-unidad-barras { display: block; height: 32px; max-width: 120px; border-radius: 4px; background: var(--r2-inv-placa); object-fit: contain; }
+:root[data-diseno="3g"] .r2-inv-unidad-barras--hueco { width: 96px; background: var(--g3-contenedor); }
+:root[data-diseno="3g"] .r2-inv-subvacio { padding: 12px 16px 12px 60px !important; color: var(--g3-tinta-2); font: var(--r2-t-secundario); list-style: none; }
+:root[data-diseno="3g"] .r2-inv-celular .r2-inv-subvacio { padding-left: 16px !important; border-bottom: 1px solid var(--g3-linea); }
+
+/* Celular: las acciones con texto pasan a una tercera línea del renglón (objetivos de 44 px) */
+:root[data-diseno="3g"] :is(.r2-inv-celular, .r2-tabla-celular.r2-inv-acciones-abajo) .r2-fila { flex-wrap: wrap; row-gap: 0; }
+:root[data-diseno="3g"] :is(.r2-inv-celular, .r2-tabla-celular.r2-inv-acciones-abajo) .r2-fila-accion:has(.r2-boton) { flex: 1 0 100%; justify-content: flex-start; gap: 8px; padding: 0 0 12px; }
+:root[data-diseno="3g"] .r2-inv-celular .r2-fila-accion:has(.r2-boton) { padding-left: 52px; }
+:root[data-diseno="3g"] :is(.r2-inv-celular, .r2-tabla-celular.r2-inv-acciones-abajo) .r2-fila-accion:has(.r2-boton) .r2-menu-acciones { margin-left: auto; }
+:root[data-diseno="3g"] :is(.r2-inv-celular, .r2-tabla-celular.r2-inv-acciones-abajo) .r2-fila-accion .r2-boton { height: 44px; }
+:root[data-diseno="3g"] .r2-inv-celular .r2-fila-dato { font: 600 1rem/1.375rem var(--g3-f-texto); }
+:root[data-diseno="3g"] .r2-inv-fila-unidad { padding-left: 24px; background: var(--g3-fondo); }
+:root[data-diseno="3g"] .r2-inv-fila-unidad .r2-fila-principal { font-family: var(--g3-f-mono, ui-monospace, monospace); }
+:root[data-diseno="3g"] .r2-inv-celular .r2-inv-ajuste-campo { width: 92px; height: 44px; }
+
+/* Nuevos por autorizar */
+:root[data-diseno="3g"] .r2-inv-ayuda-nuevos { margin: 4px 0 12px; }
+:root[data-diseno="3g"] .r2-inv-nuevos .r2-selector { height: 36px; font-size: 0.875rem; }
+:root[data-diseno="3g"] .r2-inv-aviso-permisos { margin: -4px 0 12px; font-weight: 500; }
+
+/* ───────── Diálogo de cantidad (entrada, salida, descontar) ───────── */
+:root[data-diseno="3g"] .r2-inv-dialogo { display: grid; gap: 16px; }
+:root[data-diseno="3g"] .r2-inv-dialogo-nombre { margin: 0; font: 600 1rem/1.5rem var(--g3-f-texto); color: var(--g3-tinta); overflow-wrap: anywhere; }
+:root[data-diseno="3g"] .r2-inv-dialogo-datos { padding: 12px 14px; border-radius: 12px; background: var(--g3-contenedor); }
+:root[data-diseno="3g"] .r2-inv-cantidad-fila { display: flex; align-items: center; gap: 10px; min-width: 0; }
+:root[data-diseno="3g"] .r2-entrada.r2-inv-cantidad-grande { height: 56px; font: 600 1.5rem/1 var(--g3-f-texto); font-variant-numeric: tabular-nums; text-align: right; padding-right: 16px; flex: 1; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-cantidad-unidad { font: 600 1rem/1 var(--g3-f-texto); color: var(--g3-tinta-2); flex: none; }
+:root[data-diseno="3g"] .r2-inv-previa {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; padding: 10px 14px; border-radius: 12px;
+  background: var(--g3-contenedor); color: var(--g3-tinta); font: 400 0.9375rem/1.375rem var(--g3-f-texto);
+}
+:root[data-diseno="3g"] .r2-inv-previa > svg { color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-previa strong { font-size: 1.0625rem; }
+:root[data-diseno="3g"] .r2-inv-previa.r2-tono--mal { background: var(--g3-mal-suave); color: var(--g3-mal); font-weight: 500; }
+:root[data-diseno="3g"] .r2-inv-previa-etq { color: var(--g3-tinta-2); }
+
+/* ───────── Ficha del artículo (cajón) ───────── */
+:root[data-diseno="3g"] .r2-inv-ficha-existencia { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+:root[data-diseno="3g"] .r2-inv-ficha-cifra { display: grid; gap: 4px; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-cifra-grande { font: var(--r2-t-cifra-grande); font-variant-numeric: tabular-nums; color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-inv-ficha-linea { font: var(--r2-t-secundario); color: var(--g3-tinta-2); font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2-inv-ficha-descripcion { margin: 0; font: var(--r2-t-secundario); color: var(--g3-tinta-2); max-width: 65ch; }
+:root[data-diseno="3g"] .r2-inv-ficha-nombre { margin: 0; font: 600 1rem/1.5rem var(--g3-f-texto); }
+:root[data-diseno="3g"] .r2-inv-marca-local { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding-top: 4px; }
+:root[data-diseno="3g"] .r2-inv-etiqueta { margin: 0; font: var(--r2-t-etiqueta); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-movimiento { display: grid; gap: 4px; }
+:root[data-diseno="3g"] .r2-inv-movimiento-que { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0; font: var(--r2-t-dato); }
+:root[data-diseno="3g"] .r2-inv-movimiento .r2-inv-desc { white-space: normal; }
+
+/* Código de barras y QR sobre su placa */
+:root[data-diseno="3g"] .r2-inv-codigo { display: grid; gap: 8px; }
+:root[data-diseno="3g"] .r2-inv-codigo-placa {
+  display: grid; place-items: center; min-height: 104px; padding: 12px; border: 1px solid var(--g3-linea); border-radius: 12px; background: var(--r2-inv-placa);
+}
+:root[data-diseno="3g"] .r2-inv-codigo-placa img { display: block; max-width: 100%; max-height: 120px; height: auto; }
+:root[data-diseno="3g"] .r2-inv-codigo-placa--qr { min-height: 220px; }
+:root[data-diseno="3g"] .r2-inv-codigo-placa--qr img { max-height: 200px; }
+:root[data-diseno="3g"] .r2-inv-codigo-error { margin: 0; font: var(--r2-t-secundario); color: var(--r2-inv-placa-error); }
+:root[data-diseno="3g"] .r2-inv-codigo-hueso { width: 70%; height: 64px; }
+:root[data-diseno="3g"] .r2-inv-qr-hueso { width: 180px; height: 180px; }
+:root[data-diseno="3g"] .r2-inv-codigo-pie { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+:root[data-diseno="3g"] .r2-inv-codigo-texto { font: 600 0.9375rem/1.25rem var(--g3-f-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+:root[data-diseno="3g"] .r2-inv-codigo-botones { display: inline-flex; gap: 4px; }
+
+/* ───────── Formularios en cajón (nuevo artículo, almacenes, ubicación…) ───────── */
+:root[data-diseno="3g"] .r2-inv-form-cajon { display: contents; }
+:root[data-diseno="3g"] .r2-inv-rejilla-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+:root[data-diseno="3g"] .r2-inv-rejilla-campos--cuatro { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+:root[data-diseno="3g"] .r2-inv-campo-doble { grid-column: 1 / -1; }
+:root[data-diseno="3g"] .r2-inv-campo-con-accion { display: grid; gap: 6px; align-content: start; justify-items: start; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-campo-con-accion > .r2-campo { width: 100%; }
+:root[data-diseno="3g"] .r2-inv-fila-campo { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+:root[data-diseno="3g"] .r2-inv-crece { flex: 1 1 200px; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-mayusculas { text-transform: uppercase; }
+:root[data-diseno="3g"] .r2-inv-mayusculas::placeholder { text-transform: none; }
+:root[data-diseno="3g"] .r2-inv-mono { font-family: var(--g3-f-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2-inv-al-vuelo { display: grid; gap: 8px; width: 100%; padding: 12px; border-radius: 12px; background: var(--g3-contenedor); }
+:root[data-diseno="3g"] .r2-inv-al-vuelo-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+:root[data-diseno="3g"] .r2-inv-al-vuelo-botones { display: flex; gap: 8px; flex-wrap: wrap; }
+:root[data-diseno="3g"] .r2-inv-nombre-campo { position: relative; }
+:root[data-diseno="3g"] .r2-inv-sugerencias {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: var(--r2-z-menu); max-height: 320px; overflow-y: auto;
+  background: var(--g3-superficie); border: 1px solid var(--g3-linea); border-radius: 12px; box-shadow: var(--g3-sombra-2); padding: 6px;
+}
+:root[data-diseno="3g"] .r2-inv-sugerencias-cab { margin: 4px 8px 6px; font: var(--r2-t-ayuda); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-sugerencias-pie { margin: 6px 8px 2px; font: var(--r2-t-ayuda); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-sugerencia {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 6px 10px; margin: 0; border: 0; border-radius: 8px;
+  background: transparent; color: var(--g3-tinta); text-align: left; cursor: pointer; font: inherit;
+}
+:root[data-diseno="3g"] .r2-inv-sugerencia:hover, :root[data-diseno="3g"] .r2-inv-sugerencia:focus-visible { background: var(--g3-hover); }
+:root[data-diseno="3g"] .r2-inv-sugerencia-accion { flex: none; font: var(--r2-t-boton); color: var(--g3-primario); }
+:root[data-diseno="3g"] .r2-inv-proveedores { display: grid; gap: 8px; }
+:root[data-diseno="3g"] .r2-inv-proveedor { display: grid; grid-template-columns: minmax(0, 1fr) 120px auto auto; align-items: center; gap: 8px; }
+:root[data-diseno="3g"] .r2-inv-proveedor-costo { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Campo del código con cámara */
+:root[data-diseno="3g"] .r2-inv-codigo-campo { display: grid; gap: 8px; }
+:root[data-diseno="3g"] .r2-inv-codigo-fila { display: flex; align-items: center; gap: 8px; }
+:root[data-diseno="3g"] .r2-inv-codigo-fila .r2-entrada { padding-right: 44px; }
+:root[data-diseno="3g"] .r2-inv-codigo-largo { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font: 600 0.8125rem/1 var(--g3-f-texto); font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2-inv-camara { position: relative; display: grid; gap: 8px; }
+:root[data-diseno="3g"] .r2-inv-camara-visor { width: 100%; min-height: 280px; border-radius: 16px; overflow: hidden; background: var(--r2-negro-foto, #0b0b0b); }
+:root[data-diseno="3g"] .r2-inv-camara-visor video { width: 100% !important; height: auto !important; display: block; }
+:root[data-diseno="3g"] .r2-inv-camara-girar { position: absolute; top: 12px; left: 12px; background: var(--g3-superficie); color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-inv-camara-estado { margin: 0; font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+
+/* Gestionar almacenes */
+:root[data-diseno="3g"] .r2-inv-almacenes { display: grid; }
+:root[data-diseno="3g"] .r2-inv-almacen { padding: 10px 0; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2-inv-almacen:last-child { border-bottom: 0; }
+:root[data-diseno="3g"] .r2-inv-almacen-fila { display: flex; align-items: center; gap: 8px; min-height: 48px; }
+:root[data-diseno="3g"] .r2-inv-almacen-categorias { display: grid; gap: 8px; padding: 8px 0 4px; }
+:root[data-diseno="3g"] .r2-inv-casillas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+
+/* Generar etiquetas */
+:root[data-diseno="3g"] .r2-inv-etq-filtros { flex: none; display: grid; gap: 12px; padding: 0 24px 12px; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2-inv-etq-filtros .r2-busqueda { max-width: none; }
+:root[data-diseno="3g"] .r2-inv-etq-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+:root[data-diseno="3g"] .r2-inv-etq-ubicacion { flex: 1 1 200px; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-etq-resumen { display: flex; align-items: center; justify-content: space-between; gap: 12px; font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-etq-cuerpo { padding-top: 0; }
+:root[data-diseno="3g"] .r2-inv-etq-item { list-style: none; }
+:root[data-diseno="3g"] .r2-inv-etq-fila-art { gap: 12px; padding: 4px 0; }
+:root[data-diseno="3g"] .r2-inv-etq-fila-art .r2-fila-lineas { padding: 8px 0; }
+:root[data-diseno="3g"] .r2-inv-etq-unidades { padding: 4px 0 8px 56px; border-bottom: 1px solid var(--g3-linea); background: var(--g3-fondo); }
+:root[data-diseno="3g"] .r2-inv-etq-unidades-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 8px 4px 0; font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-etq-unidad { display: flex; align-items: center; gap: 8px; padding-right: 8px; }
+:root[data-diseno="3g"] .r2-inv-etq-unidad-casilla { flex: 1; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-etq-unidad-casilla .r2-casilla-texto { display: inline-flex; align-items: baseline; gap: 10px; }
+:root[data-diseno="3g"] .r2-inv-etq-unidad-estado { flex: none; }
+
+
+/* ───────── Pestañas propias de una pantalla (Conteo cíclico, Cambios por autorizar) ───────── */
+:root[data-diseno="3g"] .r2-inv-pestanas { margin: 0 0 16px; }
+:root[data-diseno="3g"] .r2-inv-panel { min-width: 0; }
+
+/* ───────── Conteo cíclico ───────── */
+:root[data-diseno="3g"] .r2-inv-progreso {
+  display: grid; grid-template-columns: minmax(220px, auto) minmax(120px, 1fr) auto auto; align-items: center; gap: 8px 20px;
+  padding: 12px 8px 12px 16px; margin: 0 0 16px; border-radius: var(--g3-r-md); background: var(--g3-contenedor);
+}
+:root[data-diseno="3g"] .r2-inv-progreso-texto { display: grid; gap: 2px; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-progreso-cifra { margin: 0; font: 400 1rem/1.5rem var(--g3-f-texto); color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-inv-progreso-cifra strong { font-weight: 600; font-size: 1.125rem; }
+:root[data-diseno="3g"] .r2-inv-progreso .r2-inv-desc { white-space: normal; }
+:root[data-diseno="3g"] .r2-inv-progreso-barra { height: 8px; border-radius: 4px; background: var(--g3-contenedor-alto); overflow: hidden; }
+:root[data-diseno="3g"] .r2-inv-progreso-barra > span { display: block; height: 100%; border-radius: inherit; background: var(--g3-primario); transition: width var(--g3-normal) var(--g3-curva); }
+:root[data-diseno="3g"] .r2-inv-progreso--listo .r2-inv-progreso-barra > span { background: var(--g3-ok); }
+:root[data-diseno="3g"] .r2-inv-progreso-por { font: 600 1rem/1 var(--g3-f-texto); font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
+:root[data-diseno="3g"] .r2-inv-terminado { display: flex; align-items: center; gap: 16px; padding: 20px 16px; border-top: 1px solid var(--g3-linea); border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2-inv-terminado > svg { flex: none; }
+:root[data-diseno="3g"] .r2-inv-terminado-texto { flex: 1; min-width: 0; display: grid; gap: 4px; }
+:root[data-diseno="3g"] .r2-inv-terminado .r2-vacio-texto { margin: 0; max-width: 72ch; }
+:root[data-diseno="3g"] .r2-inv-conteo-busqueda { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; }
+:root[data-diseno="3g"] .r2-inv-busqueda-conteo { flex: 1 1 320px; max-width: 480px; }
+:root[data-diseno="3g"] .r2-inv-ubic-conteo { font-weight: 600; }
+:root[data-diseno="3g"] .r2-entrada.r2-inv-contar-campo { height: 44px; text-align: right; font: 600 1rem/1 var(--g3-f-texto); font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2-inv-contar-campo::placeholder { font-weight: 400; color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-filtros-fechas { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 12px; margin: 0 0 12px; }
+:root[data-diseno="3g"] .r2-inv-filtros-fechas .r2-campo { width: 180px; }
+:root[data-diseno="3g"] .r2-inv-paginas { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 16px 0 0; }
+:root[data-diseno="3g"] .r2-inv-paginas > .r2-inv-desc { margin-right: 8px; }
+:root[data-diseno="3g"] .r2-inv-todo-bien { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--g3-ok); font: 500 0.9375rem/1.375rem var(--g3-f-texto); }
+
+/* ───────── Cambios por autorizar ───────── */
+:root[data-diseno="3g"] .r2-inv-cambio { display: grid; gap: 1px; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-cambio-valor { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px; font: 400 0.9375rem/1.375rem var(--g3-f-texto); font-variant-numeric: tabular-nums; color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-cambio-valor strong { font-weight: 600; color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-inv-cambio-valor strong.r2-tono--mal { color: var(--g3-mal); }
+:root[data-diseno="3g"] .r2-inv-cambio-valor > svg { color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-motivo { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: var(--r2-t-secundario); color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-inv-cambios .r2-fila-derecha { max-width: 50%; }
+
+/* ───────── Rollos y descuento ───────── */
+:root[data-diseno="3g"] .r2-inv-restante { display: inline-grid; justify-items: end; gap: 4px; min-width: 120px; }
+:root[data-diseno="3g"] .r2-inv-restante strong { font-weight: 600; color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-inv-restante-barra { display: block; width: 120px; height: 4px; border-radius: 2px; background: var(--g3-contenedor-alto); overflow: hidden; }
+:root[data-diseno="3g"] .r2-inv-restante-barra > span { display: block; height: 100%; background: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-inv-cajon-filtros { padding: 12px 0; min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-cajon-filtros .r2-segmentado { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+:root[data-diseno="3g"] .r2-inv-cajon-filtros + * { min-width: 0; }
+:root[data-diseno="3g"] .r2-inv-rollo-en-tabla { padding-left: 52px; }
+:root[data-diseno="3g"] .r2-inv-actualizando { margin: 0 0 4px; }
+
+/* ───────── Fotos con IA ───────── */
+:root[data-diseno="3g"] .r2-inv-nota-cola { margin: 0 0 8px; }
+:root[data-diseno="3g"] .r2-inv-cola-ahora { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; margin: -2px 0 10px; font: var(--r2-t-secundario); color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-inv-cola-actual { display: inline-flex; align-items: flex-start; gap: 8px; }
+:root[data-diseno="3g"] .r2-inv-cola-actual > svg { color: var(--g3-info); flex: none; margin-top: 2px; }
+:root[data-diseno="3g"] .r2-inv-cola-ahora strong { font-weight: 600; }
+
+/* ───────── Celular ───────── */
+@media (max-width: 720px) {
+  /* Inventario: «Escanear» junto a la búsqueda solo con su ícono (universal), para que la búsqueda tenga espacio */
+  :root[data-diseno="3g"] .r2-inv-inventario .r2-filtros-ranura .r2-boton--principal { width: 48px; padding: 0; }
+  :root[data-diseno="3g"] .r2-inv-inventario .r2-filtros-ranura .r2-boton--principal .r2-boton-texto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  :root[data-diseno="3g"] .r2-inv-rejilla-campos, :root[data-diseno="3g"] .r2-inv-rejilla-campos--cuatro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root[data-diseno="3g"] .r2-inv-proveedor { grid-template-columns: minmax(0, 1fr) 96px; }
+  :root[data-diseno="3g"] .r2-inv-etq-filtros { padding: 0 16px 12px; }
+  :root[data-diseno="3g"] .r2-inv-etq-fila .r2-segmentado { width: 100%; }
+  :root[data-diseno="3g"] .r2-inv-etq-fila .r2-segmento { flex: 1; }
+  :root[data-diseno="3g"] .r2-inv-etq-unidades { padding-left: 16px; }
+  :root[data-diseno="3g"] .r2-inv-casillas { grid-template-columns: minmax(0, 1fr); }
+  :root[data-diseno="3g"] .r2-inv-nombre, :root[data-diseno="3g"] .r2-inv-existencia-valor { font-size: 1rem; }
+  :root[data-diseno="3g"] .r2-inv-desc { font-size: 0.9375rem; }
+  :root[data-diseno="3g"] .r2-inv-progreso { grid-template-columns: minmax(0, 1fr) auto auto; padding: 12px 4px 12px 12px; }
+  :root[data-diseno="3g"] .r2-inv-progreso-barra { grid-column: 1 / -1; grid-row: 2; }
+  :root[data-diseno="3g"] .r2-inv-terminado { flex-wrap: wrap; }
+  :root[data-diseno="3g"] .r2-inv-terminado > .r2-boton { width: 100%; }
+  :root[data-diseno="3g"] .r2-inv-filtros-fechas .r2-campo { width: calc(50% - 6px); }
+  :root[data-diseno="3g"] .r2-inv-restante-barra { width: 96px; }
+  :root[data-diseno="3g"] .r2-inv-rollo-en-tabla { padding-left: 0; }
+}
+
+/* Objetivos de 44 px de la tira, los segmentos y la X de la búsqueda: ya los pone la fundación (revisión final). */

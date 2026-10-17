@@ -1,0 +1,181 @@
+/* Rediseño 2 · Piso (TV de producción y terminal de las áreas). TODO bajo :root[data-diseno="3g"]: con el diseño apagado
+   este archivo no cambia nada. Clases propias: r2-pi-*. Usa las piezas y tokens de la fundación (r2-piso.css: .r2-piso,
+   .r2-tv, .r2-terminal…) y solo ajusta lo que es de estas pantallas, siempre dentro de una clase r2-pi-*. */
+
+/* =========================================================================================
+   TV
+   ========================================================================================= */
+/* La escala de la TV = la escala − / + de siempre × el ajuste al tamaño de la pantalla (useLienzoTv) */
+:root[data-diseno="3g"] .r2-tv.r2-pi-tv { --r2-e: calc(var(--r2-escala, 1) * var(--r2-pi-ajuste, 1)); }
+:root[data-diseno="3g"] .r2-pi-tv .r2-tv-controles { bottom: calc(72px * var(--r2-e) + 16px); }
+:root[data-diseno="3g"] .r2-pi-tv .r2-tv-encabezado { gap: calc(20px * var(--r2-e)); }
+:root[data-diseno="3g"] .r2-pi-tv .r2-tv-titulo { min-width: 0; }
+:root[data-diseno="3g"] .r2-pi-tv .r2-tv-cuerpo { display: flex; flex-direction: column; }
+
+/* Renglones de alto fijo: así las páginas siempre caben (la cuenta está en useLienzoTv) */
+:root[data-diseno="3g"] .r2-pi-tv-tabla .r2-tv-renglon { height: calc(120px * var(--r2-e)); min-height: 0; overflow: hidden; }
+:root[data-diseno="3g"] .r2-pi-tv-tabla .r2-tv-cabecera > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-pi-tv-tabla .r2-tv-renglon { height: calc(184px * var(--r2-e)); }
+:root[data-diseno="3g"] .r2-pi-tv--area.r2-pi-tv--angosta .r2-pi-tv-tabla .r2-tv-renglon { height: calc(172px * var(--r2-e)); }
+
+/* Nombre de la obra: hasta dos líneas (los nombres reales son largos), sin cortar a la mitad */
+:root[data-diseno="3g"] .r2-pi-tv .r2-tv-obra { gap: calc(4px * var(--r2-e)); }
+:root[data-diseno="3g"] .r2-pi-tv .r2-tv-obra-nombre {
+  white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  font-size: calc(34px * var(--r2-e)); line-height: 1.06; overflow-wrap: anywhere;
+}
+:root[data-diseno="3g"] .r2-pi-tv .r2-tv-obra-detalle { font-size: calc(24px * var(--r2-e)); }
+:root[data-diseno="3g"] .r2-pi-tv .r2-tv-celda-fecha { overflow: hidden; text-overflow: ellipsis; }
+:root[data-diseno="3g"] .r2-pi-tv .r2-tv-celda-texto { max-width: 100%; }
+:root[data-diseno="3g"] .r2-pi-tv-sin { font: 500 calc(28px * var(--r2-e)) / 1 var(--g3-f-texto); color: var(--g3-tinta-3); }
+:root[data-diseno="3g"] .r2-pi-tv .r2-tv-vacio b { color: var(--g3-tinta); }
+
+/* Pie: pausadas a la izquierda (una línea), páginas a la derecha */
+:root[data-diseno="3g"] .r2-pi-tv-pie-izq { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root[data-diseno="3g"] .r2-pi-tv-pie-izq b { color: var(--g3-tinta); font-weight: 600; }
+
+/* TV vertical o celular: la obra en tres líneas */
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-tv-encabezado { flex-wrap: wrap; row-gap: calc(8px * var(--r2-e)); padding-block: calc(16px * var(--r2-e)); }
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-tv-titulo { flex-wrap: wrap; white-space: normal; }
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-tv-cifras { order: 3; flex-basis: 100%; margin: 0; justify-content: flex-start; gap: 0 calc(24px * var(--r2-e)); }
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-tv-sep { display: none; }
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-tv-marca { display: none; }
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-tv-avance { width: calc(120px * var(--r2-e)); }
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-tv .r2-hora-datos,
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-hora-datos { margin-left: auto; }
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-tv-cuerpo { padding: 0 calc(28px * var(--r2-e)); }
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-tv-encabezado,
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-tv-pie { padding-inline: calc(28px * var(--r2-e)); }
+:root[data-diseno="3g"] .r2-pi-tv-angosta { display: grid; gap: calc(8px * var(--r2-e)); min-width: 0; }
+:root[data-diseno="3g"] .r2-pi-tv-angosta-cab { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: calc(20px * var(--r2-e)); }
+:root[data-diseno="3g"] .r2-pi-tv-angosta-cab > .r2-tv-celda,
+:root[data-diseno="3g"] .r2-pi-tv-angosta-cab > .r2-pi-tv-cita .r2-tv-celda { justify-items: end; text-align: right; }
+:root[data-diseno="3g"] .r2-pi-tv--angosta .r2-pi-tv-cita .r2-tv-celda-texto { font-size: calc(30px * var(--r2-e)); }
+:root[data-diseno="3g"] .r2-pi-tv-frase {
+  margin: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+  font: 600 calc(24px * var(--r2-e)) / 1.3 var(--g3-f-texto); color: var(--g3-tinta);
+}
+:root[data-diseno="3g"] .r2-pi-tv-frase > span + span::before { content: " · "; color: var(--g3-tinta-3); font-weight: 400; }
+:root[data-diseno="3g"] .r2-pi-tv-frase-suave { color: var(--g3-tinta-2); font-weight: 400; }
+
+/* Celda de dos datos chicos en la misma línea (herrería: soldadura y pintura) */
+:root[data-diseno="3g"] .r2-pi-tv-tipo { display: grid; gap: calc(6px * var(--r2-e)); justify-items: start; min-width: 0; }
+:root[data-diseno="3g"] .r2-pi-tv .r2-pi-tv-tipo .r2-tipo { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Listos para instalar: la cita al frente */
+:root[data-diseno="3g"] .r2-pi-tv-cita .r2-tv-celda-texto { font: 600 calc(36px * var(--r2-e)) / 1.1 var(--g3-f-titulo); }
+/* Títulos de grupo: el total del grupo (no lo que cabe en esta página) y «continúa de la página anterior» (TituloGrupoTv).
+   La cuenta automática de la tabla de la fundación cuenta solo los renglones de la página: aquí se esconde. */
+:root[data-diseno="3g"] .r2-pi-tv .r2-tv-grupo-cuenta { display: none; }
+:root[data-diseno="3g"] .r2-pi-tv-grupo-total { margin-left: calc(12px * var(--r2-e)); font-family: var(--g3-f-texto); font-weight: 500; color: var(--g3-tinta-2); font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2-pi-tv-grupo-sigue { margin-left: calc(16px * var(--r2-e)); font: 400 calc(22px * var(--r2-e)) / 1.2 var(--g3-f-texto); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-pi-tv-grupo-sigue::before { content: "· "; color: var(--g3-tinta-3); }
+
+/* Tipo A / B / C (sin color): sin el relleno de etiqueta, para que el texto quede alineado con su columna */
+:root[data-diseno="3g"] .r2-pi-tv .r2-tipo.r2-tipo--neutro { padding-inline: 0; }
+
+/* =========================================================================================
+   Terminal de las áreas
+   ========================================================================================= */
+/* Avisos flotantes en piso: grandes, arriba al centro, sin emojis */
+:root[data-diseno="3g"] .r2-pi-avisos > div > div {
+  font: 600 22px/28px var(--g3-f-texto) !important; padding: 16px 22px !important; max-width: min(640px, calc(100vw - 32px)) !important;
+  border-radius: 18px !important;
+}
+
+/* Pantalla del código: una columna sola, sin tarjeta */
+:root[data-diseno="3g"] .r2-pi-codigo {
+  flex: 1; width: 100%; max-width: 608px; margin: 0 auto; padding: 32px 24px 24px; min-height: 100dvh;
+  display: flex; flex-direction: column; justify-content: center; gap: 32px;
+}
+/* Desactivado: gris y con su motivo debajo (hoy el azul lavado parecía activo) */
+:root[data-diseno="3g"] .r2-pi-codigo-form .r2-boton-piso--principal:disabled:not([aria-busy="true"]) {
+  opacity: 1; background: var(--g3-contenedor); color: var(--g3-tinta-2); border-color: var(--g3-linea-fuerte);
+}
+:root[data-diseno="3g"] .r2-pi-codigo-cab { display: grid; gap: 10px; }
+:root[data-diseno="3g"] .r2-pi-codigo-area { display: inline-flex; align-items: center; gap: 14px; }
+:root[data-diseno="3g"] .r2-pi-codigo-titulo { margin: 0; font: 600 32px/38px var(--g3-f-titulo); letter-spacing: -0.01em; }
+:root[data-diseno="3g"] .r2-pi-codigo-sub { margin: 0; font: 400 20px/28px var(--g3-f-texto); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-pi-codigo-form { display: grid; gap: 24px; }
+:root[data-diseno="3g"] .r2-pi-codigo-otra { justify-self: center; }
+:root[data-diseno="3g"] .r2-pi-codigo-pie { margin: 0; padding-top: 24px; display: flex; align-items: center; justify-content: center; gap: 10px; font: 500 16px/20px var(--g3-f-texto); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-pi-codigo-pie .g3-logo-marca { width: 28px; height: 28px; border-radius: 8px; font-size: 12px; box-shadow: none; }
+
+/* Obras del área: lista + ficha */
+:root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-columna-lista { position: relative; }
+:root[data-diseno="3g"] .r2-pi-lista-cab {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; min-height: 52px; padding: 12px 24px 8px;
+  font: 600 16px/20px var(--g3-f-texto); color: var(--g3-tinta-2); border-bottom: 1px solid var(--g3-linea);
+}
+:root[data-diseno="3g"] .r2-pi-fila-plazo { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0 10px; }
+:root[data-diseno="3g"] .r2-pi-fila-plazo .r2-pi-urgente { color: var(--g3-tinta); font-weight: 600; }
+:root[data-diseno="3g"] .r2-pi-fila-plazo .r2-pi-urgente::before { content: "·"; margin-right: 10px; color: var(--g3-tinta-3); font-weight: 400; }
+:root[data-diseno="3g"] .r2-pi-plazo { display: inline-flex; align-items: center; gap: 8px; }
+:root[data-diseno="3g"] .r2-pi-plazo:not([class*="r2-tono--"]) { color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-pi-plazo .r2-estado-punto { width: 12px; height: 12px; }
+:root[data-diseno="3g"] .r2-pi-lista-pie { padding: 32px 24px 40px; display: grid; gap: 8px; justify-items: start; border-top: 1px solid var(--g3-linea); margin-top: auto; }
+:root[data-diseno="3g"] .r2-pi-lista-pie p { margin: 0; font: 400 16px/22px var(--g3-f-texto); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-pi-lista-pie .r2-boton-piso { margin-left: -16px; padding: 0 16px; }
+
+:root[data-diseno="3g"] .r2-pi-ficha-cab { display: grid; gap: 8px; }
+:root[data-diseno="3g"] .r2-pi-ficha-datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px 32px; margin: 0; }
+:root[data-diseno="3g"] .r2-pi-ficha-datos > div { display: grid; gap: 4px; min-width: 0; }
+:root[data-diseno="3g"] .r2-pi-ficha-datos dt { font: 600 16px/20px var(--g3-f-texto); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-pi-ficha-datos dd { margin: 0; font: 600 24px/30px var(--g3-f-texto); color: var(--g3-tinta); font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2-pi-ficha-datos dd small { display: block; font: 400 18px/24px var(--g3-f-texto); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-pi-planos { display: grid; gap: 12px; }
+:root[data-diseno="3g"] .r2-pi-planos-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+:root[data-diseno="3g"] .r2-pi-planos-lista .r2-boton-piso { width: 100%; justify-content: flex-start; min-height: 72px; padding: 0 24px; }
+/* Nombre del plano en hasta dos líneas (no se corta con «…» si cabe en dos) */
+:root[data-diseno="3g"] .r2-pi-planos-lista .r2-boton-piso { text-align: left; padding-block: 8px; }
+:root[data-diseno="3g"] .r2-pi-planos-lista .r2-boton-piso > span {
+  overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; line-height: 24px;
+}
+:root[data-diseno="3g"] .r2-pi-nota { margin: 0; padding: 16px 20px; border-radius: 16px; background: var(--g3-contenedor); font: 500 18px/24px var(--g3-f-texto); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-pi-hueso-boton { height: 72px; border-radius: 20px; }
+:root[data-diseno="3g"] .r2-pi-volver { align-self: flex-start; }
+:root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-ficha { background: var(--g3-fondo); }
+:root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-separador { padding-top: 48px; }
+/* La lista se actualiza sola cada 15 s; mientras tanto «Terminar» sigue sin aceptar toques (el mismo resguardo de hoy), pero
+   no se desvanece ni parpadea: antes se ponía al 50 % cada 15 s y parecía apagado. */
+:root[data-diseno="3g"] .r2-pi-terminar--refresco .r2-boton-terminar:disabled { opacity: 1; cursor: progress; }
+
+/* Vacío y cargando de la terminal */
+:root[data-diseno="3g"] .r2-pi-vacio { max-width: 640px; margin: 0 auto; padding: 96px 24px; display: grid; gap: 12px; text-align: center; justify-items: center; }
+:root[data-diseno="3g"] .r2-pi-vacio h2 { margin: 0; font: 600 28px/34px var(--g3-f-titulo); }
+:root[data-diseno="3g"] .r2-pi-vacio p { margin: 0; font: 400 20px/28px var(--g3-f-texto); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-pi-esqueleto-fila { min-height: 88px; padding: 18px 24px; display: grid; gap: 10px; align-content: center; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2-pi-esqueleto-fila .r2-hueso { height: 20px; border-radius: 6px; }
+:root[data-diseno="3g"] .r2-pi-esqueleto-fila .r2-hueso--tenue { height: 16px; }
+
+/* En vertical o celular: lista → ficha (un toque); la ficha ocupa toda la pantalla */
+@media (max-width: 1023px) {
+  /* La hora de los datos pasa a la cabecera de la lista (así el encabezado cabe en una línea) */
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-derecha .r2-hora-datos { display: none; }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-ficha { min-height: calc(100dvh - 88px); }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-separador { position: sticky; bottom: 0; margin-top: auto; padding: 24px 0 8px; background: var(--g3-fondo); }
+}
+@media (max-width: 720px) {
+  /* Encabezado en dos líneas: área y «Actualizar» (solo el ícono, 64 px) arriba; las obras pendientes debajo */
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-encabezado {
+    display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 0; align-items: center;
+  }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-dato { grid-column: 2; grid-row: 2; font-size: 18px; line-height: 24px; }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-derecha { grid-column: 3; grid-row: 1 / span 2; margin: 0; }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-derecha .r2-boton-piso { width: 64px; padding: 0; }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-derecha .r2-boton-piso > span {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  :root[data-diseno="3g"] .r2-pi-ficha-datos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-fila-piso-objetivo { padding: 12px 16px; }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-boton-terminar { padding: 12px 68px 12px 20px; font-size: 20px; gap: 10px; }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminar-cuenta { right: 12px; }
+  :root[data-diseno="3g"] .r2-pi-lista-cab { padding-inline: 16px; }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-ficha-titulo { font-size: 26px; line-height: 32px; }
+  :root[data-diseno="3g"] .r2-pi-planos-lista { grid-template-columns: minmax(0, 1fr); }
+  :root[data-diseno="3g"] .r2-pi-codigo-titulo { font-size: 28px; line-height: 34px; }
+  /* Visor del plano: «Cerrar plano» arriba y las pestañas de los planos en su propia línea, a todo lo ancho */
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-visor-plano-cab { flex-wrap: wrap; justify-content: flex-end; }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-visor-plano-pestanas { order: 2; flex-basis: 100%; flex-wrap: wrap; overflow: visible; }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-visor-plano-obra { flex: 1 1 0; max-width: none; font-size: 18px; }
+}

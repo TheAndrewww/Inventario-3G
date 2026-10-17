@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — diseño de TV de la ola 3: window.G3_TV y html[data-g3-tv] ya nunca se ponen (las TV,
+// la terminal, anuncios y el calendario público llevan el rediseño 2), así que useTvG3() siempre da null y aplicarTv()
+// no hace nada. Al borrar las ramas viejas de cada pantalla, este archivo se queda sin uso.
 // Diseño 3G para las pantallas públicas de TV y terminal (ola 3).
 // Esas rutas siguen en window.G3_RUTAS_SIN_DISENO (index.html): la preferencia guardada del navegador NUNCA las enciende.
 // Su diseño propio para TV se enciende SOLO si la URL de esa carga trae ?diseno=3g (y &tema=oscuro para fondo oscuro):

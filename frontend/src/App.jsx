@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
@@ -48,6 +51,8 @@ import { useAuth } from './context/AuthContext';
 import { rolPuedeVer, rutaInicialPorRol } from './components/layout/Sidebar';
 import { rolPuedeVerG3 } from './diseno-3g/menuPlanta';
 import { useDiseno3G } from './diseno-3g/useDiseno3G';
+import { useDiseno3G as useDiseno3GR2 } from './rediseno2/fundacion/useDiseno3G';
+import { AvisosFlotantes } from './rediseno2/fundacion/armazon/AvisosFlotantes';
 
 const IndexRedirect = () => {
   const { user } = useAuth();
@@ -86,6 +91,8 @@ const OrdenesCompraRuta = () => {
 function App() {
   // Auto-reload cuando se detecta nueva versión en producción
   useVersionCheck();
+  // Rediseño 2: encendido, los avisos flotantes de siempre (react-hot-toast) abajo a la izquierda y con el diseño nuevo
+  const d3 = useDiseno3GR2();
   return (
     <Router>
       <RutaDiseno3G />
@@ -109,7 +116,7 @@ function App() {
             <NotificacionesProvider>
               <CalendarioProvider>
                 <PedidoProvider>
-                  <Toaster
+                  {d3 ? <AvisosFlotantes /> : <Toaster
                     position="top-right"
                     toastOptions={{
                       duration: 3000,
@@ -130,7 +137,7 @@ function App() {
                         },
                       },
                     }}
-                  />
+                  />}
 
                   <Routes>
                     {/* Ruta de login */}

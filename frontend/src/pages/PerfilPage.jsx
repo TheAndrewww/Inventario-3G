@@ -1,14 +1,21 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React from 'react';
 import { Key, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+// Rediseño 2 · vista encendida (apagado no la usa): los mismos datos y el mismo cerrar sesión
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaPerfil from '../rediseno2/gestion/VistaPerfil';
 
 const PerfilPage = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const g3 = useDiseno3G(); // Diseño 3G: textos en oración y colores del paquete (apagado, lo de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
 
   const handleLogout = () => {
     logout();
@@ -23,6 +30,10 @@ const PerfilPage = () => {
       ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
       : nombre.substring(0, 2).toUpperCase();
   };
+
+  // Rediseño 2 · vista ENCENDIDA (el JSX de hoy sigue intacto debajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) return <VistaPerfil user={user} handleLogout={handleLogout} />;
 
   return (
     <div className="p-6 max-w-4xl mx-auto">

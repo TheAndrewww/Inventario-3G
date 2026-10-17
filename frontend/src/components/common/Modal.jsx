@@ -1,7 +1,14 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
+import { Dialogo } from '../../rediseno2/fundacion/piezas/Dialogo';
+import { ZonaHeredada } from '../../rediseno2/fundacion/piezas/Miniatura';
 
 const Modal = ({ isOpen, onClose, title, children, size = 'md', closeOnBackdropClick = true }) => {
+  const d3 = useDiseno3G(); // Rediseño 2: encendido, el diálogo centrado de la fundación (mismo título, mismos hijos)
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -15,6 +22,16 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md', closeOnBackdropC
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <Dialogo abierto titulo={title} tamano={size} alCerrar={onClose} cerrarConVelo={closeOnBackdropClick}>
+        {/* El contenido de un Modal es marcado de siempre: se ve como hoy encendido (zona heredada), también dentro de una vista nueva */}
+        <ZonaHeredada>{children}</ZonaHeredada>
+      </Dialogo>
+    );
+  }
 
   const sizes = {
     sm: 'max-w-md',

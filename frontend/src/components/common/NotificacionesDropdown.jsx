@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useRef, useEffect } from 'react';
 import {
   ShoppingCart,
@@ -20,12 +23,15 @@ import { useNotificaciones } from '../../context/NotificacionesContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { g3Activo } from '../../diseno-3g/dialogosG3';
+import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
+import { PanelAvisos } from '../../rediseno2/fundacion/armazon/PanelAvisos';
 
 const NotificacionesDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const d3 = useDiseno3G();
   const {
     notificaciones,
     countNoLeidas,
@@ -153,6 +159,31 @@ const NotificacionesDropdown = () => {
     setGlobalSoundEnabled(newValue);
     toast.success(g3Activo() ? (newValue ? 'Sonido activado' : 'Sonido desactivado') : (newValue ? '🔊 Sonido activado' : '🔇 Sonido desactivado'));
   };
+
+  // Rediseño 2: encendido, el panel de avisos de la fundación con LOS MISMOS datos y manejadores (mismas peticiones y el
+  // mismo sondeo del contexto). Sin dropdownRef: el panel cierra con su velo, con Esc o con la campana.
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <PanelAvisos
+        abierto={isOpen}
+        alAlternar={() => setIsOpen(!isOpen)}
+        alCerrar={() => setIsOpen(false)}
+        avisos={notificaciones}
+        noLeidos={countNoLeidas}
+        alAbrirAviso={handleNotificacionClick}
+        alMarcarLeido={handleMarcarLeida}
+        alMarcarTodos={marcarTodasComoLeidas}
+        alEliminar={handleEliminar}
+        pedirPush={handleRequestPushPermission}
+        mostrarPush={pushSupported && pushPermission !== 'granted'}
+        mostrarFcm={pushPermission === 'granted' && fcmSupported && !fcmToken}
+        mostrarSonido={pushPermission === 'granted'}
+        sonido={soundEnabled}
+        alSonido={handleToggleSound}
+      />
+    );
+  }
 
   return (
     <div className="relative" ref={dropdownRef}>

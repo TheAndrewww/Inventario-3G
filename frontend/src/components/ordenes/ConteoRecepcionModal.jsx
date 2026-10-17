@@ -1,8 +1,14 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useMemo, useState } from 'react';
 import { X, ClipboardCheck, AlertTriangle, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ordenesCompraService from '../../services/ordenesCompra.service';
 import { g3Activo, confirmarG3 } from '../../diseno-3g/dialogosG3';
+// Rediseño 2 · vista encendida (apagado no la usa)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CajonConteoR2 from '../../rediseno2/compras/CajonConteo';
 
 const formatCantidad = (n) => {
     const v = parseFloat(n) || 0;
@@ -20,6 +26,7 @@ const ConteoRecepcionModal = ({ isOpen, onClose, conteo, onSuccess }) => {
         return inicial;
     });
     const [guardando, setGuardando] = useState(false);
+    const d3 = useDiseno3GR2(); // Rediseño 2: cajón del conteo encendido
 
     if (!isOpen || !conteo) return null;
 
@@ -72,6 +79,15 @@ const ConteoRecepcionModal = ({ isOpen, onClose, conteo, onSuccess }) => {
             setGuardando(false);
         }
     };
+
+    // Rediseño 2 · encendido: lo mismo en un cajón con tabla (el JSX de hoy sigue abajo)
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <CajonConteoR2 onClose={onClose} conteo={conteo} contados={contados} setContados={setContados}
+                faltantes={faltantes} sobrantes={sobrantes} guardando={guardando} cerrarConteo={cerrar} />
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">

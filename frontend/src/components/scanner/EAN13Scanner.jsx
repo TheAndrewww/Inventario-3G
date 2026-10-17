@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -8,9 +11,12 @@ import articulosService from '../../services/articulos.service';
 import { usePedido } from '../../context/PedidoContext';
 import { getImageUrl } from '../../utils/imageUtils';
 import { g3Activo, confirmarG3 } from '../../diseno-3g/dialogosG3';
+import { useDiseno3G as useRediseno2 } from '../../rediseno2/fundacion/useDiseno3G';
+import { EscanerCamaraR2 } from '../../rediseno2/tickets/PiezasEscaner';
 
 const EAN13Scanner = ({ onClose }) => {
   const g3 = useDiseno3G(); // Diseño 3G: ícono en vez de emoji (apagado, lo de siempre)
+  const d3 = useRediseno2(); // Rediseño 2: encendido se pinta EscanerCamaraR2 con este mismo estado y manejadores
   const [isScanning, setIsScanning] = useState(false);
   const [cameras, setCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState(null);
@@ -320,6 +326,31 @@ const EAN13Scanner = ({ onClose }) => {
       stopScanning();
     };
   }, []);
+
+  // Rediseño 2 encendido: la cámara arriba y los escaneados abajo, en el mismo lugar donde la abre cada pantalla (sin el
+  // panel lateral aparte). «Vaciar» repite tal cual lo que hoy va escrito dentro del botón «Vaciar Carrito».
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <EscanerCamaraR2 c={{
+        isScanning, cameras, selectedCamera, setSelectedCamera, carritoEscaneados, flashEffect,
+        startScanning, stopScanning, switchCamera, aumentarCantidad, disminuirCantidad, eliminarDelCarrito, crearPedido,
+        vaciarCarrito: () => {
+          if (g3Activo() && !isScanning) {
+            confirmarG3({
+              titulo: '¿Vaciar el carrito?',
+              datos: [['Artículos escaneados', String(carritoEscaneados.length)]],
+              confirmar: 'Vaciar carrito', cancelar: 'No vaciar', peligro: true,
+            }).then((si) => { if (si) setCarritoEscaneados([]); });
+            return;
+          }
+          if (window.confirm('¿Deseas vaciar el carrito?')) {
+            setCarritoEscaneados([]);
+          }
+        },
+      }} />
+    );
+  }
 
   // Componente del carrito para renderizar con Portal
   const carritoModal = carritoEscaneados.length > 0 ? (

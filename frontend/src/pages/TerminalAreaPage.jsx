@@ -1,3 +1,7 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve. Las ramas con tv
+// (useTvG3) en true son el diseño de TV de la ola 3, que tampoco se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -22,6 +26,10 @@ import { esProyectoMTO, esUrgenteMTO } from '../utils/produccion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTvG3 } from '../diseno-3g/tvG3';
 import { BarraTv, VivoTv, CargandoTv } from '../diseno-3g/PiezasTv';
+import { useDiseno3G } from '../rediseno2/fundacion/useDiseno3G';
+import VistaTerminalCodigo from '../rediseno2/piso/VistaTerminalCodigo';
+import VistaTerminalArea from '../rediseno2/piso/VistaTerminalArea';
+import { AvisosPiso } from '../rediseno2/piso/AvisosPiso';
 
 // Configuración de áreas
 const AREAS_CONFIG = {
@@ -108,6 +116,7 @@ const LoginArea = ({ onLogin, areaEsperada = null, aviso = null, onCambiarArea }
     const [error, setError] = useState(null);
     const nombreArea = AREAS_CONFIG[areaEsperada]?.nombre || null;
     const textoAviso = error || aviso;
+    const d3 = useDiseno3G(); // Rediseño 2: encendido, la vista nueva (mismo formulario y mismo manejador)
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -127,6 +136,16 @@ const LoginArea = ({ onLogin, areaEsperada = null, aviso = null, onCambiarArea }
             setLoading(false);
         }
     };
+
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <VistaTerminalCodigo
+                area={areaEsperada} nombreArea={nombreArea} codigo={codigo} alCambiarCodigo={(v) => setCodigo(v.toUpperCase())}
+                alEnviar={handleSubmit} cargando={loading} error={textoAviso} alCambiarArea={areaEsperada ? onCambiarArea : null}
+            />
+        );
+    }
 
     if (tv) {
         // Mismo formulario y mismo manejador; solo cambia cómo se ve.
@@ -287,8 +306,11 @@ const PDFViewerModal = ({ archivo, onClose }) => {
 };
 
 // Tarjeta de proyecto para terminal (grande y simple)
-const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: globalLoading, area, codigo }) => {
+const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: globalLoading, area, codigo, alArchivos }) => {
     const tv = useTvG3();
+    // Rediseño 2: encendido, esta tarjeta solo es el cargador de los planos de su obra (la misma petición, una vez, con la
+    // misma llave); no pinta nada y le avisa a la vista nueva qué trajo. La ficha de la obra la pinta la vista.
+    const d3 = useDiseno3G();
     const [loading, setLoading] = useState(false);
     const [archivosLoading, setArchivosLoading] = useState(false);
     const [archivos, setArchivos] = useState(null);
@@ -320,6 +342,10 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
         cargarArchivos();
     }, [proyecto.id, area, codigo]);
 
+    useEffect(() => {
+        if (d3 && alArchivos) alArchivos(proyecto.id, { cargando: archivosLoading, lista: archivos ? (archivos.archivos?.[area] || []) : null });
+    }, [d3, alArchivos, proyecto.id, archivos, archivosLoading, area]);
+
     const handleCompletar = async () => {
         if (loading || globalLoading) return;
         setLoading(true);
@@ -333,6 +359,9 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
     // Obtener archivos relevantes para esta área
     const archivosRelevantes = archivos?.archivos?.[area] || [];
     const tieneArchivos = archivosRelevantes.length > 0;
+
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) return null;
 
     if (tv) {
         // Mismos datos, mismos planos y el mismo botón (mismo manejador); sin emojis y con el azul de acción.
@@ -524,6 +553,7 @@ const ProyectoCardTerminal = ({ proyecto, onCompletar, areaConfig, loading: glob
 // Pantalla principal del terminal
 const TerminalView = ({ area, codigo, onLogout, onCodigoRechazado }) => {
     const tv = useTvG3(); // Diseño 3G para TV: mismos datos, misma actualización cada 15 s
+    const d3 = useDiseno3G(); // Rediseño 2: encendido, lista + ficha (mismos datos, misma actualización y mismos manejadores)
     const areaConfig = AREAS_CONFIG[area];
     const Icon = areaConfig?.icon || Package;
 
@@ -579,7 +609,16 @@ const TerminalView = ({ area, codigo, onLogout, onCodigoRechazado }) => {
                         ? `${areaConfig.nombre} completada ✅ ¡Listo para Instalación!`
                         : `${areaConfig.nombre} completada ✅`;
 
-                    if (tv) {
+                    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+                    if (d3) {
+                        // Rediseño 2: el mismo aviso, sin emojis y diciendo qué sigue
+                        toast.success(
+                            response.data.puedeAvanzarAInstalacion
+                                ? `${areaConfig.nombre} terminada. La obra queda lista para instalar.`
+                                : `${areaConfig.nombre} terminada. Falta ${areaConfig.subEtapa === 'manufactura' ? 'herrería' : 'manufactura'}.`,
+                            { duration: 4000 }
+                        );
+                    } else if (tv) {
                         // Mismo aviso, sin emojis
                         toast.success(
                             <div className="g3tv-aviso">
@@ -611,7 +650,9 @@ const TerminalView = ({ area, codigo, onLogout, onCodigoRechazado }) => {
 
                 if (response.success) {
                     toast.success(
-                        tv
+                        d3
+                            ? response.message
+                            : tv
                             ? <div className="g3tv-aviso">{response.message}</div>
                             : (
                                 <div className="text-center">
@@ -634,6 +675,30 @@ const TerminalView = ({ area, codigo, onLogout, onCodigoRechazado }) => {
             toast.error(error.response?.data?.message || 'Error al completar');
         }
     };
+
+    // Rediseño 2 (encendido): la cola del área + la ficha de la obra elegida. Cada obra conserva su cargador de planos de
+    // hoy (ProyectoCardTerminal con la misma llave), que en encendido no pinta nada.
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <VistaTerminalArea
+                area={area} nombreArea={areaConfig?.nombre || area} proyectos={proyectos} cargando={loading} actualizando={actualizando}
+                alActualizar={() => cargarProyectos(false)} alCompletar={handleCompletar} alCambiarArea={onLogout}
+                cargadores={(alArchivos) => proyectos.map(proyecto => (
+                    <ProyectoCardTerminal
+                        key={proyecto.id}
+                        proyecto={proyecto}
+                        onCompletar={handleCompletar}
+                        areaConfig={areaConfig}
+                        loading={actualizando}
+                        area={area}
+                        codigo={codigo}
+                        alArchivos={alArchivos}
+                    />
+                ))}
+            />
+        );
+    }
 
     if (loading && tv) return <CargandoTv>Cargando proyectos…</CargandoTv>;
     if (loading) {
@@ -779,6 +844,7 @@ const TerminalAreaPage = () => {
     const { area: areaParam } = useParams();
     const navigate = useNavigate();
     const tv = useTvG3();
+    const d3 = useDiseno3G(); // Rediseño 2: encendido, sus avisos grandes de piso (los mismos toast de siempre)
     // Diseño 3G para TV: la liga conserva ?diseno=3g al entrar y salir del área, para que la tableta siga igual si se recarga.
     const sufijoTv = tv ? `?diseno=3g${tv === 'oscuro' ? '&tema=oscuro' : ''}` : '';
     // A4 · PLA-04: la liga del área ya no entra sola: solo si esta pantalla tiene guardado el código de esa área.
@@ -817,6 +883,26 @@ const TerminalAreaPage = () => {
         setAviso(mensaje || 'El código de esta pantalla ya no vale. Escribe el código de tu área.');
         setArea(null);
     }, [area]);
+
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <>
+                <AvisosPiso />
+                {area && AREAS_CONFIG[area] ? (
+                    <TerminalView area={area} codigo={codigo} onLogout={handleLogout} onCodigoRechazado={handleCodigoRechazado} />
+                ) : (
+                    <LoginArea
+                        key={areaParam || 'todas'}
+                        onLogin={handleLogin}
+                        areaEsperada={areaParam && AREAS_CONFIG[areaParam] ? areaParam : null}
+                        aviso={aviso}
+                        onCambiarArea={handleLogout}
+                    />
+                )}
+            </>
+        );
+    }
 
     return (
         <>

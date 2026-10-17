@@ -1,8 +1,14 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { X, ClipboardCheck, Plus, Trash2, Package, Loader, Check, Search, Wrench, Box } from 'lucide-react';
 import toast from 'react-hot-toast';
 import checklistService from '../../services/checklist.service';
 import { g3Activo, confirmarG3 } from '../../diseno-3g/dialogosG3';
+// Rediseño 2 · encendido: el mismo checklist en un cajón (rediseno2/gestion/CajonesChecklist)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import { CajonChecklistEquipo } from '../../rediseno2/gestion/CajonesChecklist';
 
 const ChecklistEquipoModal = ({ isOpen, onClose, equipo }) => {
   const [checklist, setChecklist] = useState([]);
@@ -11,6 +17,7 @@ const ChecklistEquipoModal = ({ isOpen, onClose, equipo }) => {
   const [mostrarAgregar, setMostrarAgregar] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [tabActiva, setTabActiva] = useState('herramienta'); // 'herramienta' | 'material'
+  const d3 = useDiseno3GR2();
 
   useEffect(() => {
     if (isOpen && equipo?.id) {
@@ -113,6 +120,18 @@ const ChecklistEquipoModal = ({ isOpen, onClose, equipo }) => {
     acc[sec].push(c);
     return acc;
   }, {});
+
+  // Rediseño 2 · encendido: mismo estado y mismos manejadores
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <CajonChecklistEquipo equipo={equipo} onClose={onClose} cargando={cargando} tabActiva={tabActiva} setTabActiva={setTabActiva}
+        checklistHerramientas={checklistHerramientas} checklistMateriales={checklistMateriales} checklistActiva={checklistActiva}
+        porSeccion={porSeccion} mostrarAgregar={mostrarAgregar} setMostrarAgregar={setMostrarAgregar} busqueda={busqueda} setBusqueda={setBusqueda}
+        itemsDisponibles={itemsDisponibles} hayDelTipo={todosLosItems.some((i) => i.tipo === tabActiva)}
+        asignarItem={asignarItem} asignarTodos={asignarTodos} quitarItem={quitarItem} />
+    );
+  }
 
   const renderItemRow = (asignacion) => {
     const item = asignacion.checklistItem;

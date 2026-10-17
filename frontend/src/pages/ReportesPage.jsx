@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useEffect, useMemo, useState } from 'react';
 import { BarChart3, Package, AlertCircle, AlertTriangle, CheckCircle, TrendingUp, RefreshCw, Check, X, Sparkles, DollarSign } from 'lucide-react';
 import reportesService from '../services/reportes.service';
@@ -6,6 +9,9 @@ import toast from 'react-hot-toast';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import { g3Activo, confirmarG3, cx, etq } from '../diseno-3g/dialogosG3';
+// Rediseño 2 · vista encendida (apagado no la usa): mismo reporte, misma selección y la misma petición de aplicar
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaReportes from '../rediseno2/gestion/VistaReportes';
 
 const formatCurrency = (n) => `$${(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatNumber = (n) => (n || 0).toLocaleString('es-MX');
@@ -134,6 +140,8 @@ const ReportesPage = () => {
     const [filtroAccion, setFiltroAccion] = useState('todos');
     // Mín/máx escritos a mano en la tabla: id → { min, max } (texto del input)
     const [valores, setValores] = useState({});
+    const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+    const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
     const cargar = async () => {
         try {
@@ -142,9 +150,11 @@ const ReportesPage = () => {
             setData(res);
             setSeleccion(new Set());
             setValores({});
+            setErrorCargaR2(null);
         } catch (err) {
             console.error(err);
             toast.error('Error al cargar el reporte');
+            setErrorCargaR2(err.response?.data?.message || err.message || 'Error al cargar el reporte');
         } finally {
             setLoading(false);
         }
@@ -253,6 +263,17 @@ const ReportesPage = () => {
             setAplicando(false);
         }
     };
+
+    // Rediseño 2 · vista ENCENDIDA: los mismos datos y los mismos manejadores (el JSX de hoy sigue intacto debajo)
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <VistaReportes data={data} loading={loading} errorCarga={errorCargaR2} dias={dias} setDias={setDias} cargar={cargar}
+                filtroAccion={filtroAccion} setFiltroAccion={setFiltroAccion} seleccion={seleccion} setSeleccion={setSeleccion}
+                aplicando={aplicando} aplicar={aplicar} sugerenciasFiltradas={sugerenciasFiltradas} propuesta={propuesta}
+                editarValor={editarValor} valores={valores} toggleSeleccion={toggleSeleccion} seleccionarTodos={seleccionarTodos} />
+        );
+    }
 
     if (loading && !data) return <Loader fullScreen />;
 
@@ -505,6 +526,7 @@ const ReportesPage = () => {
 
 const KpiCard = ({ icon, bg, label, value, sub, dinero }) => {
     const g3 = useDiseno3G(); // Diseño 3G: número con el componente del paquete
+    // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
     if (g3) {
         return (
             <div className={dinero ? 'g3-kpi g3p-kpi-dinero' : 'g3-kpi'}>

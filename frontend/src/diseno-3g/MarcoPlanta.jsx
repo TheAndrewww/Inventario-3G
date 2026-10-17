@@ -1,3 +1,5 @@
+// VIEJO: se borra a partir del 24-oct-2026 — todo el archivo. Era el armazón del Diseño 3G de antes (ola 1-3); con el rediseño 2
+// el marco es rediseno2/fundacion/armazon/Armazon.jsx y nadie importa este archivo.
 // Diseño 3G — armazón de Planta: riel agrupado por área, barra superior de vidrio (título, tema, avisos,
 // selector de apps con el interruptor, perfil), pestañas de sección y barra inferior en celular.
 // Solo se usa con el interruptor encendido (DashboardLayout decide). Las rutas y los permisos son los de siempre.
@@ -34,7 +36,7 @@ function BotonTema() {
 function SelectorApps() {
   const ref = useRef(null);
   useEffect(() => {
-    const s = window.G3?.selectorApps(ref.current, { actual: 'planta' });
+    const s = window.G3?.selectorApps(ref.current, { actual: 'planta', interruptor: false });
     return () => s?.destruir();
   }, []);
   return <span ref={ref} className="g3p-selector" />;

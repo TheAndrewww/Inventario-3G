@@ -1,3 +1,7 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve. Las ramas con tv
+// (useTvG3) en true son el diseño de TV de la ola 3, que tampoco se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ZoomIn, ZoomOut, RotateCw, Snowflake, CheckCircle2 } from 'lucide-react';
 import { Loader } from '../components/common';
@@ -9,6 +13,8 @@ import { sortProyectosPorUrgencia } from '../utils/produccion';
 import { px } from '../utils/produccion';
 import { useTvG3 } from '../diseno-3g/tvG3';
 import { BarraTv, VivoTv, ControlesTv, CargandoTv } from '../diseno-3g/PiezasTv';
+import { useDiseno3G } from '../rediseno2/fundacion/useDiseno3G';
+import VistaTvProduccion from '../rediseno2/piso/VistaTvProduccion';
 
 const DashboardProduccionTVPage = () => {
     // Hook para datos (modo público, refresh cada 1 min)
@@ -19,6 +25,8 @@ const DashboardProduccionTVPage = () => {
     });
     // Diseño 3G para TV: solo si la liga de esta pantalla trae ?diseno=3g (ver diseno-3g/tvG3.js). Mismos datos y misma frecuencia.
     const tv = useTvG3();
+    // Rediseño 2: encendido, la vista nueva (abajo, antes del return de siempre). Mismos datos, manejadores y claves.
+    const d3 = useDiseno3G();
 
     // Zoom y Orientación (persistidos en localStorage)
     const [zoomLevel, setZoomLevel] = useState(() => {
@@ -97,6 +105,18 @@ const DashboardProduccionTVPage = () => {
         proyectos.filter(p => p.pausado),
         [proyectos]
     );
+
+    // Rediseño 2 (encendido): tablero de renglones con páginas automáticas; la carga, el orden y los filtros son los de arriba
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <VistaTvProduccion
+                proyectos={proyectos} activos={proyectosActivos} pausadas={proyectosCongelados} estadisticas={estadisticas}
+                cargando={loading && proyectos.length === 0} zoom={zoomLevel} rotacion={rotacion} controlesVisibles={controlsVisible}
+                alReducir={handleZoomOut} alAumentar={handleZoomIn} alRotar={rotar}
+            />
+        );
+    }
 
     if (loading && proyectos.length === 0) {
         if (tv) return <CargandoTv>Cargando proyectos…</CargandoTv>;

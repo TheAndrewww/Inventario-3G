@@ -1,15 +1,15 @@
-// Diseño 3G — en cada cambio de ruta vuelve a decidir si la pantalla lleva el diseño nuevo (G3.aplicar()).
-// Las pantallas públicas (TV, terminal, anuncios, calendario público) están en window.G3_RUTAS_SIN_DISENO (index.html):
-// nunca llevan el atributo ni piden la letra, aunque el interruptor esté encendido en ese navegador.
-// Ola 3: esas mismas pantallas tienen su diseño para TV solo si la URL de la carga traía ?diseno=3g (tvG3.js); aquí se
-// quita en las rutas internas y se regresa en las públicas. Sin ese parámetro no hace nada.
-// Con el interruptor apagado no cambia nada (aplicar() no encuentra nada que poner) y no pinta nada.
+// Diseño 3G — en cada cambio de ruta deja el diseño nuevo encendido.
+// Solo el diseño nuevo (16-oct-2026): ya no hay rutas sin diseño ni interruptor. Antes llamaba G3.aplicar(), que todavía
+// lee un «actual» guardado y quitaba el atributo; ahora forzarDiseno3G() lo deja puesto sin tocar lo guardado.
+// VIEJO: se borra a partir del 24-oct-2026 — aplicarTv (diseño de TV de la ola 3): window.G3_TV ya nunca se pone, así
+// que no hace nada.
 import { useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { aplicarTv } from './tvG3';
+import { forzarDiseno3G } from './forzarDiseno3G';
 
 export default function RutaDiseno3G() {
   const { pathname } = useLocation();
-  useLayoutEffect(() => { window.G3?.aplicar(); aplicarTv(pathname); }, [pathname]);
+  useLayoutEffect(() => { forzarDiseno3G(); aplicarTv(pathname); }, [pathname]);
   return null;
 }

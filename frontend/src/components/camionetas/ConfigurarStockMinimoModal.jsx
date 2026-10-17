@@ -1,9 +1,15 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Save, Trash2, Package, Search, Check, Edit2 } from 'lucide-react';
 import camionetasService from '../../services/camionetas.service';
 import herramientasRentaService from '../../services/herramientasRenta.service';
 import toast from 'react-hot-toast';
 import { g3Activo, confirmarG3, pedirTextoG3 } from '../../diseno-3g/dialogosG3';
+// Rediseño 2 · encendido: el mismo estado y los mismos manejadores en un cajón (rediseno2/gestion/CajonMinimosEquipo)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CajonMinimosEquipo from '../../rediseno2/gestion/CajonMinimosEquipo';
 
 const ConfigurarStockMinimoModal = ({ camioneta, onClose, onActualizar }) => {
   const [tiposHerramientas, setTiposHerramientas] = useState([]);
@@ -11,6 +17,7 @@ const ConfigurarStockMinimoModal = ({ camioneta, onClose, onActualizar }) => {
   const [cargando, setCargando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
+  const d3 = useDiseno3GR2();
 
   // Herramientas seleccionadas para agregar en batch
   const [seleccionadas, setSeleccionadas] = useState([]);
@@ -191,6 +198,19 @@ const ConfigurarStockMinimoModal = ({ camioneta, onClose, onActualizar }) => {
   };
 
   if (!camioneta) return null;
+
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <CajonMinimosEquipo
+        camioneta={camioneta} onClose={onClose} cargando={cargando} guardando={guardando} busqueda={busqueda} setBusqueda={setBusqueda}
+        tiposFiltrados={tiposFiltrados} seleccionadas={seleccionadas} stocksConfigurados={stocksConfigurados} agregarSeleccion={agregarSeleccion}
+        quitarSeleccion={quitarSeleccion} actualizarCantidad={actualizarCantidad} actualizarObservaciones={actualizarObservaciones}
+        guardarTodas={guardarTodas} eliminarConfiguracion={eliminarConfiguracion} editarConfiguracion={editarConfiguracion}
+        obtenerImagenUrl={obtenerImagenUrl}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

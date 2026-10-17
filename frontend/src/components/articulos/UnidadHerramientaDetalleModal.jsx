@@ -1,13 +1,20 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useRef, useState, useEffect } from 'react';
 import { X, Download, Printer, Package, Hash } from 'lucide-react';
 import { Modal } from '../common';
 import herramientasRentaService from '../../services/herramientasRenta.service';
 import { g3Activo, avisoG3 } from '../../diseno-3g/dialogosG3';
+// Rediseño 2: encendido, la unidad se ve en un cajón (rediseno2/inventario/CajonUnidadHerramienta)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CajonUnidadHerramienta from '../../rediseno2/inventario/CajonUnidadHerramienta';
 
 const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClose }) => {
   const barcodeRef = useRef(null);
   const [qrImageUrl, setQrImageUrl] = useState(null);
   const [loadingQr, setLoadingQr] = useState(true);
+  const d3 = useDiseno3GR2(); // Rediseño 2 encendido: cajón (se llama antes del return de abajo para no cambiar el orden de los hooks)
 
   if (!unidad || !tipoHerramienta) return null;
 
@@ -191,6 +198,14 @@ const UnidadHerramientaDetalleModal = ({ unidad, tipoHerramienta, isOpen, onClos
   };
 
   const estadoBadge = getEstadoBadge(unidad.estado);
+
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <CajonUnidadHerramienta unidad={unidad} tipoHerramienta={tipoHerramienta} abierto={isOpen} alCerrar={onClose}
+        etiquetaEstado={estadoBadge.label} qr={qrImageUrl} cargandoQr={loadingQr} alDescargar={handleDescargar} alImprimir={handleImprimir} />
+    );
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Detalles de la Unidad">

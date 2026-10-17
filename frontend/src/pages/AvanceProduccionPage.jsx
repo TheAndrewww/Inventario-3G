@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
     Search,
@@ -20,6 +23,8 @@ import {
     X
 } from 'lucide-react';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaAvance from '../rediseno2/produccion/VistaAvance';
 import CabG3 from '../diseno-3g/CabG3';
 import produccionService from '../services/produccion.service';
 import { flattenProyectos, sortProyectosPorUrgencia, esProyectoMTO, esUrgenteMTO } from '../utils/produccion';
@@ -338,6 +343,10 @@ const AvanceProduccionPage = () => {
     const [procesando, setProcesando] = useState(false);
     const mountedRef = useRef(true);
     const g3 = useDiseno3G(); // Diseño 3G: encabezado del paquete y textos sin emojis (apagado, lo de siempre)
+    const d3 = useDiseno3GR2(); // Rediseño 2: encendido, la vista nueva (abajo, antes del return de siempre)
+    // Rediseño 2: el error de la última carga, para que la vista nueva diga qué pasó y ofrezca «Reintentar»
+    // (la petición y el aviso flotante de siempre no cambian; apagado no se pinta)
+    const [errorCarga, setErrorCarga] = useState(null);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -354,10 +363,12 @@ const AvanceProduccionPage = () => {
             if (response.success && mountedRef.current) {
                 const proys = flattenProyectos(response.data.resumen);
                 setProyectos(proys);
+                setErrorCarga(null);
             }
         } catch (error) {
             console.error('Error loading projects:', error);
             toast.error('Error al cargar proyectos');
+            if (mountedRef.current) setErrorCarga(error.response?.data?.message || error.message || 'Error al cargar proyectos');
         } finally {
             if (mountedRef.current) {
                 setLoading(false);
@@ -431,6 +442,22 @@ const AvanceProduccionPage = () => {
             setProcesando(false);
         }
     };
+
+    // Rediseño 2 (encendido): misma información y mismos manejadores, otra vista. Apagado sigue todo igual que hoy.
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <VistaAvance
+                proyectosFiltrados={proyectosFiltrados} loading={loading} refreshing={refreshing} errorCarga={errorCarga}
+                busqueda={busqueda} setBusqueda={setBusqueda} cargarProyectos={cargarProyectos}
+                confirmModal={confirmModal} setConfirmModal={setConfirmModal} procesando={procesando}
+                handleMarcarEtapa={handleMarcarEtapa} handleConfirm={handleConfirm}
+                ETAPAS_FLOW={ETAPAS_FLOW} isEtapaCompletada={isEtapaCompletada} isEtapaActiva={isEtapaActiva}
+                isEtapaVisible={isEtapaVisible} nombreEtapaG3={nombreEtapaG3}
+                esProyectoMTO={esProyectoMTO} esUrgenteMTO={esUrgenteMTO}
+            />
+        );
+    }
 
     // Loading state
     if (loading) {

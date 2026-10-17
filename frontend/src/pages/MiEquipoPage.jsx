@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import {
     Wrench,
@@ -19,6 +22,9 @@ import { getImageUrl } from '../utils/imageUtils';
 import toast from 'react-hot-toast';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
+// Rediseño 2 · vista encendida (apagado no la usa): mismos datos y mismos manejadores
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaMiEquipo from '../rediseno2/gestion/VistaMiEquipo';
 
 const MiEquipoPage = () => {
     const { user } = useAuth();
@@ -29,6 +35,8 @@ const MiEquipoPage = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [usuariosDisponibles, setUsuariosDisponibles] = useState([]);
     const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(''); // '' = mi propio equipo
+    const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+    const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
     useEffect(() => {
         fetchData(usuarioSeleccionado || null);
@@ -48,9 +56,11 @@ const MiEquipoPage = () => {
             setLoading(true);
             const response = await miEquipoService.obtenerMiEquipo(usuarioId);
             setData(response);
+            setErrorCargaR2(null);
         } catch (error) {
             console.error('Error al cargar datos:', error);
             toast.error('Error al cargar los datos');
+            setErrorCargaR2(error?.message || 'Error al cargar los datos');
         } finally {
             setLoading(false);
         }
@@ -70,6 +80,7 @@ const MiEquipoPage = () => {
             malo: { color: 'bg-red-100 text-red-800 border-red-200', icon: '🔴' }
         };
         const badge = badges[condicion] || badges.bueno;
+        // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
         if (g3) {
             // Mismo texto que hoy (la condición tal cual, «Bueno» si no trae); el color sigue al estado
             const g3c = { bueno: ['ok', 'Bueno'], regular: ['aviso', 'Regular'], malo: ['mal', 'Malo'] }[condicion]
@@ -82,6 +93,16 @@ const MiEquipoPage = () => {
             </span>
         );
     };
+
+    // Rediseño 2 · vista ENCENDIDA: los mismos datos y los mismos manejadores (el JSX de hoy sigue intacto debajo)
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <VistaMiEquipo user={user} esAdmin={esAdmin} loading={loading} data={data} refreshing={refreshing} handleRefresh={handleRefresh}
+                usuariosDisponibles={usuariosDisponibles} usuarioSeleccionado={usuarioSeleccionado} setUsuarioSeleccionado={setUsuarioSeleccionado}
+                errorCarga={errorCargaR2} recargar={() => fetchData(usuarioSeleccionado || null)} />
+        );
+    }
 
     if (loading) {
         return <Loader fullScreen />;

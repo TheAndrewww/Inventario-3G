@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { AlertTriangle, Package, Search, RefreshCw, Download, Warehouse, ChevronDown, ChevronRight, XCircle, DollarSign } from 'lucide-react';
@@ -9,6 +12,9 @@ import toast from 'react-hot-toast';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import { cx, etq } from '../diseno-3g/dialogosG3';
+// Rediseño 2 · vista encendida (apagado no la usa)
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaStockBajoR2 from '../rediseno2/compras/VistaStockBajo';
 
 const formatCurrency = (n) => `$${(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatNumber = (n) => (n || 0).toLocaleString('es-MX');
@@ -88,15 +94,19 @@ const StockBajoPage = () => {
     const [soloConMinimo, setSoloConMinimo] = useState(false);
     const [imagenAmpliada, setImagenAmpliada] = useState(null);
     const [colapsados, setColapsados] = useState(new Set());
+    const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+    const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
     const cargar = async () => {
         try {
             setLoading(true);
             const res = await reportesService.stockBajo();
             setData(res);
+            setErrorCargaR2(null);
         } catch (err) {
             console.error(err);
             toast.error(err.response?.data?.message || 'Error al cargar el stock bajo');
+            setErrorCargaR2(err.response?.data?.message || err.message || 'Error al cargar el stock bajo');
         } finally {
             setLoading(false);
         }
@@ -179,6 +189,31 @@ const StockBajoPage = () => {
     // Ventana exclusiva de administrador (el backend también lo valida)
     if (user && user.rol !== 'administrador') {
         return <Navigate to="/inventario" replace />;
+    }
+
+    // Rediseño 2 · vista ENCENDIDA: mismos datos, mismos filtros y la misma exportación (el JSX de hoy sigue intacto debajo)
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <VistaStockBajoR2
+                data={data}
+                loading={loading}
+                errorCarga={errorCargaR2}
+                recargar={cargar}
+                busqueda={busqueda}
+                setBusqueda={setBusqueda}
+                filtroEstado={filtroEstado}
+                setFiltroEstado={setFiltroEstado}
+                almacenActivo={almacenActivo}
+                setAlmacenActivo={setAlmacenActivo}
+                soloConMinimo={soloConMinimo}
+                setSoloConMinimo={setSoloConMinimo}
+                gruposBase={gruposBase}
+                almacenesFiltrados={almacenesFiltrados}
+                totales={totales}
+                exportarCSV={exportarCSV}
+            />
+        );
     }
 
     if (loading && !data) return <Loader fullScreen />;

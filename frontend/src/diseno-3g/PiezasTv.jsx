@@ -1,3 +1,5 @@
+// VIEJO: se borra a partir del 24-oct-2026 — todo el archivo (diseño de TV de la ola 3): html[data-g3-tv] ya nunca se pone; las
+// TV y la terminal llevan el rediseño 2 (rediseno2/fundacion/piso).
 // Diseño 3G para TV — piezas comunes de las pantallas públicas (ola 3). Solo se montan con html[data-g3-tv]
 // (useTvG3() de tvG3.js); apagado cada pantalla pinta lo de siempre. Ninguna pieza pide nada al servidor: los datos, los
 // manejadores y la frecuencia de actualización son los de cada pantalla.

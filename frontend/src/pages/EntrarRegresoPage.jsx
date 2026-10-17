@@ -1,7 +1,13 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { regresoDeCuentas3g } from '../services/cuentas3g';
 import { rutaInicialPorRol } from '../components/layout/Sidebar';
+// Rediseño 2 · vista encendida (apagado no la usa): el mismo canje y el mismo texto
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import { VistaEntrando } from '../rediseno2/gestion/VistaEntrar';
 
 // Regreso de Cuentas 3G (E1 · PLA-24), ruta pública /entrar/regreso. Solo existe con VITE_CUENTAS3G_MODO en «ambos» o
 // «solo». Va fuera del AuthProvider a propósito: así ninguna petición sin sesión de las otras pantallas la saca a /login
@@ -13,6 +19,7 @@ let enCurso = null; // StrictMode monta dos veces en desarrollo: el canje es de 
 const EntrarRegresoPage = () => {
   const navigate = useNavigate();
   const [texto, setTexto] = useState('Entrando con tu cuenta 3G…');
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
 
   useEffect(() => {
     const busqueda = window.location.search;
@@ -28,6 +35,10 @@ const EntrarRegresoPage = () => {
     });
     return () => { vivo = false; };
   }, [navigate]);
+
+  // Rediseño 2 · vista ENCENDIDA (el JSX de hoy sigue intacto debajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) return <VistaEntrando texto={texto} />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100 flex items-center justify-center p-4 g3-fondo-lanzador">

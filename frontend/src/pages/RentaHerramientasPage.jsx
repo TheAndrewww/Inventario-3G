@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -28,6 +31,10 @@ import { useAuth } from '../context/AuthContext';
 import { getImageUrl } from '../utils/imageUtils';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
+// Rediseño 2 · vista encendida (apagado no la usa): mismo estado, mismas peticiones y los mismos diálogos
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaRenta from '../rediseno2/gestion/VistaRenta';
+import { CajonAsignar, CajonDevolver, CajonNuevoTipo, CajonCondicion } from '../rediseno2/gestion/CajonesRenta';
 
 const RentaHerramientasPage = () => {
     const navigate = useNavigate();
@@ -43,6 +50,8 @@ const RentaHerramientasPage = () => {
     const [unidadSeleccionada, setUnidadSeleccionada] = useState(null);
     const [modalNuevoTipo, setModalNuevoTipo] = useState(false);
     const { user } = useAuth();
+    const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes de los return de siempre)
+    const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
     // Solo administradores, almacenistas y encargados pueden gestionar
     const puedeGestionar = ['administrador', 'almacenista', 'almacen', 'encargado'].includes(user?.rol);
@@ -58,9 +67,11 @@ const RentaHerramientasPage = () => {
             setLoading(true);
             const data = await herramientasRentaService.obtenerTipos();
             setTipos(data.tipos || []);
+            setErrorCargaR2(null);
         } catch (error) {
             console.error('Error al cargar tipos de herramienta:', error);
             toast.error('Error al cargar las herramientas');
+            setErrorCargaR2(error?.message || 'Error al cargar las herramientas');
         } finally {
             setLoading(false);
         }
@@ -146,6 +157,7 @@ const RentaHerramientasPage = () => {
         };
         const badge = badges[condicion] || badges.bueno;
         const Icon = badge.icon;
+        // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
         if (g3) {
             const g3c = { bueno: ['ok', 'Bueno'], regular: ['aviso', 'Regular'], malo: ['mal', 'Malo'], perdido: ['neutro', 'Perdido'], baja: ['neutro', 'Baja'] }[condicion] || ['ok', 'Bueno'];
             return <span className={`g3-estado g3-estado--${g3c[0]}`}>{g3c[1]}</span>;
@@ -169,6 +181,7 @@ const RentaHerramientasPage = () => {
             en_transito: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', texto: 'En tránsito' }
         };
         const badge = badges[estatus] || badges.disponible;
+        // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
         if (g3) {
             const tono = { disponible: 'ok', asignado: 'info', en_reparacion: 'aviso', en_transito: 'info' }[estatus] || 'ok';
             return <span className={`g3-estado g3-estado--${tono}`}>{badge.texto}</span>;
@@ -198,6 +211,73 @@ const RentaHerramientasPage = () => {
     const estaAsignada = (unidad) => {
         return unidad.estatus === 'asignado' || unidad.estado === 'asignada';
     };
+
+    // Rediseño 2 · vista ENCENDIDA: los mismos datos, los mismos manejadores y los mismos diálogos (el JSX de hoy sigue intacto
+    // debajo). Los diálogos son los de siempre: cada uno pinta su cajón nuevo encendido.
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <VistaRenta
+                puedeGestionar={puedeGestionar} tipos={tipos} tiposFiltrados={tiposFiltrados} tiposExpandidos={tiposExpandidos}
+                unidadesPorTipo={unidadesPorTipo} loading={loading} errorCarga={errorCargaR2} recargar={fetchTipos} searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm} stats={stats} puedeCrear={user?.rol === 'administrador' || user?.rol === 'almacenista'}
+                toggleTipo={toggleTipo} handleAsignar={handleAsignar} handleDevolver={handleDevolver} handleCambiarEstado={handleCambiarEstado}
+                handleImprimirCodigos={handleImprimirCodigos} setModalNuevoTipo={setModalNuevoTipo} mapearEstadoACondicion={mapearEstadoACondicion}
+                estaAsignada={estaAsignada}
+                dialogos={(
+                    <>
+                        {modalAsignar && unidadSeleccionada && (
+                            <ModalAsignar
+                                isOpen={modalAsignar}
+                                unidad={unidadSeleccionada}
+                                onClose={() => { setModalAsignar(false); setUnidadSeleccionada(null); }}
+                                onSuccess={() => {
+                                    setModalAsignar(false);
+                                    setUnidadSeleccionada(null);
+                                    fetchTipos();
+                                    if (unidadSeleccionada.tipo?.id) fetchUnidadesTipo(unidadSeleccionada.tipo.id);
+                                }}
+                            />
+                        )}
+                        {modalDevolver && unidadSeleccionada && (
+                            <ModalDevolver
+                                isOpen={modalDevolver}
+                                unidad={unidadSeleccionada}
+                                onClose={() => { setModalDevolver(false); setUnidadSeleccionada(null); }}
+                                onSuccess={() => {
+                                    setModalDevolver(false);
+                                    setUnidadSeleccionada(null);
+                                    fetchTipos();
+                                    if (unidadSeleccionada.tipo?.id) fetchUnidadesTipo(unidadSeleccionada.tipo.id);
+                                }}
+                            />
+                        )}
+                        {modalNuevoTipo && (
+                            <ModalNuevoTipo
+                                isOpen={modalNuevoTipo}
+                                onClose={() => setModalNuevoTipo(false)}
+                                onSuccess={() => { setModalNuevoTipo(false); fetchTipos(); }}
+                            />
+                        )}
+                        {modalCambiarEstado && unidadSeleccionada && (
+                            <ModalCambiarEstado
+                                isOpen={modalCambiarEstado}
+                                unidad={unidadSeleccionada}
+                                onClose={() => { setModalCambiarEstado(false); setUnidadSeleccionada(null); }}
+                                onSuccess={() => {
+                                    setModalCambiarEstado(false);
+                                    setUnidadSeleccionada(null);
+                                    // Refrescar unidades del tipo
+                                    if (unidadSeleccionada?.tipo_herramienta_id) fetchUnidadesTipo(unidadSeleccionada.tipo_herramienta_id);
+                                    fetchTipos();
+                                }}
+                            />
+                        )}
+                    </>
+                )}
+            />
+        );
+    }
 
     if (!puedeGestionar) {
         return (
@@ -615,6 +695,7 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
     const [camionetas, setCamionetas] = useState([]);
     const [camionetaSeleccionada, setCamionetaSeleccionada] = useState('');
     const [loading, setLoading] = useState(false);
+    const d3 = useDiseno3GR2(); // Rediseño 2: el mismo formulario en un cajón
 
     useEffect(() => {
         fetchDatos();
@@ -670,6 +751,17 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
             setLoading(false);
         }
     };
+
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <CajonAsignar unidad={unidad} onClose={onClose} tipoAsignacion={tipoAsignacion} setTipoAsignacion={setTipoAsignacion}
+                usuarioSeleccionado={usuarioSeleccionado} setUsuarioSeleccionado={setUsuarioSeleccionado} camionetaSeleccionada={camionetaSeleccionada}
+                setCamionetaSeleccionada={setCamionetaSeleccionada} observaciones={observaciones} setObservaciones={setObservaciones}
+                fechaVencimiento={fechaVencimiento} setFechaVencimiento={setFechaVencimiento} usuarios={usuarios} camionetas={camionetas}
+                loading={loading} handleSubmit={handleSubmit} />
+        );
+    }
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Asignar Herramienta">
@@ -799,6 +891,7 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
 const ModalDevolver = ({ isOpen, unidad, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
     const [observaciones, setObservaciones] = useState('');
+    const d3 = useDiseno3GR2(); // Rediseño 2: el mismo formulario en un cajón
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -820,6 +913,11 @@ const ModalDevolver = ({ isOpen, unidad, onClose, onSuccess }) => {
             setLoading(false);
         }
     };
+
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return <CajonDevolver unidad={unidad} onClose={onClose} observaciones={observaciones} setObservaciones={setObservaciones} loading={loading} handleSubmit={handleSubmit} />;
+    }
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Devolver Herramienta">
@@ -872,6 +970,7 @@ const ModalDevolver = ({ isOpen, unidad, onClose, onSuccess }) => {
 // Modal para crear nuevo tipo de herramienta
 const ModalNuevoTipo = ({ isOpen, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
+    const d3 = useDiseno3GR2(); // Rediseño 2: el mismo formulario en un cajón
     const [categorias, setCategorias] = useState([]);
     const [ubicaciones, setUbicaciones] = useState([]);
     const [proveedores, setProveedores] = useState([]);
@@ -973,6 +1072,14 @@ const ModalNuevoTipo = ({ isOpen, onClose, onSuccess }) => {
             setLoading(false);
         }
     };
+
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <CajonNuevoTipo onClose={onClose} formData={formData} handleChange={handleChange} categorias={categorias} ubicaciones={ubicaciones}
+                proveedores={proveedores} loading={loading} handleSubmit={handleSubmit} />
+        );
+    }
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Nuevo Tipo de Herramienta" maxWidth="max-w-2xl">
@@ -1169,6 +1276,7 @@ const ModalNuevoTipo = ({ isOpen, onClose, onSuccess }) => {
 const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
     const g3 = useDiseno3G(); // Diseño 3G: opciones sin emojis
+    const d3 = useDiseno3GR2(); // Rediseño 2: el mismo formulario en un cajón
     const [nuevaCondicion, setNuevaCondicion] = useState('');
     const [motivo, setMotivo] = useState('');
 
@@ -1237,6 +1345,15 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
 
     const condicionActual = unidad.condicion || mapearEstadoACondicion(unidad.estado);
     const estatusActual = unidad.estatus || (unidad.estado === 'asignada' ? 'asignado' : 'disponible');
+
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <CajonCondicion unidad={unidad} onClose={onClose} condicionesDisponibles={condicionesDisponibles} nuevaCondicion={nuevaCondicion}
+                setNuevaCondicion={setNuevaCondicion} motivo={motivo} setMotivo={setMotivo} condicionActual={condicionActual}
+                estatusActual={estatusActual} loading={loading} handleSubmit={handleSubmit} />
+        );
+    }
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Cambiar Condición de Herramienta">

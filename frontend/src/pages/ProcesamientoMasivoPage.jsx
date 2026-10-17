@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Wand2,
@@ -20,6 +23,9 @@ import toast from 'react-hot-toast';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
+// Rediseño 2: encendido, rediseno2/inventario/VistaFotosIA (mismo estado, mismas peticiones y el mismo sondeo)
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaFotosIA from '../rediseno2/inventario/VistaFotosIA';
 
 const ProcesamientoMasivoPage = () => {
   const [articulos, setArticulos] = useState([]);
@@ -33,6 +39,8 @@ const ProcesamientoMasivoPage = () => {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [imagenModal, setImagenModal] = useState(null); // Para ver imagen grande
   const g3 = useDiseno3G(); // Diseño 3G: encabezado, columnas apiladas en celular y confirmación del paquete (apagado, lo de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2 encendido
+  const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de carga para la vista nueva (el aviso de siempre no cambia)
 
   // Cargar artículos, estado de cola e historial al iniciar
   useEffect(() => {
@@ -61,8 +69,10 @@ const ProcesamientoMasivoPage = () => {
       // Filtrar solo artículos con imagen
       const articulosConImagen = data.filter(art => art.imagen_url);
       setArticulos(articulosConImagen);
+      setErrorCargaR2(null);
     } catch (error) {
       console.error('Error al cargar artículos:', error);
+      setErrorCargaR2(error?.response?.data?.message || error?.message || 'Error al cargar artículos');
       toast.error('Error al cargar artículos');
     } finally {
       setLoading(false);
@@ -223,6 +233,18 @@ const ProcesamientoMasivoPage = () => {
         return estado;
     }
   };
+
+  // Rediseño 2 encendido: la cola en una tira, la tabla con casillas y el historial en un cajón
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <VistaFotosIA f={{
+        articulos, selectedArticulos, setSelectedArticulos, loading, processing, queueStatus, historial, loadingHistory, autoRefresh,
+        handleSelectArticulo, handleSelectAll, handleProcesarSeleccionados, handleRetryItem, handleLimpiarCola, fetchQueueStatus, fetchHistorial,
+        errorCargaR2, fetchArticulos,
+      }} />
+    );
+  }
 
   if (loading) {
     return <Loader />;

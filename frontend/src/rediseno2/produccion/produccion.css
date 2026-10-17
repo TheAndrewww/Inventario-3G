@@ -1,0 +1,231 @@
+/* Rediseño 2 · Producción (tablero, avance por área, avisos y carpeta de la obra).
+   TODO bajo :root[data-diseno="3g"]: con el diseño apagado este archivo no cambia nada. Clases propias: r2-prod-*.
+   Usa los tokens del paquete (--g3-*) y los de la fundación (--r2-*). No re-pinta piezas de la fundación fuera de estas
+   pantallas (todo lo que toca una pieza común va dentro de una clase r2-prod-*). */
+
+/* ───────── Tira de filtros del tablero ───────── */
+:root[data-diseno="3g"] .r2-prod-tira { margin-bottom: 4px; }
+:root[data-diseno="3g"] .r2-prod-cifra { cursor: pointer; }
+:root[data-diseno="3g"] .r2-prod-cifra[draggable="true"]:active { cursor: grabbing; }
+:root[data-diseno="3g"] .r2-prod-cifra--arrastrando { opacity: 0.4; }
+:root[data-diseno="3g"] .r2-prod-cifra--soltar { box-shadow: inset 0 0 0 2px var(--g3-primario); }
+:root[data-diseno="3g"] .r2-prod-tira-separador {
+  flex: none; align-self: stretch; width: 12px; margin: 8px 2px; cursor: grab; position: relative;
+}
+:root[data-diseno="3g"] .r2-prod-tira-separador::before {
+  content: ""; position: absolute; left: 5px; top: 4px; bottom: 4px; width: 2px; border-radius: 2px; background: var(--g3-linea-fuerte);
+}
+:root[data-diseno="3g"] .r2-prod-tira-separador.r2-prod-cifra--soltar { box-shadow: none; }
+:root[data-diseno="3g"] .r2-prod-tira-separador.r2-prod-cifra--soltar::before { background: var(--g3-primario); width: 3px; }
+/* La cifra que sigue al separador no lleva su rayita de división */
+:root[data-diseno="3g"] .r2-prod-tira-separador + .r2-tira-cifra::before { opacity: 0; }
+:root[data-diseno="3g"] .r2-prod-orden-original { flex: none; margin-left: 4px; }
+@media (min-width: 1201px) {
+  /* En escritorio las 8 cifras caben en una línea sin desplazarse */
+  :root[data-diseno="3g"] .r2-prod-tira .r2-tira-cifra { padding: 0 12px; gap: 7px; }
+}
+
+/* ───────── Renglón de obra ───────── */
+:root[data-diseno="3g"] .r2-prod-obra { display: grid; gap: 2px; min-width: 0; }
+:root[data-diseno="3g"] .r2-prod-obra-nombre { font: var(--r2-t-principal); color: var(--g3-tinta); overflow-wrap: anywhere; }
+:root[data-diseno="3g"] .r2-prod-obra-sub { font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-prod-urgente { font-weight: 600; }
+:root[data-diseno="3g"] .r2-prod-texto { font: var(--r2-t-secundario); }
+:root[data-diseno="3g"] .r2-prod-texto:not([class*="r2-tono--"]) { color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-prod-texto--fuerte { font-weight: 600; }
+:root[data-diseno="3g"] .r2-prod-avance { display: grid; justify-items: start; gap: 6px; min-width: 0; }
+:root[data-diseno="3g"] .r2-prod-problema { min-width: 0; }
+:root[data-diseno="3g"] .r2-prod-sin-dato { color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-prod-maxima { display: grid; gap: 2px; justify-items: start; }
+:root[data-diseno="3g"] .r2-prod-maxima-fecha { font: var(--r2-t-dato); color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-prod-maxima--linea { display: inline; }
+:root[data-diseno="3g"] .r2-prod-tablero .r2-tabla td { vertical-align: middle; }
+
+/* Los cinco pasos en una línea: Diseño · Compras · Manufactura · Herrería · Lista para instalar */
+:root[data-diseno="3g"] .r2-prod-segmentos { display: inline-flex; align-items: center; gap: 3px; flex: none; height: 12px; }
+:root[data-diseno="3g"] .r2-prod-seg {
+  width: 20px; height: 12px; border-radius: 3px; background: transparent; box-shadow: inset 0 0 0 1.5px var(--g3-linea-fuerte);
+}
+:root[data-diseno="3g"] .r2-prod-seg--par { margin-left: 3px; }
+:root[data-diseno="3g"] .r2-prod-seg--hecha { background: var(--g3-ok); box-shadow: none; }
+:root[data-diseno="3g"] .r2-prod-seg--curso { background: var(--g3-info); box-shadow: none; }
+:root[data-diseno="3g"] .r2-prod-seg--pronto { background: var(--g3-aviso); box-shadow: none; }
+:root[data-diseno="3g"] .r2-prod-seg--tarde { background: var(--g3-mal); box-shadow: none; }
+:root[data-diseno="3g"] .r2-prod-seg--noaplica { height: 2px; border-radius: 1px; box-shadow: none; background: var(--g3-linea-fuerte); }
+:root[data-diseno="3g"] .r2-prod-nota-almacen { margin: 4px 0 12px; }
+
+/* ───────── Cajón de la obra ───────── */
+:root[data-diseno="3g"] .r2-prod-cabecera-estados { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+:root[data-diseno="3g"] .r2-prod-pronostico { margin: 0; display: flex; align-items: flex-start; gap: 8px; font: 600 0.9375rem/1.375rem var(--g3-f-texto); }
+:root[data-diseno="3g"] .r2-prod-pronostico > svg { flex: none; margin-top: 2px; }
+:root[data-diseno="3g"] .r2-prod-pronostico > span { color: var(--g3-tinta); font-weight: 500; }
+:root[data-diseno="3g"] .r2-prod-avisos-obra { gap: 12px; }
+:root[data-diseno="3g"] .r2-prod-pasos { list-style: none; margin: 0; padding: 0; display: grid; }
+:root[data-diseno="3g"] .r2-prod-paso {
+  position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 4px 12px;
+  min-height: 56px; padding: 6px 0;
+}
+/* La línea vertical que une los pasos */
+:root[data-diseno="3g"] .r2-prod-paso::before {
+  content: ""; position: absolute; left: 13px; top: 0; bottom: 0; width: 2px; background: var(--g3-linea);
+}
+:root[data-diseno="3g"] .r2-prod-pasos > .r2-prod-paso:first-child::before { top: 50%; }
+:root[data-diseno="3g"] .r2-prod-pasos > .r2-prod-paso:last-child::before { bottom: 50%; }
+:root[data-diseno="3g"] .r2-prod-paso-marca {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--g3-superficie);
+  color: var(--g3-tinta-2);
+}
+:root[data-diseno="3g"] .r2-prod-paso-punto { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--g3-linea-fuerte); background: var(--g3-superficie); }
+:root[data-diseno="3g"] .r2-prod-paso--hecha .r2-prod-paso-marca { color: var(--g3-ok); }
+:root[data-diseno="3g"] .r2-prod-paso--curso .r2-prod-paso-punto { background: var(--g3-info); box-shadow: none; }
+:root[data-diseno="3g"] .r2-prod-paso--pronto .r2-prod-paso-punto { background: var(--g3-aviso); box-shadow: none; }
+:root[data-diseno="3g"] .r2-prod-paso--tarde .r2-prod-paso-punto { background: var(--g3-mal); box-shadow: none; }
+:root[data-diseno="3g"] .r2-prod-paso--noaplica .r2-prod-paso-punto { width: 10px; height: 2px; border-radius: 1px; box-shadow: none; background: var(--g3-linea-fuerte); }
+:root[data-diseno="3g"] .r2-prod-paso-textos { display: grid; gap: 2px; min-width: 0; }
+:root[data-diseno="3g"] .r2-prod-paso-nombre { font: var(--r2-t-principal); color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-prod-paso--noaplica .r2-prod-paso-nombre { color: var(--g3-tinta-2); font-weight: 500; }
+:root[data-diseno="3g"] .r2-prod-paso-detalle { font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-prod-paso--sub .r2-prod-paso-textos { padding-left: 16px; }
+:root[data-diseno="3g"] .r2-prod-paso-grupo {
+  position: relative; padding: 8px 0 2px 40px; font: var(--r2-t-etiqueta); color: var(--g3-tinta-2);
+}
+:root[data-diseno="3g"] .r2-prod-paso-grupo::before { content: ""; position: absolute; left: 13px; top: 0; bottom: 0; width: 2px; background: var(--g3-linea); }
+:root[data-diseno="3g"] .r2-prod-paso-interruptor { gap: 10px; }
+:root[data-diseno="3g"] .r2-prod-paso-interruptor .r2-interruptor-texto { font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-prod-mono { font-family: var(--g3-f-mono); font-size: 0.875rem; }
+
+/* Nuevo proyecto */
+:root[data-diseno="3g"] .r2-prod-formulario { display: grid; gap: 16px; padding-top: 12px; }
+:root[data-diseno="3g"] .r2-prod-formulario-par { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 480px) { :root[data-diseno="3g"] .r2-prod-formulario-par { grid-template-columns: minmax(0, 1fr); } }
+
+/* «Ordenar filtros» (el menú con ligas a las TV ya es el «⋯» común de la fundación) */
+:root[data-diseno="3g"] .r2-prod-orden-ayuda { margin-bottom: 12px; }
+:root[data-diseno="3g"] .r2-prod-orden-lista { list-style: none; margin: 0; padding: 0; display: grid; }
+:root[data-diseno="3g"] .r2-prod-orden-fila { display: flex; align-items: center; gap: 4px; min-height: 48px; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2-prod-orden-fila:last-child { border-bottom: 0; }
+:root[data-diseno="3g"] .r2-prod-orden-nombre { flex: 1; font: var(--r2-t-dato); color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-prod-orden-separador { flex: 1; font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+
+/* ───────── Celular ───────── */
+@media (max-width: 720px) {
+  :root[data-diseno="3g"] .r2-prod-tablero .r2-fila-secundario { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  :root[data-diseno="3g"] .r2-prod-paso { grid-template-columns: 28px minmax(0, 1fr); }
+  :root[data-diseno="3g"] .r2-prod-paso-interruptor { grid-column: 2; justify-self: start; }
+}
+
+/* ───────── Avance por área ───────── */
+:root[data-diseno="3g"] .r2-prod-ayuda { margin: 0 0 8px; }
+:root[data-diseno="3g"] .r2-prod-confirmar { display: grid; gap: 12px; padding-top: 4px; }
+:root[data-diseno="3g"] .r2-prod-confirmar-que { margin: 0; font: var(--r2-t-dato); color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-prod-confirmar-aviso { margin: 0; display: flex; align-items: center; gap: 8px; font: 600 0.875rem/1.25rem var(--g3-f-texto); }
+:root[data-diseno="3g"] .r2-prod-grupo-celular {
+  display: flex; align-items: center; gap: 8px; margin: 8px calc(-1 * var(--r2-relleno)) 0; padding: 0 var(--r2-relleno); height: 44px;
+  background: var(--g3-contenedor); font: var(--r2-t-grupo); color: var(--g3-tinta);
+}
+:root[data-diseno="3g"] .r2-prod-avance-fila { display: grid; gap: 10px; padding: 12px 0 14px; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2-prod-avance-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+:root[data-diseno="3g"] .r2-prod-avance-entrega { flex: none; text-align: right; }
+:root[data-diseno="3g"] .r2-prod-avance-etapas { display: flex; flex-wrap: wrap; gap: 8px; }
+:root[data-diseno="3g"] .r2-prod-avance-boton { height: 44px; }
+:root[data-diseno="3g"] .r2-prod-avance-hecha {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px; font: 500 0.9375rem/1.25rem var(--g3-f-texto); color: var(--g3-tinta-2);
+}
+
+/* ───────── Avisos a Producción ───────── */
+:root[data-diseno="3g"] .r2-prod-aviso { display: grid; gap: 2px; min-width: 0; max-width: 64ch; }
+:root[data-diseno="3g"] .r2-prod-aviso-titulo { font: 600 0.875rem/1.25rem var(--g3-f-texto); color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-prod-aviso-muestra {
+  font: var(--r2-t-secundario); color: var(--g3-tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+:root[data-diseno="3g"] .r2-prod-avisos .r2-tabla--compacta td { height: 56px; }
+:root[data-diseno="3g"] .r2-prod-avisos-fuentes { margin-top: 16px; }
+:root[data-diseno="3g"] .r2-prod-marca {
+  display: inline-grid; place-items: center; width: 18px; height: 18px; flex: none; border-radius: 5px;
+  box-shadow: inset 0 0 0 2px var(--g3-linea-campo); color: var(--g3-sobre-primario);
+}
+:root[data-diseno="3g"] .r2-prod-marca--si { background: var(--g3-primario); box-shadow: none; }
+
+/* ───────── Carpeta de la obra ───────── */
+:root[data-diseno="3g"] .r2-prod-carpeta-ruta { display: inline-flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+:root[data-diseno="3g"] .r2-prod-carpeta-ruta > svg { flex: none; }
+:root[data-diseno="3g"] .r2-prod-archivos {
+  list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;
+}
+:root[data-diseno="3g"] .r2-prod-archivo {
+  display: grid; gap: 4px; width: 100%; margin: 0; padding: 0 0 10px; text-align: left; cursor: pointer;
+  border: 1px solid var(--g3-linea); border-radius: 12px; background: var(--g3-superficie); color: var(--g3-tinta); overflow: hidden;
+}
+:root[data-diseno="3g"] .r2-prod-archivo:hover { border-color: var(--g3-primario); }
+:root[data-diseno="3g"] .r2-prod-archivo-vista {
+  display: grid; place-items: center; height: 104px; margin-bottom: 4px; background: var(--g3-contenedor); color: var(--g3-tinta-2);
+}
+:root[data-diseno="3g"] .r2-prod-archivo-vista img { width: 100%; height: 100%; object-fit: cover; display: block; }
+:root[data-diseno="3g"] .r2-prod-archivo-hueso { width: 100%; height: 100%; border-radius: 0; }
+:root[data-diseno="3g"] .r2-prod-archivo-nombre {
+  padding: 0 10px; font: 500 0.875rem/1.25rem var(--g3-f-texto); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+:root[data-diseno="3g"] .r2-prod-archivo-sub { display: flex; align-items: center; gap: 4px; padding: 0 10px; font: var(--r2-t-ayuda); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-prod-archivo-sub > svg { flex: none; }
+:root[data-diseno="3g"] .r2-prod-ocultos { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+:root[data-diseno="3g"] .r2-prod-visor { display: grid; gap: 12px; padding-top: 12px; }
+:root[data-diseno="3g"] .r2-prod-visor-cab { display: flex; align-items: center; gap: 8px; min-width: 0; }
+:root[data-diseno="3g"] .r2-prod-visor-nombre { flex: 1; min-width: 0; font: var(--r2-t-principal); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-diseno="3g"] .r2-prod-visor-marco {
+  display: grid; place-items: center; min-height: 50vh; border-radius: 12px; background: var(--g3-contenedor); overflow: hidden;
+}
+:root[data-diseno="3g"] .r2-prod-visor-marco :is(img, video) { max-width: 100%; max-height: 70vh; object-fit: contain; }
+:root[data-diseno="3g"] .r2-prod-visor-marco iframe { width: 100%; height: 70vh; border: 0; background: var(--g3-superficie); }
+:root[data-diseno="3g"] .r2-prod-visor-hueso { width: 100%; height: 50vh; border-radius: 0; }
+
+/* Ajustes del renglón del tablero */
+:root[data-diseno="3g"] .r2-prod-una-linea { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-diseno="3g"] .r2-prod-tablero .r2-prod-obra { max-width: 100%; }
+:root[data-diseno="3g"] .r2-prod-etapa { display: grid; gap: 2px; justify-items: start; }
+:root[data-diseno="3g"] .r2-prod-tablero .r2-tabla td:first-child { max-width: 0; }
+@media (max-width: 720px) {
+  /* En celular el interruptor queda a la derecha del paso; su texto sigue para lectores de pantalla */
+  :root[data-diseno="3g"] .r2-prod-paso { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  :root[data-diseno="3g"] .r2-prod-paso-interruptor { grid-column: auto; justify-self: end; }
+  :root[data-diseno="3g"] .r2-prod-paso-interruptor .r2-interruptor-texto {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+}
+@media (max-width: 720px) {
+  /* Cajón de la obra en celular: la decisión principal a todo lo ancho; lo demás en una fila */
+  :root[data-diseno="3g"] .r2-prod-decision-principal { flex: 1 1 100%; }
+  :root[data-diseno="3g"] .r2-prod-solo-ancho { display: none; }
+}
+
+/* ───────── Revisión (16-oct) ───────── */
+/* Tira del tablero en laptop (721–1439 px): las 8 cifras caben en una línea desde 1280 px (antes «Herrería» quedaba
+   escondida a la derecha en 1280 y 1366 sin ninguna pista); más angosto, la tira pasa a dos renglones en vez de esconderlas. */
+@media (min-width: 721px) and (max-width: 1439px) {
+  :root[data-diseno="3g"] .r2-prod-tira { flex-wrap: wrap; overflow-x: visible; }
+  :root[data-diseno="3g"] .r2-prod-tira .r2-tira-cifra { padding: 0 7px; gap: 5px; }
+  :root[data-diseno="3g"] .r2-prod-tira .r2-tira-valor { font-size: 1.125rem; }
+  :root[data-diseno="3g"] .r2-prod-tira-separador { width: 8px; margin: 8px 0; }
+  :root[data-diseno="3g"] .r2-prod-tira-separador::before { left: 3px; }
+}
+/* Celular: el margen de la tira y las cifras de 44 px ya los pone la fundación (revisión final) */
+@media (max-width: 720px) {
+  :root[data-diseno="3g"] .r2-prod-tira { padding-top: 0; padding-bottom: 0; }
+}
+
+/* Conteo por etapa del servidor (lo de las 4 tarjetas de antes), como dato informativo a la derecha de la búsqueda */
+:root[data-diseno="3g"] .r2-prod-resumen {
+  margin: 0; display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font: var(--r2-t-secundario); color: var(--g3-tinta-2);
+}
+:root[data-diseno="3g"] .r2-prod-resumen-n { font-weight: 600; color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-prod-resumen--pie { margin-top: 16px; }
+
+/* Avance por área en celular: «hecha» en verde (como en escritorio) y la fecha de entrega al tamaño de dato */
+:root[data-diseno="3g"] .r2-prod-avance-hecha.r2-tono--ok { color: var(--g3-ok); }
+@media (max-width: 720px) {
+  :root[data-diseno="3g"] .r2-prod-avance-entrega .r2-plazo { font-size: 0.9375rem; line-height: 1.25rem; }
+  /* Avisos: el renglón deja ver dos líneas (el motivo de lo que falló cabe completo) */
+  :root[data-diseno="3g"] .r2-prod-avisos .r2-fila-secundario { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  /* Carpeta: nombres de archivo a tamaño de dato */
+  :root[data-diseno="3g"] .r2-prod-archivo-nombre { font-size: 0.9375rem; }
+}

@@ -1,14 +1,51 @@
 # Diseño 3G en Planta (Inventario 3G)
 
-Todo lo de esta carpeta vive detrás del interruptor **Diseño 3G** (`<html data-diseno="3g">`).
-Apagado (lo normal), el sistema se ve y funciona exactamente como siempre.
+## Solo el diseño nuevo (16-oct-2026)
 
-## Cómo se enciende y se apaga
+Decisión del dueño: todos ven solo el Diseño 3G con el rediseño 2 y ya no hay forma de volver a lo viejo. Incluye las
+pantallas públicas: las 4 TV de producción, la terminal de las áreas, Anuncios y el Calendario público.
 
-- Encender: abrir cualquier liga del sistema con `?diseno=3g` (por ejemplo `https://inventario-3-g.vercel.app/?diseno=3g`).
-  Se queda guardado en ese navegador (`localStorage['diseno-3g']`).
-- Apagar: botón de 9 puntos (arriba a la derecha) › interruptor «Diseño 3G», o abrir una liga con `?diseno=actual`.
-- Tema (solo con Diseño 3G): botón de sol/luna de la barra: claro → oscuro → automático (como el equipo).
+- **Siempre encendido:** `index.html` trae `<html data-diseno="3g">` fijo y el guion de `<head>` lo vuelve a poner antes de
+  cualquier CSS. `?diseno=actual` y `?diseno=3g` ya no cambian nada: el guion los quita de la dirección (sin tocar
+  `history.state`) antes de que cargue el paquete, para que `diseno-3g.js` no guarde nada al leerlos.
+- **Lo guardado en el navegador no se toca:** ni el guion ni la pantalla escriben `localStorage['diseno-3g']`. Si alguien
+  tenía «actual» guardado, el paquete quitaría el atributo al cargar; `forzarDiseno3G.js` (importado en `main.jsx` justo
+  después del paquete, y en cada cambio de ruta desde `RutaDiseno3G.jsx`) lo vuelve a poner en la misma vuelta y regresa
+  lo guardado a su valor. Así, si hubiera que regresar a la versión de antes (Instant Rollback de Vercel o revertir el
+  commit), cada persona ve lo que veía antes de publicar.
+- **Sin parpadeo:** `useDiseno3G()` (este archivo y `rediseno2/fundacion/useDiseno3G.js`) devuelve siempre `true`, igual que
+  `leerDiseno3G()`.
+- **Sin interruptor:** el selector de apps (9 puntos) se monta con `interruptor: false` (`Riel.jsx`; también en
+  `MarcoPlanta.jsx`, que ya no se usa). Ya no hay rutas sin diseño: `window.G3_RUTAS_SIN_DISENO` se quitó de `index.html`.
+- **El tema** claro/oscuro/auto se sigue respetando (`localStorage['diseno-3g-tema']`), y las TV y la terminal aceptan
+  `?tema=claro` u `?tema=oscuro` en la liga (solo esa carga).
+- **El paquete no se tocó** (`diseno-3g.js` sigue igual que `Plataforma-3G/diseno-3g/`).
+- **La terminal** sigue pidiendo el código del área una vez y lo recuerda (`localStorage['terminal3g-codigos']`, sin cambios).
+
+### Borrar lo viejo (a partir del 24-oct-2026, en un commit aparte)
+
+Todo lo que ya no se ve está marcado con `VIEJO: se borra a partir del 24-oct-2026`:
+
+```bash
+grep -rn "VIEJO: se borra" src index.html   # cada archivo, cada `if (d3)` / `if (g3)` con vista apagada y los archivos enteros
+```
+
+Orden sugerido:
+1. En cada pantalla, quitar el `return` viejo que sigue a `if (d3) { … }` y las ramas con `d3`, `g3` o `g3Activo()` en
+   false (en `dialogosG3.js` la rama sin Diseño 3G: `confirm()`/`alert()`/`prompt()` del navegador). Las ramas con `tv`
+   (`useTvG3()`) en true son del diseño de TV de la ola 3 y también se van.
+2. Los archivos enteros marcados: `MarcoPlanta.jsx`, `PiezasTv.jsx`, `tvG3.js` (cuando ya nadie lo importe),
+   `planta-tv-3g.css` y `planta-tv-mapa.css` (y sus imports en `main.jsx`), `components/layout/Header.jsx`,
+   `SubPestanasGrupo.jsx` y el componente `Sidebar` (sus exportaciones de arriba se quedan: el riel y las rutas salen de ahí).
+3. Lo que quede sin usar (ESLint lo marca: imports, `useDiseno3G`, `CabG3`, `MasAcciones`…) y por último el CSS que solo
+   servía a lo viejo (`.g3-si` de `index.html`, `planta-mapa-tailwind.css` si ya nada lo usa).
+
+Antes de unir: `node --test test/*.test.mjs` en `frontend/`, `npm run build`, ESLint y una vuelta por cada pantalla.
+
+## Cómo se encendía (hasta el 16-oct-2026)
+
+Todo lo de esta carpeta vivía detrás del interruptor **Diseño 3G** (`<html data-diseno="3g">`). Apagado era lo normal.
+Desde el 16-oct-2026 ya no aplica: ver «Solo el diseño nuevo».
 
 ## Archivos
 
@@ -20,7 +57,8 @@ Apagado (lo normal), el sistema se ve y funciona exactamente como siempre.
 | `MarcoPlanta.jsx` | Propio | Armazón nuevo: riel por áreas, barra de vidrio con título, tema, avisos, selector de apps (con el interruptor) y perfil; pestañas de sección; barra inferior en celular. Lo usa `DashboardLayout` solo con el interruptor encendido. |
 | `menuPlanta.js` | Propio | Grupos del riel (Almacén, Compras, Producción, Calendario, Herramientas y cuadrillas, Administración), títulos claros de cada pantalla y secciones con pestañas (Tickets de material, Compras). **Permisos y rutas salen de `ALL_MENU_ITEMS`** (`components/layout/Sidebar.jsx`); si se agrega una pantalla allí y no aquí, aparece en «Otros». |
 | `useDiseno3G.js` | Propio | `useDiseno3G()` y `useTemaG3()` para React. |
-| `RutaDiseno3G.jsx` | Propio (ola 2) | Llama `G3.aplicar()` en cada cambio de ruta (lo monta `App.jsx`). Las pantallas públicas están en `window.G3_RUTAS_SIN_DISENO` (`index.html`). Sustituye a `SinDiseno3G.jsx`. |
+| `RutaDiseno3G.jsx` | Propio (ola 2) | En cada cambio de ruta llama `forzarDiseno3G()` (lo monta `App.jsx`). Hasta el 16-oct-2026 llamaba `G3.aplicar()`. |
+| `forzarDiseno3G.js` | Propio (16-oct-2026) | Deja el diseño encendido al cargar el paquete y en cada cambio de ruta, sin tocar lo guardado en el navegador. |
 | `dialogosG3.js` | Propio (ola 2) | `g3Activo()`, `confirmarG3()`, `avisoG3()` y ayudas `etq()`, `siG3()`, `cx()` para no agregar nada al DOM con el interruptor apagado. |
 | `CabG3.jsx` | Propio (ola 2) | Encabezado de pantalla del paquete (`g3-cab`): título en oración, para qué sirve y acciones. |
 | `MasAcciones.jsx` | Propio (ola 2) | «Más acciones» de un renglón (`g3-menu`, con `position: fixed`): las opciones llaman al mismo manejador que el botón de siempre. |
@@ -74,7 +112,10 @@ f4bac54ef921c330e501e35d6e5065c226f44586a896f84f0d22924fac9b8e54  sistemas.json
 - El fragmento de `index.html` ya es el de v1.1.0 (con `<meta charset>` antes), con `window.G3_RUTAS_SIN_DISENO` (TV, terminal,
   anuncios, calendario público) justo antes, y `RutaDiseno3G` llama `G3.aplicar()` al cambiar de ruta (ola 2).
 
-## Pantallas de TV y terminal (ola 3)
+## Pantallas de TV y terminal (ola 3) — VIEJO, hasta el 16-oct-2026
+
+> Ya no aplica: desde el 16-oct-2026 las TV, la terminal, Anuncios y el Calendario público llevan siempre el rediseño 2,
+> con o sin `?diseno=3g` en la liga. Lo de abajo se queda como historia y se borra con lo demás a partir del 24-oct-2026.
 
 Las pantallas públicas siguen fuera del interruptor guardado (`window.G3_RUTAS_SIN_DISENO`): en un equipo compartido la
 preferencia de otra persona nunca las cambia. Su diseño para TV se enciende **solo si la liga de esa carga trae `?diseno=3g`**

@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { Briefcase, Plus, Edit, Trash2, Package, Settings, ClipboardList, ClipboardCheck } from 'lucide-react';
 import camionetasService from '../services/camionetas.service';
@@ -12,6 +15,9 @@ import { useDiseno3G } from '../diseno-3g/useDiseno3G';
 import CabG3 from '../diseno-3g/CabG3';
 import MasAcciones from '../diseno-3g/MasAcciones';
 import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
+// Rediseño 2 · vista encendida (apagado no la usa): mismo estado, mismas peticiones y los mismos diálogos
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaEquipos from '../rediseno2/gestion/VistaEquipos';
 
 const CamionetasPage = () => {
   const [camionetas, setCamionetas] = useState([]);
@@ -27,6 +33,8 @@ const CamionetasPage = () => {
   const [mostrarChecklistManager, setMostrarChecklistManager] = useState(false);
   const [equipoChecklist, setEquipoChecklist] = useState(null);
   const g3 = useDiseno3G(); // Diseño 3G: encabezado, un botón principal por equipo y confirmación del paquete (apagado, lo de siempre)
+  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
+  const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
@@ -49,9 +57,11 @@ const CamionetasPage = () => {
       setCargando(true);
       const response = await camionetasService.obtenerTodos();
       setCamionetas(response.data.camionetas || []);
+      setErrorCargaR2(null);
     } catch (error) {
       console.error('Error al cargar camionetas:', error);
       toast.error('Error al cargar camionetas');
+      setErrorCargaR2(error?.response?.data?.message || error?.message || 'Error al cargar camionetas');
     } finally {
       setCargando(false);
     }
@@ -210,6 +220,31 @@ const CamionetasPage = () => {
       </span>
     );
   };
+
+  // Rediseño 2 · vista ENCENDIDA: los mismos datos, los mismos manejadores y los mismos diálogos (el JSX de hoy sigue intacto
+  // debajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <VistaEquipos
+        camionetas={camionetas} encargados={encargados} ubicaciones={ubicaciones} cargando={cargando} errorCarga={errorCargaR2}
+        recargar={cargarCamionetas} mostrarModal={mostrarModal} camionetaEditando={camionetaEditando} formData={formData}
+        setFormData={setFormData} abrirModalNuevo={abrirModalNuevo} abrirModalEditar={abrirModalEditar} cerrarModal={cerrarModal}
+        handleSubmit={handleSubmit} handleEliminar={handleEliminar} abrirInventario={abrirInventario} abrirConfiguracion={abrirConfiguracion}
+        setMostrarChecklistManager={setMostrarChecklistManager} setEquipoChecklist={setEquipoChecklist}
+        dialogos={(
+          <>
+            {mostrarInventario && <InventarioCamionetaModal camioneta={camionetaInventario} onClose={cerrarInventario} />}
+            {mostrarConfiguracion && (
+              <ConfigurarStockMinimoModal camioneta={camionetaConfiguracion} onClose={cerrarConfiguracion} onActualizar={cargarCamionetas} />
+            )}
+            <ChecklistManager isOpen={mostrarChecklistManager} onClose={() => setMostrarChecklistManager(false)} />
+            <ChecklistEquipoModal isOpen={!!equipoChecklist} onClose={() => setEquipoChecklist(null)} equipo={equipoChecklist} />
+          </>
+        )}
+      />
+    );
+  }
 
   if (cargando) {
     return (

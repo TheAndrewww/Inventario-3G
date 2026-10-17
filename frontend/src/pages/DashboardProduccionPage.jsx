@@ -1,3 +1,6 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useCallback, lazy, Suspense } from 'react';
 import {
     Package,
@@ -18,6 +21,8 @@ import { useProduccionData } from '../hooks/useProduccionData';
 import { useProduccionFilters } from '../hooks/useProduccionFilters';
 import { useAuth } from '../context/AuthContext';
 import { useDiseno3G } from '../diseno-3g/useDiseno3G';
+import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import VistaTablero from '../rediseno2/produccion/VistaTablero';
 
 // ============ Modal para nuevo proyecto ============
 const ModalNuevoProyecto = ({ isOpen, onClose, onCrear }) => {
@@ -232,6 +237,7 @@ const DashboardProduccionPage = () => {
     const [proyectoCarpeta, setProyectoCarpeta] = useState(null);
     const { user } = useAuth();
     const g3 = useDiseno3G(); // Diseño 3G: solo textos (apagado, los de siempre)
+    const d3 = useDiseno3GR2(); // Rediseño 2: encendido, la vista nueva (abajo, antes del return de siempre)
     const esAlmacen = user?.rol === 'almacen';
 
     // Hooks personalizados
@@ -241,6 +247,7 @@ const DashboardProduccionPage = () => {
         loading,
         sincronizando,
         ultimaSync,
+        cargarDatos,
         sincronizarSheets,
         sincronizarDrive,
         completarEtapa,
@@ -270,6 +277,23 @@ const DashboardProduccionPage = () => {
         : proyectos;
 
     const { filtro, setFiltro, busqueda, setBusqueda, proyectosFiltrados, opciones } = useProduccionFilters(proyectosVisibles);
+
+    // Rediseño 2 (encendido): misma información y mismos manejadores, otra vista. Apagado sigue todo igual que hoy.
+    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+    if (d3) {
+        return (
+            <VistaTablero
+                usuario={user} esAlmacen={esAlmacen} proyectos={proyectos} proyectosVisibles={proyectosVisibles}
+                proyectosFiltrados={proyectosFiltrados} estadisticas={estadisticas} loading={loading}
+                sincronizando={sincronizando} ultimaSync={ultimaSync} cargarDatos={cargarDatos}
+                sincronizarSheets={sincronizarSheets} sincronizarDrive={sincronizarDrive} regresarEtapa={regresarEtapa}
+                crearProyecto={crearProyecto} togglePausa={togglePausa} toggleEtapa={toggleEtapa}
+                filtro={filtro} setFiltro={setFiltro} busqueda={busqueda} setBusqueda={setBusqueda} opciones={opciones}
+                modalOpen={modalOpen} setModalOpen={setModalOpen} proyectoCarpeta={proyectoCarpeta} setProyectoCarpeta={setProyectoCarpeta}
+                claveOrdenFiltros={claveOrdenFiltros} ordenarOpciones={ordenarOpciones}
+            />
+        );
+    }
 
     if (loading && proyectos.length === 0) {
         return (

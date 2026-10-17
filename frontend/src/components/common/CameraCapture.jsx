@@ -1,6 +1,11 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, X, Check, RotateCw } from 'lucide-react';
 import { Modal } from './index';
+import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
+import { Boton } from '../../rediseno2/fundacion/piezas/Boton';
 
 const CameraCapture = ({ isOpen, onClose, onCapture }) => {
   const videoRef = useRef(null);
@@ -9,6 +14,7 @@ const CameraCapture = ({ isOpen, onClose, onCapture }) => {
   const [capturedImage, setCapturedImage] = useState(null);
   const [error, setError] = useState(null);
   const [facingMode, setFacingMode] = useState('environment'); // 'user' o 'environment'
+  const d3 = useDiseno3G();
 
   useEffect(() => {
     if (isOpen) {
@@ -97,6 +103,50 @@ const CameraCapture = ({ isOpen, onClose, onCapture }) => {
     stopCamera();
     setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
   };
+
+  // Rediseño 2: encendido, la misma cámara y los mismos manejadores con las piezas de la fundación.
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <Modal isOpen={isOpen} onClose={handleClose} title="Tomar fotografía" size="lg">
+        <div className="r2-camara">
+          {error && (
+            <div className="r2-error-carga" role="alert">
+              <div className="r2-error-cuerpo">
+                <p className="r2-error-titulo">No se pudo abrir la cámara</p>
+                <p className="r2-error-texto">Revisa que el navegador tenga permiso para usarla.</p>
+                <p className="r2-error-motivo">{error}</p>
+              </div>
+            </div>
+          )}
+          <div className="r2-camara-visor">
+            {!capturedImage ? (
+              <>
+                <video ref={videoRef} autoPlay playsInline muted />
+                <button type="button" onClick={toggleCamera} className="r2-boton-icono r2-boton-icono--grande r2-camara-girar" aria-label="Cambiar de cámara" title="Cambiar de cámara">
+                  <RotateCw size={22} aria-hidden="true" />
+                </button>
+              </>
+            ) : (
+              <img src={capturedImage} alt="Foto tomada" />
+            )}
+          </div>
+          <canvas ref={canvasRef} hidden />
+          <div className="r2-camara-acciones">
+            <Boton nivel="fantasma" alHacer={handleClose}>Cancelar</Boton>
+            {!capturedImage ? (
+              <Boton nivel="principal" icono={Camera} alHacer={handleCapture} deshabilitado={!stream} motivo="La cámara todavía no está lista">Tomar foto</Boton>
+            ) : (
+              <>
+                <Boton nivel="contorno" alHacer={handleRetake}>Tomar otra</Boton>
+                <Boton nivel="principal" icono={Check} alHacer={handleConfirm}>Usar esta foto</Boton>
+              </>
+            )}
+          </div>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Tomar Fotografía" size="lg">

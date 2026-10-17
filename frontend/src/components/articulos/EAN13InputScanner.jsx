@@ -1,11 +1,18 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3, g3Activo() en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, X, Loader2, Barcode, AlertCircle, SwitchCamera } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import toast from 'react-hot-toast';
 import { g3Activo } from '../../diseno-3g/dialogosG3';
 import { detectBarcodeType, getBarcodeTypeName } from '../../utils/barcodeTypeDetector';
+// Rediseño 2: encendido se pinta con rediseno2/inventario/CampoCodigoR2 (la misma cámara y los mismos manejadores)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CampoCodigoR2 from '../../rediseno2/inventario/CampoCodigoR2';
 
-const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected }) => {
+// `resto` (id y aria-* del <Campo> que lo envuelve) solo lo usa la vista encendida
+const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected, ...resto }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [lastScanned, setLastScanned] = useState(null);
@@ -13,6 +20,7 @@ const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected }
   const [selectedCamera, setSelectedCamera] = useState(null);
   const html5QrCodeRef = useRef(null);
   const scannerInitialized = useRef(false);
+  const d3 = useDiseno3GR2();
 
   // Validar que el código tenga contenido válido
   const validateCode = (code) => {
@@ -323,6 +331,14 @@ const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected }
       }
     };
   }, []);
+
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    return (
+      <CampoCodigoR2 valor={value} alCambiar={handleInputChange} deshabilitado={disabled} escaneando={isScanning} mostrarEscaner={showScanner}
+        camaras={cameras} alIniciar={startScanning} alDetener={stopScanning} alCambiarCamara={switchCamera} valido={validateCode(value)} resto={resto} />
+    );
+  }
 
   return (
     <div className="space-y-3">

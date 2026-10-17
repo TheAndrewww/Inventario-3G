@@ -1,12 +1,19 @@
+// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
+// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
+// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState } from 'react';
 import Modal from '../common/Modal';
 import { AlertTriangle, RotateCcw, Package, FileText, XCircle } from 'lucide-react';
+// Rediseño 2 · vista encendida (apagado no la usa)
+import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import CajonAnularOrdenR2 from '../../rediseno2/compras/CajonAnularOrden';
 
 const AnularOrdenCompraModal = ({ isOpen, onClose, orden, onAnular }) => {
   const [motivo, setMotivo] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resultado, setResultado] = useState(null);
+  const d3 = useDiseno3GR2(); // Rediseño 2: cajón encendido
 
   const handleAnular = async () => {
     if (!motivo || motivo.trim().length === 0) {
@@ -45,6 +52,27 @@ const AnularOrdenCompraModal = ({ isOpen, onClose, orden, onAnular }) => {
   };
 
   if (!orden) return null;
+
+  // Rediseño 2 · encendido: el mismo motivo, la misma anulación y el mismo resultado en un cajón (el JSX de hoy sigue abajo)
+  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
+  if (d3) {
+    if (!isOpen) return null;
+    return (
+      <CajonAnularOrdenR2
+        onClose={handleClose}
+        orden={orden}
+        motivo={motivo}
+        alCambiarMotivo={(valor) => {
+          setMotivo(valor);
+          setError('');
+        }}
+        error={error}
+        loading={loading}
+        resultado={resultado}
+        handleAnular={handleAnular}
+      />
+    );
+  }
 
   return (
     <Modal
