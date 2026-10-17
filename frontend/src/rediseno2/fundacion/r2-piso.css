@@ -63,7 +63,7 @@
 }
 /* Tablero de renglones */
 :root[data-diseno="3g"] .r2-tv-tabla { display: grid; }
-:root[data-diseno="3g"] :is(.r2-tv-cabecera, .r2-tv-renglon) { display: grid; grid-template-columns: var(--r2-tv-cols); column-gap: calc(24px * var(--r2-e)); align-items: center; }
+:root[data-diseno="3g"] .r2-tv-cabecera, :root[data-diseno="3g"] .r2-tv-renglon { display: grid; grid-template-columns: var(--r2-tv-cols); column-gap: calc(24px * var(--r2-e)); align-items: center; }
 :root[data-diseno="3g"] .r2-tv-cabecera {
   min-height: calc(48px * var(--r2-e)); border-bottom: 1px solid var(--g3-linea-fuerte);
   font: 600 calc(22px * var(--r2-e)) / 1.2 var(--g3-f-texto); color: var(--g3-tinta-2);
@@ -122,13 +122,13 @@
 :root[data-diseno="3g"] .r2-terminal-cuerpo { flex: 1; min-height: 0; padding: 0; }
 :root[data-diseno="3g"] .r2-terminal-pie { padding: 16px 24px; border-top: 1px solid var(--g3-linea); }
 /* Lista + ficha (la pantalla las acomoda con estas clases) */
-:root[data-diseno="3g"] .r2-terminal-dos { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); min-height: calc(100dvh - 88px); }
+:root[data-diseno="3g"] .r2-terminal-dos { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); min-height: calc(100vh - 88px); min-height: calc(100dvh - 88px); }
 :root[data-diseno="3g"] .r2-terminal-columna-lista { border-right: 1px solid var(--g3-linea); display: flex; flex-direction: column; min-width: 0; background: var(--g3-superficie); }
 :root[data-diseno="3g"] .r2-terminal-lista { list-style: none; margin: 0; padding: 0; flex: 1; }
 :root[data-diseno="3g"] .r2-terminal-ficha { padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 24px; min-width: 0; }
 @media (min-width: 1024px) {
   /* La ficha se queda a la vista mientras se recorre la cola */
-  :root[data-diseno="3g"] .r2-terminal-ficha { position: sticky; top: 88px; align-self: start; min-height: calc(100dvh - 88px); max-height: calc(100dvh - 88px); overflow-y: auto; }
+  :root[data-diseno="3g"] .r2-terminal-ficha { position: sticky; top: 88px; align-self: start; min-height: calc(100vh - 88px); max-height: calc(100vh - 88px); min-height: calc(100dvh - 88px); max-height: calc(100dvh - 88px); overflow-y: auto; }
 }
 :root[data-diseno="3g"] .r2-terminal-ficha-titulo { margin: 0; font: 600 32px/38px var(--g3-f-titulo); letter-spacing: -0.01em; overflow-wrap: anywhere; }
 :root[data-diseno="3g"] .r2-terminal-ficha-dato { margin: 0; font: 400 20px/28px var(--g3-f-texto); color: var(--g3-tinta-2); }

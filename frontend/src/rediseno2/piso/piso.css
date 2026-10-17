@@ -85,7 +85,7 @@
 
 /* Pantalla del código: una columna sola, sin tarjeta */
 :root[data-diseno="3g"] .r2-pi-codigo {
-  flex: 1; width: 100%; max-width: 608px; margin: 0 auto; padding: 32px 24px 24px; min-height: 100dvh;
+  flex: 1; width: 100%; max-width: 608px; margin: 0 auto; padding: 32px 24px 24px; min-height: 100vh; min-height: 100dvh;
   display: flex; flex-direction: column; justify-content: center; gap: 32px;
 }
 /* Desactivado: gris y con su motivo debajo (hoy el azul lavado parecía activo) */
@@ -152,7 +152,7 @@
 @media (max-width: 1023px) {
   /* La hora de los datos pasa a la cabecera de la lista (así el encabezado cabe en una línea) */
   :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-derecha .r2-hora-datos { display: none; }
-  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-ficha { min-height: calc(100dvh - 88px); }
+  :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-ficha { min-height: calc(100vh - 88px); min-height: calc(100dvh - 88px); }
   :root[data-diseno="3g"] .r2-pi-terminal .r2-terminal-separador { position: sticky; bottom: 0; margin-top: auto; padding: 24px 0 8px; background: var(--g3-fondo); }
 }
 @media (max-width: 720px) {
