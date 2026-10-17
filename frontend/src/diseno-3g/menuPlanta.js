@@ -24,6 +24,43 @@ export const guardarSubOrdenG3 = (userId, grupoId, paths) => {
   } catch { /* sin almacenamiento */ }
   window.dispatchEvent(new Event(EVENTO_SUBORDEN_G3));
 };
+// La primera vez que el usuario abre Diseño 3G hereda lo que ya había personalizado en el menú de siempre
+// (paneles ocultos, orden y orden de las pestañas de Compras). Se hace una sola vez por usuario y navegador:
+// después cada menú guarda lo suyo, y «Mostrar todos» / «Orden original» del riel no vuelven a copiar.
+const TICKETS_PATHS = ['/pedido', '/pedidos-pendientes', '/historial'];
+const leerLS = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+export function heredarAjustesDelMenu(userId) {
+  const u = userId ?? 'anon';
+  const marca = `g3-riel-heredado:${u}`;
+  try {
+    if (localStorage.getItem(marca)) return;
+    const ocultosViejos = leerLS(`sidebar-hidden:${u}`);
+    if (Array.isArray(ocultosViejos) && localStorage.getItem(claveOcultosG3(userId)) == null) {
+      const n = new Set(ocultosViejos);
+      // El grupo Compras era un solo renglón; en el riel son sus pestañas
+      if (n.delete('/compras')) MENU_GRUPOS.compras.orden.forEach((p) => n.add(p));
+      // Tickets es una sección: se oculta (con su propia clave, para que el ojo del riel la pueda volver a mostrar)
+      // solo si estaban ocultas sus tres pantallas
+      if (TICKETS_PATHS.every((p) => n.has(p))) { TICKETS_PATHS.forEach((p) => n.delete(p)); n.add('tickets'); }
+      localStorage.setItem(claveOcultosG3(userId), JSON.stringify([...n]));
+    }
+    const ordenViejo = leerLS(`sidebar-order:${u}`);
+    if (Array.isArray(ordenViejo) && localStorage.getItem(claveOrdenG3(userId)) == null) {
+      const orden = [];
+      ordenViejo.forEach((p) => {
+        const clave = TICKETS_PATHS.includes(p) ? 'tickets' : p;
+        if (!orden.includes(clave)) orden.push(clave);
+      });
+      localStorage.setItem(claveOrdenG3(userId), JSON.stringify(orden));
+    }
+    const subViejo = leerLS(`sidebar-suborder:${u}:compras`);
+    if (Array.isArray(subViejo) && leerSubOrdenG3(userId, 'compras') == null) {
+      localStorage.setItem(claveSubOrdenG3(userId, 'compras'), JSON.stringify(subViejo));
+    }
+    localStorage.setItem(marca, '1');
+  } catch { /* sin almacenamiento: el riel arranca con el de fábrica */ }
+}
+
 // Pestañas de un grupo (Compras) que ve el rol, en el orden que el usuario puso en el riel (o el de fábrica).
 // Misma regla que subPestanasGrupo del menú de siempre, pero con su propia clave.
 const subPestanasG3 = (grupoId, rol, userId) => {

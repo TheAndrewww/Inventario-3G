@@ -9,7 +9,7 @@ import NotificacionesDropdown from '../components/common/NotificacionesDropdown'
 import { MENU_GRUPOS } from '../components/layout/Sidebar';
 import {
   rielParaRol, tituloDeRuta, seccionDeRuta, pestanasDeSeccion, SECCIONES,
-  claveOcultosG3 as claveOcultos, claveOrdenG3 as claveOrden, guardarSubOrdenG3, EVENTO_SUBORDEN_G3,
+  claveOcultosG3 as claveOcultos, claveOrdenG3 as claveOrden, guardarSubOrdenG3, EVENTO_SUBORDEN_G3, heredarAjustesDelMenu,
 } from './menuPlanta';
 import { useTemaG3 } from './useDiseno3G';
 const leerJSON = (k, def) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? def; } catch { return def; } };
@@ -45,12 +45,12 @@ export default function MarcoPlanta() {
   const { user } = useAuth();
   const [abierto, setAbierto] = useState(false); // riel en celular
   const [editando, setEditando] = useState(false);
-  const [ocultos, setOcultos] = useState(() => new Set(leerJSON(claveOcultos(user?.id), [])));
+  const [ocultos, setOcultos] = useState(() => { heredarAjustesDelMenu(user?.id); return new Set(leerJSON(claveOcultos(user?.id), [])); });
   const [orden, setOrden] = useState(() => leerJSON(claveOrden(user?.id), []));
   const [versionSub, setVersionSub] = useState(0);
   const arrastre = useRef(null);
 
-  useEffect(() => { setOcultos(new Set(leerJSON(claveOcultos(user?.id), []))); setOrden(leerJSON(claveOrden(user?.id), [])); }, [user?.id]);
+  useEffect(() => { heredarAjustesDelMenu(user?.id); setOcultos(new Set(leerJSON(claveOcultos(user?.id), []))); setOrden(leerJSON(claveOrden(user?.id), [])); }, [user?.id]);
   useEffect(() => {
     const alCambiar = () => setVersionSub((v) => v + 1);
     window.addEventListener(EVENTO_SUBORDEN_G3, alCambiar);
