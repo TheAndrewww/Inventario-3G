@@ -5,10 +5,12 @@ import React, { useCallback } from 'react';
 import { FolderOpen, Calendar, Clock, User, FileText, AlertCircle } from 'lucide-react';
 import CarpetaProyectoModal, { Dato } from '../carpetas/CarpetaProyectoModal';
 import { obtenerCarpetaVentas } from '../../services/calendario.service';
+import { obtenerCarpetaProduccion } from '../../services/produccion.service';
 // Rediseño 2 (encendido): los mismos datos en palabras de la vista nueva (la carpeta y su petición no cambian)
 import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
 import { estadoDe, tipoTrabajo } from '../../rediseno2/fundacion/vocabulario';
 import { nombreEquipo, oracion } from '../../rediseno2/gestion/comunes';
+import { fechaExacta } from '../../rediseno2/fundacion/formato';
 
 const ETAPAS = {
   pendiente: 'Pendiente',
@@ -19,7 +21,21 @@ const ETAPAS = {
   completado: 'Completado'
 };
 
-const rutaArchivo = (id) => `/calendario/proyecto/ventas/archivo/${id}`;
+// Cada archivo se pide por la ruta de su carpeta: ventas o producción
+const rutaArchivo = (id, archivo) => (archivo?._origen === 'produccion'
+  ? `/produccion/carpeta/archivo/${id}`
+  : `/calendario/proyecto/ventas/archivo/${id}`);
+
+// Ventas arriba; luego lo de producción por área (las categorías las pone el backend de producción)
+const GRUPOS = [
+  { clave: 'ventas', titulo: 'Ventas' },
+  { clave: 'manufactura', titulo: 'Producción · Manufactura' },
+  { clave: 'herreria', titulo: 'Producción · Herrería' },
+  { clave: 'ticket', titulo: 'Producción · Tickets de almacén' }
+];
+
+const estadoArea = (tiene, hecho) => (tiene ? (hecho ? 'Terminada' : 'Pendiente') : null);
+const fechaDe = (v) => (v ? fechaExacta(String(v).slice(0, 10)) || null : null);
 
 /**
  * Ventana que abre almacén/calidad al dar click a un proyecto del calendario:
@@ -31,9 +47,29 @@ const ProyectoVentasModal = ({ isOpen, onClose, proyecto, mes, dia }) => {
   const nombreProyecto = proyecto?.nombre || '';
   const d3 = useDiseno3GR2();
 
+  // Ventas (carpeta de Drive + el proyecto de producción que le corresponde) y, con ese proyecto, su carpeta de
+  // producción (planos de manufactura y herrería, tickets). Producción solo la ven administración, almacén y diseño: a los
+  // demás el servidor la niega y la ventana se queda con ventas.
   const cargar = useCallback(async () => {
     const respuesta = await obtenerCarpetaVentas(nombreProyecto, mes);
-    return respuesta.data;
+    const ventas = respuesta.data || {};
+    const archivos = (ventas.archivos || []).map((a) => ({ ...a, categoria: 'ventas', _origen: 'ventas' }));
+    let produccion = null;
+    if (ventas.proyecto?.id) {
+      try {
+        produccion = (await obtenerCarpetaProduccion(ventas.proyecto.id))?.data || null;
+      } catch {
+        produccion = null;
+      }
+    }
+    const deProduccion = (produccion?.archivos || []).map((a) => ({ ...a, _origen: 'produccion' }));
+    return {
+      ...ventas,
+      carpeta: ventas.carpeta || produccion?.carpeta || null,
+      archivos: [...archivos, ...deProduccion],
+      ocultos: (ventas.ocultos || 0) + (produccion?.ocultos || 0),
+      carpetaProduccion: produccion?.carpeta || null
+    };
   }, [nombreProyecto, mes]);
 
   const datosProyecto = (datos) => {
@@ -53,7 +89,15 @@ const ProyectoVentasModal = ({ isOpen, onClose, proyecto, mes, dia }) => {
           <Dato etiqueta="Equipo" valor={falla ? 'Falla' : (proyecto?.equipoHora ? nombreEquipo(proyecto.equipoHora) : null)} />
           {proyecto?.nota && <Dato etiqueta={falla ? 'Motivo de la falla' : 'Nota del calendario'} valor={proyecto.nota} />}
           {info?.pausado && <Dato etiqueta="Pausada" valor={info.pausado_motivo || 'Sí'} />}
+          {/* Producción del mismo proyecto (cruzado por nombre en el servidor) */}
+          {info && <Dato etiqueta="Proyecto en producción" valor={info.nombre} />}
+          <Dato etiqueta="Entró a producción" valor={fechaDe(info?.fecha_entrada)} />
+          <Dato etiqueta="Fecha máxima" valor={fechaDe(info?.fecha_limite)} />
+          <Dato etiqueta="Manufactura" valor={estadoArea(info?.tiene_manufactura, info?.manufactura_completado)} />
+          <Dato etiqueta="Soldadura" valor={estadoArea(info?.tiene_herreria, info?.herreria_completado || info?.herreria_armado_completado)} />
+          <Dato etiqueta="Pintura" valor={estadoArea(info?.tiene_herreria, info?.herreria_completado || info?.herreria_pintado_completado)} />
           <Dato etiqueta="Notas" valor={info?.descripcion} />
+          {datos && !info && <Dato etiqueta="Producción" valor="No se encontró este proyecto en producción" />}
         </>
       );
     }
@@ -82,11 +126,12 @@ const ProyectoVentasModal = ({ isOpen, onClose, proyecto, mes, dia }) => {
       isOpen={isOpen}
       onClose={onClose}
       titulo={nombreProyecto}
-      subtitulo="Ventas"
-      textoCargando="Abriendo carpeta de ventas…"
+      subtitulo={d3 ? 'Ventas y producción' : 'Ventas'}
+      textoCargando="Abriendo ventas y producción…"
       cargar={cargar}
       rutaArchivo={rutaArchivo}
       datosProyecto={datosProyecto}
+      grupos={d3 ? GRUPOS : undefined}
     />
   );
 };

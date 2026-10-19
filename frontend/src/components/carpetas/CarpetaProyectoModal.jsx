@@ -1,7 +1,7 @@
 // VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
 // `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
 // Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   X,
   FolderOpen,
@@ -260,30 +260,39 @@ const CarpetaProyectoModal = ({
   const [archivoAbierto, setArchivoAbierto] = useState(null);
   const d3 = useDiseno3GR2(); // Rediseño 2: encendido, la carpeta en un cajón (abajo, antes del return de siempre)
 
+  // Cada carga lleva su número: si mientras tanto se abrió otro proyecto, la respuesta vieja se tira. Sin esto, una búsqueda
+  // lenta en Drive (p. ej. PABLO HERNANDEZ, cuya carpeta está en el mes anterior) llegaba después y pintaba sus datos en la
+  // ventana de LUISA DÍAZ (19-oct-2026).
+  const vuelta = useRef(0);
   const ejecutar = useCallback(async () => {
+    const mia = ++vuelta.current;
     setCargando(true);
     setError(null);
+    setDatos(null);
     setArchivoAbierto(null);
     try {
       const data = await cargar();
+      if (mia !== vuelta.current) return;
       setDatos(data);
       if (onDatos) onDatos(data);
     } catch (err) {
+      if (mia !== vuelta.current) return;
       setError(err.response?.data?.message || 'No se pudo leer la carpeta');
     } finally {
-      setCargando(false);
+      if (mia === vuelta.current) setCargando(false);
     }
   }, [cargar, onDatos]);
 
+  // Se carga al abrir y otra vez si cambia el proyecto (`cargar` cambia con él; el padre debe memoizarla)
   useEffect(() => {
     if (isOpen) ejecutar();
     else {
+      vuelta.current += 1;
       setDatos(null);
       setArchivoAbierto(null);
     }
-    // ejecutar cambia con `cargar`; el padre debe memoizarla
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, cargar]);
 
   useEffect(() => {
     const onEsc = (e) => {
@@ -323,10 +332,10 @@ const CarpetaProyectoModal = ({
         archivoAbierto={archivoAbierto} ejecutar={ejecutar} onClose={onClose} datosProyecto={datosProyecto} grupos={grupos}
         secciones={grupos ? secciones : [{ titulo: `Archivos · ${archivos.length}`, archivos }]} archivos={archivos}
         pintarMiniatura={(archivo) => (
-          <Miniatura archivo={archivo} ruta={rutaArchivo(archivo.id)} onClick={() => setArchivoAbierto(archivo)} />
+          <Miniatura archivo={archivo} ruta={rutaArchivo(archivo.id, archivo)} onClick={() => setArchivoAbierto(archivo)} />
         )}
         pintarVisor={() => (
-          <Visor archivo={archivoAbierto} ruta={rutaArchivo(archivoAbierto.id)} onVolver={() => setArchivoAbierto(null)} />
+          <Visor archivo={archivoAbierto} ruta={rutaArchivo(archivoAbierto.id, archivoAbierto)} onVolver={() => setArchivoAbierto(null)} />
         )}
       />
     );
@@ -378,7 +387,7 @@ const CarpetaProyectoModal = ({
           ) : archivoAbierto ? (
             <Visor
               archivo={archivoAbierto}
-              ruta={rutaArchivo(archivoAbierto.id)}
+              ruta={rutaArchivo(archivoAbierto.id, archivoAbierto)}
               onVolver={() => setArchivoAbierto(null)}
             />
           ) : (
@@ -411,7 +420,7 @@ const CarpetaProyectoModal = ({
                         <Miniatura
                           key={archivo.id}
                           archivo={archivo}
-                          ruta={rutaArchivo(archivo.id)}
+                          ruta={rutaArchivo(archivo.id, archivo)}
                           onClick={() => setArchivoAbierto(archivo)}
                         />
                       ))}

@@ -214,7 +214,12 @@ export const obtenerCarpetaVentasProyecto = async (req, res) => {
           tiene_manufactura: proyecto.tiene_manufactura,
           tiene_herreria: proyecto.tiene_herreria,
           manufactura_completado: proyecto.manufactura_completado,
-          herreria_completado: proyecto.herreria_completado
+          herreria_completado: proyecto.herreria_completado,
+          // Herrería = soldadura + pintura (el calendario muestra las dos)
+          herreria_armado_completado: proyecto.herreria_armado_completado,
+          herreria_pintado_completado: proyecto.herreria_pintado_completado,
+          compras_en_proceso: proyecto.compras_en_proceso,
+          prioridad: proyecto.prioridad
         }
       : null;
 

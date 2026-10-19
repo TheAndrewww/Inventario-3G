@@ -239,8 +239,24 @@ export const buscarCarpetaVentas = async (nombreProyecto, mesHint = null) => {
                 setCache(claveCache, enElMes);
                 return enElMes;
             }
-            console.log(`   ↪️ [VENTAS] Nada en "${mesHint}", buscando en todos los meses`);
         }
+        // La semana que cruza de mes vive en la carpeta del mes anterior («SEPTIEMBRE 30-03» trae citas de octubre):
+        // se busca ahí antes de recorrer todo VENTAS, que es lento (caso PABLO HERNANDEZ, 19-oct-2026).
+        const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+        const i = MESES.indexOf(mesNorm);
+        if (i !== -1) {
+            const anterior = MESES[(i + 11) % 12];
+            const carpetasAnterior = carpetasRaiz.filter(c => normalizar(c.name).startsWith(anterior));
+            if (carpetasAnterior.length > 0) {
+                const enAnterior = await bajarBuscando(carpetasAnterior);
+                if (enAnterior) {
+                    console.log(`✅ [VENTAS] Carpeta: "${enAnterior.name}" en ${enAnterior.ruta} (mes anterior, score ${enAnterior.score})`);
+                    setCache(claveCache, enAnterior);
+                    return enAnterior;
+                }
+            }
+        }
+        console.log(`   ↪️ [VENTAS] Nada en "${mesHint}" ni en el mes anterior, buscando en todos los meses`);
     }
 
     // 2) Búsqueda global en toda la raíz de VENTAS.
