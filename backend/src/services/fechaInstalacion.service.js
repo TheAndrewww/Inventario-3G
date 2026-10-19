@@ -106,11 +106,15 @@ const citasPorNombre = (citas) => {
         const key = normalizarNombre(cp.nombre);
         if (!key || key.includes('cimentacion') || !cp.fecha) continue;
         const lista = (mapa[key] = mapa[key] || []);
+        // El RETIRO casi siempre va en el segundo renglón de la celda ("LUIS RÍOS" + "MTO RETIRO"),
+        // que llega como `cliente`. Mirando solo el nombre, el retiro contaba como instalación y
+        // a Charly se le preguntaba por una producción que ni ha llegado al taller (19-oct-2026).
+        const retiro = esCitaRetiro(normalizarNombre(`${cp.nombre} ${cp.cliente || ''}`));
         // D8 · PLA-22: un día con hora (en cualquiera de sus renglones) es una cita agendada; sin hora es la fecha
         // límite que escribe Operación. Solo se anota: qué fecha manda no cambia.
         const previa = lista.find(c => c.fecha === cp.fecha);
-        if (previa) { if (cp.hora) previa.conHora = true; }
-        else lista.push({ fecha: cp.fecha, retiro: esCitaRetiro(key), conHora: !!cp.hora });
+        if (previa) { if (cp.hora) previa.conHora = true; if (!retiro) previa.retiro = false; }
+        else lista.push({ fecha: cp.fecha, retiro, conHora: !!cp.hora });
     }
     return mapa;
 };
