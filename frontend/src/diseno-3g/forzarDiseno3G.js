@@ -9,11 +9,18 @@
 // Lo guardado en el navegador (localStorage['diseno-3g']) se deja como estaba: G3.encender guarda «3g», así que se
 // regresa al valor de antes. Así, si hubiera que regresar a la versión de antes (Instant Rollback de Vercel o revertir
 // este cambio), cada persona ve lo que veía antes de publicar y no el diseño encendido para todos.
+import { esRutaTvClasica } from '../tv-clasico/rutasTvClasica.js';
+
 const CLAVE_DISENO = 'diseno-3g';
 
 export function forzarDiseno3G() {
   if (typeof document === 'undefined') return;
   const raiz = document.documentElement;
+  // TV clásica (19-oct-2026): TV de producción y calendario público sin el diseño nuevo
+  if (typeof window !== 'undefined' && esRutaTvClasica(window.location?.pathname)) {
+    raiz.removeAttribute('data-diseno');
+    return;
+  }
   if (raiz.getAttribute('data-diseno') === '3g') return;
   const api = typeof window !== 'undefined' ? window.G3 : undefined;
   if (!api || typeof api.encender !== 'function') {

@@ -1,0 +1,40 @@
+// TV clásica (19-oct-2026, a pedido del usuario): copia de la versión de ANTES del Diseño 3G (b411ea5^), fondo blanco y logos.
+// No usar useDiseno3G aquí ni borrar con la limpieza de lo VIEJO del 24-oct. Ver tv-clasico/rutasTvClasica.js.
+import React from 'react';
+import { ETAPAS_CONFIG } from './ProyectoTimeline';
+import { s, px } from '../utils/produccion';
+
+const EstadisticasHeader = ({ estadisticas }) => {
+
+    const items = [
+        { label: 'En Diseño', value: estadisticas.diseno || 0, color: ETAPAS_CONFIG.diseno.color, icon: ETAPAS_CONFIG.diseno.icon },
+        { label: 'En Compras', value: estadisticas.compras || 0, color: ETAPAS_CONFIG.compras.color, icon: ETAPAS_CONFIG.compras.icon },
+        { label: 'En Producción', value: estadisticas.produccion || 0, color: ETAPAS_CONFIG.produccion.color, icon: ETAPAS_CONFIG.produccion.icon },
+        { label: 'Completado', value: estadisticas.instalacion || 0, color: ETAPAS_CONFIG.instalacion.color, icon: ETAPAS_CONFIG.instalacion.icon },
+    ];
+
+    return (
+        <div className="grid grid-cols-4 mb-6" style={{ gap: px(8) }}>
+            {items.map(item => {
+                const Icon = item.icon;
+                return (
+                    <div
+                        key={item.label}
+                        className="bg-white rounded-xl shadow-sm border border-gray-100 text-center flex flex-col items-center justify-center"
+                        style={{ padding: `${px(24)} ${px(8)}`, minHeight: px(220) }}
+                    >
+                        <div className="flex items-center justify-center" style={{ marginBottom: px(8) }}>
+                            <div className="rounded-full flex items-center justify-center" style={{ width: px(48), height: px(48), backgroundColor: `${item.color}20` }}>
+                                <Icon style={{ width: px(24), height: px(24), color: item.color }} />
+                            </div>
+                        </div>
+                        <div className="font-bold" style={{ fontSize: s(2.25), color: item.color }}>{item.value}</div>
+                        <div className="font-bold leading-tight text-gray-500" style={{ fontSize: s(1.125) }}>{item.label}</div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
+export default EstadisticasHeader;

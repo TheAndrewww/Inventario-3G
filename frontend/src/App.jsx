@@ -23,16 +23,16 @@ import PerfilPage from './pages/PerfilPage';
 import ProveedoresPage from './pages/ProveedoresPage';
 import OrdenesCompraPage from './pages/OrdenesCompraPage';
 import CalendarioPage from './pages/CalendarioPage';
-import CalendarioPublicoPage from './pages/CalendarioPublicoPage';
+import CalendarioPublicoPage from './tv-clasico/CalendarioPublicoPage'; // TV clásica (fondo blanco, como antes del Diseño 3G)
 import AnunciosPublicosPage from './pages/AnunciosPublicosPage';
 import ProcesamientoMasivoPage from './pages/ProcesamientoMasivoPage';
 import MiEquipoPage from './pages/MiEquipoPage';
 import DashboardProduccionPage from './pages/DashboardProduccionPage';
 import TerminalAreaPage from './pages/TerminalAreaPage';
-import DashboardProduccionTVPage from './pages/DashboardProduccionTVPage';
-import DashboardPreparadosTVPage from './pages/DashboardPreparadosTVPage';
-import DashboardManufacturaTVPage from './pages/DashboardManufacturaTVPage';
-import DashboardHerreriaTVPage from './pages/DashboardHerreriaTVPage';
+import DashboardProduccionTVPage from './tv-clasico/DashboardProduccionTVPage'; // TV clásica (fondo blanco, como antes del Diseño 3G)
+import DashboardPreparadosTVPage from './tv-clasico/DashboardPreparadosTVPage'; // TV clásica (fondo blanco, como antes del Diseño 3G)
+import DashboardManufacturaTVPage from './tv-clasico/DashboardManufacturaTVPage'; // TV clásica (fondo blanco, como antes del Diseño 3G)
+import DashboardHerreriaTVPage from './tv-clasico/DashboardHerreriaTVPage'; // TV clásica (fondo blanco, como antes del Diseño 3G)
 import ControlCampanaPage from './pages/ControlCampanaPage';
 import ConteoCiclicoPage from './pages/ConteoCiclicoPage';
 import DescontarAlmacenPage from './pages/DescontarAlmacenPage';

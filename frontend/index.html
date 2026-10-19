@@ -12,8 +12,10 @@
          - Ya no hay rutas sin diseño: TV, terminal, anuncios y calendario público también llevan el rediseño
            (window.G3_RUTAS_SIN_DISENO se quitó). Ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
          VIEJO: se borra a partir del 24-oct-2026 — la regla de abajo solo servía con el diseño apagado. -->
+    <!-- TV clásica (19-oct-2026): /produccion-tv, /preparados-tv, /manufactura-tv, /herreria-tv y /calendario-publico van SIN
+         data-diseno (como antes del Diseño 3G); misma lista en src/tv-clasico/rutasTvClasica.js. -->
     <style>:root:not([data-diseno='3g']) .g3-si{display:none!important}</style>
-    <script>(function(d,k){d.setAttribute('data-diseno','3g');try{var u=new URL(location.href);if(u.searchParams.has('diseno')){u.searchParams.delete('diseno');history.replaceState(history.state,'',u.pathname+u.search+u.hash)}}catch(e){}try{var t=localStorage.getItem(k+'-tema');if(/^(auto|claro|oscuro)$/.test(t))d.setAttribute('data-g3-tema',t)}catch(e){}})(document.documentElement,'diseno-3g')</script>
+    <script>(function(d,k){if(/^\/(produccion|preparados|manufactura|herreria)-tv\/?$|^\/calendario-publico\/?$/.test(location.pathname)){d.removeAttribute('data-diseno');return}d.setAttribute('data-diseno','3g');try{var u=new URL(location.href);if(u.searchParams.has('diseno')){u.searchParams.delete('diseno');history.replaceState(history.state,'',u.pathname+u.search+u.hash)}}catch(e){}try{var t=localStorage.getItem(k+'-tema');if(/^(auto|claro|oscuro)$/.test(t))d.setAttribute('data-g3-tema',t)}catch(e){}})(document.documentElement,'diseno-3g')</script>
     <!-- Rediseño 2 · pantallas de piso: ya no se pone data-g3-tv (el diseño de TV de la ola 3 no se usa). Solo se anota ?tema=claro|oscuro
          de ESTA carga para useTemaPiso() (src/rediseno2/fundacion/piso/usePiso.js). -->
     <script>(function(d){try{if(d.getAttribute('data-diseno')!=='3g')return;var t=new URLSearchParams(location.search).get('tema');if(t==='claro'||t==='oscuro')window.G3_TEMA_PISO=t}catch(e){}})(document.documentElement)</script>

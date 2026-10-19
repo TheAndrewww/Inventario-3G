@@ -69,12 +69,16 @@ describe('index.html: siempre el diseño nuevo', () => {
     assert.match(html, /<html lang="es" data-diseno="3g">/);
   });
 
-  it('ya no hay rutas sin diseño (TV, terminal, anuncios y calendario público lo llevan)', () => {
+  it('todo lleva el diseño nuevo salvo la TV clásica (TV de producción y calendario público, 19-oct-2026)', () => {
     assert.doesNotMatch(html, /G3_RUTAS_SIN_DISENO\s*=/);
     assert.ok(guionDiseno, 'falta el guion de <head> del diseño');
-    for (const ruta of ['/produccion-tv', '/preparados-tv', '/manufactura-tv', '/herreria-tv', '/terminal', '/terminal/manufactura', '/anuncios', '/calendario-publico', '/login', '/inventario']) {
+    for (const ruta of ['/terminal', '/terminal/manufactura', '/anuncios', '/login', '/inventario', '/produccion', '/calendario']) {
       const { atributos } = correrGuion(guionDiseno, { url: `https://planta.test${ruta}` });
       assert.equal(atributos.get('data-diseno'), '3g', ruta);
+    }
+    for (const ruta of ['/produccion-tv', '/preparados-tv', '/manufactura-tv', '/herreria-tv/', '/calendario-publico']) {
+      const { atributos } = correrGuion(guionDiseno, { url: `https://planta.test${ruta}` });
+      assert.equal(atributos.has('data-diseno'), false, ruta);
     }
   });
 
@@ -114,9 +118,9 @@ describe('index.html: siempre el diseño nuevo', () => {
     assert.equal(roto.atributos.get('data-diseno'), '3g');
   });
 
-  it('las TV y la terminal siguen tomando ?tema=claro|oscuro de esa carga', () => {
+  it('la terminal sigue tomando ?tema=claro|oscuro de esa carga', () => {
     assert.ok(guionPiso, 'falta el guion de las pantallas de piso');
-    const { contexto, atributos } = correrGuion(guionDiseno, { url: 'https://planta.test/produccion-tv?diseno=3g&tema=oscuro' });
+    const { contexto, atributos } = correrGuion(guionDiseno, { url: 'https://planta.test/terminal?diseno=3g&tema=oscuro' });
     assert.equal(atributos.get('data-diseno'), '3g');
     // El guion de piso corre después, con la dirección ya limpia de ?diseno
     contexto.location.search = '?tema=oscuro';
@@ -163,6 +167,16 @@ describe('forzarDiseno3G: vuelve a poner el atributo sin cambiar lo guardado', (
     forzarDiseno3G();
     assert.equal(atributos.get('data-diseno'), '3g');
     assert.equal(almacen.datos.get('diseno-3g'), 'actual');
+  });
+
+  it('en la TV clásica lo quita y no enciende nada', () => {
+    const n = encendidos;
+    atributos.set('data-diseno', '3g');
+    g.window.location = { pathname: '/manufactura-tv' };
+    forzarDiseno3G();
+    delete g.window.location;
+    assert.equal(atributos.has('data-diseno'), false);
+    assert.equal(encendidos, n);
   });
 
   it('sin nada guardado, no deja «3g» guardado', () => {
