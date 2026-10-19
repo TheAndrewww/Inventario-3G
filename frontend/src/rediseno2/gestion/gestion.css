@@ -573,3 +573,21 @@
   font: 600 0.8125rem/1.125rem var(--g3-f-texto); color: var(--g3-tinta-2); cursor: pointer;
 }
 :root[data-diseno="3g"] .r2g-mes-mas:hover { background: var(--g3-contenedor); color: var(--g3-tinta); }
+
+/* Más color (19-oct-2026, a pedido del usuario): cada día con su fondo. Entre semana un azul muy suave, sábado y domingo
+   gris, hoy más marcado, asueto ámbar y los días de otro mes apagados. La cabecera de la semana lleva una franja. */
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia { background: color-mix(in srgb, var(--g3-primario) 8%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia:nth-child(n+6) { background: color-mix(in srgb, var(--g3-contenedor-alto) 75%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia.r2g-dia--asueto { background: color-mix(in srgb, var(--g3-aviso) 18%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia.r2g-dia--hoy { background: color-mix(in srgb, var(--g3-primario) 20%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia-cab--cal { background: color-mix(in srgb, var(--g3-primario) 17%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia--hoy .r2g-dia-cab--cal { background: color-mix(in srgb, var(--g3-primario) 30%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-obra { box-shadow: 0 1px 2px color-mix(in srgb, var(--g3-tinta) 10%, transparent); }
+
+:root[data-diseno="3g"] .r2g-mes-cab { background: color-mix(in srgb, var(--g3-primario) 17%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-mes-dia { background: color-mix(in srgb, var(--g3-primario) 8%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--finde { background: color-mix(in srgb, var(--g3-contenedor-alto) 75%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--asueto { background: color-mix(in srgb, var(--g3-aviso) 18%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--fuera { background: var(--g3-contenedor); }
+:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--hoy { background: color-mix(in srgb, var(--g3-primario) 20%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-evento { box-shadow: 0 1px 1px color-mix(in srgb, var(--g3-tinta) 8%, transparent); }
