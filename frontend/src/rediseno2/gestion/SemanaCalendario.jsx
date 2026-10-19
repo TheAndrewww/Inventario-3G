@@ -52,6 +52,8 @@ function Obra({ p, dia, alAbrir, colorDeEquipo, variante }) {
   const cliente = p.cliente && !mismoTexto(p.cliente, p.nombre) ? p.cliente : null;
   const tipo = TIPOS_CON_ETIQUETA.includes(String(p.tipoProyecto || '').toUpperCase()) ? <TipoTrabajo tipo={p.tipoProyecto} /> : null;
   const falla = p.equipoHora === 'FALLA';
+  // Lo que viene del panel de producción o de compras (p.virtual) no tiene carpeta de ventas: no se toca
+  if (p.virtual) alAbrir = undefined;
   const Como = alAbrir ? 'button' : 'div';
   const accesible = [p.hora, p.nombre, cliente, falla ? 'falla' : nombreEquipo(p.equipoHora)].filter(Boolean).join(', ');
 
@@ -65,6 +67,7 @@ function Obra({ p, dia, alAbrir, colorDeEquipo, variante }) {
           <span className="r2g-agenda-cuerpo">
             <span className="r2g-obra-nombre">{p.nombre}</span>
             {cliente && <span className="r2g-obra-cliente">{cliente}</span>}
+            {p.etiqueta && <span className="r2g-obra-etiqueta">{p.etiqueta}</span>}
             <span className="r2g-obra-pie">
               <Equipo p={p} colorDeEquipo={colorDeEquipo} />
               {tipo}
@@ -89,6 +92,7 @@ function Obra({ p, dia, alAbrir, colorDeEquipo, variante }) {
         </span>
         <span className="r2g-obra-nombre">{p.nombre}</span>
         {cliente && <span className="r2g-obra-cliente">{cliente}</span>}
+        {p.etiqueta && <span className="r2g-obra-etiqueta">{p.etiqueta}</span>}
         {tipo && <span className="r2g-obra-tipo">{tipo}</span>}
         <Falla p={p} />
       </Como>

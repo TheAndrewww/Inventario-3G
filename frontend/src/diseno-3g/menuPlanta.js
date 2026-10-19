@@ -92,7 +92,7 @@ export const TITULOS = {
   '/avance-produccion': 'Avance por área',
   '/produccion/avisos': 'Avisos a Producción',
   '/control-campana': 'Campaña de control',
-  '/calendario': 'Calendario de instalaciones',
+  '/calendario': 'Calendario',
   '/camionetas': 'Equipos',
   '/renta-herramientas': 'Herramientas de renta',
   '/mi-equipo': 'Mi equipo',

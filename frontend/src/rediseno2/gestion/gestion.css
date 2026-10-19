@@ -574,20 +574,50 @@
 }
 :root[data-diseno="3g"] .r2g-mes-mas:hover { background: var(--g3-contenedor); color: var(--g3-tinta); }
 
-/* Más color (19-oct-2026, a pedido del usuario): cada día con su fondo. Entre semana un azul muy suave, sábado y domingo
-   gris, hoy más marcado, asueto ámbar y los días de otro mes apagados. La cabecera de la semana lleva una franja. */
-:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia { background: color-mix(in srgb, var(--g3-primario) 8%, var(--g3-superficie)); }
-:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia:nth-child(n+6) { background: color-mix(in srgb, var(--g3-contenedor-alto) 75%, var(--g3-superficie)); }
-:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia.r2g-dia--asueto { background: color-mix(in srgb, var(--g3-aviso) 18%, var(--g3-superficie)); }
-:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia.r2g-dia--hoy { background: color-mix(in srgb, var(--g3-primario) 20%, var(--g3-superficie)); }
-:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia-cab--cal { background: color-mix(in srgb, var(--g3-primario) 17%, var(--g3-superficie)); }
-:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia--hoy .r2g-dia-cab--cal { background: color-mix(in srgb, var(--g3-primario) 30%, var(--g3-superficie)); }
+/* Color (19-oct-2026, a pedido del usuario): base en GRISES y ROJO (no azul). Entre semana gris muy claro, sábado y domingo
+   gris más marcado, hoy en rojo, asueto ámbar y los días de otro mes apagados. Cabeceras en gris oscuro suave. */
+:root[data-diseno="3g"] .r2g-pagina-calendario {
+  --r2g-rojo: #c62828;
+  --r2g-dia: color-mix(in srgb, var(--g3-contenedor) 35%, var(--g3-superficie));
+  --r2g-finde: color-mix(in srgb, var(--g3-contenedor-alto) 85%, var(--g3-superficie));
+  --r2g-cabecera: color-mix(in srgb, var(--g3-tinta) 9%, var(--g3-superficie));
+  --r2g-hoy: color-mix(in srgb, var(--r2g-rojo) 9%, var(--g3-superficie));
+}
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia { background: var(--r2g-dia); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia:nth-child(n+6) { background: var(--r2g-finde); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia.r2g-dia--asueto { background: color-mix(in srgb, var(--g3-aviso) 16%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia.r2g-dia--hoy { background: var(--r2g-hoy); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia-cab--cal { background: var(--r2g-cabecera); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia--hoy .r2g-dia-cab--cal { background: color-mix(in srgb, var(--r2g-rojo) 16%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-pagina-calendario .r2g-dia--hoy .r2g-dia-semana { color: var(--r2g-rojo); }
+:root[data-diseno="3g"] .r2g-pagina-calendario .r2g-dia--hoy .r2g-dia-numero { background: var(--r2g-rojo); color: #fff; }
 :root[data-diseno="3g"] .r2g-semana--oficina .r2g-obra { box-shadow: 0 1px 2px color-mix(in srgb, var(--g3-tinta) 10%, transparent); }
 
-:root[data-diseno="3g"] .r2g-mes-cab { background: color-mix(in srgb, var(--g3-primario) 17%, var(--g3-superficie)); }
-:root[data-diseno="3g"] .r2g-mes-dia { background: color-mix(in srgb, var(--g3-primario) 8%, var(--g3-superficie)); }
-:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--finde { background: color-mix(in srgb, var(--g3-contenedor-alto) 75%, var(--g3-superficie)); }
-:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--asueto { background: color-mix(in srgb, var(--g3-aviso) 18%, var(--g3-superficie)); }
-:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--fuera { background: var(--g3-contenedor); }
-:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--hoy { background: color-mix(in srgb, var(--g3-primario) 20%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-mes-cab { background: var(--r2g-cabecera); }
+:root[data-diseno="3g"] .r2g-mes-dia { background: var(--r2g-dia); }
+:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--finde { background: var(--r2g-finde); }
+:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--asueto { background: color-mix(in srgb, var(--g3-aviso) 16%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--fuera { background: var(--g3-contenedor-alto); }
+:root[data-diseno="3g"] .r2g-mes-dia.r2g-mes-dia--hoy { background: var(--r2g-hoy); }
+:root[data-diseno="3g"] .r2g-pagina-calendario .r2g-mes-dia--hoy .r2g-mes-num { background: var(--r2g-rojo); color: #fff; }
 :root[data-diseno="3g"] .r2g-evento { box-shadow: 0 1px 1px color-mix(in srgb, var(--g3-tinta) 8%, transparent); }
+
+/* Taller (manufactura, soldadura, pintura y almacén) que viene del panel de producción y de compras: con su etiqueta */
+:root[data-diseno="3g"] .r2g-obra-etiqueta { font: 600 0.75rem/1rem var(--g3-f-texto); letter-spacing: 0.02em; text-transform: uppercase; color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2g-evento--taller { cursor: default; }
+:root[data-diseno="3g"] .r2g-evento-area { flex: none; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--g3-tinta-2); }
+
+/* Distribución de equipos, arriba del calendario */
+:root[data-diseno="3g"] .r2g-distribucion { margin: 4px 0 12px; }
+:root[data-diseno="3g"] .r2g-distribucion-titulo { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font: 600 0.8125rem/1.125rem var(--g3-f-texto); letter-spacing: 0.04em; text-transform: uppercase; color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2g-distribucion-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+:root[data-diseno="3g"] .r2g-distribucion-equipo {
+  display: grid; gap: 2px; width: 100%; height: 100%; margin: 0; padding: 8px 12px; text-align: left; cursor: pointer;
+  border: 1px solid var(--g3-linea); border-left: 5px solid var(--r2g-color, var(--g3-tinta-3)); border-radius: 10px;
+  background: color-mix(in srgb, var(--r2g-color, var(--g3-tinta-3)) 12%, var(--g3-superficie)); color: var(--g3-tinta);
+}
+:root[data-diseno="3g"] .r2g-distribucion-equipo:hover { background: color-mix(in srgb, var(--r2g-color, var(--g3-tinta-3)) 22%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-distribucion-equipo--puesto { outline: 2px solid var(--r2g-rojo, #c62828); outline-offset: 1px; }
+:root[data-diseno="3g"] .r2g-distribucion-nombre { font: 700 0.9375rem/1.25rem var(--g3-f-texto); }
+:root[data-diseno="3g"] .r2g-distribucion-resp { font: 600 0.8125rem/1.125rem var(--g3-f-texto); }
+:root[data-diseno="3g"] .r2g-distribucion-gente { font: 400 0.75rem/1rem var(--g3-f-texto); color: var(--g3-tinta-2); }

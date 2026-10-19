@@ -7,9 +7,9 @@
 // Todo sale de CalendarioPage: los tres meses que ya carga, el cambio de mes (cambiarMes / setMesActual), el sondeo de 2 min,
 // la escala guardada y la pantalla completa. Esta vista no pide nada.
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Users, RefreshCw, Maximize2, ZoomIn, ZoomOut, CalendarDays, Rows3, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users, RefreshCw, Maximize2, ZoomIn, ZoomOut, CalendarDays, Rows3 } from 'lucide-react';
 import {
-  Pagina, EncabezadoPagina, Boton, BotonIcono, Segmentado, FiltroMenu, Tabla, Cajon, CajonCabecera, CajonCuerpo, SeccionCajon,
+  Pagina, EncabezadoPagina, Boton, BotonIcono, Segmentado, FiltroMenu, Tabla,
   Cargando, ErrorCarga, Vacio, TipoTrabajo, useAnchoR2, horaCorta, fechaExacta, plural, clases,
 } from '../fundacion';
 import ProyectoVentasModal from '../../components/calendario/ProyectoVentasModal';
@@ -19,10 +19,13 @@ import {
   MESES, armarDias, diasDeRango, diasDelMes, lunesDe, sumarDias, textoRango, nombreMes, diaLargo, relativoDia, minutosDe, mismoDia,
 } from './calendario';
 import { colorRgb, nombreEquipo, mismoTexto, leerPreferencia, guardarPreferencia, motivoError } from './comunes';
+import { juntarTaller, esCampo, esTaller, colorTaller } from './tallerCalendario';
+import { useTallerCalendario } from './useTallerCalendario';
 import './gestion.css';
 
 const CLAVE_EQUIPOS = 'r2-calendario-equipos';
 const CLAVE_VISTA = 'r2-calendario-vista';
+const CLAVE_GRUPO = 'r2-calendario-grupo';
 
 export default function VistaCalendario(p) {
   const {
@@ -44,12 +47,17 @@ export default function VistaCalendario(p) {
     const v = leerPreferencia(CLAVE_EQUIPOS, []);
     return Array.isArray(v) && v[0] ? String(v[0]) : '';
   });
-  const [verEquipos, setVerEquipos] = useState(false);
+  // Campo (equipos I–V: instalaciones, mantenimientos y garantías) o Taller (manufactura, herrería y almacén)
+  const [grupo, setGrupo] = useState(() => (['campo', 'taller'].includes(leerPreferencia(CLAVE_GRUPO, 'todo')) ? leerPreferencia(CLAVE_GRUPO, 'todo') : 'todo'));
+  const elegirGrupo = (v) => { setGrupo(v); guardarPreferencia(CLAVE_GRUPO, v); };
   const [verAnteriores, setVerAnteriores] = useState(false);
 
-  // Los tres meses cargados, en un solo mapa de días (la semana que cruza de mes no se repite)
-  const mapa = useMemo(() => armarDias({ actual: calendario, anterior: calendarioMesAnterior, siguiente: calendarioSiguienteMes, mesActual }),
+  // Los tres meses cargados, en un solo mapa de días (la semana que cruza de mes no se repite), más el taller:
+  // entregas de manufactura, soldadura y pintura del panel de producción y los pedidos por llegar (tallerCalendario.js)
+  const mapaHoja = useMemo(() => armarDias({ actual: calendario, anterior: calendarioMesAnterior, siguiente: calendarioSiguienteMes, mesActual }),
     [calendario, calendarioMesAnterior, calendarioSiguienteMes, mesActual]);
+  const taller = useTallerCalendario();
+  const mapa = useMemo(() => juntarTaller(mapaHoja, taller), [mapaHoja, taller]);
 
   // Colores de cada equipo (identidad, de la hoja) y lista para el filtro
   const equiposHoja = useMemo(() => distribucionEquipos?.equipos || [], [distribucionEquipos]);
@@ -58,13 +66,26 @@ export default function VistaCalendario(p) {
     equiposHoja.forEach((e) => { const c = colorRgb(e.color); if (c) { m.set(String(e.tipoEquipo || '').toUpperCase(), c); m.set(String(e.nombre || '').toUpperCase(), c); } });
     return m;
   }, [equiposHoja]);
-  const colorDeEquipo = (nombre) => colorPorEquipo.get(String(nombre || '').toUpperCase()) || null;
+  const colorDeEquipo = (nombre) => {
+    const n = String(nombre || '').toUpperCase();
+    // PINTURA viene en blanco en la hoja y SOLDADURA no existe: color fijo para que se vea la barra
+    if (n === 'PINTURA' || n === 'SOLDADURA') return colorTaller(n);
+    return colorPorEquipo.get(n) || colorTaller(n) || null;
+  };
   const opcionesEquipo = useMemo(() => {
     const nombres = new Set(equiposHoja.map((e) => String(e.tipoEquipo || e.nombre || '').toUpperCase()).filter(Boolean));
     mapa.forEach((d) => d.proyectos.forEach((x) => { if (x.equipoHora && x.equipoHora !== 'FALLA') nombres.add(String(x.equipoHora).toUpperCase()); }));
     return [...nombres];
   }, [equiposHoja, mapa]);
-  const filtro = equipo ? (x) => String(x.equipoHora || '').toUpperCase() === equipo : null;
+  // En celular no hay selector de trabajo: se ve todo
+  const grupoVisto = celular ? 'todo' : grupo;
+  const deGrupo = (x) => {
+    if (grupoVisto === 'todo') return true;
+    const e = String(x.equipoHora || '').toUpperCase();
+    // La falla sin equipo es de campo (la visita que no se hizo)
+    return grupoVisto === 'campo' ? (esCampo(e) || e === 'FALLA' || (!e && !x.virtual)) : esTaller(e);
+  };
+  const filtro = equipo || grupoVisto !== 'todo' ? (x) => (!equipo || String(x.equipoHora || '').toUpperCase() === equipo) && deGrupo(x) : null;
   const elegirEquipo = (v) => { setEquipo(v); guardarPreferencia(CLAVE_EQUIPOS, v ? [v] : []); };
 
   // Rango visible: escritorio = la semana (lunes a domingo); celular = de hoy a 6 días después (agenda de obra)
@@ -111,7 +132,8 @@ export default function VistaCalendario(p) {
     setSemanas(Math.round((lunesDe(fecha) - lunesDe(hoy)) / (7 * 86400000)));
   };
 
-  const abrir = (proyecto, dia) => setProyectoSeleccionado({ proyecto, dia: dia.numero, mes: dia.mesTab || mesActual });
+  // Lo que viene del panel de producción o de compras no tiene carpeta de ventas: no se abre
+  const abrir = (proyecto, dia) => !proyecto?.virtual && setProyectoSeleccionado({ proyecto, dia: dia.numero, mes: dia.mesTab || mesActual });
 
   const totalSemana = dias.reduce((n, d) => n + d.proyectos.filter((x) => (filtro ? filtro(x) : true)).length, 0);
   const fallas = dias.reduce((n, d) => n + d.proyectos.filter((x) => x.equipoHora === 'FALLA').length, 0);
@@ -166,6 +188,8 @@ export default function VistaCalendario(p) {
         <div className="r2g-cal-derecha">
           <FiltroMenu etiqueta="Equipo" valor={equipo} alCambiar={elegirEquipo}
             opciones={[{ valor: '', texto: 'Todos' }, ...opcionesEquipo.map((e) => ({ valor: e, texto: nombreEquipo(e) }))]} />
+          <Segmentado etiqueta="Trabajo" valor={grupo} alCambiar={elegirGrupo}
+            opciones={[{ valor: 'todo', texto: 'Todo' }, { valor: 'campo', texto: 'Instalaciones' }, { valor: 'taller', texto: 'Taller' }]} />
           <Segmentado etiqueta="Ver por" valor={vista} alCambiar={cambiarVista}
             opciones={[{ valor: 'semana', texto: 'Semana' }, { valor: 'mes', texto: 'Mes' }]} />
         </div>
@@ -244,17 +268,15 @@ export default function VistaCalendario(p) {
 
   return (
     <Pagina titulo="Calendario" densidad="comoda" className="r2g-pagina r2g-pagina-calendario">
-      <EncabezadoPagina titulo="Calendario de instalaciones" dato={datoEncabezado}
-        secundarias={[{ texto: `Equipos (${equiposHoja.length})`, icono: Users, alHacer: () => setVerEquipos(true), deshabilitado: !equiposHoja.length, motivo: 'La hoja del mes todavía no trae la distribución' }]}
-        masAcciones={masAcciones} />
+      <EncabezadoPagina titulo="Calendario" dato={datoEncabezado} masAcciones={masAcciones} />
       {ultimaActualizacion && <span className="r2-solo-lectores">Datos de {fechaExacta(ultimaActualizacion)}</span>}
+      <DistribucionEquipos equipos={equiposHoja} mes={nombreMes(distribucionEquipos?.mes || mesActual)} colorDeEquipo={colorDeEquipo}
+        equipoElegido={equipo} alElegir={(e) => elegirEquipo(equipo === e ? '' : e)} />
       {barra}
       {chips}
       {resumen}
       {cuerpo}
 
-      <CajonEquipos abierto={verEquipos} alCerrar={() => setVerEquipos(false)} equipos={equiposHoja} mes={nombreMes(distribucionEquipos?.mes || mesActual)}
-        colorDeEquipo={colorDeEquipo} equipoElegido={equipo} alElegir={(e) => { elegirEquipo(e); setVerEquipos(false); }} />
       {modal}
     </Pagina>
   );
@@ -317,13 +339,15 @@ function MesCalendario({ mapa, mesActual, hoy, filtro, abrir, colorDeEquipo, alV
                 {vistas.map((x, i) => {
                   const falla = x.equipoHora === 'FALLA';
                   const color = !falla && (colorDeEquipo(x.equipoHora) || colorRgb(x.colorHora));
+                  const ComoEvento = x.virtual ? 'div' : 'button';
                   return (
                     <li key={`${d.clave}-${i}`}>
-                      <button type="button" className={clases('r2g-evento', falla && 'r2g-evento--falla')} style={color ? { '--r2g-color': color } : undefined}
-                        onClick={() => abrir(x, d)} title={[x.hora, x.nombre, falla ? `Falla${x.nota ? `: ${x.nota}` : ''}` : nombreEquipo(x.equipoHora)].filter(Boolean).join(' · ')}>
+                      <ComoEvento type={x.virtual ? undefined : 'button'} className={clases('r2g-evento', falla && 'r2g-evento--falla', x.virtual && 'r2g-evento--taller')} style={color ? { '--r2g-color': color } : undefined}
+                        onClick={x.virtual ? undefined : () => abrir(x, d)} title={[x.hora, x.nombre, x.etiqueta, falla ? `Falla${x.nota ? `: ${x.nota}` : ''}` : nombreEquipo(x.equipoHora)].filter(Boolean).join(' · ')}>
                         {x.hora && <span className="r2g-evento-hora">{x.hora}</span>}
+                        {x.virtual && <span className="r2g-evento-area">{nombreEquipo(x.equipoHora)}</span>}
                         <span className="r2g-evento-nombre">{x.nombre}</span>
-                      </button>
+                      </ComoEvento>
                     </li>
                   );
                 })}
@@ -387,42 +411,31 @@ function AgendaMes({ mapa, mesActual, hoy, filtro, abrir, colorDeEquipo, equipo,
   );
 }
 
-// Distribución de equipos del mes (antes ocupaba la primera pantalla)
-function CajonEquipos({ abierto, alCerrar, equipos, mes, colorDeEquipo, equipoElegido, alElegir }) {
+// Distribución de equipos del mes, siempre visible arriba (a pedido del usuario, 19-oct-2026). Tocar un equipo filtra sus obras.
+function DistribucionEquipos({ equipos, mes, colorDeEquipo, equipoElegido, alElegir }) {
+  if (!equipos.length) return null;
   return (
-    <Cajon abierto={abierto} alCerrar={alCerrar} etiqueta="Distribución de equipos">
-      <CajonCabecera titulo="Distribución de equipos" dato={`${mes} · ${plural(equipos.length, 'equipo', 'equipos')}`} alCerrar={alCerrar} />
-      <CajonCuerpo>
-        {equipos.length === 0 ? (
-          <Vacio icono={Users} titulo="Sin distribución este mes" texto="La hoja del CALENDARIO todavía no trae la tabla de equipos." compacto />
-        ) : (
-          <SeccionCajon>
-            <ul className="r2g-equipos">
-              {equipos.map((e, i) => {
-                const clave = String(e.tipoEquipo || e.nombre || '').toUpperCase();
-                const [responsable, ...resto] = e.integrantes || [];
-                return (
-                  <li key={`${clave}-${i}`} className="r2g-equipos-fila">
-                    <div className="r2g-equipos-nombre">
-                      <span className="r2g-equipo r2g-equipo--grande">
-                        <span className="r2g-punto" style={colorDeEquipo(clave) ? { background: colorDeEquipo(clave) } : undefined} aria-hidden="true" />
-                        {nombreEquipo(e.nombre)}
-                      </span>
-                      {responsable && <span className="r2g-sec">Responsable: <b className="r2g-fuerte">{oracionNombre(responsable)}</b></span>}
-                      {resto.length > 0 && <span className="r2g-sec">{resto.map(oracionNombre).join(', ')}</span>}
-                    </div>
-                    <Boton nivel={equipoElegido === clave ? 'tonal' : 'fantasma'} tamano="chico" icono={equipoElegido === clave ? X : undefined}
-                      alHacer={() => alElegir(equipoElegido === clave ? '' : clave)}>
-                      {equipoElegido === clave ? 'Ver todos' : 'Ver sus obras'}
-                    </Boton>
-                  </li>
-                );
-              })}
-            </ul>
-          </SeccionCajon>
-        )}
-      </CajonCuerpo>
-    </Cajon>
+    <section className="r2g-distribucion" aria-label={`Distribución de equipos de ${mes.toLowerCase()}`}>
+      <h2 className="r2g-distribucion-titulo"><Users size={16} aria-hidden="true" />Distribución de equipos · {mes}</h2>
+      <ul className="r2g-distribucion-lista">
+        {equipos.map((e, i) => {
+          const clave = String(e.tipoEquipo || e.nombre || '').toUpperCase();
+          const [responsable, ...resto] = e.integrantes || [];
+          const puesto = equipoElegido === clave;
+          return (
+            <li key={`${clave}-${i}`}>
+              <button type="button" className={clases('r2g-distribucion-equipo', puesto && 'r2g-distribucion-equipo--puesto')}
+                style={colorDeEquipo(clave) ? { '--r2g-color': colorDeEquipo(clave) } : undefined}
+                onClick={() => alElegir(clave)} aria-pressed={puesto} title={puesto ? 'Ver todos los equipos' : 'Ver solo las obras de este equipo'}>
+                <span className="r2g-distribucion-nombre">{nombreEquipo(e.nombre)}</span>
+                {responsable && <span className="r2g-distribucion-resp">{oracionNombre(responsable)}</span>}
+                {resto.length > 0 && <span className="r2g-distribucion-gente">{resto.map(oracionNombre).join(', ')}</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
