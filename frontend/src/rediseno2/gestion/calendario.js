@@ -116,6 +116,8 @@ export function textoRango(inicio, fin, conAnio = false) {
 }
 /** «lun 12» */
 export const diaCorto = (f) => `${DIAS_CORTOS[f.getDay()]} ${f.getDate()}`;
+/** «lun» (el día de la semana solo, para la cabecera del calendario) */
+export const diaSemanaCorto = (f) => DIAS_CORTOS[f.getDay()];
 /** «viernes 16 oct» */
 export const diaLargo = (f) => `${DIAS_LARGOS[f.getDay()]} ${f.getDate()} ${MESES_CORTOS[f.getMonth()]}`;
 /** «viernes 16 de octubre» */

@@ -103,6 +103,14 @@ export default function VistaCalendario(p) {
     }
   };
 
+  // Del mes a la semana de ese día (al tocar el número del día o «N más»)
+  const verSemanaDe = (fecha) => {
+    setVista('semana');
+    guardarPreferencia(CLAVE_VISTA, 'semana');
+    setVerAnteriores(false);
+    setSemanas(Math.round((lunesDe(fecha) - lunesDe(hoy)) / (7 * 86400000)));
+  };
+
   const abrir = (proyecto, dia) => setProyectoSeleccionado({ proyecto, dia: dia.numero, mes: dia.mesTab || mesActual });
 
   const totalSemana = dias.reduce((n, d) => n + d.proyectos.filter((x) => (filtro ? filtro(x) : true)).length, 0);
@@ -185,6 +193,12 @@ export default function VistaCalendario(p) {
     cuerpo = <ErrorCarga mensaje="No se pudo cargar el calendario." motivo={motivoError(errorCarga)} alReintentar={() => cargarCalendario(false)} />;
   } else if (!calendario) {
     cuerpo = <Vacio icono={CalendarDays} titulo="El calendario de este mes no tiene semanas" texto="Cuando se capturen las obras del mes en la hoja del CALENDARIO aparecerán aquí." />;
+  } else if (vista === 'mes' && !celular) {
+    cuerpo = (
+      <div className="r2g-semana-marco" style={escalaNormal !== 100 ? { zoom: escalaNormal / 100 } : undefined}>
+        <MesCalendario mapa={mapa} mesActual={mesActual} hoy={hoy} filtro={filtro} abrir={abrir} colorDeEquipo={colorDeEquipo} alVerSemana={verSemanaDe} />
+      </div>
+    );
   } else if (vista === 'mes') {
     cuerpo = <AgendaMes mapa={mapa} mesActual={mesActual} hoy={hoy} filtro={filtro} abrir={abrir} colorDeEquipo={colorDeEquipo} equipo={equipo} quitarFiltro={() => elegirEquipo('')} />;
   } else if (celular) {
@@ -267,7 +281,63 @@ function EsqueletoSemana() {
   );
 }
 
-// Mes: agenda por día (solo los días con obras), una tabla con un grupo por día
+// Mes en escritorio: cuadrícula de calendario (lunes a domingo), cada obra como un evento con el color de su equipo
+const MES_CABEN = 4;
+const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+function MesCalendario({ mapa, mesActual, hoy, filtro, abrir, colorDeEquipo, alVerSemana }) {
+  const iMes = MESES.indexOf(mesActual);
+  // Año del mes que se ve: el de hoy, salvo diciembre ↔ enero
+  const anio = hoy.getFullYear() + (hoy.getMonth() === 11 && iMes === 0 ? 1 : hoy.getMonth() === 0 && iMes === 11 ? -1 : 0);
+  const primero = new Date(anio, iMes, 1);
+  const inicio = lunesDe(primero);
+  const ultimo = new Date(anio, iMes + 1, 0);
+  const semanas = Math.ceil((Math.round((ultimo - inicio) / 86400000) + 1) / 7);
+  const dias = diasDeRango(mapa, inicio, semanas * 7);
+  return (
+    <div className="r2g-mes" role="grid" aria-label={`Calendario de ${nombreMes(mesActual).toLowerCase()}`}>
+      <div className="r2g-mes-cab" role="row">
+        {DIAS_SEMANA.map((n) => <div key={n} role="columnheader" className="r2g-mes-cab-dia">{n}</div>)}
+      </div>
+      <div className="r2g-mes-cuerpo" style={{ gridTemplateRows: `repeat(${semanas}, minmax(132px, 1fr))` }}>
+        {dias.map((d) => {
+          const fuera = d.fecha.getMonth() !== iMes;
+          const esHoy = mismoDia(d.fecha, hoy);
+          const obras = d.proyectos.filter((x) => (filtro ? filtro(x) : true)).sort((a, b) => minutosDe(a.hora) - minutosDe(b.hora));
+          const vistas = obras.length > MES_CABEN ? obras.slice(0, MES_CABEN - 1) : obras;
+          const sobran = obras.length - vistas.length;
+          return (
+            <div key={d.clave} role="gridcell" className={clases('r2g-mes-dia', fuera && 'r2g-mes-dia--fuera', esHoy && 'r2g-mes-dia--hoy', d.asueto && 'r2g-mes-dia--asueto', [0, 6].includes(d.fecha.getDay()) && 'r2g-mes-dia--finde')}
+              aria-label={`${diaLargo(d.fecha)}${esHoy ? ', hoy' : ''}: ${plural(obras.length, 'obra', 'obras')}`}>
+              <div className="r2g-mes-dia-cab">
+                <button type="button" className="r2g-mes-num" onClick={() => alVerSemana(d.fecha)} title="Ver esta semana">{d.fecha.getDate()}</button>
+                {d.asueto && <span className="r2g-asueto">Asueto</span>}
+              </div>
+              <ul className="r2g-mes-obras">
+                {vistas.map((x, i) => {
+                  const falla = x.equipoHora === 'FALLA';
+                  const color = !falla && (colorDeEquipo(x.equipoHora) || colorRgb(x.colorHora));
+                  return (
+                    <li key={`${d.clave}-${i}`}>
+                      <button type="button" className={clases('r2g-evento', falla && 'r2g-evento--falla')} style={color ? { '--r2g-color': color } : undefined}
+                        onClick={() => abrir(x, d)} title={[x.hora, x.nombre, falla ? `Falla${x.nota ? `: ${x.nota}` : ''}` : nombreEquipo(x.equipoHora)].filter(Boolean).join(' · ')}>
+                        {x.hora && <span className="r2g-evento-hora">{x.hora}</span>}
+                        <span className="r2g-evento-nombre">{x.nombre}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {sobran > 0 && <button type="button" className="r2g-mes-mas" onClick={() => alVerSemana(d.fecha)}>{sobran === 1 ? '1 más' : `${sobran} más`}</button>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Mes en celular: agenda por día (solo los días con obras), una tabla con un grupo por día
 function AgendaMes({ mapa, mesActual, hoy, filtro, abrir, colorDeEquipo, equipo, quitarFiltro }) {
   const iMes = MESES.indexOf(mesActual);
   const diasMes = diasDelMes(mapa, iMes);

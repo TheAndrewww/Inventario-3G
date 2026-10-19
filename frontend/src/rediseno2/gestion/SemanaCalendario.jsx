@@ -19,7 +19,7 @@ import { AlertTriangle } from 'lucide-react';
 import { TipoTrabajo } from '../fundacion/piezas/Estado';
 import { clases } from '../fundacion/formato';
 import { colorRgb, mismoTexto, nombreEquipo } from './comunes';
-import { diaCorto, diaLargo, minutosDe, mismoDia, relativoDia } from './calendario';
+import { diaCorto, diaLargo, diaSemanaCorto, minutosDe, mismoDia, relativoDia } from './calendario';
 import './gestion.css';
 
 const TIPOS_CON_ETIQUETA = ['MANTENIMIENTO', 'GARANTIA', 'GARANTÍA'];
@@ -76,9 +76,11 @@ function Obra({ p, dia, alAbrir, colorDeEquipo, variante }) {
     );
   }
 
+  const color = !falla && (colorDeEquipo?.(p.equipoHora) || colorRgb(p.colorHora));
   return (
     <li>
       <Como type={alAbrir ? 'button' : undefined} className={clases('r2g-obra', falla && 'r2g-obra--falla')}
+        style={color ? { '--r2g-color': color } : undefined}
         onClick={alAbrir ? () => alAbrir(p, dia) : undefined} title={alAbrir ? 'Ver la carpeta de ventas de este proyecto' : undefined}
         aria-label={alAbrir ? `${accesible}. Ver la carpeta de ventas` : undefined}>
         <span className="r2g-obra-cab">
@@ -130,7 +132,7 @@ export default function SemanaCalendario({
   }
 
   return (
-    <div className={clases('r2g-semana', variante === 'tv' && 'r2g-semana--tv', className)} role="list" aria-label={etiqueta}>
+    <div className={clases('r2g-semana', variante === 'tv' ? 'r2g-semana--tv' : 'r2g-semana--oficina', className)} role="list" aria-label={etiqueta}>
       {dias.map((d) => {
         const todas = visibles(d);
         const esHoy = mismoDia(d.fecha, hoy);
@@ -142,11 +144,20 @@ export default function SemanaCalendario({
         return (
           <section key={d.clave} role="listitem" className={clases('r2g-dia', esHoy && 'r2g-dia--hoy', d.asueto && 'r2g-dia--asueto', lleno && 'r2g-dia--lleno')}
             aria-label={`${diaLargo(d.fecha)}${esHoy ? ', hoy' : ''}${d.asueto ? ', asueto' : ''}: ${todas.length === 1 ? '1 obra' : `${todas.length} obras`}`}>
-            <header className="r2g-dia-cab">
-              <span className="r2g-dia-nombre">{diaCorto(d.fecha)}</span>
-              {esHoy && <span className="r2g-dia-hoy">Hoy</span>}
-              {d.asueto && <span className="r2g-asueto">Asueto</span>}
-            </header>
+            {tv ? (
+              <header className="r2g-dia-cab">
+                <span className="r2g-dia-nombre">{diaCorto(d.fecha)}</span>
+                {esHoy && <span className="r2g-dia-hoy">Hoy</span>}
+                {d.asueto && <span className="r2g-asueto">Asueto</span>}
+              </header>
+            ) : (
+              // Oficina: como un calendario de pared, el día de la semana chico y el número grande (hoy en círculo)
+              <header className="r2g-dia-cab r2g-dia-cab--cal">
+                <span className="r2g-dia-semana">{diaSemanaCorto(d.fecha)}</span>
+                <span className="r2g-dia-numero">{d.fecha.getDate()}</span>
+                {d.asueto && <span className="r2g-asueto">Asueto</span>}
+              </header>
+            )}
             {obras.length ? (
               <ul className="r2g-dia-obras">
                 {obras.map((p, i) => <Obra key={`${d.clave}-${i}`} p={p} dia={d} alAbrir={alAbrir} colorDeEquipo={colorDeEquipo} variante={variante} />)}

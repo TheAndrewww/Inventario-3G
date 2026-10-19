@@ -508,3 +508,68 @@
    conservan su borde para que se note lo que falta calificar. Siguen siendo el mismo botón. */
 :root[data-diseno="3g"] .r2g-celda-campana--futura { border-color: transparent; background: color-mix(in srgb, var(--g3-contenedor) 55%, transparent); }
 :root[data-diseno="3g"] button.r2g-celda-campana--futura:hover { border-color: var(--g3-linea-fuerte); }
+
+/* ═════ Calendario de oficina con forma de calendario (19-oct-2026, a pedido del usuario: «que se vea como un calendario y
+   no como una tabla de Excel»). Semana: el día chico y el número grande, hoy en círculo, cada obra con el color de su
+   equipo. Mes: cuadrícula lunes a domingo con eventos. --r2g-color = color del equipo (identidad, de la hoja). ═════ */
+:root[data-diseno="3g"] .r2g-semana--oficina {
+  border: 1px solid var(--g3-linea); border-radius: 14px; overflow: hidden; background: var(--g3-superficie);
+}
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-dia--hoy { background: var(--g3-primario-tinte); }
+:root[data-diseno="3g"] .r2g-dia-cab--cal {
+  flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 76px; padding: 8px 6px;
+  background: var(--g3-superficie);
+}
+:root[data-diseno="3g"] .r2g-dia-semana { font: 600 0.75rem/1rem var(--g3-f-texto); letter-spacing: 0.06em; text-transform: uppercase; color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2g-dia-numero {
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%;
+  font: 500 1.5rem/1 var(--g3-f-titulo, var(--g3-f-texto)); font-variant-numeric: tabular-nums; color: var(--g3-tinta);
+}
+:root[data-diseno="3g"] .r2g-dia--hoy .r2g-dia-semana { color: var(--g3-primario); }
+:root[data-diseno="3g"] .r2g-dia--hoy .r2g-dia-numero { background: var(--g3-primario); color: var(--g3-sobre-primario); font-weight: 600; }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-obra {
+  border-left: 4px solid var(--r2g-color, var(--g3-tinta-3));
+  background: color-mix(in srgb, var(--r2g-color, var(--g3-tinta-3)) 14%, var(--g3-superficie));
+  border-radius: 8px;
+}
+:root[data-diseno="3g"] .r2g-semana--oficina button.r2g-obra:hover { background: color-mix(in srgb, var(--r2g-color, var(--g3-tinta-3)) 24%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-semana--oficina .r2g-obra--falla { border-left-color: var(--g3-mal); background: color-mix(in srgb, var(--g3-mal) 10%, var(--g3-superficie)); }
+
+/* Mes: cuadrícula */
+:root[data-diseno="3g"] .r2g-mes { border: 1px solid var(--g3-linea); border-radius: 14px; overflow: hidden; background: var(--g3-superficie); }
+:root[data-diseno="3g"] .r2g-mes-cab { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2g-mes-cab-dia { padding: 10px 8px; text-align: center; font: 600 0.75rem/1rem var(--g3-f-texto); letter-spacing: 0.06em; text-transform: uppercase; color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2g-mes-cuerpo { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+:root[data-diseno="3g"] .r2g-mes-dia {
+  min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 6px 6px 8px;
+  border-right: 1px solid var(--g3-linea); border-bottom: 1px solid var(--g3-linea);
+}
+:root[data-diseno="3g"] .r2g-mes-dia:nth-child(7n) { border-right: 0; }
+:root[data-diseno="3g"] .r2g-mes-dia--finde { background: color-mix(in srgb, var(--g3-contenedor) 45%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-mes-dia--hoy { background: var(--g3-primario-tinte); }
+:root[data-diseno="3g"] .r2g-mes-dia--fuera .r2g-mes-num { color: var(--g3-tinta-3); }
+:root[data-diseno="3g"] .r2g-mes-dia--fuera .r2g-mes-obras { opacity: 0.55; }
+:root[data-diseno="3g"] .r2g-mes-dia-cab { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+:root[data-diseno="3g"] .r2g-mes-num {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 6px; border: 0; border-radius: 15px;
+  background: transparent; font: 600 0.9375rem/1 var(--g3-f-texto); font-variant-numeric: tabular-nums; color: var(--g3-tinta); cursor: pointer;
+}
+:root[data-diseno="3g"] .r2g-mes-num:hover { background: var(--g3-contenedor); }
+:root[data-diseno="3g"] .r2g-mes-dia--hoy .r2g-mes-num { background: var(--g3-primario); color: var(--g3-sobre-primario); }
+:root[data-diseno="3g"] .r2g-mes-obras { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; min-width: 0; }
+:root[data-diseno="3g"] .r2g-mes-obras > li { min-width: 0; }
+:root[data-diseno="3g"] .r2g-evento {
+  display: flex; align-items: baseline; gap: 6px; width: 100%; min-width: 0; margin: 0; padding: 3px 6px; border: 0; border-radius: 6px;
+  border-left: 3px solid var(--r2g-color, var(--g3-tinta-3));
+  background: color-mix(in srgb, var(--r2g-color, var(--g3-tinta-3)) 16%, var(--g3-superficie));
+  color: var(--g3-tinta); text-align: left; font: 500 0.8125rem/1.125rem var(--g3-f-texto); cursor: pointer; overflow: hidden;
+}
+:root[data-diseno="3g"] .r2g-evento:hover { background: color-mix(in srgb, var(--r2g-color, var(--g3-tinta-3)) 28%, var(--g3-superficie)); }
+:root[data-diseno="3g"] .r2g-evento--falla { border-left-color: var(--g3-mal); background: color-mix(in srgb, var(--g3-mal) 12%, var(--g3-superficie)); color: var(--g3-mal); }
+:root[data-diseno="3g"] .r2g-evento-hora { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2g-evento-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-diseno="3g"] .r2g-mes-mas {
+  align-self: flex-start; margin: 0; padding: 2px 6px; border: 0; border-radius: 6px; background: transparent;
+  font: 600 0.8125rem/1.125rem var(--g3-f-texto); color: var(--g3-tinta-2); cursor: pointer;
+}
+:root[data-diseno="3g"] .r2g-mes-mas:hover { background: var(--g3-contenedor); color: var(--g3-tinta); }
