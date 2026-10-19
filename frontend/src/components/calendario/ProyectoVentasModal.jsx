@@ -87,6 +87,8 @@ const ProyectoVentasModal = ({ isOpen, onClose, proyecto, mes, dia }) => {
           <Dato etiqueta="Tipo" valor={tipo ? (tipoTrabajo(tipo)?.texto === String(tipo).trim() ? oracion(tipo) : tipoTrabajo(tipo)?.texto) : null} />
           <Dato etiqueta="Etapa" valor={info?.etapa_actual ? estadoDe('etapa', info.etapa_actual).texto : null} />
           <Dato etiqueta="Equipo" valor={falla ? 'Falla' : (proyecto?.equipoHora ? nombreEquipo(proyecto.equipoHora) : null)} />
+          {/* Entregas de taller del calendario: «Entrega de manufactura», «Entrega de soldadura», «Entrega de pintura» */}
+          <Dato etiqueta="Trabajo" valor={proyecto?.etiqueta} />
           {proyecto?.nota && <Dato etiqueta={falla ? 'Motivo de la falla' : 'Nota del calendario'} valor={proyecto.nota} />}
           {info?.pausado && <Dato etiqueta="Pausada" valor={info.pausado_motivo || 'Sí'} />}
           {/* Producción del mismo proyecto (cruzado por nombre en el servidor) */}

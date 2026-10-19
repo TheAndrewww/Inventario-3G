@@ -7,6 +7,9 @@
 // Todo sale de CalendarioPage: los tres meses que ya carga, el cambio de mes (cambiarMes / setMesActual), el sondeo de 2 min,
 // la escala guardada y la pantalla completa. Esta vista no pide nada.
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { rolPuedeVer } from '../../components/layout/Sidebar';
 import { ChevronLeft, ChevronRight, Users, RefreshCw, Maximize2, ZoomIn, ZoomOut, CalendarDays, Rows3 } from 'lucide-react';
 import {
   Pagina, EncabezadoPagina, Boton, BotonIcono, Segmentado, FiltroMenu, Tabla,
@@ -57,7 +60,13 @@ export default function VistaCalendario(p) {
   const mapaHoja = useMemo(() => armarDias({ actual: calendario, anterior: calendarioMesAnterior, siguiente: calendarioSiguienteMes, mesActual }),
     [calendario, calendarioMesAnterior, calendarioSiguienteMes, mesActual]);
   const taller = useTallerCalendario();
-  const mapa = useMemo(() => juntarTaller(mapaHoja, taller), [mapaHoja, taller]);
+  // Un pedido de almacén abre su orden de compra; quien no ve Órdenes de Compra no tiene a dónde ir
+  const { user } = useAuth();
+  const irA = useNavigate();
+  const verOrdenes = rolPuedeVer(user?.rol, '/ordenes-compra');
+  const mapa = useMemo(() => juntarTaller(mapaHoja, verOrdenes ? taller
+    : taller.map((t) => (t.proyecto.origen === 'compras' ? { ...t, proyecto: { ...t.proyecto, sinAbrir: true } } : t))),
+  [mapaHoja, taller, verOrdenes]);
 
   // Colores de cada equipo (identidad, de la hoja) y lista para el filtro
   const equiposHoja = useMemo(() => distribucionEquipos?.equipos || [], [distribucionEquipos]);
@@ -132,8 +141,13 @@ export default function VistaCalendario(p) {
     setSemanas(Math.round((lunesDe(fecha) - lunesDe(hoy)) / (7 * 86400000)));
   };
 
-  // Lo que viene del panel de producción o de compras no tiene carpeta de ventas: no se abre
-  const abrir = (proyecto, dia) => !proyecto?.virtual && setProyectoSeleccionado({ proyecto, dia: dia.numero, mes: dia.mesTab || mesActual });
+  // Obra de la hoja o entrega de taller (manufactura, soldadura, pintura): ventas y producción del proyecto.
+  // Pedido de almacén: su orden de compra.
+  const abrir = (proyecto, dia) => {
+    if (!proyecto || proyecto.sinAbrir) return;
+    if (proyecto.origen === 'compras') { irA(`/ordenes-compra?orden=${encodeURIComponent(proyecto.folio)}`); return; }
+    setProyectoSeleccionado({ proyecto, dia: dia.numero, mes: dia.mesTab || mesActual });
+  };
 
   const totalSemana = dias.reduce((n, d) => n + d.proyectos.filter((x) => (filtro ? filtro(x) : true)).length, 0);
   const fallas = dias.reduce((n, d) => n + d.proyectos.filter((x) => x.equipoHora === 'FALLA').length, 0);
@@ -339,11 +353,11 @@ function MesCalendario({ mapa, mesActual, hoy, filtro, abrir, colorDeEquipo, alV
                 {vistas.map((x, i) => {
                   const falla = x.equipoHora === 'FALLA';
                   const color = !falla && (colorDeEquipo(x.equipoHora) || colorRgb(x.colorHora));
-                  const ComoEvento = x.virtual ? 'div' : 'button';
+                  const ComoEvento = x.sinAbrir ? 'div' : 'button';
                   return (
                     <li key={`${d.clave}-${i}`}>
-                      <ComoEvento type={x.virtual ? undefined : 'button'} className={clases('r2g-evento', falla && 'r2g-evento--falla', x.virtual && 'r2g-evento--taller')} style={color ? { '--r2g-color': color } : undefined}
-                        onClick={x.virtual ? undefined : () => abrir(x, d)} title={[x.hora, x.nombre, x.etiqueta, falla ? `Falla${x.nota ? `: ${x.nota}` : ''}` : nombreEquipo(x.equipoHora)].filter(Boolean).join(' · ')}>
+                      <ComoEvento type={x.sinAbrir ? undefined : 'button'} className={clases('r2g-evento', falla && 'r2g-evento--falla', x.sinAbrir && 'r2g-evento--taller')} style={color ? { '--r2g-color': color } : undefined}
+                        onClick={x.sinAbrir ? undefined : () => abrir(x, d)} title={[x.hora, x.nombre, x.etiqueta, falla ? `Falla${x.nota ? `: ${x.nota}` : ''}` : nombreEquipo(x.equipoHora)].filter(Boolean).join(' · ')}>
                         {x.hora && <span className="r2g-evento-hora">{x.hora}</span>}
                         {x.virtual && <span className="r2g-evento-area">{nombreEquipo(x.equipoHora)}</span>}
                         <span className="r2g-evento-nombre">{x.nombre}</span>

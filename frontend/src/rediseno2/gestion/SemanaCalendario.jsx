@@ -52,8 +52,8 @@ function Obra({ p, dia, alAbrir, colorDeEquipo, variante }) {
   const cliente = p.cliente && !mismoTexto(p.cliente, p.nombre) ? p.cliente : null;
   const tipo = TIPOS_CON_ETIQUETA.includes(String(p.tipoProyecto || '').toUpperCase()) ? <TipoTrabajo tipo={p.tipoProyecto} /> : null;
   const falla = p.equipoHora === 'FALLA';
-  // Lo que viene del panel de producción o de compras (p.virtual) no tiene carpeta de ventas: no se toca
-  if (p.virtual) alAbrir = undefined;
+  // Taller: lo de producción abre ventas y producción; un pedido de almacén abre su orden (sinAbrir: el rol no ve órdenes)
+  if (p.sinAbrir) alAbrir = undefined;
   const Como = alAbrir ? 'button' : 'div';
   const accesible = [p.hora, p.nombre, cliente, falla ? 'falla' : nombreEquipo(p.equipoHora)].filter(Boolean).join(', ');
 

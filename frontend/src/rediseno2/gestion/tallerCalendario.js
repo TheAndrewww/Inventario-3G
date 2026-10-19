@@ -75,6 +75,7 @@ export function armarTaller(proyectos, ordenes) {
       proyecto: {
         nombre: o.proveedor?.nombre || 'Proveedor sin nombre',
         cliente: o.ticket_id || '',
+        folio: o.ticket_id || String(o.id),
         hora: '',
         tipoProyecto: 'NORMAL',
         equipoHora: 'ALMACEN',
