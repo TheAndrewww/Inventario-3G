@@ -181,6 +181,13 @@ export const leerCitasCercanas = async (hoy = hoyMexico()) => {
     return citas;
 };
 
+/** El mes anterior COMPLETO, solo para saber si un MTO ya se retiró (no para fechas de instalación). */
+export const leerCitasMesAnterior = async (hoy = hoyMexico()) => {
+    const anterior = MESES[(Number(hoy.slice(5, 7)) + 10) % 12];
+    const r = await conReintento(() => leerCalendarioMes(anterior), anterior);
+    return r?.data?.proyectos || [];
+};
+
 /**
  * Sheets falla de vez en cuando por cuota, y ahí el calendario se cae entero: la agenda
  * contesta con la fecha del Índice y un proyecto que hoy se instala parece haberse recorrido.
@@ -205,7 +212,7 @@ const conReintento = async (fn, etiqueta, intentos = 3) => {
  * Fecha de instalación que manda para cada proyecto, con la regla del dashboard.
  * @returns {Map<number, {fecha: string|null, fuente: 'calendario'|'indice'}>}
  */
-export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico()) => {
+export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico(), { citasAnteriores = [] } = {}) => {
     const mesEnCurso = hoy.slice(0, 7);
     const mapa = citasPorNombre(citas);
 
@@ -275,6 +282,17 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico()) =
         if (fecha) citaDe.set(id, fecha);
     }
 
+    // ¿Ya hubo un RETIRO antes de la cita? Un MTO primero se retira de la obra, llega al taller y
+    // luego se reinstala: solo esa reinstalación le toca a producción (regla del usuario,
+    // 19-oct-2026). Una cita MTO sin retiro antes ES el retiro, aunque no lo diga (LUIS RÍOS).
+    // Se mira también el mes anterior completo, porque el retiro suele ir semanas antes.
+    const retiros = Object.entries(citasPorNombre([...citasAnteriores, ...(citas || [])]))
+        .flatMap(([n, l]) => l.filter(c => c.retiro).map(c => ({ base: nombreBase(n), fecha: c.fecha })));
+    const huboRetiro = (id, cita) => {
+        const bases = new Set((nombresDeProyecto.get(id) || []).map(nombreBase));
+        return retiros.some(r => bases.has(r.base) && r.fecha < cita);
+    };
+
     const res = new Map();
     for (const p of proyectos) {
         const indice = p.fecha_limite || null;
@@ -283,7 +301,7 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico()) =
         if (cita && (soloCalendario || !indice || cita <= indice || cita.slice(0, 7) <= mesEnCurso)) {
             // conHora (D8 · PLA-22): ese día tiene una cita con hora, no solo la fecha límite. Nadie más lo lee.
             const conHora = (nombresDeProyecto.get(p.id) || []).some(n => (mapa[n] || []).some(c => c.fecha === cita && !c.retiro && c.conHora));
-            res.set(p.id, { fecha: cita, fuente: 'calendario', conHora });
+            res.set(p.id, { fecha: cita, fuente: 'calendario', conHora, retiroPrevio: huboRetiro(p.id, cita) });
         } else {
             res.set(p.id, { fecha: indice, fuente: 'indice' });
         }

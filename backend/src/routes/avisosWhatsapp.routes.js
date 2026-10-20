@@ -7,7 +7,7 @@
 
 import express from 'express';
 import { Op } from 'sequelize';
-import { proyectosAbiertos, resolverFechasInstalacion, leerCitasCercanas, resumenProduccion } from '../services/fechaInstalacion.service.js';
+import { proyectosAbiertos, resolverFechasInstalacion, leerCitasCercanas, leerCitasMesAnterior, resumenProduccion } from '../services/fechaInstalacion.service.js';
 import { obtenerDistribucionEquipos } from '../services/googleSheets.service.js';
 import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor, ProduccionProyecto, SolicitudCompra, Movimiento, DetalleMovimiento, Equipo } from '../models/index.js';
 import { urlSolicitudes } from '../services/barridoCompras.service.js';
@@ -595,7 +595,9 @@ router.get('/produccion/agenda', async (req, res) => {
         let fechas = null;
         let calendarioLeido = false;
         try {
-            fechas = resolverFechasInstalacion(proyectos, await leerCitasCercanas());
+            // El mes anterior solo sirve para ver retiros; si no se puede leer, el MTO no se pregunta.
+            const citasAnteriores = await leerCitasMesAnterior().catch(() => []);
+            fechas = resolverFechasInstalacion(proyectos, await leerCitasCercanas(), undefined, { citasAnteriores });
             calendarioLeido = true;
         } catch (e) {
             // Sin calendario se contesta con la col D, como antes: mejor un aviso con la fecha
@@ -613,6 +615,9 @@ router.get('/produccion/agenda', async (req, res) => {
                 fecha_instalacion: fecha,
                 fecha_indice: p.fecha_limite,
                 etapa_actual: p.etapa_actual,
+                // MTO: a Charly solo se le pregunta si ya hubo un retiro antes (ver huboRetiro).
+                es_mto: String(p.tipo_proyecto || '').toUpperCase() === 'MTO' || /\bMTO\b/i.test(p.nombre || ''),
+                retiro_previo: fechas?.get(p.id)?.retiroPrevio === true,
                 ...resumenProduccion(p),
                 produccion_completado_en: p.produccion_completado_en
             }));
