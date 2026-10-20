@@ -1,62 +1,26 @@
 // Rediseño 2 · Producción · Tablero de producción (/produccion), vista encendida.
-// Antes: 4 tarjetas de números, 8 controles en dos renglones y una tarjeta de 419 px por obra (15 pantallas).
-// Ahora: encabezado con UNA acción («Nuevo proyecto»; lo raro en «Más acciones»), los filtros como tira de cifras, y una
-// obra por renglón agrupada por lo que se decide (atrasadas arriba). El detalle y los interruptores de etapa viven en el
-// cajón de la obra. Todo lo que pinta sale de la página: mismos datos, mismos filtros, mismos manejadores.
+// Encabezado con UNA acción («Nuevo proyecto»; lo raro en «Más acciones») y los filtros como tira de cifras. Debajo, desde el
+// 19-oct-2026 (a pedido del usuario: «mantén la estructura anterior con el diseño nuevo»), la tarjeta de siempre por obra
+// (botones de etapa ahí mismo, fecha máxima, cita del calendario) agrupada por lo que se decide y con color por urgencia.
+// Todo lo que pinta sale de la página: mismos datos, mismos filtros, mismos manejadores.
 import { useMemo, useState } from 'react';
 import { Plus, Monitor, Database, Cloud, FolderOpen, ArrowUpDown } from 'lucide-react';
 import {
-  Pagina, EncabezadoPagina, BarraFiltros, Tabla, Estado, plural, numero, clases, fechaCita, fechaExacta, tipoTrabajo, useEsCelular,
+  Pagina, EncabezadoPagina, BarraFiltros, Cargando, Vacio, ErrorCarga, plural, numero, clases, useEsCelular,
 } from '../fundacion';
 import ProyectoCarpetaModal from '../../components/produccion/ProyectoCarpetaModal';
-import {
-  atrasoDe, etapaDe, pasosDe, problemaDe, fechaMaximaDe, citaDe, grupoDe, agrupar, GRUPOS_TABLERO, horaDe,
-} from './obras';
-import { Segmentos, TextoTono, FechaMaxima } from './PiezasObra';
+import ProyectoTimeline from '../../components/produccion/ProyectoTimeline';
+import { atrasoDe, grupoDe, agrupar, GRUPOS_TABLERO, horaDe } from './obras';
 import { TiraFiltrosObras } from './TiraFiltrosObras';
 import { DialogoOrdenFiltros } from './DialogoOrdenFiltros';
-import { CajonObra } from './CajonObra';
 import { CajonNuevoProyecto } from './CajonNuevoProyecto';
 import './produccion.css';
 
-// Lo que cada renglón necesita, calculado una vez por obra
-const leerObra = (p) => {
-  const atraso = atrasoDe(p);
-  const pasos = pasosDe(p);
-  return { p, atraso, pasos, etapa: etapaDe(p), problema: problemaDe(p, pasos, atraso), maxima: fechaMaximaDe(p), cita: citaDe(p), grupo: grupoDe(p, atraso) };
-};
-
-function CeldaObra({ o }) {
-  const tipo = tipoTrabajo(o.p.tipo_proyecto);
-  const sub = [o.p.cliente, tipo?.texto].filter(Boolean).join(' · ');
-  return (
-    <span className="r2-prod-obra">
-      <span className="r2-prod-obra-nombre">{o.p.nombre}</span>
-      {sub && <span className="r2-prod-obra-sub r2-prod-una-linea" title={sub}>{sub}</span>}
-    </span>
-  );
-}
-
-// Etapa actual y, debajo, «Urgente» cuando la tarjeta de hoy lo marcaba (urgente sin atraso). Revisión: si la fecha
-// máxima ya sale en ámbar o rojo (vence en 3 días o menos), «Urgente» no se repite aquí: un solo aviso por renglón. Sigue
-// a la vista cuando la urgencia viene de la prioridad o de una garantía, y siempre en la cabecera del cajón.
-function CeldaEtapa({ o }) {
-  const urgente = o.atraso.esUrgente && !o.atraso.enRetraso && !o.p.pausado && !o.maxima?.tono;
-  return (
-    <span className="r2-prod-etapa">
-      <Estado tono={o.p.pausado ? 'neutro' : o.etapa.tono} texto={o.p.pausado ? 'Pausada' : o.etapa.texto} />
-      {urgente && <TextoTono tono="aviso" className="r2-prod-urgente">Urgente</TextoTono>}
-    </span>
-  );
-}
-
-// Lo que el renglón dice en «Avance» en escritorio: la etapa ya sale en su columna, así que no se repite
-// («Pausada» o «Por empezar» dos veces en el mismo renglón). En celular se usa el texto completo.
-const textoAvance = (o) => {
-  if (o.p.pausado) return { texto: o.p.pausado_motivo ? `Motivo: ${o.p.pausado_motivo}` : 'Sin motivo anotado', tono: 'neutro' };
-  if (o.p.etapa_actual === 'pendiente') return { texto: '', tono: null };
-  return o.problema;
-};
+// Estructura de antes con el diseño nuevo (19-oct-2026, a pedido del usuario): una TARJETA por obra con sus botones de
+// etapa ahí mismo, la fecha máxima y la cita del calendario (ProyectoTimeline, la misma de siempre), agrupadas por lo que se
+// decide. Cada grupo tiene su color (escala de urgencia): Atrasadas rojo → Vencen esta semana ámbar → En tiempo verde →
+// Listas para instalar azul → Pausadas y cerradas gris. La obra con prioridad «Urgente» lleva su marca.
+const leerObra = (p) => ({ p, grupo: grupoDe(p, atrasoDe(p)) });
 
 // Conteo por etapa que da el servidor: lo que hoy salía en las 4 tarjetas (En diseño, En compras, En producción,
 // Completado). Es informativo (no filtra); la tira de arriba cuenta lo que deja ver cada filtro, por eso pueden no coincidir.
@@ -82,12 +46,11 @@ function ResumenEtapas({ estadisticas, className }) {
 
 export default function VistaTablero({
   usuario, esAlmacen, proyectos, proyectosVisibles, proyectosFiltrados, estadisticas, loading, sincronizando, ultimaSync,
-  cargarDatos, sincronizarSheets, sincronizarDrive, regresarEtapa, crearProyecto, togglePausa, toggleEtapa,
+  cargarDatos, sincronizarSheets, sincronizarDrive, completarEtapa, completarSubEtapa, regresarEtapa, crearProyecto, togglePausa, toggleEtapa,
   filtro, setFiltro, busqueda, setBusqueda, opciones, modalOpen, setModalOpen, proyectoCarpeta, setProyectoCarpeta,
   claveOrdenFiltros, ordenarOpciones,
 }) {
   const celular = useEsCelular();
-  const [obraId, setObraId] = useState(null);
   const [ordenando, setOrdenando] = useState(false);
 
   // Orden de los filtros por persona: la MISMA clave y la MISMA regla que las píldoras de hoy (FiltrosProyectos)
@@ -107,8 +70,6 @@ export default function VistaTablero({
 
   const obras = useMemo(() => proyectosFiltrados.map(leerObra), [proyectosFiltrados]);
   const grupos = useMemo(() => agrupar(obras, (o) => o.grupo, GRUPOS_TABLERO), [obras]);
-  // El cajón sigue a la obra aunque la lista se recargue (busca la versión más nueva por id)
-  const obraAbierta = obraId != null ? proyectos.find((p) => p.id === obraId) || null : null;
 
   // Error de la primera carga: la página solo avisa con un mensaje flotante; sin datos ni estadísticas, falló
   const sinDatos = !loading && proyectos.length === 0 && Object.keys(estadisticas || {}).length === 0;
@@ -131,29 +92,6 @@ export default function VistaTablero({
     { texto: sincronizando ? 'Actualizando…' : 'Actualizar carpetas de Drive', icono: Cloud, alHacer: sincronizarDrive, deshabilitado: sincronizando, titulo: 'Actualizar carpetas y archivos desde Google Drive' },
     '-',
     { texto: 'Ordenar filtros…', icono: ArrowUpDown, alHacer: () => setOrdenando(true) },
-  ];
-
-  const columnas = [
-    { id: 'obra', titulo: 'Obra', celda: (o) => <CeldaObra o={o} /> },
-    // Anchos que se encogen entre 1440 y 1280 px para que la columna «Obra» no se quede en 170 px (nombres en 3 renglones)
-    { id: 'etapa', titulo: 'Etapa actual', ancho: 'clamp(148px, calc(168px - (1440px - 100vw) * 0.125), 168px)', celda: (o) => <CeldaEtapa o={o} /> },
-    {
-      id: 'avance', titulo: 'Avance', ancho: 'clamp(236px, calc(288px - (1440px - 100vw) * 0.325), 288px)',
-      celda: (o) => {
-        const t = textoAvance(o);
-        return (
-          <span className="r2-prod-avance">
-            <Segmentos pasos={o.pasos} />
-            <TextoTono tono={t.tono} className="r2-prod-problema">{t.texto}</TextoTono>
-          </span>
-        );
-      },
-    },
-    {
-      id: 'cita', titulo: 'Cita', ancho: 'clamp(104px, calc(112px - (1440px - 100vw) * 0.05), 112px)', ocultarEn: 'tableta',
-      celda: (o) => (o.cita ? <span className="r2-num" title={fechaExacta(o.cita)}>{fechaCita(o.cita)}</span> : <span className="r2-prod-sin-dato" title="Sin cita en el calendario">—</span>),
-    },
-    { id: 'maxima', titulo: 'Fecha máxima', ancho: 'clamp(124px, calc(136px - (1440px - 100vw) * 0.075), 136px)', celda: (o) => <FechaMaxima info={o.maxima} /> },
   ];
 
   const vacio = filtrando
@@ -179,27 +117,45 @@ export default function VistaTablero({
         activos={filtrando ? 1 : 0} alQuitar={quitarFiltros} resultados={proyectosFiltrados.length}
         vista={celular ? null : <ResumenEtapas estadisticas={estadisticas} />} />
 
-      <Tabla etiqueta="Obras" clave={(o) => o.p.id} columnas={columnas} grupos={grupos}
-        alAbrir={(o) => setObraId(o.p.id)} etiquetaAbrir={(o) => `Abrir la obra ${o.p.nombre}`} seleccionada={obraId}
-        masAcciones={celular ? undefined : (o) => [{ texto: 'Ver carpeta de la obra', icono: FolderOpen, alHacer: () => setProyectoCarpeta(o.p) }]}
-        filaCelular={(o) => ({
-          principal: o.p.nombre,
-          // El problema ya nombra la etapa («Compras · 2 días de atraso»); en celular no se repite
-          secundario: <TextoTono tono={o.problema.tono}>{o.problema.texto}</TextoTono>,
-          derecha: o.maxima ? <TextoTono tono={o.maxima.tono}>{o.maxima.texto || '—'}</TextoTono> : <span className="r2-prod-sin-dato">Sin fecha</span>,
-          debajo: <Segmentos pasos={o.pasos} />,
-        })}
-        cargando={loading}
-        error={sinDatos ? { mensaje: 'No se pudo cargar el tablero de producción.', alReintentar: cargarDatos } : null}
-        vacio={vacio} />
+      {loading && proyectos.length === 0 ? (
+        <Cargando forma="lista" filas={6} etiqueta="Cargando obras…" />
+      ) : sinDatos ? (
+        <ErrorCarga mensaje="No se pudo cargar el tablero de producción." alReintentar={cargarDatos} />
+      ) : obras.length === 0 ? (
+        <Vacio {...vacio} />
+      ) : (
+        <div className="r2-prod-tarjetas">
+          {grupos.filter((g) => g.filas.length > 0).map((g) => (
+            <section key={g.id} className={`r2-prod-grupo r2-prod-grupo--${g.id}`} aria-label={g.titulo}>
+              <h2 className="r2-prod-grupo-titulo">
+                <span className="r2-prod-grupo-punto" aria-hidden="true" />
+                {g.titulo}
+                <span className="r2-prod-grupo-n">{g.filas.length}</span>
+                {g.nota && <span className="r2-prod-grupo-nota">{g.nota}</span>}
+              </h2>
+              <div className="r2-prod-grupo-lista">
+                {g.filas.map(({ p }) => (
+                  <article key={p.id} className={clases('r2-prod-tarjeta', p.prioridad === 1 && 'r2-prod-tarjeta--urgente')}>
+                    {p.prioridad === 1 && <span className="r2-prod-tarjeta-prioridad">Prioridad urgente</span>}
+                    <ProyectoTimeline
+                      proyecto={p}
+                      onAbrirCarpeta={() => setProyectoCarpeta(p)}
+                      onCompletar={esAlmacen ? undefined : completarEtapa}
+                      onRegresar={esAlmacen ? undefined : regresarEtapa}
+                      onCompletarSubEtapa={completarSubEtapa}
+                      onTogglePausa={esAlmacen ? undefined : togglePausa}
+                      onToggleEtapa={toggleEtapa}
+                      // Calidad solo cierra producción: no mueve diseño ni compras
+                      etapasPermitidas={esAlmacen ? ['manufactura', 'herreria'] : null}
+                    />
+                  </article>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
       {celular && !loading && <ResumenEtapas estadisticas={estadisticas} className="r2-prod-resumen--pie" />}
-
-      <CajonObra proyecto={obraAbierta} abierto={Boolean(obraAbierta)} alCerrar={() => setObraId(null)}
-        onToggleEtapa={toggleEtapa}
-        onRegresar={esAlmacen ? undefined : regresarEtapa}
-        onTogglePausa={esAlmacen ? undefined : togglePausa}
-        etapasPermitidas={esAlmacen ? ['manufactura', 'herreria'] : null}
-        alAbrirCarpeta={(p) => setProyectoCarpeta(p)} />
 
       <CajonNuevoProyecto abierto={modalOpen} alCerrar={() => setModalOpen(false)} onCrear={crearProyecto} />
 

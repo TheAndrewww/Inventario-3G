@@ -287,6 +287,7 @@ const DashboardProduccionPage = () => {
                 proyectosFiltrados={proyectosFiltrados} estadisticas={estadisticas} loading={loading}
                 sincronizando={sincronizando} ultimaSync={ultimaSync} cargarDatos={cargarDatos}
                 sincronizarSheets={sincronizarSheets} sincronizarDrive={sincronizarDrive} regresarEtapa={regresarEtapa}
+                completarEtapa={completarEtapa} completarSubEtapa={completarSubEtapa}
                 crearProyecto={crearProyecto} togglePausa={togglePausa} toggleEtapa={toggleEtapa}
                 filtro={filtro} setFiltro={setFiltro} busqueda={busqueda} setBusqueda={setBusqueda} opciones={opciones}
                 modalOpen={modalOpen} setModalOpen={setModalOpen} proyectoCarpeta={proyectoCarpeta} setProyectoCarpeta={setProyectoCarpeta}

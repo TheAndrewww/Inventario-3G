@@ -229,3 +229,38 @@
   /* Carpeta: nombres de archivo a tamaño de dato */
   :root[data-diseno="3g"] .r2-prod-archivo-nombre { font-size: 0.9375rem; }
 }
+
+/* ───── Tablero con tarjetas (19-oct-2026): la estructura de antes con el diseño nuevo. Cada grupo con su color (escala
+   de urgencia): Atrasadas rojo, Vencen esta semana ámbar, En tiempo verde, Listas para instalar azul, Pausadas y cerradas
+   gris. La tarjeta de la obra (ProyectoTimeline) es la de siempre; aquí solo se le pone marco, barra y sombra. ───── */
+:root[data-diseno="3g"] .r2-prod-tarjetas { display: grid; gap: 22px; margin-top: 8px; }
+:root[data-diseno="3g"] .r2-prod-grupo { --r2p-color: #6b7280; --r2p-suave: #f3f4f6; }
+:root[data-diseno="3g"] .r2-prod-grupo--atrasadas { --r2p-color: #c62828; --r2p-suave: #fdecec; }
+:root[data-diseno="3g"] .r2-prod-grupo--semana { --r2p-color: #d97706; --r2p-suave: #fef3e2; }
+:root[data-diseno="3g"] .r2-prod-grupo--tiempo { --r2p-color: #15803d; --r2p-suave: #e7f6ec; }
+:root[data-diseno="3g"] .r2-prod-grupo--listas { --r2p-color: #1d4ed8; --r2p-suave: #e5edfd; }
+:root[data-diseno="3g"] .r2-prod-grupo-titulo {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: 0 0 10px; padding: 8px 14px;
+  border-radius: 12px; background: var(--r2p-suave); color: var(--r2p-color);
+  font: 700 0.875rem/1.25rem var(--g3-f-texto); text-transform: uppercase; letter-spacing: 0.05em;
+}
+:root[data-diseno="3g"] .r2-prod-grupo-punto { width: 10px; height: 10px; border-radius: 50%; background: var(--r2p-color); flex: none; }
+:root[data-diseno="3g"] .r2-prod-grupo-n {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 22px; padding: 0 8px; border-radius: 999px;
+  background: var(--r2p-color); color: #fff; font-size: 0.75rem; letter-spacing: 0;
+}
+:root[data-diseno="3g"] .r2-prod-grupo-nota { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-prod-grupo-lista { display: grid; gap: 12px; }
+:root[data-diseno="3g"] .r2-prod-tarjeta {
+  position: relative; border-radius: 14px; background: var(--g3-superficie);
+  border-left: 6px solid var(--r2p-color); box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 6px 18px rgba(16, 24, 40, 0.07);
+  overflow: hidden; transition: box-shadow var(--g3-rapido) ease-out, transform var(--g3-rapido) ease-out;
+}
+:root[data-diseno="3g"] .r2-prod-tarjeta:hover { box-shadow: 0 2px 4px rgba(16, 24, 40, 0.06), 0 12px 28px rgba(16, 24, 40, 0.1); }
+/* La tarjeta de siempre trae su propio margen, sombra y esquinas: dentro del marco no se duplican */
+:root[data-diseno="3g"] .r2-prod-tarjeta > div:first-of-type { margin-bottom: 0 !important; border-radius: 0; box-shadow: none; }
+:root[data-diseno="3g"] .r2-prod-tarjeta--urgente { box-shadow: 0 0 0 2px #c62828, 0 6px 18px rgba(198, 40, 40, 0.18); }
+:root[data-diseno="3g"] .r2-prod-tarjeta-prioridad {
+  position: absolute; top: 0; right: 0; z-index: 1; padding: 3px 12px; border-bottom-left-radius: 10px;
+  background: #c62828; color: #fff; font: 700 0.6875rem/1rem var(--g3-f-texto); text-transform: uppercase; letter-spacing: 0.06em;
+}
