@@ -225,3 +225,20 @@
 }
 :root[data-diseno="3g"]:not([data-vestido="no"]) .r2-cajon-titulo { font-weight: 700; }
 :root[data-diseno="3g"]:not([data-vestido="no"]) .r2-seccion-cajon-titulo { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.75rem; color: var(--g3-primario); }
+
+/* ───────────── 10. Submenú del riel (Tickets de material, Compras) ───────────── */
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-seccion { display: grid; gap: 2px; min-width: 0; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-flecha { margin-left: auto; flex: none; color: var(--g3-tinta-3); transition: transform var(--g3-rapido) ease-out; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-seccion--abierta .r2-riel-flecha { transform: rotate(180deg); }
+/* La entrada de la sección donde estás: tinte rojo (el rojo lleno es para la pantalla elegida dentro del submenú) */
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-item--en-seccion { background: var(--g3-primario-tinte); color: var(--g3-sobre-primario-suave); font-weight: 600; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-item--en-seccion > svg { color: var(--g3-primario); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-submenu {
+  display: grid; gap: 2px; margin: 2px 0 6px 21px; padding-left: 10px; border-left: 2px solid var(--g3-primario-suave);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-item--hijo { min-height: 34px; font-size: 0.8125rem; padding: 0 12px; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-item--hijo[aria-current="page"] { box-shadow: 0 3px 10px rgba(200, 16, 46, 0.25); }
+@media (min-width: 861px) and (max-width: 1200px) {
+  /* Riel compacto (solo íconos): sin flecha ni submenú; la entrada lleva a la sección */
+  :root[data-diseno="3g"] .r2-riel:not(.r2-riel--abierto) :is(.r2-riel-flecha, .r2-riel-submenu) { display: none; }
+}

@@ -41,10 +41,21 @@ export function pestanasDeRuta(ruta, rol, userId) {
 }
 
 /** Riel del rol: grupos [{id, titulo, mostrarTitulo, items:[{clave, etiqueta, icono, destino, rutas, oculto, subitems?}]}]. */
+// Submenú del riel (19-oct-2026, a pedido del usuario): las pantallas de una sección con pestañas también salen en el riel,
+// debajo de su entrada; las que el usuario ocultó no salen.
+const subitemsDe = (seccion, rol, userId, ocultos) => pestanasDeSeccion(seccion, rol, userId)
+  .map((p) => ({ clave: p.path, destino: p.path, etiqueta: PESTANA[p.path] || p.etiqueta, oculto: ocultos.has(p.path) }));
+
 export function rielR2(rol, userId, ocultos = new Set()) {
   const grupos = rielParaRol(rol, userId, ocultos);
   return grupos.map((g) => {
-    if (g.id !== 'compras') return { ...g, mostrarTitulo: g.items.length > 1 && g.id !== 'calendario' };
+    if (g.id !== 'compras') {
+      return {
+        ...g,
+        mostrarTitulo: g.items.length > 1 && g.id !== 'calendario',
+        items: g.items.map((it) => (it.seccion ? { ...it, subitems: subitemsDe(it.seccion, rol, userId, ocultos) } : it)),
+      };
+    }
     const pestanas = pestanasDeSeccion('compras', rol, userId);
     if (!pestanas.length) return null;
     const oculto = ocultos.has('compras') || pestanas.every((p) => ocultos.has(p.path));
@@ -54,7 +65,7 @@ export function rielR2(rol, userId, ocultos = new Set()) {
       items: [{
         clave: 'compras', seccion: 'compras', etiqueta: 'Compras', icono: ShoppingBag,
         destino: pestanas[0].path, rutas: pestanas.map((p) => p.path), oculto,
-        subitems: pestanas.map((p) => ({ clave: p.path, etiqueta: PESTANA[p.path] || p.etiqueta })),
+        subitems: subitemsDe('compras', rol, userId, ocultos),
       }],
     };
   }).filter(Boolean).filter((g) => g.items.length);

@@ -2,9 +2,9 @@
 // pestañas). ≥ 1201 px: 264 px con nombres. 861–1200 px: 72 px solo con íconos (nombre al pasar el cursor) y «Menú» lo abre
 // completo encima. ≤ 860 px: no se ve; «Más» de la barra inferior lo abre como cajón, con tema, apps, Mi perfil y Cerrar
 // sesión al pie. Personalizar menú: mismas claves g3-riel-ocultos / g3-riel-orden / g3-riel-suborden:<id>:compras.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { GripVertical, Eye, EyeOff, RotateCcw, Check, SlidersHorizontal, X, Menu, LogOut, Sun, Moon, SunMoon } from 'lucide-react';
+import { GripVertical, Eye, EyeOff, RotateCcw, Check, SlidersHorizontal, X, Menu, LogOut, Sun, Moon, SunMoon, ChevronDown } from 'lucide-react';
 import { useCapa } from '../useCapa';
 import { useTemaR2 } from '../useDiseno3G';
 import { iniciales, clases } from '../formato';
@@ -48,6 +48,15 @@ export function Riel({
   const ref = useRef(null);
   useCapa({ abierta: abierto, ref, alCerrar });
   const activo = (it) => it.rutas.includes(rutaActual);
+  // Secciones con submenú (Tickets de material, Compras): se despliegan al darles clic; la de la pantalla actual, abierta
+  const [abiertas, setAbiertas] = useState(() => new Set());
+  const [cerradas, setCerradas] = useState(() => new Set());
+  const desplegada = (it) => abiertas.has(it.clave) || (activo(it) && !cerradas.has(it.clave));
+  const alternar = (it) => {
+    const abrir = !desplegada(it);
+    setAbiertas((s) => { const n = new Set(s); if (abrir) n.add(it.clave); else n.delete(it.clave); return n; });
+    setCerradas((s) => { const n = new Set(s); if (abrir) n.delete(it.clave); else n.add(it.clave); return n; });
+  };
   const visibles = grupos.map((g) => ({ ...g, items: editando ? g.items : g.items.filter((it) => !it.oculto) })).filter((g) => g.items.length);
 
   return (
@@ -91,7 +100,7 @@ export function Riel({
                           {it.oculto ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                         </button>
                       </div>
-                      {it.subitems && it.subitems.length > 1 && (
+                      {it.clave === 'compras' && it.subitems && it.subitems.length > 1 && (
                         <div className="r2-riel-subitems" aria-label={`Orden de las pestañas de ${it.etiqueta}`}>
                           {it.subitems.map((s) => (
                             <div key={s.clave} className="r2-riel-item r2-riel-item--sub" draggable
@@ -100,6 +109,33 @@ export function Riel({
                               <GripVertical size={16} aria-hidden="true" className="r2-riel-asa" />
                               <span className="r2-riel-texto">{s.etiqueta}</span>
                             </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                const subs = (it.subitems || []).filter((s) => !s.oculto);
+                if (subs.length > 1) {
+                  const abiertaYa = desplegada(it);
+                  // Clic en la entrada: la despliega (y lleva a su primera pantalla si todavía no estás en la sección).
+                  // Si ya estás en ella, solo la abre o la cierra. En el riel compacto (solo íconos) lleva a la sección.
+                  return (
+                    <div key={it.clave} className={clases('r2-riel-seccion', abiertaYa && 'r2-riel-seccion--abierta')}>
+                      <Link to={it.destino} className={clases('r2-riel-item', 'r2-riel-item--padre', activo(it) && 'r2-riel-item--en-seccion')}
+                        aria-expanded={abiertaYa} title={it.etiqueta}
+                        onClick={(e) => { if (activo(it)) e.preventDefault(); alternar(it); }}>
+                        <Icono size={18} aria-hidden="true" />
+                        <span className="r2-riel-texto">{it.etiqueta}</span>
+                        <ChevronDown size={16} aria-hidden="true" className="r2-riel-flecha" />
+                      </Link>
+                      {abiertaYa && (
+                        <div className="r2-riel-submenu" role="group" aria-label={`Pantallas de ${it.etiqueta}`}>
+                          {subs.map((s) => (
+                            <Link key={s.clave} to={s.destino} className="r2-riel-item r2-riel-item--hijo"
+                              aria-current={rutaActual === s.destino ? 'page' : undefined} onClick={abierto ? alCerrar : undefined}>
+                              <span className="r2-riel-texto">{s.etiqueta}</span>
+                            </Link>
                           ))}
                         </div>
                       )}
