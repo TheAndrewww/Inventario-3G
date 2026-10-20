@@ -12,6 +12,8 @@ import './diseno-3g/planta-tv-3g.css'
 // Rediseño 2 (todo bajo :root[data-diseno="3g"]). Ver src/rediseno2/fundacion/index.js
 import './rediseno2/fundacion/r2.css'
 import './rediseno2/fundacion/r2-piso.css'
+// Vestido (19-oct-2026): color, forma y profundidad como el diseño de antes, sobre la misma estructura. Va al final de los CSS.
+import './rediseno2/fundacion/r2-vestido.css'
 import './diseno-3g/diseno-3g.js'
 // Solo el diseño nuevo (16-oct-2026): justo después del paquete, para que un «actual» guardado no lo apague al cargar
 import './diseno-3g/forzarDiseno3G.js'

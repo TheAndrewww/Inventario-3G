@@ -1,0 +1,227 @@
+/* Rediseño 2 · VESTIDO (19-oct-2026, a pedido del usuario: «se ve muy como tablas de Excel; los diseños anteriores tenían
+   más diseño, colores, forma… la estructura del nuevo me gusta pero se ve muy simple»).
+   No cambia ninguna estructura ni comportamiento: solo color, forma y profundidad, como el diseño de antes (rojo 3G, tarjetas
+   blancas con sombra y esquinas redondas, encabezados de tabla con color, estados en píldora).
+   - Se carga DESPUÉS de r2.css y r2-piso.css (main.jsx). Cada regla lleva :not([data-vestido="no"]) en :root: así gana a las
+     reglas de cada grupo (gestion.css, produccion.css…) sin !important, y con <html data-vestido="no"> se apaga entero.
+   - Paleta: grises + rojo 3G (el azul acero se queda solo para «información»). Oscuro: mismos tonos, más suaves. */
+
+/* ───────────── 1. Tokens: el rojo 3G manda ───────────── */
+:root[data-diseno="3g"]:not([data-vestido="no"]):not([data-g3-tema="oscuro"]):not([data-g3-tema="auto"]) {
+  --g3-fondo: #eef0f3;
+  --g3-contenedor: #eceef1;
+  --g3-contenedor-alto: #e2e5e9;
+  --g3-linea: #e4e6ea;
+  --g3-primario: #c8102e;
+  --g3-primario-hover: #a10c24;
+  --g3-sobre-primario: #ffffff;
+  --g3-primario-suave: #fde4e7;
+  --g3-sobre-primario-suave: #8a0c20;
+  --g3-primario-tinte: rgba(200, 16, 46, 0.06);
+  --g3-foco: rgba(200, 16, 46, 0.55);
+  --g3-foco-anillo: rgba(200, 16, 46, 0.2);
+  --g3-sombra-1: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
+  --g3-sombra-2: 0 2px 4px rgba(16, 24, 40, 0.05), 0 8px 24px rgba(16, 24, 40, 0.08);
+  --r2v-pizarra: #2f3542;
+  --r2v-pizarra-2: #454d5d;
+  --r2v-cebra: #f8f9fb;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-diseno="3g"][data-g3-tema="auto"]:not([data-vestido="no"]) {
+    --g3-fondo: #eef0f3; --g3-contenedor: #eceef1; --g3-contenedor-alto: #e2e5e9; --g3-linea: #e4e6ea;
+    --g3-primario: #c8102e; --g3-primario-hover: #a10c24; --g3-sobre-primario: #ffffff; --g3-primario-suave: #fde4e7;
+    --g3-sobre-primario-suave: #8a0c20; --g3-primario-tinte: rgba(200, 16, 46, 0.06); --g3-foco: rgba(200, 16, 46, 0.55);
+    --g3-foco-anillo: rgba(200, 16, 46, 0.2);
+    --r2v-pizarra: #2f3542; --r2v-pizarra-2: #454d5d; --r2v-cebra: #f8f9fb;
+  }
+}
+:root[data-diseno="3g"][data-g3-tema="oscuro"]:not([data-vestido="no"]) {
+  --g3-primario: #ff8a95; --g3-primario-hover: #ffa8b0; --g3-sobre-primario: #3b0008;
+  --g3-primario-suave: #4a1219; --g3-sobre-primario-suave: #ffd9dd; --g3-primario-tinte: rgba(255, 138, 149, 0.1);
+  --g3-foco: rgba(255, 138, 149, 0.7); --g3-foco-anillo: rgba(255, 138, 149, 0.25);
+  --r2v-pizarra: #2a2f3a; --r2v-pizarra-2: #353b48; --r2v-cebra: rgba(255, 255, 255, 0.02);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-diseno="3g"][data-g3-tema="auto"]:not([data-vestido="no"]) {
+    --g3-primario: #ff8a95; --g3-primario-hover: #ffa8b0; --g3-sobre-primario: #3b0008;
+    --g3-primario-suave: #4a1219; --g3-sobre-primario-suave: #ffd9dd; --g3-primario-tinte: rgba(255, 138, 149, 0.1);
+    --g3-foco: rgba(255, 138, 149, 0.7); --g3-foco-anillo: rgba(255, 138, 149, 0.25);
+    --r2v-pizarra: #2a2f3a; --r2v-pizarra-2: #353b48; --r2v-cebra: rgba(255, 255, 255, 0.02);
+  }
+}
+
+/* ───────────── 2. Armazón: riel y barra ───────────── */
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-contenido:not(.r2-contenido--heredado) {
+  background: radial-gradient(900px 320px at 100% -80px, var(--g3-primario-tinte) 0%, transparent 70%), var(--g3-fondo);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel {
+  background: var(--g3-superficie); border-right: 1px solid var(--g3-linea); box-shadow: 2px 0 12px rgba(16, 24, 40, 0.04);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-grupo-titulo {
+  text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.6875rem; color: var(--g3-tinta-3); padding-top: 10px;
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-item { border-radius: 12px; min-height: 40px; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) a.r2-riel-item:hover,
+:root[data-diseno="3g"]:not([data-vestido="no"]) button.r2-riel-item:hover { background: var(--g3-primario-tinte); color: var(--g3-tinta); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) a.r2-riel-item:hover > svg { color: var(--g3-primario); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-item[aria-current="page"],
+:root[data-diseno="3g"]:not([data-vestido="no"]) a.r2-riel-item[aria-current="page"]:hover {
+  background: linear-gradient(135deg, var(--g3-primario) 0%, var(--g3-primario-hover) 100%); color: var(--g3-sobre-primario);
+  box-shadow: 0 4px 12px rgba(200, 16, 46, 0.28);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-riel-item[aria-current="page"] > svg { color: inherit; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-barra {
+  background: color-mix(in srgb, var(--g3-superficie) 88%, transparent); border-bottom: 1px solid var(--g3-linea);
+  box-shadow: 0 1px 0 rgba(16, 24, 40, 0.02);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-barra-area {
+  text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem; color: var(--g3-primario);
+}
+
+/* ───────────── 3. Encabezado de página: tarjeta con acento rojo ───────────── */
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-encabezado:not(.r2-encabezado--pestanas) {
+  position: relative; margin: 0 0 16px; padding: 14px 20px 14px 24px; overflow: hidden;
+  background: var(--g3-superficie); border-radius: 18px; box-shadow: var(--g3-sombra-2);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-encabezado:not(.r2-encabezado--pestanas)::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
+  background: linear-gradient(180deg, var(--g3-primario) 0%, var(--g3-primario-hover) 100%);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-encabezado-titulo { font-weight: 700; font-size: 1.625rem; line-height: 2rem; letter-spacing: -0.015em; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-encabezado-dato {
+  padding: 2px 10px; border-radius: 999px; background: var(--g3-contenedor); color: var(--g3-tinta-2); font-weight: 500;
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-encabezado--pestanas { box-shadow: 0 2px 8px rgba(16, 24, 40, 0.05); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-pestana:is([aria-current="page"], [aria-selected="true"]) { color: var(--g3-primario); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-pestana::after { height: 3px; }
+@media (max-width: 860px) {
+  :root[data-diseno="3g"]:not([data-vestido="no"]) .r2-encabezado:not(.r2-encabezado--pestanas) { padding: 8px 12px 8px 16px; border-radius: 14px; }
+}
+
+/* ───────────── 4. Tira de cifras: tarjetas con número grande ───────────── */
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira { gap: 10px; padding: 2px 2px 6px; margin: 0 0 14px; background: transparent; border-radius: 0; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-cifra {
+  flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; min-width: 132px; min-height: 76px; padding: 10px 16px;
+  background: var(--g3-superficie); border-radius: 16px; box-shadow: var(--g3-sombra-1); border-top: 4px solid var(--g3-linea-fuerte);
+  transition: transform var(--g3-rapido) ease-out, box-shadow var(--g3-rapido) ease-out;
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-cifra + .r2-tira-cifra::before { display: none; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) button.r2-tira-cifra:hover { background: var(--g3-superficie); transform: translateY(-2px); box-shadow: var(--g3-sombra-2); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-cifra:has(.r2-tono--mal) { border-top-color: var(--g3-mal); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-cifra:has(.r2-tono--aviso) { border-top-color: #e0a100; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-cifra:has(.r2-tono--ok) { border-top-color: var(--g3-ok); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-cifra:has(.r2-tono--info) { border-top-color: var(--g3-info); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-cifra--activa,
+:root[data-diseno="3g"]:not([data-vestido="no"]) button.r2-tira-cifra--activa:hover {
+  background: linear-gradient(135deg, var(--g3-primario) 0%, var(--g3-primario-hover) 100%); color: var(--g3-sobre-primario);
+  border-top-color: transparent; box-shadow: 0 6px 16px rgba(200, 16, 46, 0.3);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-cifra--activa .r2-tira-punto { background: var(--g3-sobre-primario); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-valor { font-size: 1.625rem; line-height: 1.875rem; font-weight: 700; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-texto { font-size: 0.8125rem; font-weight: 500; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-punto { position: absolute; top: 12px; right: 12px; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-palomita { position: absolute; top: 10px; right: 10px; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-info {
+  align-self: stretch; gap: 16px; padding: 10px 18px; border-radius: 16px; color: #fff;
+  background: linear-gradient(135deg, var(--r2v-pizarra) 0%, var(--r2v-pizarra-2) 100%); box-shadow: var(--g3-sombra-1);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-info .r2-tira-dato { flex-direction: column; align-items: flex-start; gap: 0; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-info .r2-tira-texto { color: rgba(255, 255, 255, 0.75); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-info .r2-tira-valor--info { color: #fff; font-size: 1.25rem; line-height: 1.625rem; font-weight: 700; }
+@media (max-width: 720px) {
+  :root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-cifra { min-width: 108px; min-height: 64px; padding: 8px 12px; }
+  :root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tira-valor { font-size: 1.375rem; line-height: 1.625rem; }
+}
+
+/* ───────────── 5. Filtros, búsqueda, segmentado ───────────── */
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-filtros { background: var(--g3-fondo); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-busqueda-campo {
+  background: var(--g3-superficie); border: 1px solid var(--g3-linea); box-shadow: var(--g3-sombra-1);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-filtro { background: var(--g3-superficie); box-shadow: var(--g3-sombra-1); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-filtro--puesto { background: var(--g3-primario-suave); color: var(--g3-sobre-primario-suave); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-segmentado { background: var(--g3-contenedor-alto); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-segmento[aria-checked="true"] {
+  background: var(--g3-primario); color: var(--g3-sobre-primario); box-shadow: 0 2px 6px rgba(200, 16, 46, 0.3);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-segmento[aria-checked="true"] .r2-segmento-cuenta { color: inherit; opacity: 0.85; }
+
+/* ───────────── 6. Tabla: tarjeta, cabecera pizarra, grupos con acento, cebra ───────────── */
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla-marco {
+  background: var(--g3-superficie); border-radius: 16px; box-shadow: var(--g3-sombra-2); margin-bottom: 8px;
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla thead th {
+  height: 44px; background: var(--r2v-pizarra); color: #fff; border-bottom: 0;
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em;
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla thead tr:first-child th:first-child { border-top-left-radius: 16px; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla thead tr:first-child th:last-child { border-top-right-radius: 16px; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla thead .r2-ordenar:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla thead .r2-casilla,
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla thead input { accent-color: #fff; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla :is(td, th):first-child { padding-left: 16px; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla :is(td, th):last-child { padding-right: 16px; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla tbody tr.r2-renglon:nth-child(even) { background: var(--r2v-cebra); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-renglon:hover,
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla tbody tr.r2-renglon:nth-child(even):hover { background: var(--g3-primario-tinte); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-renglon:is(.r2-renglon--abierto, .r2-renglon--elegido) { background: var(--g3-primario-suave); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla td { border-bottom-color: var(--g3-linea); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla tbody:last-child tr:last-child td { border-bottom: 0; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla tbody:last-child tr:last-child td:first-child { border-bottom-left-radius: 16px; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla tbody:last-child tr:last-child td:last-child { border-bottom-right-radius: 16px; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-grupo th {
+  height: 42px; background: linear-gradient(90deg, var(--g3-primario-suave) 0%, var(--g3-superficie) 70%);
+  border-left: 4px solid var(--g3-primario); border-bottom: 1px solid var(--g3-linea);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-grupo-boton { color: var(--g3-sobre-primario-suave); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.8125rem; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-grupo-boton > svg { color: var(--g3-primario); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-grupo-cuenta {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 7px; border-radius: 999px;
+  background: var(--g3-primario); color: var(--g3-sobre-primario); font-size: 0.75rem; font-weight: 700; letter-spacing: 0;
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla-vacia { background: var(--g3-superficie); border-radius: 16px; border: 0; box-shadow: var(--g3-sombra-1); }
+/* Listas de celular y de cajón: renglones en tarjeta */
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla-celular .r2-lista,
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-lista-seccion > .r2-lista {
+  background: var(--g3-superficie); border-radius: 14px; box-shadow: var(--g3-sombra-1); padding: 0 12px;
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla-celular .r2-lista > :last-child .r2-fila,
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tabla-celular .r2-lista > .r2-fila:last-child { border-bottom: 0; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-grupo-boton--celular,
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-lista-grupo-titulo {
+  background: transparent; color: var(--g3-sobre-primario-suave); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.8125rem;
+}
+
+/* ───────────── 7. Estado en píldora, tipo y plazo ───────────── */
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-estado-linea { padding: 3px 10px 3px 8px; border-radius: 999px; font-weight: 600; font-size: 0.8125rem; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-estado.r2-tono--ok .r2-estado-linea { background: var(--g3-ok-suave); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-estado.r2-tono--aviso .r2-estado-linea { background: var(--g3-aviso-suave); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-estado.r2-tono--mal .r2-estado-linea { background: var(--g3-mal-suave); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-estado.r2-tono--info .r2-estado-linea { background: var(--g3-info-suave); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-estado.r2-tono--neutro .r2-estado-linea { background: var(--g3-neutro-suave); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-tipo { border-radius: 999px; padding: 2px 10px; }
+
+/* ───────────── 8. Botones ───────────── */
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-boton--principal {
+  background: linear-gradient(135deg, var(--g3-primario) 0%, var(--g3-primario-hover) 100%); box-shadow: 0 4px 12px rgba(200, 16, 46, 0.28);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-boton--principal:hover { filter: brightness(1.06); box-shadow: 0 6px 16px rgba(200, 16, 46, 0.34); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-boton--contorno { background: var(--g3-superficie); border-color: var(--g3-linea); box-shadow: var(--g3-sombra-1); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-boton--contorno:hover { border-color: var(--g3-primario); color: var(--g3-primario); }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-boton--tonal:hover { background: var(--g3-primario); color: var(--g3-sobre-primario); }
+
+/* ───────────── 9. Secciones, cajones y diálogos ───────────── */
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-seccion-titulo { position: relative; padding-left: 14px; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-seccion-titulo::before {
+  content: ""; position: absolute; left: 0; top: 3px; bottom: 3px; width: 4px; border-radius: 4px; background: var(--g3-primario);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-cajon-cabecera {
+  position: relative; background: linear-gradient(180deg, var(--g3-contenedor) 0%, var(--g3-superficie) 100%);
+  border-bottom: 1px solid var(--g3-linea);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-cajon-cabecera::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+  background: linear-gradient(90deg, var(--g3-primario) 0%, var(--g3-primario-hover) 100%);
+}
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-cajon-titulo { font-weight: 700; }
+:root[data-diseno="3g"]:not([data-vestido="no"]) .r2-seccion-cajon-titulo { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.75rem; color: var(--g3-primario); }
