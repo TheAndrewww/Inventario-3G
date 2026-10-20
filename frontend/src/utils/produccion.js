@@ -423,8 +423,11 @@ const construirCitasPorNombre = (calendarioProyectos, anio, mes) => {
         if (!cp.nombre) return;
         const key = normalizarNombre(cp.nombre);
         if (!key) return;
-        // Ignorar entradas de cimentación
-        if (key.includes('cimentacion')) return;
+        // CIMENTACIÓN y RETIRO casi siempre van en el 2o renglón de la celda (`cliente`):
+        // se miran los dos renglones, igual que en backend/src/services/fechaInstalacion.service.js.
+        const completo = normalizarNombre(`${cp.nombre} ${cp.cliente || ''}`);
+        // Cimentación = producción en la obra; la instalación es cuando termina
+        if (completo.includes('cimentacion')) return;
         let fecha = cp.fecha;
         if (!fecha && cp.dia) {
             fecha = `${anio}-${String(mes).padStart(2, '0')}-${String(cp.dia).padStart(2, '0')}`;
@@ -434,7 +437,7 @@ const construirCitasPorNombre = (calendarioProyectos, anio, mes) => {
         if (lista.some(c => c.fecha === fecha)) return; // misma fecha repetida
         lista.push({
             fecha,
-            retiro: esCitaRetiro(key),
+            retiro: esCitaRetiro(completo),
             // La hora en rojo oscuro = FALLA en la instalación (hay que reprogramar)
             falla: cp.equipoHora === 'FALLA',
             nota: cp.nota || null

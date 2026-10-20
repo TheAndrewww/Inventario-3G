@@ -104,7 +104,10 @@ const citasPorNombre = (citas) => {
     const mapa = {};
     for (const cp of citas || []) {
         const key = normalizarNombre(cp.nombre);
-        if (!key || key.includes('cimentacion') || !cp.fecha) continue;
+        // CIMENTACIÓN = trabajo de producción en la obra; la instalación va DESPUÉS, cuando
+        // termina (CONDOMINIOS MAYORCA: cimentación mar-mié, instalación jueves). Casi siempre
+        // va en el 2o renglón (`cliente`): mirando solo el nombre, el martes salía como instalación.
+        if (!key || normalizarNombre(`${cp.nombre} ${cp.cliente || ''}`).includes('cimentacion') || !cp.fecha) continue;
         const lista = (mapa[key] = mapa[key] || []);
         // El RETIRO casi siempre va en el segundo renglón de la celda ("LUIS RÍOS" + "MTO RETIRO"),
         // que llega como `cliente`. Mirando solo el nombre, el retiro contaba como instalación y
