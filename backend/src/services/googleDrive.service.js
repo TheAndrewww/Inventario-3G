@@ -237,6 +237,17 @@ export const buscarCarpetaProyecto = async (nombreProyecto, mesHint = null) => {
                 }
             }
 
+            // Pasada 1b: el mismo nombre con otros signos. Un ajuste pequeño en el índice ("MOISES BUSTOS - TUBO" →
+            // "MOISES BUSTOS / TUBO", "LA TRATORIA |ERIKA" → "| ERIKA") dejaba al proyecto sin carpeta y fuera de
+            // los tableros mientras la carpeta se renombraba (21-oct).
+            const sinSignos = (x) => x.replace(/[^A-Z0-9Ñ]+/g, ' ').trim();
+            const exactasSinSignos = items.filter(item => variantes.some(v => sinSignos(normalizarNombre(item.carpeta.name)) === sinSignos(v)));
+            if (exactasSinSignos.length === 1) {
+                const item = exactasSinSignos[0];
+                console.log(`✅ Carpeta encontrada (mismo nombre, otros signos): "${item.carpeta.name}" en ${ubicacionDe(item)}`);
+                return { id: item.carpeta.id, name: item.carpeta.name, mes: item.carpetaMes.name };
+            }
+
             // Pasada 2: mejor substring
             let mejor = null;
             for (const item of items) {
@@ -479,7 +490,27 @@ export const sincronizarProyecto = async (proyecto) => {
         // búsqueda al mes correspondiente del Drive y evitar ambigüedad cuando
         // hay clientes con el mismo nombre en distintos meses del año.
         const mesHint = proyecto.spreadsheet_row_id?.split('_')[0] || null;
-        const carpeta = await buscarCarpetaProyecto(proyecto.nombre, mesHint);
+        let carpeta = await buscarCarpetaProyecto(proyecto.nombre, mesHint);
+
+        // Si ya tenía su carpeta y sigue viva, se queda con ella aunque el nombre ya no cuadre: el renglón es el
+        // mismo (spreadsheet_row_id) y solo cambió cómo se escribe. Antes se borraban sus archivos y salía de las
+        // TV de Herrería/Manufactura hasta que alguien igualara el nombre de la carpeta (21-oct).
+        if (!carpeta && proyecto.drive_folder_id) {
+            try {
+                const drive = await authenticate();
+                const { data } = await drive.files.get({ fileId: proyecto.drive_folder_id, fields: 'id, name, trashed', supportsAllDrives: true });
+                // Solo si se parece (comparte alguna palabra): una carpeta que no tiene nada que ver era un mal match viejo.
+                const palabras = (x) => new Set(String(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().split(/[^A-Z0-9Ñ]+/).filter(w => w.length >= 4));
+                const delProyecto = palabras(proyecto.nombre);
+                const seParece = [...palabras(data?.name || '')].some(w => delProyecto.has(w));
+                if (data && !data.trashed && seParece) {
+                    console.log(`📌 "${proyecto.nombre}": su carpeta ya no se llama igual ("${data.name}"), se conserva`);
+                    carpeta = { id: data.id, name: data.name, mes: mesHint };
+                }
+            } catch (e) {
+                console.warn(`⚠️ "${proyecto.nombre}": no se pudo revisar su carpeta anterior (${e.message})`);
+            }
+        }
 
         if (!carpeta) {
             // Limpiar cualquier carpeta y banderas que hayan quedado de un
