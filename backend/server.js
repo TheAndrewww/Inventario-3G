@@ -148,6 +148,7 @@ import almacenesRoutes from './src/routes/almacenes.routes.js';
 import rollosMembrana from './src/routes/rollosMembrana.routes.js';
 import checklistRoutes from './src/routes/checklist.routes.js';
 import solicitudesCambioRoutes from './src/routes/solicitudesCambio.routes.js';
+import pedidosEncargadosRoutes from './src/routes/pedidosEncargados.routes.js';
 import configuracionRoutes from './src/routes/configuracion.routes.js';
 import reportesRoutes from './src/routes/reportes.routes.js';
 import avisosWhatsappRoutes from './src/routes/avisosWhatsapp.routes.js';
@@ -307,6 +308,7 @@ app.use('/api/almacenes', almacenesRoutes);
 app.use('/api/rollos-membrana', rollosMembrana);
 app.use('/api/checklist', checklistRoutes);
 app.use('/api/solicitudes-cambio', solicitudesCambioRoutes);
+app.use('/api/pedidos-encargados', pedidosEncargadosRoutes); // 23-oct: pedidos de los encargados a Almacén
 app.use('/api/configuracion', configuracionRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/avisos-whatsapp', avisosWhatsappRoutes);
@@ -1312,6 +1314,15 @@ const startServer = async () => {
             console.log('✅ Tabla bitacora_avisos verificada');
         } catch (bitacoraErr) {
             console.error('⚠️ Error verificando la tabla bitacora_avisos:', bitacoraErr.message);
+        }
+
+        // 23-oct: pedidos de los encargados a Almacén (su propio sync: crea si no existe; nunca alter)
+        try {
+            const { default: SolicitudAlmacen } = await import('./src/models/SolicitudAlmacen.js');
+            await SolicitudAlmacen.sync();
+            console.log('✅ Tabla solicitudes_almacen verificada');
+        } catch (almacenErr) {
+            console.error('⚠️ Error verificando la tabla solicitudes_almacen:', almacenErr.message);
         }
 
         // C4 · PLA-16: la historia de la orden de compra (su propio sync: crea si no existe; nunca alter)

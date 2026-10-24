@@ -13,6 +13,8 @@
  *   POST /api/sistemas/v1/produccion/pronostico  alcance «produccion.pronostico»  el sí o el no de Producción (C7 · PLA-17)
  *   POST /api/sistemas/v1/proveedores/credito  alcance «proveedores.credito»  crédito y plazo de CTAS CRÉDITO (B3 · PLA-20)
  *   GET /api/sistemas/v1/proveedores  alcance «proveedores.credito»  la ficha maestra de proveedores para Julia (B3 · PLA-20)
+ *   POST /api/sistemas/v1/almacen/solicitudes  alcance «almacen.solicitar»  pedidos de los encargados a Almacén (23-oct; origen «operacion»)
+ *   GET /api/sistemas/v1/almacen/solicitudes   alcance «almacen.solicitar»  ?encargado= · el estado de esos pedidos para la tableta
  *
  * Cómo se entra (igual en los cinco sistemas):
  *   - «Authorization: Bearer <llave>» y «X-3G-Origen: <sistema>» (inicio, cuentas, finanzas, ventas…).
@@ -42,6 +44,7 @@ import { leerLatidos } from './latidos.js';
 import { registrarSeguimiento } from './ordenes.js';
 import { registrarPronostico } from './pronostico.js';
 import { ALCANCE_PROVEEDORES, recibirCredito, leerProveedores } from './proveedores.js';
+import { ALCANCE_ALMACEN, registrarSolicitudAlmacen, listarSolicitudesAlmacen, TEXTO_TIPO } from './almacen.js';
 
 export const PREFIJO_INICIO = '/api/inicio3g/v1';
 export const PREFIJO_SISTEMAS = '/api/sistemas/v1';
@@ -292,6 +295,34 @@ export const pendientesPlanta = async ({ puesto = null } = {}) => {
             });
         }
     }
+    // 23-oct: los pedidos de los encargados que Almacén aún no atiende
+    if (!puesto || ['dir', 'almacen'].includes(puesto)) {
+        try {
+            const { default: SolicitudAlmacen } = await import('../../models/SolicitudAlmacen.js');
+            const pedidos = await SolicitudAlmacen.findAll({ where: { estado: 'pendiente' }, order: [['created_at', 'ASC'], ['id', 'ASC']], limit: MAX_LISTA });
+            for (const s of pedidos) {
+                const urgente = s.para_fecha && s.para_fecha <= new Date(ahora + DIA_MS).toISOString().slice(0, 10);
+                lista.push({
+                    id: `planta-almacen-${s.id}`,
+                    titulo: `${TEXTO_TIPO[s.tipo] || 'Pedido'} para ${s.encargado}`,
+                    detalle: s.texto.length > 120 ? `${s.texto.slice(0, 117)}…` : s.texto,
+                    urgencia: urgente ? 'alta' : 'media',
+                    hora: null,
+                    vence: s.para_fecha ? `${s.para_fecha}T09:00:00-06:00` : null,
+                    desde: isoMexico(new Date(s.created_at)),
+                    etapa: null,
+                    area: 'Almacén',
+                    fuente: 'planta',
+                    tipo: 'tarea',
+                    obra: s.obra_id || null,
+                    persona: s.encargado,
+                    accion: 'Surtir',
+                    url: `${frontend()}/pedidos-encargados`,
+                    puestos: ['dir', 'almacen']
+                });
+            }
+        } catch { /* sin tabla todavía */ }
+    }
     const peso = { alta: 0, media: 1, baja: 2 };
     lista.sort((a, b) => peso[a.urgencia] - peso[b.urgencia] || a.desde.localeCompare(b.desde));
     return { sistema: 'planta', generado: isoMexico(), pendientes: lista.slice(0, MAX_LISTA) };
@@ -458,6 +489,9 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
     // B3 · PLA-20: crédito y plazo de CTAS CRÉDITO (los manda Julia) y la ficha maestra que lee Julia (FIN-23)
     router.post(`${PREFIJO_SISTEMAS}/proveedores/credito`, ...escribirCon(ALCANCE_PROVEEDORES, recibirCredito));
     router.get(`${PREFIJO_SISTEMAS}/proveedores`, ...leer(ALCANCE_PROVEEDORES, leerProveedores));
+    // 23-oct: los encargados le piden a Almacén desde su tableta (Operación los reenvía) y ven si ya se surtió
+    router.post(`${PREFIJO_SISTEMAS}/almacen/solicitudes`, ...escribirCon(ALCANCE_ALMACEN, (req) => registrarSolicitudAlmacen(req.body)));
+    router.get(`${PREFIJO_SISTEMAS}/almacen/solicitudes`, ...leer(ALCANCE_ALMACEN, (req) => listarSolicitudesAlmacen(req)));
 
     // Cualquier otra ruta de las puertas
     router.use([PREFIJO_INICIO, PREFIJO_SISTEMAS], (req, res) => error(res, 404, 'No existe esa puerta en Planta.'));

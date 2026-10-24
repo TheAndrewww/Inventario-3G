@@ -80,6 +80,7 @@ export const TITULOS = {
   '/entradas-salidas': 'Entradas y salidas',
   '/conteo-ciclico': 'Conteo cíclico',
   '/solicitudes-cambio': 'Cambios por autorizar',
+  '/pedidos-encargados': 'Pedidos de encargados',
   '/rollos-membrana': 'Rollos de membrana',
   '/descontar-almacen': 'Descuento de almacén',
   '/procesamiento-masivo': 'Fotos de artículos con IA',
@@ -147,6 +148,7 @@ export const GRUPOS_RIEL = [
   { id: 'almacen', titulo: 'Almacén', items: [
     { path: '/inventario', icono: Package },
     { seccion: 'tickets', path: 'tickets', etiqueta: 'Tickets de material', icono: ClipboardList },
+    { path: '/pedidos-encargados', icono: Truck },
     { path: '/entradas-salidas', icono: ArrowUpDown },
     { path: '/conteo-ciclico', icono: ClipboardCheck },
     { path: '/solicitudes-cambio', icono: Inbox },

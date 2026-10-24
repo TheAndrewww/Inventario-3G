@@ -12,6 +12,8 @@ export const ALL_MENU_ITEMS = [
   { path: '/procesamiento-masivo', icon: Wand2, label: 'Procesamiento IA', roles: ['administrador'] },
   { path: '/pedido', icon: ShoppingCart, label: 'Orden de Salida', roles: ['administrador', 'diseñador'] },
   { path: '/pedidos-pendientes', icon: ClipboardList, label: 'Tickets Pendientes', roles: ['administrador', 'almacen'] },
+  // 23-oct-2026: lo que los encargados piden a Almacén desde su tableta (llega por Operación)
+  { path: '/pedidos-encargados', icon: Truck, label: 'Pedidos de encargados', roles: ['administrador', 'almacen'] },
   { path: '/camionetas', icon: Briefcase, label: 'Equipos', roles: ['administrador'] },
   { path: '/usuarios', icon: UserCog, label: 'Usuarios', roles: ['administrador'] },
   { path: '/solicitudes-cambio', icon: Inbox, label: 'Solicitudes', roles: ['administrador', 'almacen', 'compras'] },
