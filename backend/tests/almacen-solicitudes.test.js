@@ -84,3 +84,9 @@ test('Almacén: parcial o no se puede llevan nota; surtido no', () => {
     assert.deepEqual(leerRespuesta({ estado: 'rechazada', nota: 'No hay taladro de banco' }), { estado: 'rechazada', nota: 'No hay taladro de banco' });
     assert.match(leerRespuesta({ estado: 'pendiente' }).error, /estado/);
 });
+
+test('26-oct: la requisición del encargado va al grupo Requisiciones con un texto sin importes', async () => {
+    const { textoRequisicion } = await import('../src/routes/sistemas/almacen.js');
+    const t = textoRequisicion({ encargado: 'GERAS', tipo: 'REPOSICION', texto: '2 cajas de tornillo 1/4', para_fecha: '2026-10-27', proyecto: null });
+    assert.equal(t, '📋 *Requisición de Geras* · Reposición de stock\n2 cajas de tornillo 1/4\nPara el 27 oct\nSe atiende en Inventario › Pedidos de encargados.');
+});

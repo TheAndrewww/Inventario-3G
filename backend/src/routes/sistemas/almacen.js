@@ -83,6 +83,28 @@ const avisarAlmacen = async (fila) => {
     } catch (e) {
         console.error('[puerta] aviso de pedido de encargado (no crítico):', e.message);
     }
+    // 26-oct (jefe): la requisición del encargado también va al grupo de WhatsApp REQUISICIONES (sin importes).
+    try {
+        const { enviarWhatsApp } = await import('../../services/whatsapp.service.js');
+        await enviarWhatsApp(textoRequisicion(fila), 'requisiciones');
+    } catch (e) {
+        console.error('[puerta] aviso a Requisiciones (no crítico):', e.message);
+    }
+};
+
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const nombreBonito = (s) => String(s || '').toLowerCase().replace(/(^|\s)\S/g, (x) => x.toUpperCase());
+
+/** El aviso al grupo Requisiciones. Pura. */
+export const textoRequisicion = (f) => {
+    const para = f.para_fecha ? (() => { const [, m, d] = String(f.para_fecha).split('-').map(Number); return `${d} ${MESES_CORTOS[m - 1]}`; })() : null;
+    return [
+        `📋 *Requisición de ${nombreBonito(f.encargado)}* · ${TEXTO_TIPO[f.tipo] ?? f.tipo}`,
+        f.texto,
+        f.proyecto ? `Obra: ${f.proyecto}` : null,
+        para ? `Para el ${para}` : null,
+        'Se atiende en Inventario › Pedidos de encargados.',
+    ].filter(Boolean).join('\n');
 };
 
 /** Guarda un pedido. Devuelve { codigo, cuerpo } para la puerta. `avisar` se puede cambiar en las pruebas. */
