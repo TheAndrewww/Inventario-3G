@@ -4,8 +4,10 @@
  *   1. Que el orden y el corte de /produccion/cerradas coincidan cuando las horas de cierre se guardaron con
  *      microsegundos (NOW() de SQL). Es la regresión de 2caa1a7: con la columna sola, el cursor repetía obras.
  *   2. /produccion/en-curso con VENCIDAS_USA_JULIA y el nombre corto de la ficha: que las consultas corran en Postgres
- *      (orden_seguimiento, proveedores_ficha, «DESC NULLS FIRST») y que el material del día sea el mismo que da el SQL
- *      escrito aparte con la misma regla, con la bandera encendida y apagada.
+ *      (orden_seguimiento, proveedores_ficha y la consulta del material del día con la fecha de Julia) y que el material
+ *      del día sea el mismo que da el SQL escrito aparte con la misma regla, con la bandera encendida y apagada.
+ *   3. Con la bandera, que 2 100 órdenes en camino sin fecha propia no dejen fuera a la que llega hoy (la fecha que manda
+ *      se calcula antes del corte, sin tope de lectura).
  *
  * Solo corre con PRUEBA_PG_URL apuntando a un Postgres LOCAL (127.0.0.1, localhost o [::1]) que ya tenga las tablas de
  * Planta, por ejemplo una base de prueba creada con los modelos. Sin esa variable, o si no es local, se salta. Si falta
@@ -215,5 +217,50 @@ test('en-curso contra Postgres: la llegada de Julia (VENCIDAS_USA_JULIA) y el no
         await q('DELETE FROM proveedores_ficha WHERE proveedor_id IN (SELECT id FROM proveedores WHERE nombre LIKE :patron)', { patron });
         await q('DELETE FROM proveedores WHERE nombre LIKE :patron', { patron });
         await q('DELETE FROM produccion_proyectos WHERE nombre LIKE :patron', { patron });
+    }
+});
+
+test('en-curso contra Postgres con VENCIDAS_USA_JULIA: 2 100 órdenes sin fecha propia no dejan fuera a la que llega hoy', { skip: SALTAR }, async () => {
+    const { leerEnCurso } = P;
+    const { default: OrdenSeguimiento } = await import('../src/models/OrdenSeguimiento.js');
+    await OrdenSeguimiento.sync(); // como server.js al arrancar: crea si no existe, nunca alter
+    const marca = `PRUEBA-TOPE-${process.pid}`;
+    const patron = `${marca}-%`;
+    const ahora = new Date();
+    const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(ahora);
+    const ayer = (() => { const [y, m, d] = hoy.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10); })();
+    const q = async (sql, replacements = {}) => (await sequelize.query(sql, { replacements }))[0];
+    const antes = process.env.VENCIDAS_USA_JULIA;
+    try {
+        const [{ id: usuario }] = await q('SELECT id FROM usuarios ORDER BY id LIMIT 1');
+        const [{ id: prov }] = await q('INSERT INTO proveedores (nombre, activo, created_at, updated_at) VALUES (:n, true, now(), now()) RETURNING id', { n: `${marca}-PROV` });
+        // 2 100 en camino sin fecha propia (más que el tope de 2 000 que tenía la lectura de candidatas) y, después, la de hoy
+        await q(`INSERT INTO ordenes_compra (ticket_id, proveedor_id, usuario_creador_id, estado, fecha_llegada_estimada, created_at, updated_at)
+                 SELECT :marca || '-N' || g, :p, :u, 'enviada', NULL, now(), now() FROM generate_series(1, 2100) g`, { marca, p: prov, u: usuario });
+        await q(`INSERT INTO ordenes_compra (ticket_id, proveedor_id, usuario_creador_id, estado, fecha_llegada_estimada, created_at, updated_at)
+                 VALUES (:t, :p, :u, 'parcial', CAST(:l AS timestamptz), now(), now())`,
+        { t: `${marca}-HOY`, p: prov, u: usuario, l: `${hoy}T00:00:00Z` });
+        // A una de las sin fecha, Julia la esperaba ayer: entra como vencida
+        const [conJulia] = await q('SELECT id FROM ordenes_compra WHERE ticket_id = :t', { t: `${marca}-N1500` });
+        await q(`INSERT INTO orden_seguimiento (orden_id, folio, origen, tipo, estado, fecha, fecha_estimada, huella, created_at)
+                 VALUES (:o, :f, 'finanzas', 'estado', 'pedida', now(), CAST(:e AS date), md5(:f) || md5(:f || '-2'), now())`,
+        { o: conJulia.id, f: `${marca}-N1500`, e: ayer });
+
+        process.env.VENCIDAS_USA_JULIA = '1';
+        const r = await leerEnCurso({ query: {} }, { ahora });
+        assert.equal(r.codigo, 200);
+        assert.deepEqual(r.cuerpo.avisos, []);
+        const folios = r.cuerpo.material.ordenes.map((o) => o.folio);
+        assert.ok(folios.includes(`${marca}-HOY`), 'la de hoy sale aunque haya 2 100 sin fecha propia');
+        const deJulia = r.cuerpo.material.ordenes.find((o) => o.folio === `${marca}-N1500`);
+        assert.deepEqual(deJulia && [deJulia.llegadaEstimada, deJulia.vencida, deJulia.llegadaDeJulia, deJulia.llegadaOrden], [ayer, true, true, null]);
+        assert.ok(!folios.some((f) => f.startsWith(`${marca}-N`) && f !== `${marca}-N1500`), 'sin fecha y sin Julia no entran');
+        const sql = await q(SQL_DEL_DIA_CON_JULIA, { hoy });
+        assert.deepEqual(r.cuerpo.material.ordenes.map((o) => [o.folio, o.llegadaEstimada]), sql.map((f) => [f.ticket_id, f.llegada]), 'material del día = SQL (encendida)');
+    } finally {
+        if (antes === undefined) delete process.env.VENCIDAS_USA_JULIA; else process.env.VENCIDAS_USA_JULIA = antes;
+        await q('DELETE FROM orden_seguimiento WHERE folio LIKE :patron', { patron });
+        await q('DELETE FROM ordenes_compra WHERE ticket_id LIKE :patron', { patron });
+        await q('DELETE FROM proveedores WHERE nombre LIKE :patron', { patron });
     }
 });
