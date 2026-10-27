@@ -196,7 +196,8 @@ let ordenesCompra = ORDENES_DEL_DIA;
 let fichas = FICHAS;
 let fallarFichas = false;
 let fechasJulia = new Map(); // orden_id → AAAA-MM-DD (lo que daría OrdenSeguimiento.fechasEstimadasJulia)
-let fallarJulia = false;
+let fallarJulia = false; // la lectura de las órdenes de las obras (fechasEstimadasJulia)
+let fallarJuliaDelDia = false; // la consulta del material del día con la fecha de Julia
 const llamadasJulia = []; // los orden_id que se pidieron a Julia, por llamada
 const consultas = [];
 const originales = {
@@ -214,7 +215,7 @@ before(() => {
     };
     Configuracion.findOne = async ({ where }) => (where.clave === 'produccion_fechas_instalacion' && foto ? { valor: JSON.stringify(foto) } : null);
     sequelize.query = async (sql, { replacements = {} } = {}) => {
-        consultas.push({ sql });
+        consultas.push({ sql, replacements });
         if (/SELECT id, obra_id FROM produccion_proyectos WHERE id IN/.test(sql)) {
             const filas = proyectos.filter((p) => replacements.ids.includes(p.id) && p.obra).map((p) => ({ id: p.id, obra_id: p.obra }));
             return [filas, filas];
@@ -233,6 +234,24 @@ before(() => {
         }
         if (/pronostico_whatsapp/.test(sql)) {
             const filas = pronosticos.filter((x) => replacements.ids.includes(x.id));
+            return [filas, filas];
+        }
+        // El material del día con VENCIDAS_USA_JULIA (SQL_DEL_DIA_CON_JULIA): la fecha que manda es la de llegadaDeOrden,
+        // sobre TODAS las en camino sin recibir, y luego el corte. `fechasJulia` ya es la más reciente de cada orden.
+        if (/FROM ordenes_compra oc/.test(sql)) {
+            if (fallarJuliaDelDia) throw new Error('orden_seguimiento caída (prueba, material del día)');
+            assert.match(sql, /origen = 'finanzas' AND s\.fecha_estimada IS NOT NULL/);
+            assert.match(sql, /ORDER BY s\.fecha DESC, s\.id DESC LIMIT 1/);
+            assert.match(sql, /ORDER BY llegada DESC, id ASC/);
+            const manana = new Date(replacements.manana);
+            const filas = ordenesCompra
+                .filter((o) => replacements.estados.includes(o.estado) && !o.fecha_recepcion
+                    && (!o.fecha_llegada_estimada || new Date(o.fecha_llegada_estimada) < manana))
+                .map((o) => ({ id: o.id, llegada: P.llegadaDeOrden(o, fechasJulia).llegada }))
+                .filter((x) => x.llegada && x.llegada <= replacements.hoy)
+                .sort((a, b) => (a.llegada === b.llegada ? a.id - b.id : (a.llegada < b.llegada ? 1 : -1)))
+                .slice(0, replacements.tope)
+                .map((x) => ({ id: x.id, julia: fechasJulia.get(x.id) ?? null }));
             return [filas, filas];
         }
         throw new Error(`consulta inesperada en la prueba: ${sql.slice(0, 60)}`);
@@ -777,6 +796,8 @@ const JULIA = new Map([
     [501, sumarDias(HOY, 2)], [503, HOY], [505, AYER], [506, sumarDias(HOY, -10)], [507, HOY], [508, HOY], [509, AYER], [510, AYER]
 ]);
 const resumen = (ordenes) => ordenes.map((o) => [o.folio, o.llegadaEstimada, o.vencida, o.llegadaDeJulia ?? false, 'llegadaOrden' in o ? o.llegadaOrden : '—', o.proveedor]);
+const AVISO_JULIA_OBRAS = 'No se pudo leer la fecha de llegada que dio Julia en las órdenes de las obras: sale la de la orden.';
+const AVISO_JULIA_DEL_DIA = 'No se pudo leer la fecha de llegada que dio Julia en el material del día: sale la de la orden.';
 
 const conBandera = async (valor, fn) => {
     const antes = process.env.VENCIDAS_USA_JULIA;
@@ -792,6 +813,7 @@ const conBandera = async (valor, fn) => {
         ordenesCompra = ORDENES_DEL_DIA;
         fechasJulia = new Map();
         fallarJulia = false;
+        fallarJuliaDelDia = false;
         fallarFichas = false;
     }
 };
@@ -820,12 +842,12 @@ test('en-curso con VENCIDAS_USA_JULIA: la llegada de Julia manda si es más nuev
                 ['OC-0506', sumarDias(HOY, -5), true, false, '—', 'SIN FICHA SA']
             ]);
         });
-        // Las candidatas del día: en camino, sin recibir, con fecha propia hasta hoy o sin fecha (tope 2 000, sin importes)
-        const delDia = consultas.filter((c) => c.modelo === 'OrdenCompra' && c.opciones.raw).at(-1).opciones;
-        assert.deepEqual(delDia.attributes, ['id', 'fecha_llegada_estimada']);
-        assert.equal(delDia.limit, 2000);
-        assert.deepEqual(delDia.order, [['fecha_llegada_estimada', 'DESC NULLS FIRST'], ['id', 'DESC']]);
-        assert.deepEqual(llamadasJulia.map((ids) => ids.join(',')).sort(), ['501,503', '501,504,505,506,508']);
+        // El material del día sale de una sola consulta que calcula la fecha que manda antes del corte de 50 (sin tope de
+        // lectura); a fechasEstimadasJulia solo se le piden las órdenes de las obras.
+        const delDia = consultas.filter((c) => /FROM ordenes_compra oc/.test(c.sql || '')).at(-1);
+        assert.deepEqual(delDia.replacements, { estados: ['enviada', 'parcial'], manana: `${sumarDias(HOY, 1)}T00:00:00.000Z`, hoy: HOY, tope: 50 });
+        assert.ok(!consultas.some((c) => c.modelo === 'OrdenCompra' && c.opciones.raw), 'ya no se leen candidatas aparte');
+        assert.deepEqual(llamadasJulia.map((ids) => ids.join(',')), ['501,503']);
     });
 });
 
@@ -835,12 +857,13 @@ test('en-curso con VENCIDAS_USA_JULIA: si orden_seguimiento o la ficha no se pue
     try {
         await conBandera('sí', async () => {
             fallarJulia = true;
+            fallarJuliaDelDia = true;
             fallarFichas = true;
             await conPuerta(async (pedir) => {
                 const r = await pedir('/api/sistemas/v1/produccion/en-curso');
                 assert.equal(r.status, 200);
-                // Un solo aviso aunque se pidió dos veces (obras y material del día); la ficha no avisa: sale el nombre
-                assert.deepEqual(r.json.avisos, ['No se pudo leer la fecha de llegada que dio Julia: sale la de la orden.']);
+                // Un aviso por parte (obras y material del día); la ficha no avisa: sale el nombre completo
+                assert.deepEqual([...r.json.avisos].sort(), [AVISO_JULIA_DEL_DIA, AVISO_JULIA_OBRAS]);
                 assert.deepEqual(resumen(r.json.obras[0].material.ordenes), [['OC-0501', AYER, true, false, '—', 'ACEROS DEL BAJÍO SA DE CV']]);
                 // Igual que con la bandera apagada: la 505 (sin fecha propia) no entra
                 assert.deepEqual(resumen(r.json.material.ordenes), [
@@ -850,10 +873,75 @@ test('en-curso con VENCIDAS_USA_JULIA: si orden_seguimiento o la ficha no se pue
                     ['OC-0506', sumarDias(HOY, -5), true, false, '—', 'SIN FICHA SA']
                 ]);
             });
+            // El respaldo del material del día es la consulta de la bandera apagada, tal cual
+            const respaldo = consultas.filter((c) => c.modelo === 'OrdenCompra' && c.opciones.limit === 50).at(-1).opciones;
+            assert.deepEqual(respaldo.order, [['fecha_llegada_estimada', 'DESC'], ['id', 'ASC']]);
+            assert.deepEqual(Object.keys(respaldo.where).sort(), ['estado', 'fecha_llegada_estimada', 'fecha_recepcion']);
         });
     } finally {
         console.error = errores;
     }
+});
+
+test('en-curso con VENCIDAS_USA_JULIA: si falla solo una lectura de Julia, el aviso dice cuál y la otra parte sí la trae', async () => {
+    const errores = console.error;
+    console.error = () => {};
+    try {
+        // Solo el material del día: las obras traen la de Julia; el material del día, el de la bandera apagada
+        await conBandera('1', async () => {
+            fallarJuliaDelDia = true;
+            await conPuerta(async (pedir) => {
+                const r = await pedir('/api/sistemas/v1/produccion/en-curso');
+                assert.equal(r.status, 200);
+                assert.deepEqual(r.json.avisos, [AVISO_JULIA_DEL_DIA]);
+                assert.deepEqual(resumen(r.json.obras[0].material.ordenes), [['OC-0501', sumarDias(HOY, 2), false, true, AYER, 'Aceros Bajío']]);
+                assert.deepEqual(resumen(r.json.material.ordenes), [
+                    ['OC-0504', HOY, false, false, '—', 'LONAS DE LEÓN SA DE CV'],
+                    ['OC-0501', AYER, true, false, '—', 'Aceros Bajío'],
+                    ['OC-0508', sumarDias(HOY, -3), true, false, '—', 'Aceros Bajío'],
+                    ['OC-0506', sumarDias(HOY, -5), true, false, '—', 'SIN FICHA SA']
+                ]);
+            });
+        });
+        // Solo las órdenes de las obras: el material del día trae la de Julia; las obras, la de la orden
+        await conBandera('1', async () => {
+            fallarJulia = true;
+            await conPuerta(async (pedir) => {
+                const r = await pedir('/api/sistemas/v1/produccion/en-curso');
+                assert.equal(r.status, 200);
+                assert.deepEqual(r.json.avisos, [AVISO_JULIA_OBRAS]);
+                assert.deepEqual(resumen(r.json.obras[0].material.ordenes), [['OC-0501', AYER, true, false, '—', 'Aceros Bajío']]);
+                assert.deepEqual(resumen(r.json.material.ordenes), [
+                    ['OC-0504', HOY, false, false, '—', 'LONAS DE LEÓN SA DE CV'],
+                    ['OC-0508', HOY, false, true, sumarDias(HOY, -3), 'Aceros Bajío'],
+                    ['OC-0505', AYER, true, true, null, 'Toldos tel •••'],
+                    ['OC-0506', sumarDias(HOY, -5), true, false, '—', 'SIN FICHA SA']
+                ]);
+            });
+        });
+    } finally {
+        console.error = errores;
+    }
+});
+
+test('en-curso con VENCIDAS_USA_JULIA: 2 100 órdenes en camino sin fecha propia no dejan fuera a la que llega hoy', async () => {
+    await conBandera('1', async () => {
+        // Más sin fecha que el tope que tenía la lectura de candidatas (2 000), y ninguna con fecha de Julia
+        ordenesCompra = [
+            ...Array.from({ length: 2100 }, (_, i) => orden(20000 + i, 'enviada', null, PROVEEDOR)),
+            orden(504, 'parcial', enDias(0), { id: 8, nombre: 'LONAS DE LEÓN SA DE CV' }),
+            orden(506, 'enviada', enDias(-5), { id: 10, nombre: 'SIN FICHA SA' })
+        ];
+        fechasJulia = new Map([[22099, AYER]]);
+        await conPuerta(async (pedir) => {
+            const r = await pedir('/api/sistemas/v1/produccion/en-curso');
+            assert.equal(r.status, 200);
+            assert.deepEqual(r.json.avisos, []);
+            assert.deepEqual(r.json.material.ordenes.map((o) => [o.folio, o.llegadaEstimada]), [
+                ['OC-0504', HOY], ['OC-022099', AYER], ['OC-0506', sumarDias(HOY, -5)]
+            ]);
+        });
+    });
 });
 
 test('en-curso con VENCIDAS_USA_JULIA apagada (o «0»): no se lee a Julia y el material del día es el de siempre', async () => {
@@ -999,18 +1087,6 @@ test('llegadaDeOrden: el criterio del aviso de vencidas (fechaLlegadaEfectiva), 
             assert.equal(nuestra.llegada === null, delAviso === null, `${deOrden} / ${deJulia}`);
         }
     }
-});
-
-test('esperadasHasta: las que se esperan hasta hoy con la fecha que manda, hoy primero y luego las vencidas más recientes', () => {
-    const oc = (id, dia) => ({ id, fecha_llegada_estimada: dia ? new Date(`${dia}T00:00:00Z`) : null });
-    const hoy = '2026-10-27';
-    const candidatas = [oc(1, '2026-10-20'), oc(2, null), oc(3, '2026-10-27'), oc(4, '2026-10-26'), oc(5, null), oc(6, '2026-10-25'), oc(7, '2026-10-27')];
-    const julia = new Map([[1, '2026-10-26'], [2, '2026-10-27'], [4, '2026-11-02'], [6, '2026-10-01']]);
-    // 2 y 3 y 7 hoy (por id), 1 ayer por Julia, 6 con la suya; fuera la 4 (Julia la recorrió) y la 5 (sin fecha)
-    assert.deepEqual(P.esperadasHasta(candidatas, julia, hoy), [2, 3, 7, 1, 6]);
-    assert.deepEqual(P.esperadasHasta(candidatas, new Map(), hoy), [3, 7, 4, 6, 1], 'sin Julia, como la consulta de siempre');
-    const muchas = Array.from({ length: 80 }, (_, i) => oc(i + 1, '2026-10-27'));
-    assert.deepEqual(P.esperadasHasta(muchas, new Map(), hoy), Array.from({ length: 50 }, (_, i) => i + 1), 'tope de 50');
 });
 
 test('nombreProveedor: el nombre corto de la ficha si lo tiene; si no, el completo; siempre por sinDatos', () => {

@@ -70,7 +70,8 @@
  *     (fechaLlegadaEfectiva, cronJobs.js), comparado por día. `vencida` sale de esa misma fecha. Cuando manda la de
  *     Julia, la orden trae además `llegadaDeJulia: true` y `llegadaOrden` (la de la orden, AAAA-MM-DD o null). Con la
  *     bandera, una orden sin fecha propia entra al material del día si Julia la espera hasta hoy, y una vencida que
- *     Julia recorrió a otro día sale de él. Si la fecha de Julia no se puede leer, sale la de la orden y `avisos` lo dice.
+ *     Julia recorrió a otro día sale de él. Si la fecha de Julia no se puede leer, sale la de la orden y `avisos` lo dice
+ *     (en las órdenes de las obras o en el material del día: cada parte la lee por su lado).
  *
  * Reglas (v2):
  *   - Nunca lee Google Sheets (la cuota se agotó el 29-sep). La fecha de instalación sale de la foto que la revisión de
@@ -108,7 +109,6 @@ const MAX_TEXTO = 400;
 const MAX_MATERIAL = 10;
 const MAX_TICKETS_LEIDOS = 2000;
 const MAX_SOLICITUDES_LEIDAS = 1000;
-const MAX_ORDENES_LEIDAS = 2000; // candidatas del material del día con VENCIDAS_USA_JULIA
 const CLAVE_FOTO = 'produccion_fechas_instalacion'; // la de fechaInstalacion.service.js (revisarAdelantos)
 const ETAPAS_CERRADAS = ['instalacion', 'completado'];
 const ETAPAS_EN_CURSO = ['pendiente', 'diseno', 'compras', 'produccion'];
@@ -365,18 +365,6 @@ const camposLlegada = (l, vencida) => ({
     vencida,
     ...(l.deJulia ? { llegadaDeJulia: true, llegadaOrden: l.deOrden } : {})
 });
-
-/**
- * Con VENCIDAS_USA_JULIA: de las órdenes candidatas (en camino, sin recibir, con fecha propia hasta hoy o sin fecha), las
- * que se esperan hasta hoy con la fecha que manda, las de hoy primero y luego las vencidas más recientes (id para
- * desempatar), 50 como máximo. Pura. → [id]
- */
-export const esperadasHasta = (candidatas, fechasJulia, hoy) => candidatas
-    .map((oc) => ({ id: oc.id, llegada: llegadaDeOrden(oc, fechasJulia).llegada }))
-    .filter((x) => x.llegada && x.llegada <= hoy)
-    .sort((a, b) => (a.llegada === b.llegada ? a.id - b.id : (a.llegada < b.llegada ? 1 : -1)))
-    .slice(0, MAX_LISTA)
-    .map((x) => x.id);
 
 const normalizar = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
@@ -695,20 +683,68 @@ const leerNombresCortos = async (proveedores) => {
     return mapa;
 };
 
-const AVISO_SIN_JULIA = 'No se pudo leer la fecha de llegada que dio Julia: sale la de la orden.';
+// Cada parte lee la fecha de Julia por su lado: el aviso dice cuál no pudo (cada uno una sola vez).
+const AVISO_SIN_JULIA = {
+    obras: 'No se pudo leer la fecha de llegada que dio Julia en las órdenes de las obras: sale la de la orden.',
+    delDia: 'No se pudo leer la fecha de llegada que dio Julia en el material del día: sale la de la orden.'
+};
+const avisarSinJulia = (avisos, texto) => {
+    if (!avisos.includes(texto)) avisos.push(texto);
+};
+
 /**
- * Con VENCIDAS_USA_JULIA (solo se llama con ella encendida): Map orden_id → la fecha estimada más reciente que dio Julia,
- * la misma que usa el aviso de vencidas (OrdenSeguimiento.fechasEstimadasJulia). Si no se puede leer, mapa vacío (sale
- * la de la orden) y `avisos` lo dice una vez.
+ * Con VENCIDAS_USA_JULIA (solo se llama con ella encendida), para las órdenes de las obras: Map orden_id → la fecha
+ * estimada más reciente que dio Julia, la misma que usa el aviso de vencidas (OrdenSeguimiento.fechasEstimadasJulia). Si
+ * no se puede leer, mapa vacío (sale la de la orden) y `avisos` lo dice una vez.
  */
 const leerFechasJulia = async (ordenIds, avisos) => {
     if (!ordenIds.length) return new Map();
     try {
         return await OrdenSeguimiento.fechasEstimadasJulia(ordenIds);
     } catch (e) {
-        console.error('[puerta] produccion: no se pudo leer la llegada de Julia (sale la de la orden):', e.message);
-        if (!avisos.includes(AVISO_SIN_JULIA)) avisos.push(AVISO_SIN_JULIA);
+        console.error('[puerta] produccion: no se pudo leer la llegada de Julia de las órdenes de las obras (sale la de la orden):', e.message);
+        avisarSinJulia(avisos, AVISO_SIN_JULIA.obras);
         return new Map();
+    }
+};
+
+/**
+ * Con VENCIDAS_USA_JULIA, el material del día en una sola consulta: la fecha que manda se calcula en la base ANTES del
+ * corte de 50, así ninguna orden se queda fuera por un tope de lectura. Es la regla de llegadaDeOrden: el día UTC de la
+ * orden y el último renglón de Finanzas con fecha estimada (el mismo de OrdenSeguimiento.fechasEstimadasJulia); la de
+ * Julia manda si es más nueva o si la orden no tiene (GREATEST ignora los NULL). Candidatas: en camino, sin recibir, con
+ * fecha propia hasta hoy o sin fecha (la de Julia nunca adelanta a la de la orden). Las de hoy primero, luego las
+ * vencidas más recientes; el id desempata. Da el id y la fecha de Julia (AAAA-MM-DD o null) de cada una, ya en orden.
+ * LATERAL para que el renglón de Julia se busque una vez por orden (índice orden_seguimiento.orden_id).
+ */
+const SQL_DEL_DIA_CON_JULIA = `
+    SELECT id, to_char(julia, 'YYYY-MM-DD') AS julia
+      FROM (
+        SELECT oc.id, j.julia, GREATEST(j.julia, (oc.fecha_llegada_estimada AT TIME ZONE 'UTC')::date) AS llegada
+          FROM ordenes_compra oc
+          LEFT JOIN LATERAL (
+              SELECT s.fecha_estimada AS julia FROM orden_seguimiento s
+               WHERE s.orden_id = oc.id AND s.origen = 'finanzas' AND s.fecha_estimada IS NOT NULL
+               ORDER BY s.fecha DESC, s.id DESC LIMIT 1
+          ) j ON true
+         WHERE oc.estado IN (:estados) AND oc.fecha_recepcion IS NULL
+           AND (oc.fecha_llegada_estimada IS NULL OR oc.fecha_llegada_estimada < CAST(:manana AS timestamptz))
+      ) l
+     WHERE llegada <= CAST(:hoy AS date)
+     ORDER BY llegada DESC, id ASC
+     LIMIT :tope`;
+
+/** [{ id, julia }] del material del día con la fecha de Julia, o null si no se pudo leer (`avisos` lo dice). */
+const elegirDelDiaConJulia = async (hoy, manana, avisos) => {
+    try {
+        const [filas] = await sequelize.query(SQL_DEL_DIA_CON_JULIA, {
+            replacements: { estados: ORDENES_EN_CAMINO, manana: manana.toISOString(), hoy, tope: MAX_LISTA }
+        });
+        return filas.map((f) => ({ id: Number(f.id), julia: f.julia || null }));
+    } catch (e) {
+        console.error('[puerta] produccion: no se pudo leer la llegada de Julia del material del día (sale la de la orden):', e.message);
+        avisarSinJulia(avisos, AVISO_SIN_JULIA.delDia);
+        return null;
     }
 };
 
@@ -716,13 +752,11 @@ const leerFechasJulia = async (ordenIds, avisos) => {
  * Órdenes en camino que se esperaban hasta hoy y los proyectos de los tickets que las originaron.
  *   - Sin VENCIDAS_USA_JULIA (como hoy): con su fecha propia hasta hoy, las de hoy primero y luego las vencidas más
  *     recientes, 50.
- *   - Con ella: la fecha que decide es la de llegadaDeOrden (la de Julia si es más nueva o si la orden no tiene). Como la
- *     de Julia nunca adelanta a la de la orden, las candidatas son las en camino con fecha propia hasta hoy o sin fecha;
- *     se cruzan con las de Julia y se quedan las 50 que tocan (esperadasHasta), en el mismo orden.
+ *   - Con ella: las 50 que elige SQL_DEL_DIA_CON_JULIA con la fecha que manda, en ese orden. Si esa consulta falla, como
+ *     con la bandera apagada (la misma consulta y la misma respuesta) y `avisos` lo dice.
  */
 const leerOrdenesDelDia = async (hoy, { conJulia = false, avisos = [] } = {}) => {
-    const enCamino = { estado: { [Op.in]: ORDENES_EN_CAMINO }, fecha_recepcion: null };
-    const hastaHoy = { [Op.lt]: new Date(`${sumarDias(hoy, 1)}T00:00:00Z`) };
+    const manana = new Date(`${sumarDias(hoy, 1)}T00:00:00Z`);
     const attributes = ['id', 'ticket_id', 'estado', 'fecha_llegada_estimada'];
     const include = [
         { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'], required: false },
@@ -733,35 +767,24 @@ const leerOrdenesDelDia = async (hoy, { conJulia = false, avisos = [] } = {}) =>
         }
     ];
     let ordenes;
-    let fechasJulia = new Map();
-    if (!conJulia) {
+    const fechasJulia = new Map();
+    const elegidas = conJulia ? await elegirDelDiaConJulia(hoy, manana, avisos) : null;
+    if (elegidas) {
+        for (const f of elegidas) if (f.julia) fechasJulia.set(f.id, f.julia);
+        const lugar = new Map(elegidas.map((f, i) => [f.id, i]));
+        ordenes = elegidas.length
+            ? (await OrdenCompra.findAll({ where: { id: { [Op.in]: [...lugar.keys()] } }, attributes, include }))
+                .sort((a, b) => lugar.get(a.id) - lugar.get(b.id))
+            : [];
+    } else {
         ordenes = await OrdenCompra.findAll({
-            where: { ...enCamino, fecha_llegada_estimada: hastaHoy },
+            where: { estado: { [Op.in]: ORDENES_EN_CAMINO }, fecha_recepcion: null, fecha_llegada_estimada: { [Op.lt]: manana } },
             attributes,
             include,
             // Las de hoy primero y luego las vencidas más recientes: una orden vencida hace meses no tapa a las de hoy.
             order: [['fecha_llegada_estimada', 'DESC'], ['id', 'ASC']],
             limit: MAX_LISTA
         });
-    } else {
-        const candidatas = await OrdenCompra.findAll({
-            where: { ...enCamino, [Op.or]: [{ fecha_llegada_estimada: hastaHoy }, { fecha_llegada_estimada: null }] },
-            attributes: ['id', 'fecha_llegada_estimada'],
-            // Si hay más que el tope, se ven las sin fecha propia (la de Julia decide) y luego las de fecha más reciente.
-            order: [['fecha_llegada_estimada', 'DESC NULLS FIRST'], ['id', 'DESC']],
-            limit: MAX_ORDENES_LEIDAS,
-            raw: true
-        });
-        if (candidatas.length >= MAX_ORDENES_LEIDAS) {
-            avisos.push(`Hay más de ${MAX_ORDENES_LEIDAS} órdenes en camino que se esperaban hasta hoy: no se vieron todas.`);
-        }
-        fechasJulia = await leerFechasJulia(candidatas.map((o) => o.id), avisos);
-        const ids = esperadasHasta(candidatas, fechasJulia, hoy);
-        const lugar = new Map(ids.map((id, i) => [id, i]));
-        ordenes = ids.length
-            ? (await OrdenCompra.findAll({ where: { id: { [Op.in]: ids } }, attributes, include }))
-                .sort((a, b) => lugar.get(a.id) - lugar.get(b.id))
-            : [];
     }
     const proyectosDeOrden = new Map();
     if (ordenes.length) {
