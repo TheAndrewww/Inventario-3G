@@ -118,10 +118,21 @@ const ORDENES_DEL_DIA = [
 ];
 
 // ---------- Evaluador pequeño de los filtros de Sequelize que usa la puerta ----------
-const tiempo = (v) => (v instanceof Date ? v.getTime() : v);
+// Postgres guarda la hora con microsegundos (NOW() de SQL) y un Date de JS solo llega al milisegundo. Una fila de la
+// prueba puede traer los microsegundos aparte, en «<columna>_us» (0 a 999): la columna sola compara y ordena con ellos y
+// date_trunc('milliseconds', columna) sin ellos, como en Postgres. Las horas se comparan en microsegundos.
+const campoDe = (attr) => (typeof attr === 'string' ? attr : attr?.col ?? attr?.args?.find((a) => a?.col)?.col);
+const truncaAlMilisegundo = (attr) => attr?.fn === 'date_trunc' && attr.args?.[0] === 'milliseconds';
+const valorDe = (fila, attr) => {
+    const campo = campoDe(attr);
+    const v = fila[campo];
+    if (!(v instanceof Date)) return v;
+    return v.getTime() * 1000 + (truncaAlMilisegundo(attr) ? 0 : (fila[`${campo}_us`] || 0));
+};
+const tiempo = (v) => (v instanceof Date ? v.getTime() * 1000 : v);
 const condicion = (valor, cond) => {
     if (cond === null) return valor === null || valor === undefined;
-    if (cond instanceof Date) return valor instanceof Date && valor.getTime() === cond.getTime();
+    if (cond instanceof Date) return valor === tiempo(cond);
     if (typeof cond !== 'object') return valor === cond;
     for (const op of Reflect.ownKeys(cond)) {
         const x = cond[op];
@@ -139,22 +150,18 @@ const condicion = (valor, cond) => {
     }
     return true;
 };
-// sequelize.where(sequelize.fn('date_trunc', 'milliseconds', sequelize.col(x)), …): los Date de la prueba ya van al
-// milisegundo, así que basta con la columna.
-const campoDe = (attr) => (typeof attr === 'string' ? attr : attr?.col ?? attr?.args?.find((a) => a?.col)?.col);
 const cumple = (fila, where = {}) => {
-    if (where?.constructor?.name === 'Where') return condicion(fila[campoDe(where.attribute)], where.logic);
+    if (where?.constructor?.name === 'Where') return condicion(valorDe(fila, where.attribute), where.logic);
     return Reflect.ownKeys(where).every((k) => {
         if (k === Op.or) return where[k].some((w) => cumple(fila, w));
         if (k === Op.and) return where[k].every((w) => cumple(fila, w));
-        return condicion(fila[k], where[k]);
+        return condicion(valorDe(fila, k), where[k]);
     });
 };
 const ordenar = (filas, order = []) => [...filas].sort((a, b) => {
     for (const [columna, dir] of order) {
-        const campo = campoDe(columna);
-        const x = tiempo(a[campo]);
-        const y = tiempo(b[campo]);
+        const x = valorDe(a, columna);
+        const y = valorDe(b, columna);
         if (x === y) continue;
         if (x === null || x === undefined) return 1;
         if (y === null || y === undefined) return -1;
@@ -398,6 +405,35 @@ test('cerradas: el cursor recorre 120 obras en páginas de 50 sin repetir ni per
     const q = consultas.filter((c) => c.modelo === 'ProduccionProyecto').at(-1).opciones;
     assert.equal(q.order[0][0].fn, 'date_trunc');
     assert.deepEqual(q.order[0][0].args.slice(0, 1), ['milliseconds']);
+});
+
+test('cerradas: horas con microsegundos (NOW() de SQL): orden y corte coinciden y el cursor no repite ni pierde', async () => {
+    // Regresión de 2caa1a7. 48 obras en minutos distintos y 4 que cerraron en el MISMO milisegundo con distintos
+    // microsegundos (los id al revés de los microsegundos). La página 1 corta a la mitad de ese milisegundo. Si orden o
+    // corte usaran la columna sola (con microsegundos), la página 2 repetiría 2102 y 2103.
+    const T = new Date(AHORA - 2 * 864e5);
+    proyectos = [
+        ...Array.from({ length: 48 }, (_, i) => base({
+            id: 2000 + i, nombre: `OBRA ${i}`, etapa_actual: 'instalacion',
+            instalacion_completado_en: new Date(T.getTime() - (48 - i) * 60000), instalacion_completado_en_us: 250
+        })),
+        ...[[2100, 900], [2101, 500], [2102, 100], [2103, 0]].map(([id, us]) => base({
+            id, nombre: `MISMO MILISEGUNDO ${id}`, etapa_actual: 'completado', instalacion_completado_en: new Date(T), instalacion_completado_en_us: us
+        }))
+    ];
+    await conPuerta(async (pedir) => {
+        const a = await pedir('/api/sistemas/v1/produccion/cerradas');
+        assert.equal(a.status, 200);
+        assert.equal(a.json.obras.length, 50);
+        assert.deepEqual(a.json.obras.slice(-2).map((o) => o.proyectoId), [2100, 2101], 'en el mismo milisegundo, por id');
+        assert.deepEqual(a.json.siguiente, { desde: T.toISOString(), despuesDe: 2101 });
+        const b = await pedir(`/api/sistemas/v1/produccion/cerradas?desde=${encodeURIComponent(a.json.siguiente.desde)}&despuesDe=2101`);
+        assert.equal(b.status, 200);
+        assert.deepEqual(b.json.obras.map((o) => o.proyectoId), [2102, 2103]);
+        assert.equal(b.json.hayMas, false);
+        const ids = [...a.json.obras, ...b.json.obras].map((o) => o.proyectoId);
+        assert.equal(new Set(ids).size, 52, 'ni repetidas ni perdidas');
+    });
 });
 
 test('cerradas: desde inválido, en el futuro, repetido o despuesDe suelto → 400', async () => {
