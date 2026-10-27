@@ -121,7 +121,9 @@ const condicion = (valor, cond) => {
     if (typeof cond !== 'object') return valor === cond;
     for (const op of Reflect.ownKeys(cond)) {
         const x = cond[op];
-        if (op === Op.in) { if (!x.includes(valor)) return false; } else if (op === Op.gt) {
+        if (op === Op.in) { if (!x.includes(valor)) return false; } else if (op === Op.eq) {
+            if (tiempo(valor) !== tiempo(x)) return false;
+        } else if (op === Op.gt) {
             if (valor === null || valor === undefined || !(tiempo(valor) > tiempo(x))) return false;
         } else if (op === Op.lt) {
             if (valor === null || valor === undefined || !(tiempo(valor) < tiempo(x))) return false;
@@ -133,13 +135,20 @@ const condicion = (valor, cond) => {
     }
     return true;
 };
-const cumple = (fila, where = {}) => Reflect.ownKeys(where).every((k) => {
-    if (k === Op.or) return where[k].some((w) => cumple(fila, w));
-    if (k === Op.and) return where[k].every((w) => cumple(fila, w));
-    return condicion(fila[k], where[k]);
-});
+// sequelize.where(sequelize.fn('date_trunc', 'milliseconds', sequelize.col(x)), …): los Date de la prueba ya van al
+// milisegundo, así que basta con la columna.
+const campoDe = (attr) => (typeof attr === 'string' ? attr : attr?.col ?? attr?.args?.find((a) => a?.col)?.col);
+const cumple = (fila, where = {}) => {
+    if (where?.constructor?.name === 'Where') return condicion(fila[campoDe(where.attribute)], where.logic);
+    return Reflect.ownKeys(where).every((k) => {
+        if (k === Op.or) return where[k].some((w) => cumple(fila, w));
+        if (k === Op.and) return where[k].every((w) => cumple(fila, w));
+        return condicion(fila[k], where[k]);
+    });
+};
 const ordenar = (filas, order = []) => [...filas].sort((a, b) => {
-    for (const [campo, dir] of order) {
+    for (const [columna, dir] of order) {
+        const campo = campoDe(columna);
         const x = tiempo(a[campo]);
         const y = tiempo(b[campo]);
         if (x === y) continue;
@@ -196,7 +205,7 @@ before(() => {
         if (where.orden_compra_id) return [{ orden_compra_id: 501, pedidoOrigen: { proyecto: 'Toldo Restaurante / MTO' } }, { orden_compra_id: 501, pedidoOrigen: { proyecto: 'Toldo Restaurante / MTO' } }];
         throw new Error('solicitudes: filtro inesperado');
     };
-    OrdenCompra.findAll = async (opciones) => { consultas.push({ modelo: 'OrdenCompra', opciones }); return ORDENES_DEL_DIA; };
+    OrdenCompra.findAll = async (opciones) => { consultas.push({ modelo: 'OrdenCompra', opciones }); return ordenar(ORDENES_DEL_DIA, opciones.order); };
     LlaveSistema.findOne = async () => null;
     LlaveSistema.create = async () => ({});
 });
@@ -367,6 +376,10 @@ test('cerradas: el cursor recorre 120 obras en páginas de 50 sin repetir ni per
         assert.deepEqual(tamanos, [50, 50, 20]);
         assert.deepEqual(vistos, esperado);
     });
+    // Orden y corte al milisegundo (date_trunc), el mismo valor en los dos
+    const q = consultas.filter((c) => c.modelo === 'ProduccionProyecto').at(-1).opciones;
+    assert.equal(q.order[0][0].fn, 'date_trunc');
+    assert.deepEqual(q.order[0][0].args.slice(0, 1), ['milliseconds']);
 });
 
 test('cerradas: desde inválido, en el futuro, repetido o despuesDe suelto → 400', async () => {
@@ -461,7 +474,7 @@ test('en-curso: el taller (producción o planos sin terminar) con sus áreas, ob
 
         assert.deepEqual(toldo.material.tickets, [{ folio: 'T-0101', estado: 'pendiente', fecha: DIA_MX.format(horasAtras(30)), surtido: 50 }]);
         assert.deepEqual(toldo.material.ordenes, [{
-            folio: 'OC-0501', estado: 'enviada', proveedor: 'ACEROS', llegadaEstimada: AYER, vencida: true,
+            folio: 'OC-0501', estado: 'enviada', proveedor: 'ACEROS DEL BAJÍO SA DE CV', llegadaEstimada: AYER, vencida: true,
             articulos: [{ nombre: 'Cable acero 1/4', cantidad: 12, unidad: 'metros' }]
         }]);
         assert.deepEqual(toldo.material.sinOrden, [{ nombre: 'Tensor 3/8', cantidad: 4, unidad: 'piezas' }]);
@@ -474,10 +487,10 @@ test('en-curso: el taller (producción o planos sin terminar) con sus áreas, ob
         assert.deepEqual(thelmaMto.material.ordenes.map((o) => [o.folio, o.llegadaEstimada, o.vencida, o.proveedor]), [['OC-0503', null, false, null]]);
 
         assert.equal(r.json.material.hoy, HOY);
-        assert.deepEqual(r.json.material.ordenes, [
-            { folio: 'OC-0501', estado: 'enviada', proveedor: 'ACEROS', llegadaEstimada: AYER, vencida: true,
-                articulos: [{ nombre: 'Cable acero 1/4', cantidad: 12, recibida: 0, unidad: 'metros' }], proyectos: ['Toldo Restaurante / MTO'] },
-            { folio: 'OC-0504', estado: 'parcial', proveedor: null, llegadaEstimada: HOY, vencida: false, articulos: [], proyectos: [] }
+        assert.deepEqual(r.json.material.ordenes, [ // las de hoy primero
+            { folio: 'OC-0504', estado: 'parcial', proveedor: null, llegadaEstimada: HOY, vencida: false, articulos: [], proyectos: [] },
+            { folio: 'OC-0501', estado: 'enviada', proveedor: 'ACEROS DEL BAJÍO SA DE CV', llegadaEstimada: AYER, vencida: true,
+                articulos: [{ nombre: 'Cable acero 1/4', cantidad: 12, recibida: 0, unidad: 'metros' }], proyectos: ['Toldo Restaurante / MTO'] }
         ]);
     });
     // Las consultas: por etapa (índice) y las órdenes del día solo en camino, sin recibir y hasta hoy

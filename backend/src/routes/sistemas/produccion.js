@@ -11,7 +11,7 @@
  *       Sin `desde`: los últimos 7 días. Más de 31 días atrás se recorta a 31 (la respuesta dice el que se usó).
  *       Inválido o en el futuro: 400.
  *     · Cursor: con `hayMas: true`, la página siguiente se pide con `siguiente.desde` y `siguiente.despuesDe` tal cual.
- *       `despuesDe` sin `desde`: 400.
+ *       `despuesDe` sin `desde`: 400. La hora se compara al milisegundo (date_trunc), con el id para desempatar.
  *     → { sistema, generado, desde, obras: [OBRA], hayMas, siguiente: { desde, despuesDe } | null }
  *
  *   GET /api/sistemas/v1/produccion/estado?obras=3G-26-0412,3G-26-0415
@@ -49,7 +49,7 @@
  *   tickets-abiertos); las órdenes y lo «sin orden» salen de las solicitudes de compra de esos tickets.
  *
  * ORDEN_DEL_DIA (material de la primera página): órdenes enviadas o parciales, sin recibir, con llegada estimada hasta
- *   hoy (las vencidas también), 50 como máximo:
+ *   hoy (las vencidas también), 50 como máximo, las de hoy primero y luego las vencidas más recientes:
  *   { folio, estado, proveedor, llegadaEstimada, vencida, articulos: [{ nombre, cantidad, recibida, unidad }] (10),
  *     proyectos: [nombres de los proyectos de los tickets que la originaron] (10) }
  *
@@ -307,7 +307,7 @@ export const materialPorObra = (obras, tickets, solicitudes, hoy) => {
             o = {
                 folio: oc.ticket_id,
                 estado: oc.estado,
-                proveedor: sinDatos(oc.proveedor?.nombre_corto || oc.proveedor?.nombre, 120),
+                proveedor: sinDatos(oc.proveedor?.nombre, 120),
                 llegadaEstimada: llegada,
                 vencida: !!llegada && llegada < hoy && ORDENES_EN_CAMINO.includes(oc.estado),
                 articulos: []
@@ -326,7 +326,7 @@ export const ordenesDelDia = (ordenes, proyectosDeOrden, hoy) => ordenes.slice(0
     return {
         folio: oc.ticket_id,
         estado: oc.estado,
-        proveedor: sinDatos(oc.proveedor?.nombre_corto || oc.proveedor?.nombre, 120),
+        proveedor: sinDatos(oc.proveedor?.nombre, 120),
         llegadaEstimada: llegada,
         vencida: !!llegada && llegada < hoy,
         articulos: (oc.detalles || []).slice(0, MAX_MATERIAL).map((d) => articulo(d.articulo, d.cantidad_solicitada, { recibida: numero(d.cantidad_recibida) })),
@@ -367,11 +367,14 @@ const cuerpoError = (texto) => ({ codigo: 400, cuerpo: { error: texto } });
 export const leerCerradas = async (req, { ahora = new Date() } = {}) => {
     const l = leerDesde(req.query, ahora);
     if (l.error) return cuerpoError(`No se pudo leer: ${l.error}.`);
+    // El cursor compara al milisegundo (lo que cabe en un Date de JS): una hora guardada con microsegundos (NOW() de
+    // SQL) repetiría obras entre páginas. Orden y corte usan el mismo valor; el empate lo rompe el id.
+    const cerradaMs = sequelize.fn('date_trunc', 'milliseconds', sequelize.col('instalacion_completado_en'));
     const corte = l.despuesDe === null
-        ? { instalacion_completado_en: { [Op.gt]: l.desde } }
+        ? sequelize.where(cerradaMs, { [Op.gt]: l.desde })
         : { [Op.or]: [
-            { instalacion_completado_en: { [Op.gt]: l.desde } },
-            { instalacion_completado_en: l.desde, id: { [Op.gt]: l.despuesDe } }
+            sequelize.where(cerradaMs, { [Op.gt]: l.desde }),
+            { [Op.and]: [sequelize.where(cerradaMs, { [Op.eq]: l.desde }), { id: { [Op.gt]: l.despuesDe } }] }
         ] };
     const filas = await ProduccionProyecto.findAll({
         where: {
@@ -380,7 +383,7 @@ export const leerCerradas = async (req, { ahora = new Date() } = {}) => {
             [Op.and]: [SIN_CANCELADOS, corte]
         },
         attributes: CAMPOS_OBRA,
-        order: [['instalacion_completado_en', 'ASC'], ['id', 'ASC']],
+        order: [[cerradaMs, 'ASC'], ['id', 'ASC']],
         limit: MAX_LISTA + 1
     });
     const hayMas = filas.length > MAX_LISTA;
@@ -452,7 +455,7 @@ const leerSolicitudesDeTickets = (ticketIds) => (ticketIds.length ? SolicitudCom
         {
             model: OrdenCompra, as: 'ordenCompra', required: false,
             attributes: ['id', 'ticket_id', 'estado', 'fecha_llegada_estimada', 'fecha_recepcion'],
-            include: [{ model: Proveedor, as: 'proveedor', attributes: ['nombre', 'nombre_corto'], required: false }]
+            include: [{ model: Proveedor, as: 'proveedor', attributes: ['nombre'], required: false }]
         }
     ],
     order: [['id', 'ASC']],
@@ -469,14 +472,15 @@ const leerOrdenesDelDia = async (hoy) => {
         },
         attributes: ['id', 'ticket_id', 'estado', 'fecha_llegada_estimada'],
         include: [
-            { model: Proveedor, as: 'proveedor', attributes: ['nombre', 'nombre_corto'], required: false },
+            { model: Proveedor, as: 'proveedor', attributes: ['nombre'], required: false },
             {
                 model: DetalleOrdenCompra, as: 'detalles', required: false,
                 attributes: ['cantidad_solicitada', 'cantidad_recibida'],
                 include: [{ model: Articulo, as: 'articulo', attributes: ['nombre', 'unidad'], required: false }]
             }
         ],
-        order: [['fecha_llegada_estimada', 'ASC'], ['id', 'ASC']],
+        // Las de hoy primero y luego las vencidas más recientes: una orden vencida hace meses no tapa a las de hoy.
+        order: [['fecha_llegada_estimada', 'DESC'], ['id', 'ASC']],
         limit: MAX_LISTA
     });
     const proyectosDeOrden = new Map();
