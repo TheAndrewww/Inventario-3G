@@ -56,7 +56,7 @@ const base = (datos) => ({
 });
 
 const CERRADAS = [
-    base({ id: 1, nombre: 'LONA SOMBRA ESCOLAR', cliente: 'ANA LÓPEZ 462 123 4567', etapa_actual: 'instalacion', instalacion_completado_en: horasAtras(48),
+    base({ id: 1, nombre: 'LONA SOMBRA ESCOLAR', cliente: 'ANA LÓPEZ (462) 123 4567 ana@empresa.mx', etapa_actual: 'instalacion', instalacion_completado_en: horasAtras(48),
         instalacion_completado_por: 5, tiene_manufactura: true, manufactura_completado: true, manufactura_completado_en: horasAtras(60),
         tiene_herreria: true, herreria_completado: true, herreria_armado_completado: true, herreria_pintado_completado: true,
         fecha_limite: '2026-11-05', obra: '3G-26-0101' }),
@@ -75,14 +75,16 @@ const EN_CURSO = [
     base({ id: 21, nombre: 'TOLDO RESTAURANTE', etapa_actual: 'produccion', prioridad: 1, tiene_manufactura: true, tiene_herreria: true,
         herreria_armado_completado: true, diseno_completado_en: horasAtras(300), compras_completado_en: horasAtras(200),
         observaciones_produccion: 'Falta costura; llamar al 4621234567, anticipo $12,500', observaciones_compras: 'Pagaron 8500 pesos al proveedor',
+        observaciones_diseno: 'Dueña: ana@empresa.mx tel (462) 123 4567; instalar en Av. Siempre Viva 742 Col. Centro',
         fecha_limite: '2026-11-12', obra: '3G-26-0201' }),
-    base({ id: 22, nombre: 'PÉRGOLA CASA CLUB', etapa_actual: 'diseno', tiene_manufactura: true }),
+    base({ id: 22, nombre: 'PÉRGOLA CASA CLUB', etapa_actual: 'diseno', tiene_manufactura: true,
+        observaciones_compras: 'Saldo 12,500 + iva; anticipo 8500; MXN 4,000 y USD 300; proveedor 462.123.4567' }),
     base({ id: 23, nombre: 'EN COMPRAS SIN PLANOS', etapa_actual: 'compras' }),
     base({ id: 24, nombre: 'YA CERRADA', etapa_actual: 'instalacion', instalacion_completado_en: horasAtras(5), tiene_manufactura: true, manufactura_completado: true }),
     base({ id: 25, nombre: 'CANCELADA EN TALLER', tipo_proyecto: 'CANCELADO', etapa_actual: 'produccion' }),
     base({ id: 26, nombre: 'INACTIVA EN TALLER', activo: false, etapa_actual: 'produccion' }),
     base({ id: 27, nombre: 'HERRERÍA LISTA EN DISEÑO', etapa_actual: 'diseno', tiene_herreria: true, herreria_completado: true }),
-    base({ id: 28, nombre: 'THELMA PADILLA', etapa_actual: 'produccion' }),
+    base({ id: 28, nombre: 'THELMA PADILLA', cliente: 'THELMA 462.123.9999 thelma@correo.example', etapa_actual: 'produccion' }),
     base({ id: 29, nombre: 'THELMA PADILLA / MTO', etapa_actual: 'produccion', tipo_proyecto: 'MTO', es_extensivo: true })
 ];
 
@@ -329,7 +331,7 @@ test('cerradas: últimos 7 días por omisión, en orden, sin canceladas, inactiv
         const [, lona, velaria, mto] = r.json.obras;
         assert.equal(lona.obraId, '3G-26-0101');
         assert.equal(lona.proyecto, 'LONA SOMBRA ESCOLAR');
-        assert.equal(lona.cliente, 'ANA LÓPEZ •••');
+        assert.equal(lona.cliente, 'ANA LÓPEZ ••• •••', 'teléfono con paréntesis y correo tapados');
         assert.equal(lona.etapa, 'instalacion');
         assert.equal(lona.entregada, false);
         assert.equal(lona.cerradaConSesion, true);
@@ -452,7 +454,12 @@ test('estado: sin obras, con un ID mal escrito o con más de 50 → 400', async 
 test('en-curso: el taller (producción o planos sin terminar) con sus áreas, observaciones y material', async () => {
     proyectos = EN_CURSO;
     foto = FOTO;
-    pronosticos = [{ id: 21, p: { respuesta: 'no', motivo: 'falta tela', fechaPropuesta: '2026-11-12', autor: 'Charly', preguntadoEn: new Date(AHORA).toISOString(), contestadoEn: new Date(AHORA).toISOString() } }];
+    // El motivo y la fecha los escribe la persona: llegan con teléfono, correo, dirección y montos y salen tapados.
+    pronosticos = [{ id: 21, p: {
+        respuesta: 'no', motivo: 'falta tela; llamar al (462) 555 0101 o a ana@empresa.mx, anticipo 8500',
+        fechaPropuesta: 'cuando paguen el saldo 12,500 en Av. Siempre Viva 742', autor: 'Charly',
+        preguntadoEn: new Date(AHORA).toISOString(), contestadoEn: new Date(AHORA).toISOString()
+    } }];
     fallarTickets = false;
     await conPuerta(async (pedir) => {
         const r = await pedir('/api/sistemas/v1/produccion/en-curso');
@@ -471,9 +478,12 @@ test('en-curso: el taller (producción o planos sin terminar) con sus áreas, ob
         assert.equal(toldo.areas.herreria.soldadura, true);
         assert.equal(toldo.observaciones.produccion, 'Falta costura; llamar al •••, anticipo $•••');
         assert.equal(toldo.observaciones.compras, 'Pagaron ••• al proveedor');
-        assert.equal(toldo.observaciones.diseno, null);
+        assert.equal(toldo.observaciones.diseno, 'Dueña: ••• tel •••; instalar en •••');
         assert.deepEqual(toldo.fechaInstalacion, { fecha: '2026-11-10', fuente: 'calendario' });
         assert.equal(toldo.pronostico.respuesta, 'no');
+        assert.equal(toldo.pronostico.motivo, 'falta tela; llamar al ••• o a ••• anticipo •••');
+        assert.equal(toldo.pronostico.fechaPropuesta, 'cuando paguen el saldo ••• en •••');
+        assert.equal(toldo.pronostico.texto, 'Reagendar: falta tela; llamar al ••• o a ••• anticipo ••• · cuando paguen el saldo ••• en •••');
         assert.equal(toldo.pronostico.autor, undefined, 'sin el nombre de quien contestó');
 
         assert.deepEqual(toldo.material.tickets, [{ folio: 'T-0101', estado: 'pendiente', fecha: DIA_MX.format(horasAtras(30)), surtido: 50 }]);
@@ -485,8 +495,10 @@ test('en-curso: el taller (producción o planos sin terminar) con sus áreas, ob
 
         const [, pergola, thelma, thelmaMto] = r.json.obras;
         assert.equal(pergola.etapa, 'diseno');
+        assert.equal(pergola.observaciones.compras, 'Saldo ••• + iva; anticipo •••; ••• y •••; proveedor •••');
         assert.deepEqual(pergola.material, { tickets: [], ordenes: [], sinOrden: [] });
         assert.deepEqual(thelma.material.tickets.map((t) => t.folio), ['T-0103'], 'el de nombre idéntico gana');
+        assert.equal(thelma.cliente, 'THELMA ••• •••');
         assert.deepEqual(thelmaMto.material.tickets.map((t) => t.folio), ['T-0102']);
         assert.deepEqual(thelmaMto.material.ordenes.map((o) => [o.folio, o.llegadaEstimada, o.vencida, o.proveedor]), [['OC-0503', null, false, null]]);
 
@@ -582,11 +594,16 @@ test('nunca salen teléfonos, correos, direcciones, importes ni llaves (en ningu
     });
     assert.ok(respuestas.length > 20);
     const todo = respuestas.join('\n');
-    const soloDigitos = todo.replace(/[\s+-]/g, '');
-    for (const tel of ['4621234567', '4625550101']) assert.ok(!soloDigitos.includes(tel), `salió el teléfono ${tel}`);
-    for (const importe of ['12,500', '12500', '3000.00', '1041.67', '999.00', '8500']) assert.ok(!todo.includes(importe), `salió el importe ${importe}`);
+    const soloDigitos = todo.replace(/[\s+().-]/g, '');
+    for (const tel of ['4621234567', '4625550101', '4621239999']) assert.ok(!soloDigitos.includes(tel), `salió el teléfono ${tel}`);
+    for (const importe of ['12,500', '12500', '3000.00', '1041.67', '999.00', '8500', '4,000']) assert.ok(!todo.includes(importe), `salió el importe ${importe}`);
+    assert.ok(!/USD\s?300/i.test(todo), 'salió un importe en dólares');
     assert.ok(!todo.includes('@'), 'salió un correo');
-    assert.ok(!/Siempre Viva/.test(todo), 'salió una dirección');
+    assert.ok(!/Siempre Viva|Col\. Centro/.test(todo), 'salió una dirección');
+    // Los datos sembrados sí pasaron por las respuestas (si no, esta prueba no probaría nada)
+    for (const sembrado of ['Dueña: ••• tel •••; instalar en •••', 'THELMA ••• •••', 'ANA LÓPEZ ••• •••', 'anticipo •••']) {
+        assert.ok(todo.includes(sembrado), `no salió «${sembrado}»`);
+    }
     assert.ok(!todo.includes(LLAVE) && !todo.includes(ENV_BUENO.LLAVE_ENTRANTE_OPERACION_SHA256), 'salió la llave o su huella');
     const claves = new Set();
     const juntar = (v) => { if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { claves.add(k); juntar(x); } };
@@ -613,6 +630,30 @@ test('sinDatos: teléfonos y montos fuera; fechas, medidas y folios se quedan', 
     assert.equal(P.sinDatos('Llamar a Juan 462-123-45-67 o +52 1 462 555 0101'), 'Llamar a Juan ••• o •••');
     assert.equal(P.sinDatos('Anticipo $ 3,000.00 y 1500 MXN, resto 2,000 pesos'), 'Anticipo $••• y •••, resto •••');
     assert.equal(P.sinDatos('Entrega 2026-11-03, lona de 12.5 m, 3 piezas, OC-0501'), 'Entrega 2026-11-03, lona de 12.5 m, 3 piezas, OC-0501');
+    // Los que pasaban sin tapar (revisión del 27-oct)
+    const tapados = {
+        '(462) 123 4567': '•••',
+        '462.123.4567': '•••',
+        'tel: +52 (462) 123-4567': 'tel: •••',
+        'ana@empresa.mx': '•••',
+        'Av. Siempre Viva 742 Col. Centro': '•••',
+        'Instalar en Blvd. Campestre 2005, Col. Jardines del Moral': 'Instalar en •••',
+        'Calle 5 de Mayo #120 int. 3, León': '•••, León',
+        'C.P. 37160': '•••',
+        'anticipo 8500': 'anticipo •••',
+        'pagó 8,500.00 el lunes': 'pagó ••• el lunes',
+        '8500 de anticipo': '••• de anticipo',
+        'MXN 4,000': '•••',
+        'USD 300': '•••',
+        'se pagaron 300 dlls': 'se pagaron •••',
+        'saldo 12,500 + iva': 'saldo ••• + iva',
+        'costo 1200 + 16% iva': 'costo ••• + 16% iva'
+    };
+    for (const [antes, despues] of Object.entries(tapados)) assert.equal(P.sinDatos(antes), despues, antes);
+    // Fechas, folios, cantidades chicas y nombres se quedan
+    for (const igual of ['pago el 2026-11-03', 'pago OC-0501', 'total 3 piezas', '1500 metros en total', 'THELMA PADILLA / MTO', 'Cable acero 1/4', 'Lona PVC 650']) {
+        assert.equal(P.sinDatos(igual), igual, igual);
+    }
     assert.equal(P.sinDatos('   '), null);
     assert.equal(P.sinDatos('x'.repeat(500)).length, 400);
 });

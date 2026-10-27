@@ -58,7 +58,8 @@
  *     cada 5 minutos guarda en `configuracion` (clave produccion_fechas_instalacion; calendario o Índice, ya resuelta) y,
  *     si la obra no está en la foto, de fecha_limite (Índice). `fuente: 'calendario'` cuando la foto difiere del Índice.
  *   - Nunca devuelve teléfonos, correos, direcciones, importes, costos ni llaves: los campos se eligen uno por uno y el
- *     texto libre (nombres y observaciones) pasa por `sinDatos` (teléfonos y montos → «•••»).
+ *     texto libre (nombres, cliente, observaciones, artículos, proveedor y el motivo, la fecha y el texto del pronóstico)
+ *     pasa por `sinDatos` (correos, calle y número, C.P., teléfonos y montos → «•••»).
  *   - Filtra por etapa con idx_produccion_etapa (y por tipo de movimiento con su índice) para no pasar de 2.8 s
  *     (la puerta responde 504). No crea índices ni toca server.js.
  *   - Las fechas para mostrar van en ISO de México (isoMexico, al segundo); los cursores van en ISO UTC con milésimas
@@ -74,7 +75,6 @@ import { isoMexico } from '../../utils/revisarConfig.js';
 import { resumenProduccion, sumarDias } from '../../services/fechaInstalacion.service.js';
 import { obraIdsDeProyectos, ES_ID3G } from '../../services/obraId.service.js';
 import { mismosProyectos } from '../../services/pedidosCleanup.service.js';
-import { sinTelefonos } from './bitacora.js';
 import { pronosticoParaTablero } from './pronostico.js';
 
 export const ALCANCE_PRODUCCION = 'produccion.leer';
@@ -109,12 +109,47 @@ const CAMPOS_EN_CURSO = [
 
 // ---------- Funciones puras ----------
 
-/** Teléfonos y montos fuera del texto libre, espacios juntos y tope de largo. null si no queda nada. */
+// Lo que `sinDatos` tapa. Las palabras se delimitan con letras de Unicode (\b no ve la «ó» de «pagó»).
+const RE_CORREO = /\S+@\S+/g;
+// Calle o avenida con su número («Av. Siempre Viva 742», «Calle 5 de Mayo #120 int. 3») y, si sigue, la colonia.
+const RE_DIRECCION = new RegExp(
+    String.raw`(?<![\p{L}\d])(?:av|avda|avenida|calle|blvd|boulevard|bulevar|calz|calzada|carr|carretera|priv|privada|prol|prolongaci[oó]n|andador)\.?\s+`
+    + String.raw`[^\n,;:()]{1,40}?\s?(?:#\s?|n[oú]m?\.\s?)?\d{1,5}(?!\d)\p{L}?(?![\p{L}\d])`
+    + String.raw`(?:\s*(?:int|ext|interior|exterior)\.?\s*[\p{L}\d-]{1,5})?`
+    + String.raw`(?:[\s,]+(?:col\.|colonia|fracc\.?|fraccionamiento)\s+[^\n,;:()]{1,30})?`,
+    'giu'
+);
+const RE_CODIGO_POSTAL = /(?<![\p{L}\d])c\.?\s?p\.?\s?\d{5}(?!\d)/giu;
+// Teléfonos: 10 dígitos o más, con espacios, guiones, puntos o paréntesis entre ellos («(462) 123 4567», «462.123.4567»).
+// Es la regla de sinTelefonos de la bitácora (que solo ve espacios y guiones), ampliada.
+const RE_TELEFONO = /\+?\(?\d[\d\s().-]{8,}\d/g;
+const MONEDA = String.raw`(?:mxn|usd|dlls?|dls|d[oó]lares|pesos|m\.\s?n\.)`;
+const RE_MONTO_CON_PESOS = /\$\s?\d[\d,.]*/g;
+const RE_MONEDA_ANTES = new RegExp(String.raw`(?<![\p{L}\d])(?:mxn|usd|dlls?|dls)\.?\s?\$?\s?\d[\d,.]*`, 'giu');
+const RE_MONEDA_DESPUES = new RegExp(String.raw`(?<![\p{L}\d])\d[\d,.]*\s?${MONEDA}(?![\p{L}])`, 'giu');
+// Un número de 4 cifras o más (12,500 · 8500 · 3,000.00) que no es parte de una fecha ni de un folio (2026-11-03, OC-0501).
+const CANTIDAD = String.raw`(?<![\p{L}\d/-])(?:\d{1,3}(?:[,.]\d{3})+(?:[.,]\d{1,2})?|\d{4,}(?:[.,]\d{1,2})?)(?![\d/-]|[.,]\d)`;
+const DE_DINERO = String.raw`(?:anticipos?|saldos?|pagos?|pag[oó]|pagaron|pagar|abonos?|costos?|total(?:es)?|importes?|montos?|precios?|adeudos?|dep[oó]sitos?|transferencias?|liquidaci[oó]n|iva)`;
+const RE_DINERO_Y_CANTIDAD = new RegExp(String.raw`((?<![\p{L}\d])${DE_DINERO}(?![\p{L}\d])[^\d\n]{0,20}?)${CANTIDAD}`, 'giu');
+const RE_CANTIDAD_Y_DINERO = new RegExp(String.raw`${CANTIDAD}(\s(?:de\s|del\s|en\s|para\s)?${DE_DINERO}(?![\p{L}\d]))`, 'giu');
+
+/**
+ * Lo que nunca sale de la puerta, fuera del texto libre: correos, direcciones (calle y número, colonia, C.P.), teléfonos
+ * (10 dígitos o más con cualquier separador) y montos ($, MXN/USD/dlls antes o después, y números de 4 cifras o más junto
+ * a anticipo, saldo, pago, costo, total…). Junta los espacios y pone tope de largo. null si no queda nada.
+ */
 export const sinDatos = (texto, max = MAX_TEXTO) => {
     if (texto === undefined || texto === null) return null;
-    let t = sinTelefonos(String(texto))
-        .replace(/\$\s?\d[\d,.]*/g, '$•••')
-        .replace(/\b\d[\d,.]*\s?(?:pesos|mxn|m\.n\.)(?![a-z])/gi, '•••')
+    let t = String(texto)
+        .replace(RE_CORREO, '•••')
+        .replace(RE_DIRECCION, '•••')
+        .replace(RE_CODIGO_POSTAL, '•••')
+        .replace(RE_TELEFONO, (m) => (m.replace(/\D/g, '').length >= 10 ? '•••' : m))
+        .replace(RE_MONTO_CON_PESOS, '$•••')
+        .replace(RE_MONEDA_ANTES, '•••')
+        .replace(RE_MONEDA_DESPUES, '•••')
+        .replace(RE_DINERO_Y_CANTIDAD, '$1•••')
+        .replace(RE_CANTIDAD_Y_DINERO, '•••$1')
         .replace(/\s+/g, ' ')
         .trim();
     if (!t) return null;
@@ -212,6 +247,17 @@ export const fechaDeObra = (p, foto) => {
     return { fecha: indice, fuente: indice ? 'indice' : null };
 };
 
+/**
+ * El pronóstico de PLA-17 como lo ve el tablero, con su texto libre limpio: `motivo` (300) y `fechaPropuesta` (120, «lo
+ * que dijo») llegan escritos por la persona, y `texto` los repite («Reagendar: motivo · fecha»).
+ */
+const pronosticoLimpio = (p) => ({
+    ...p,
+    texto: sinDatos(p.texto, 460),
+    motivo: sinDatos(p.motivo, 300),
+    fechaPropuesta: sinDatos(p.fechaPropuesta, 120)
+});
+
 /** Lo que Operación ve de cada obra. Pura. */
 export const armarObra = (p, { obraId = null, foto = null, pronostico = null, ahora = new Date() } = {}) => {
     const tipo = p.tipo_proyecto ? String(p.tipo_proyecto).trim().toUpperCase() : null;
@@ -246,7 +292,7 @@ export const armarObra = (p, { obraId = null, foto = null, pronostico = null, ah
         fechaInstalacion: fechaDeObra(p, foto),
         fechaIndice: p.fecha_limite || null,
         pausado: !!p.pausado,
-        pronostico: pronostico ? pronosticoParaTablero(pronostico, ahora) : null
+        pronostico: pronostico ? pronosticoLimpio(pronosticoParaTablero(pronostico, ahora)) : null
     };
 };
 
