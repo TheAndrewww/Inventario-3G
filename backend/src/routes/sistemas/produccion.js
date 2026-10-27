@@ -49,6 +49,7 @@
  *     material: {
  *       tickets: [{ folio, estado: 'pendiente'|'aprobado', fecha: AAAA-MM-DD, surtido: 0-100 }]      (10 como máximo)
  *       ordenes: [{ folio, estado, proveedor, llegadaEstimada: AAAA-MM-DD|null, vencida,
+ *                   (llegadaDeJulia, llegadaOrden: solo si manda la fecha de Julia, ver abajo),
  *                   articulos: [{ nombre, cantidad, unidad }] }]                                      (10 y 10)
  *       sinOrden: [{ nombre, cantidad, unidad }]   lo que se pidió a Compras y todavía no tiene orden (10) } }
  *   Los tickets son los abiertos (pendiente o aprobado, como el aviso de las 16:00 de tickets-abiertos). El dueño de
@@ -60,6 +61,16 @@
  *   hoy (las vencidas también), 50 como máximo, las de hoy primero y luego las vencidas más recientes:
  *   { folio, estado, proveedor, llegadaEstimada, vencida, articulos: [{ nombre, cantidad, recibida, unidad }] (10),
  *     proyectos: [nombres de los proyectos de los tickets que la originaron] (10) }
+ *
+ * Proveedor y llegada de cada orden (en `material.ordenes` de la obra y en ORDEN_DEL_DIA):
+ *   - `proveedor`: el nombre corto de la ficha del proveedor (proveedores_ficha, PLA-20) si lo tiene; si no, el nombre
+ *     completo. Solo se lee `nombre_corto` de la ficha (nunca contactos ni razones sociales).
+ *   - `llegadaEstimada`: la de la orden. Con VENCIDAS_USA_JULIA (apagada = como hoy) es la que Julia dio en
+ *     orden_seguimiento cuando es más nueva que la de la orden, o si la orden no tiene: el criterio del aviso de vencidas
+ *     (fechaLlegadaEfectiva, cronJobs.js), comparado por día. `vencida` sale de esa misma fecha. Cuando manda la de
+ *     Julia, la orden trae además `llegadaDeJulia: true` y `llegadaOrden` (la de la orden, AAAA-MM-DD o null). Con la
+ *     bandera, una orden sin fecha propia entra al material del día si Julia la espera hasta hoy, y una vencida que
+ *     Julia recorrió a otro día sale de él. Si la fecha de Julia no se puede leer, sale la de la orden y `avisos` lo dice.
  *
  * Reglas (v2):
  *   - Nunca lee Google Sheets (la cuota se agotó el 29-sep). La fecha de instalación sale de la foto que la revisión de
@@ -79,6 +90,8 @@ import {
     ProduccionProyecto, Configuracion, Movimiento, DetalleMovimiento, SolicitudCompra, OrdenCompra, DetalleOrdenCompra,
     Articulo, Proveedor
 } from '../../models/index.js';
+import { ProveedorFicha } from '../../models/Proveedor.js';
+import OrdenSeguimiento, { vencidasUsaJulia } from '../../models/OrdenSeguimiento.js';
 import { isoMexico } from '../../utils/revisarConfig.js';
 import { resumenProduccion, sumarDias } from '../../services/fechaInstalacion.service.js';
 import { obraIdsDeProyectos, ES_ID3G } from '../../services/obraId.service.js';
@@ -95,6 +108,7 @@ const MAX_TEXTO = 400;
 const MAX_MATERIAL = 10;
 const MAX_TICKETS_LEIDOS = 2000;
 const MAX_SOLICITUDES_LEIDAS = 1000;
+const MAX_ORDENES_LEIDAS = 2000; // candidatas del material del día con VENCIDAS_USA_JULIA
 const CLAVE_FOTO = 'produccion_fechas_instalacion'; // la de fechaInstalacion.service.js (revisarAdelantos)
 const ETAPAS_CERRADAS = ['instalacion', 'completado'];
 const ETAPAS_EN_CURSO = ['pendiente', 'diseno', 'compras', 'produccion'];
@@ -325,6 +339,45 @@ const articulo = (a, cantidad, extra = {}) => ({
     unidad: a?.unidad || null
 });
 
+/** El nombre del proveedor de una orden: el corto de su ficha si lo tiene y, si no, el completo. Tapado con sinDatos. */
+export const nombreProveedor = (proveedor, nombresCortos = new Map()) => {
+    if (!proveedor) return null;
+    const corto = proveedor.id !== undefined && proveedor.id !== null ? nombresCortos.get(proveedor.id) : null;
+    return sinDatos(corto && String(corto).trim() ? corto : proveedor.nombre, 120);
+};
+
+/**
+ * La llegada de una orden. Sin fecha de Julia (o con VENCIDAS_USA_JULIA apagada, que no la lee), la de la orden. Con
+ * ella, el criterio del aviso de vencidas (fechaLlegadaEfectiva de OrdenSeguimiento.js): la de Julia manda si es más
+ * nueva que la de la orden o si la orden no tiene. Se compara por día: la de la orden es el día UTC en que se guardó y la
+ * de Julia ya es AAAA-MM-DD, así no depende de la zona del servidor. → { llegada, deJulia, deOrden }
+ */
+export const llegadaDeOrden = (oc, fechasJulia = new Map()) => {
+    const deOrden = diaUTC(oc.fecha_llegada_estimada);
+    const julia = String(fechasJulia.get(oc.id) ?? '').slice(0, 10);
+    if (RE_DIA.test(julia) && (!deOrden || julia > deOrden)) return { llegada: julia, deJulia: true, deOrden };
+    return { llegada: deOrden, deJulia: false, deOrden };
+};
+
+/** Los campos de llegada de una orden en la respuesta (con los de Julia solo cuando su fecha manda). */
+const camposLlegada = (l, vencida) => ({
+    llegadaEstimada: l.llegada,
+    vencida,
+    ...(l.deJulia ? { llegadaDeJulia: true, llegadaOrden: l.deOrden } : {})
+});
+
+/**
+ * Con VENCIDAS_USA_JULIA: de las órdenes candidatas (en camino, sin recibir, con fecha propia hasta hoy o sin fecha), las
+ * que se esperan hasta hoy con la fecha que manda, las de hoy primero y luego las vencidas más recientes (id para
+ * desempatar), 50 como máximo. Pura. → [id]
+ */
+export const esperadasHasta = (candidatas, fechasJulia, hoy) => candidatas
+    .map((oc) => ({ id: oc.id, llegada: llegadaDeOrden(oc, fechasJulia).llegada }))
+    .filter((x) => x.llegada && x.llegada <= hoy)
+    .sort((a, b) => (a.llegada === b.llegada ? a.id - b.id : (a.llegada < b.llegada ? 1 : -1)))
+    .slice(0, MAX_LISTA)
+    .map((x) => x.id);
+
 const normalizar = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 // Todos los SEPARADORES de mismosProyectos (« / », «-», …) empiezan con uno de estos.
@@ -391,10 +444,13 @@ export const duenoDelTicket = (t, indice) => {
 /**
  * El material de cada obra de la página: sus tickets abiertos (`duenos`: id del ticket → id de la obra, ya resuelto
  * con duenoDelTicket) y, de sus solicitudes de compra, las órdenes abiertas y lo que aún no tiene orden. Pura: recibe lo
- * leído de la base.
+ * leído de la base (`fechasJulia`: orden_id → AAAA-MM-DD, vacío sin VENCIDAS_USA_JULIA; `nombresCortos`: proveedor_id →
+ * nombre corto de la ficha).
  * @returns {Map<number, {tickets, ordenes, sinOrden}>}
  */
-export const materialPorObra = (obras, tickets, solicitudes, hoy, { surtido = new Map(), duenos = new Map() } = {}) => {
+export const materialPorObra = (obras, tickets, solicitudes, hoy, {
+    surtido = new Map(), duenos = new Map(), fechasJulia = new Map(), nombresCortos = new Map()
+} = {}) => {
     const res = new Map(obras.map((p) => [p.id, { tickets: [], ordenes: [], sinOrden: [] }]));
     const obraDeTicket = new Map();
     for (const t of tickets) {
@@ -422,13 +478,12 @@ export const materialPorObra = (obras, tickets, solicitudes, hoy, { surtido = ne
         let o = porObra.get(oc.id);
         if (!o) {
             if (porObra.size >= MAX_MATERIAL) continue;
-            const llegada = diaUTC(oc.fecha_llegada_estimada);
+            const l = llegadaDeOrden(oc, fechasJulia);
             o = {
                 folio: oc.ticket_id,
                 estado: oc.estado,
-                proveedor: sinDatos(oc.proveedor?.nombre, 120),
-                llegadaEstimada: llegada,
-                vencida: !!llegada && llegada < hoy && ORDENES_EN_CAMINO.includes(oc.estado),
+                proveedor: nombreProveedor(oc.proveedor, nombresCortos),
+                ...camposLlegada(l, !!l.llegada && l.llegada < hoy && ORDENES_EN_CAMINO.includes(oc.estado)),
                 articulos: []
             };
             porObra.set(oc.id, o);
@@ -439,15 +494,17 @@ export const materialPorObra = (obras, tickets, solicitudes, hoy, { surtido = ne
     return res;
 };
 
-/** Las órdenes que se esperaban hasta hoy (material de la primera página de /en-curso). Pura. */
-export const ordenesDelDia = (ordenes, proyectosDeOrden, hoy) => ordenes.slice(0, MAX_LISTA).map((oc) => {
-    const llegada = diaUTC(oc.fecha_llegada_estimada);
+/**
+ * Las órdenes que se esperaban hasta hoy (material de la primera página de /en-curso), ya elegidas y en orden. Pura
+ * (`fechasJulia` y `nombresCortos` como en materialPorObra).
+ */
+export const ordenesDelDia = (ordenes, proyectosDeOrden, hoy, { fechasJulia = new Map(), nombresCortos = new Map() } = {}) => ordenes.slice(0, MAX_LISTA).map((oc) => {
+    const l = llegadaDeOrden(oc, fechasJulia);
     return {
         folio: oc.ticket_id,
         estado: oc.estado,
-        proveedor: sinDatos(oc.proveedor?.nombre, 120),
-        llegadaEstimada: llegada,
-        vencida: !!llegada && llegada < hoy,
+        proveedor: nombreProveedor(oc.proveedor, nombresCortos),
+        ...camposLlegada(l, !!l.llegada && l.llegada < hoy),
         articulos: (oc.detalles || []).slice(0, MAX_MATERIAL).map((d) => articulo(d.articulo, d.cantidad_solicitada, { recibida: numero(d.cantidad_recibida) })),
         proyectos: [...(proyectosDeOrden.get(oc.id) || [])].slice(0, MAX_MATERIAL)
     };
@@ -610,34 +667,102 @@ const leerSolicitudesDeTickets = (ticketIds) => (ticketIds.length ? SolicitudCom
         {
             model: OrdenCompra, as: 'ordenCompra', required: false,
             attributes: ['id', 'ticket_id', 'estado', 'fecha_llegada_estimada', 'fecha_recepcion'],
-            include: [{ model: Proveedor, as: 'proveedor', attributes: ['nombre'], required: false }]
+            include: [{ model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'], required: false }]
         }
     ],
     order: [['id', 'ASC']],
     limit: MAX_SOLICITUDES_LEIDAS
 }) : []);
 
-/** Órdenes en camino con llegada estimada hasta hoy y los proyectos de los tickets que las originaron. */
-const leerOrdenesDelDia = async (hoy) => {
-    const ordenes = await OrdenCompra.findAll({
-        where: {
-            estado: { [Op.in]: ORDENES_EN_CAMINO },
-            fecha_recepcion: null,
-            fecha_llegada_estimada: { [Op.lt]: new Date(`${sumarDias(hoy, 1)}T00:00:00Z`) }
-        },
-        attributes: ['id', 'ticket_id', 'estado', 'fecha_llegada_estimada'],
-        include: [
-            { model: Proveedor, as: 'proveedor', attributes: ['nombre'], required: false },
-            {
-                model: DetalleOrdenCompra, as: 'detalles', required: false,
-                attributes: ['cantidad_solicitada', 'cantidad_recibida'],
-                include: [{ model: Articulo, as: 'articulo', attributes: ['nombre', 'unidad'], required: false }]
-            }
-        ],
-        // Las de hoy primero y luego las vencidas más recientes: una orden vencida hace meses no tapa a las de hoy.
-        order: [['fecha_llegada_estimada', 'DESC'], ['id', 'ASC']],
-        limit: MAX_LISTA
-    });
+/**
+ * Map proveedor_id → nombre corto de su ficha (proveedores_ficha, PLA-20), solo de los que lo tienen. Solo se lee esa
+ * columna. Si la ficha no se puede leer, sale el nombre completo (como en Planta › Proveedores sin ficha).
+ */
+const leerNombresCortos = async (proveedores) => {
+    const mapa = new Map();
+    const ids = [...new Set(proveedores.map((p) => p?.id).filter((id) => id !== undefined && id !== null))];
+    if (!ids.length) return mapa;
+    try {
+        const filas = await ProveedorFicha.findAll({
+            where: { proveedor_id: { [Op.in]: ids } },
+            attributes: ['proveedor_id', 'nombre_corto'],
+            raw: true
+        });
+        for (const f of filas) if (f.nombre_corto && String(f.nombre_corto).trim()) mapa.set(f.proveedor_id, f.nombre_corto);
+    } catch (e) {
+        console.error('[puerta] produccion: no se pudo leer el nombre corto de los proveedores (sale el completo):', e.message);
+    }
+    return mapa;
+};
+
+const AVISO_SIN_JULIA = 'No se pudo leer la fecha de llegada que dio Julia: sale la de la orden.';
+/**
+ * Con VENCIDAS_USA_JULIA (solo se llama con ella encendida): Map orden_id → la fecha estimada más reciente que dio Julia,
+ * la misma que usa el aviso de vencidas (OrdenSeguimiento.fechasEstimadasJulia). Si no se puede leer, mapa vacío (sale
+ * la de la orden) y `avisos` lo dice una vez.
+ */
+const leerFechasJulia = async (ordenIds, avisos) => {
+    if (!ordenIds.length) return new Map();
+    try {
+        return await OrdenSeguimiento.fechasEstimadasJulia(ordenIds);
+    } catch (e) {
+        console.error('[puerta] produccion: no se pudo leer la llegada de Julia (sale la de la orden):', e.message);
+        if (!avisos.includes(AVISO_SIN_JULIA)) avisos.push(AVISO_SIN_JULIA);
+        return new Map();
+    }
+};
+
+/**
+ * Órdenes en camino que se esperaban hasta hoy y los proyectos de los tickets que las originaron.
+ *   - Sin VENCIDAS_USA_JULIA (como hoy): con su fecha propia hasta hoy, las de hoy primero y luego las vencidas más
+ *     recientes, 50.
+ *   - Con ella: la fecha que decide es la de llegadaDeOrden (la de Julia si es más nueva o si la orden no tiene). Como la
+ *     de Julia nunca adelanta a la de la orden, las candidatas son las en camino con fecha propia hasta hoy o sin fecha;
+ *     se cruzan con las de Julia y se quedan las 50 que tocan (esperadasHasta), en el mismo orden.
+ */
+const leerOrdenesDelDia = async (hoy, { conJulia = false, avisos = [] } = {}) => {
+    const enCamino = { estado: { [Op.in]: ORDENES_EN_CAMINO }, fecha_recepcion: null };
+    const hastaHoy = { [Op.lt]: new Date(`${sumarDias(hoy, 1)}T00:00:00Z`) };
+    const attributes = ['id', 'ticket_id', 'estado', 'fecha_llegada_estimada'];
+    const include = [
+        { model: Proveedor, as: 'proveedor', attributes: ['id', 'nombre'], required: false },
+        {
+            model: DetalleOrdenCompra, as: 'detalles', required: false,
+            attributes: ['cantidad_solicitada', 'cantidad_recibida'],
+            include: [{ model: Articulo, as: 'articulo', attributes: ['nombre', 'unidad'], required: false }]
+        }
+    ];
+    let ordenes;
+    let fechasJulia = new Map();
+    if (!conJulia) {
+        ordenes = await OrdenCompra.findAll({
+            where: { ...enCamino, fecha_llegada_estimada: hastaHoy },
+            attributes,
+            include,
+            // Las de hoy primero y luego las vencidas más recientes: una orden vencida hace meses no tapa a las de hoy.
+            order: [['fecha_llegada_estimada', 'DESC'], ['id', 'ASC']],
+            limit: MAX_LISTA
+        });
+    } else {
+        const candidatas = await OrdenCompra.findAll({
+            where: { ...enCamino, [Op.or]: [{ fecha_llegada_estimada: hastaHoy }, { fecha_llegada_estimada: null }] },
+            attributes: ['id', 'fecha_llegada_estimada'],
+            // Si hay más que el tope, se ven las sin fecha propia (la de Julia decide) y luego las de fecha más reciente.
+            order: [['fecha_llegada_estimada', 'DESC NULLS FIRST'], ['id', 'DESC']],
+            limit: MAX_ORDENES_LEIDAS,
+            raw: true
+        });
+        if (candidatas.length >= MAX_ORDENES_LEIDAS) {
+            avisos.push(`Hay más de ${MAX_ORDENES_LEIDAS} órdenes en camino que se esperaban hasta hoy: no se vieron todas.`);
+        }
+        fechasJulia = await leerFechasJulia(candidatas.map((o) => o.id), avisos);
+        const ids = esperadasHasta(candidatas, fechasJulia, hoy);
+        const lugar = new Map(ids.map((id, i) => [id, i]));
+        ordenes = ids.length
+            ? (await OrdenCompra.findAll({ where: { id: { [Op.in]: ids } }, attributes, include }))
+                .sort((a, b) => lugar.get(a.id) - lugar.get(b.id))
+            : [];
+    }
     const proyectosDeOrden = new Map();
     if (ordenes.length) {
         const sols = await SolicitudCompra.findAll({
@@ -654,7 +779,8 @@ const leerOrdenesDelDia = async (hoy) => {
             proyectosDeOrden.set(s.orden_compra_id, set);
         }
     }
-    return ordenesDelDia(ordenes, proyectosDeOrden, hoy);
+    const nombresCortos = await leerNombresCortos(ordenes.map((o) => o.proveedor));
+    return ordenesDelDia(ordenes, proyectosDeOrden, hoy, { fechasJulia, nombresCortos });
 };
 
 /** GET /produccion/en-curso → { codigo, cuerpo } */
@@ -670,8 +796,12 @@ export const leerEnCurso = async (req, { ahora = new Date() } = {}) => {
         avisos.push(`No se pudo leer ${texto}.`);
         return null;
     };
+    // VENCIDAS_USA_JULIA se lee una vez por petición: las órdenes de las obras y las del día usan la misma fecha.
+    const conJulia = vencidasUsaJulia();
     // El material del día no depende de la página: se pide a la par.
-    const delDia = primeraPagina ? leerOrdenesDelDia(hoy).catch(sinMaterial('el material que se esperaba hoy')) : null;
+    const delDia = primeraPagina
+        ? leerOrdenesDelDia(hoy, { conJulia, avisos }).catch(sinMaterial('el material que se esperaba hoy'))
+        : null;
     const filas = await ProduccionProyecto.findAll({
         where: {
             etapa_actual: { [Op.in]: ETAPAS_EN_CURSO }, // idx_produccion_etapa
@@ -721,7 +851,16 @@ export const leerEnCurso = async (req, { ahora = new Date() } = {}) => {
             Promise.resolve(leerSolicitudesDeTickets(ticketIds)).catch(sinMaterial('las órdenes de compra de los tickets'))
         ]);
         if (solicitudes && solicitudes.length >= MAX_SOLICITUDES_LEIDAS) avisos.push(`Las obras de esta página tienen más de ${MAX_SOLICITUDES_LEIDAS} solicitudes de compra abiertas: no se vieron todas.`);
-        material = materialPorObra(pagina, tickets, solicitudes || [], hoy, { surtido: surtido || new Map(), duenos });
+        // De las órdenes abiertas de esas solicitudes: el nombre corto del proveedor y, con la bandera, la fecha de Julia.
+        const ocs = (solicitudes || []).map((s) => s.ordenCompra)
+            .filter((oc) => oc && ORDENES_ABIERTAS.includes(oc.estado) && !oc.fecha_recepcion);
+        const [nombresCortos, fechasJulia] = await Promise.all([
+            leerNombresCortos(ocs.map((oc) => oc.proveedor)),
+            conJulia ? leerFechasJulia(ocs.map((oc) => oc.id), avisos) : new Map()
+        ]);
+        material = materialPorObra(pagina, tickets, solicitudes || [], hoy, {
+            surtido: surtido || new Map(), duenos, fechasJulia, nombresCortos
+        });
     }
     const obras = armarPagina(pagina, extra, ahora).map((o, i) => {
         const p = pagina[i];

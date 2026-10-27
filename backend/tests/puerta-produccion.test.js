@@ -29,6 +29,8 @@ const { Op } = await import('sequelize');
 const { sequelize } = await import('../src/config/database.js');
 const { ProduccionProyecto, Configuracion, Movimiento, DetalleMovimiento, SolicitudCompra, OrdenCompra } = await import('../src/models/index.js');
 const { default: LlaveSistema } = await import('../src/models/LlaveSistema.js');
+const { ProveedorFicha } = await import('../src/models/Proveedor.js');
+const { default: OrdenSeguimiento, fechaLlegadaEfectiva } = await import('../src/models/OrdenSeguimiento.js');
 const { crearPuertas } = await import('../src/routes/sistemas/index.js');
 const P = await import('../src/routes/sistemas/produccion.js');
 const { mismosProyectos } = await import('../src/services/pedidosCleanup.service.js');
@@ -92,7 +94,8 @@ const EN_CURSO = [
 
 const FOTO = { 1: '2026-11-03', 2: null, 21: '2026-11-10', 22: null };
 
-const PROVEEDOR = { nombre: 'ACEROS DEL BAJÍO SA DE CV', nombre_corto: 'ACEROS', telefono: '4625550101', email: 'ventas@aceros.example', direccion: 'Av. Siempre Viva 742' };
+// `nombre_corto` NO es columna de proveedores (vive en la ficha): si la puerta lo leyera de aquí saldría «ACEROS».
+const PROVEEDOR = { id: 7, nombre: 'ACEROS DEL BAJÍO SA DE CV', nombre_corto: 'ACEROS', telefono: '4625550101', email: 'ventas@aceros.example', direccion: 'Av. Siempre Viva 742' };
 const llegadaAyer = new Date(`${AYER}T00:00:00Z`);
 const TICKETS = [
     { id: 101, ticket_id: 'T-0101', proyecto: 'Toldo Restaurante / MTO', estado: 'pendiente', fecha_hora: horasAtras(30), detalles: [{ dispersado: true }, { dispersado: false }] },
@@ -115,6 +118,14 @@ const ORDENES_DEL_DIA = [
     { id: 501, ticket_id: 'OC-0501', estado: 'enviada', fecha_llegada_estimada: llegadaAyer, total_estimado: '12500.00', proveedor: PROVEEDOR,
         detalles: [{ cantidad_solicitada: '12.00', cantidad_recibida: '0.00', costo_unitario: '1041.67', subtotal: '12500.00', articulo: { nombre: 'Cable acero 1/4', unidad: 'metros' } }] },
     { id: 504, ticket_id: 'OC-0504', estado: 'parcial', fecha_llegada_estimada: new Date(`${HOY}T00:00:00Z`), total_estimado: '999.00', proveedor: null, detalles: [] }
+];
+
+// Fichas de proveedor (proveedores_ficha, PLA-20): el 7 con nombre corto, el 8 con el nombre corto en blanco y el 9 con
+// un teléfono metido en el nombre corto (sale tapado). El 10 no tiene ficha.
+const FICHAS = [
+    { proveedor_id: 7, nombre_corto: 'Aceros Bajío', contactos: [{ telefono: '4625550101', correo: 'ventas@aceros.example' }] },
+    { proveedor_id: 8, nombre_corto: '   ' },
+    { proveedor_id: 9, nombre_corto: 'Toldos tel 462 555 0101' }
 ];
 
 // ---------- Evaluador pequeño de los filtros de Sequelize que usa la puerta ----------
@@ -163,9 +174,12 @@ const ordenar = (filas, order = []) => [...filas].sort((a, b) => {
         const x = valorDe(a, columna);
         const y = valorDe(b, columna);
         if (x === y) continue;
-        if (x === null || x === undefined) return 1;
-        if (y === null || y === undefined) return -1;
-        return (x < y ? -1 : 1) * (dir === 'DESC' ? -1 : 1);
+        // Como Postgres: ASC deja los NULL al final y DESC al principio, salvo que se diga NULLS FIRST/LAST.
+        const desc = /^DESC/.test(dir || '');
+        const nulosPrimero = /NULLS FIRST/.test(dir || '') || (desc && !/NULLS LAST/.test(dir || ''));
+        if (x === null || x === undefined) return nulosPrimero ? -1 : 1;
+        if (y === null || y === undefined) return nulosPrimero ? 1 : -1;
+        return (x < y ? -1 : 1) * (desc ? -1 : 1);
     }
     return 0;
 });
@@ -178,10 +192,17 @@ let lentoMs = 0;
 let fallarTickets = false;
 let tickets = TICKETS;
 let solicitudes = SOLICITUDES;
+let ordenesCompra = ORDENES_DEL_DIA;
+let fichas = FICHAS;
+let fallarFichas = false;
+let fechasJulia = new Map(); // orden_id → AAAA-MM-DD (lo que daría OrdenSeguimiento.fechasEstimadasJulia)
+let fallarJulia = false;
+const llamadasJulia = []; // los orden_id que se pidieron a Julia, por llamada
 const consultas = [];
 const originales = {
     findAll: ProduccionProyecto.findAll, cfg: Configuracion.findOne, query: sequelize.query, mov: Movimiento.findAll, det: DetalleMovimiento.findAll,
-    sol: SolicitudCompra.findAll, oc: OrdenCompra.findAll, llFind: LlaveSistema.findOne, llCreate: LlaveSistema.create
+    sol: SolicitudCompra.findAll, oc: OrdenCompra.findAll, llFind: LlaveSistema.findOne, llCreate: LlaveSistema.create,
+    ficha: ProveedorFicha.findAll, julia: OrdenSeguimiento.fechasEstimadasJulia
 };
 
 before(() => {
@@ -229,7 +250,24 @@ before(() => {
         if (where.orden_compra_id) return [{ orden_compra_id: 501, pedidoOrigen: { proyecto: 'Toldo Restaurante / MTO' } }, { orden_compra_id: 501, pedidoOrigen: { proyecto: 'Toldo Restaurante / MTO' } }];
         throw new Error('solicitudes: filtro inesperado');
     };
-    OrdenCompra.findAll = async (opciones) => { consultas.push({ modelo: 'OrdenCompra', opciones }); return ordenar(ORDENES_DEL_DIA, opciones.order); };
+    OrdenCompra.findAll = async (opciones) => {
+        consultas.push({ modelo: 'OrdenCompra', opciones });
+        const filas = ordenar(ordenesCompra.filter((o) => cumple(o, opciones.where)), opciones.order);
+        return filas.slice(0, opciones.limit ?? filas.length);
+    };
+    // Solo se pide el nombre corto (nunca contactos ni razones sociales)
+    ProveedorFicha.findAll = async (opciones) => {
+        consultas.push({ modelo: 'ProveedorFicha', opciones });
+        if (fallarFichas) throw new Error('fichas caídas (prueba)');
+        assert.deepEqual(opciones.attributes, ['proveedor_id', 'nombre_corto']);
+        return fichas.filter((f) => opciones.where.proveedor_id[Op.in].includes(f.proveedor_id))
+            .map((f) => ({ proveedor_id: f.proveedor_id, nombre_corto: f.nombre_corto }));
+    };
+    OrdenSeguimiento.fechasEstimadasJulia = async (ids) => {
+        llamadasJulia.push([...ids].sort((a, b) => a - b));
+        if (fallarJulia) throw new Error('orden_seguimiento caída (prueba)');
+        return new Map([...fechasJulia].filter(([id]) => ids.includes(id)));
+    };
     LlaveSistema.findOne = async () => null;
     LlaveSistema.create = async () => ({});
 });
@@ -244,6 +282,8 @@ after(() => {
     OrdenCompra.findAll = originales.oc;
     LlaveSistema.findOne = originales.llFind;
     LlaveSistema.create = originales.llCreate;
+    ProveedorFicha.findAll = originales.ficha;
+    OrdenSeguimiento.fechasEstimadasJulia = originales.julia;
 });
 
 // ---------- Servidor de prueba (socket local) ----------
@@ -515,6 +555,10 @@ test('en-curso: el taller (producción o planos sin terminar) con sus áreas, ob
         preguntadoEn: new Date(AHORA).toISOString(), contestadoEn: new Date(AHORA).toISOString()
     } }];
     fallarTickets = false;
+    // Con VENCIDAS_USA_JULIA apagada (por omisión) la fecha de Julia no se lee aunque exista
+    delete process.env.VENCIDAS_USA_JULIA;
+    fechasJulia = new Map([[501, sumarDias(HOY, 2)]]);
+    llamadasJulia.length = 0;
     await conPuerta(async (pedir) => {
         const r = await pedir('/api/sistemas/v1/produccion/en-curso');
         assert.equal(r.status, 200);
@@ -542,7 +586,7 @@ test('en-curso: el taller (producción o planos sin terminar) con sus áreas, ob
 
         assert.deepEqual(toldo.material.tickets, [{ folio: 'T-0101', estado: 'pendiente', fecha: DIA_MX.format(horasAtras(30)), surtido: 50 }]);
         assert.deepEqual(toldo.material.ordenes, [{
-            folio: 'OC-0501', estado: 'enviada', proveedor: 'ACEROS DEL BAJÍO SA DE CV', llegadaEstimada: AYER, vencida: true,
+            folio: 'OC-0501', estado: 'enviada', proveedor: 'Aceros Bajío', llegadaEstimada: AYER, vencida: true, // nombre corto de la ficha
             articulos: [{ nombre: 'Cable acero 1/4', cantidad: 12, unidad: 'metros' }]
         }]);
         assert.deepEqual(toldo.material.sinOrden, [{ nombre: 'Tensor 3/8', cantidad: 4, unidad: 'piezas' }]);
@@ -559,7 +603,7 @@ test('en-curso: el taller (producción o planos sin terminar) con sus áreas, ob
         assert.equal(r.json.material.hoy, HOY);
         assert.deepEqual(r.json.material.ordenes, [ // las de hoy primero
             { folio: 'OC-0504', estado: 'parcial', proveedor: null, llegadaEstimada: HOY, vencida: false, articulos: [], proyectos: [] },
-            { folio: 'OC-0501', estado: 'enviada', proveedor: 'ACEROS DEL BAJÍO SA DE CV', llegadaEstimada: AYER, vencida: true,
+            { folio: 'OC-0501', estado: 'enviada', proveedor: 'Aceros Bajío', llegadaEstimada: AYER, vencida: true,
                 articulos: [{ nombre: 'Cable acero 1/4', cantidad: 12, recibida: 0, unidad: 'metros' }], proyectos: ['Toldo Restaurante / MTO'] }
         ]);
     });
@@ -571,6 +615,10 @@ test('en-curso: el taller (producción o planos sin terminar) con sus áreas, ob
     assert.deepEqual(oc.where.estado[Op.in], ['enviada', 'parcial']);
     assert.equal(oc.where.fecha_recepcion, null);
     assert.equal(oc.where.fecha_llegada_estimada[Op.lt].toISOString(), `${sumarDias(HOY, 1)}T00:00:00.000Z`);
+    assert.equal(oc.limit, 50);
+    assert.equal(llamadasJulia.length, 0, 'con la bandera apagada no se lee orden_seguimiento');
+    assert.ok(!/llegadaDeJulia|llegadaOrden/.test(respuestas.at(-1)), 'apagada: la respuesta es la de siempre');
+    fechasJulia = new Map();
     pronosticos = [];
 });
 
@@ -708,6 +756,126 @@ test('en-curso: si los tickets no se pueden leer, las obras salen igual y «avis
     }
 });
 
+// ---------- VENCIDAS_USA_JULIA y nombre corto del proveedor ----------
+
+const enDias = (n) => new Date(`${sumarDias(HOY, n)}T00:00:00Z`); // como guarda la pantalla fecha_llegada_estimada
+const orden = (id, estado, llegada, proveedor = null, extra = {}) => ({
+    id, ticket_id: `OC-0${id}`, estado, fecha_llegada_estimada: llegada, fecha_recepcion: null, total_estimado: '4321.00', proveedor, detalles: [], ...extra
+});
+// Las órdenes de compra de las pruebas de la bandera. La 501 es la de la obra TOLDO (SOLICITUDES).
+const ORDENES_JULIA = [
+    orden(501, 'enviada', llegadaAyer, PROVEEDOR),                                    // Julia la recorre a pasado mañana
+    orden(504, 'parcial', enDias(0), { id: 8, nombre: 'LONAS DE LEÓN SA DE CV' }),     // hoy, sin Julia; ficha sin nombre corto
+    orden(505, 'enviada', null, { id: 9, nombre: 'TOLDOS DEL CENTRO' }),               // sin fecha propia: Julia dice ayer
+    orden(506, 'enviada', enDias(-5), { id: 10, nombre: 'SIN FICHA SA' }),            // Julia dio una más vieja: manda la orden
+    orden(507, 'enviada', enDias(1), PROVEEDOR),                                      // mañana: Julia nunca la adelanta
+    orden(508, 'parcial', enDias(-3), PROVEEDOR),                                     // vencida que Julia recorrió a hoy
+    orden(509, 'enviada', llegadaAyer, PROVEEDOR, { fecha_recepcion: horasAtras(1) }), // ya se recibió
+    orden(510, 'borrador', llegadaAyer, PROVEEDOR)                                    // no está en camino
+];
+const JULIA = new Map([
+    [501, sumarDias(HOY, 2)], [503, HOY], [505, AYER], [506, sumarDias(HOY, -10)], [507, HOY], [508, HOY], [509, AYER], [510, AYER]
+]);
+const resumen = (ordenes) => ordenes.map((o) => [o.folio, o.llegadaEstimada, o.vencida, o.llegadaDeJulia ?? false, 'llegadaOrden' in o ? o.llegadaOrden : '—', o.proveedor]);
+
+const conBandera = async (valor, fn) => {
+    const antes = process.env.VENCIDAS_USA_JULIA;
+    if (valor === undefined) delete process.env.VENCIDAS_USA_JULIA; else process.env.VENCIDAS_USA_JULIA = valor;
+    proyectos = EN_CURSO;
+    ordenesCompra = ORDENES_JULIA;
+    fechasJulia = JULIA;
+    llamadasJulia.length = 0;
+    try {
+        await fn();
+    } finally {
+        if (antes === undefined) delete process.env.VENCIDAS_USA_JULIA; else process.env.VENCIDAS_USA_JULIA = antes;
+        ordenesCompra = ORDENES_DEL_DIA;
+        fechasJulia = new Map();
+        fallarJulia = false;
+        fallarFichas = false;
+    }
+};
+
+test('en-curso con VENCIDAS_USA_JULIA: la llegada de Julia manda si es más nueva o si la orden no tiene (obras y material del día)', async () => {
+    await conBandera('1', async () => {
+        await conPuerta(async (pedir) => {
+            const r = await pedir('/api/sistemas/v1/produccion/en-curso');
+            assert.equal(r.status, 200);
+            assert.deepEqual(r.json.avisos, []);
+            const [toldo, , , thelmaMto] = r.json.obras;
+            // La 501 venció ayer con su fecha, pero Julia la espera pasado mañana: ya no está vencida.
+            assert.deepEqual(toldo.material.ordenes, [{
+                folio: 'OC-0501', estado: 'enviada', proveedor: 'Aceros Bajío', llegadaEstimada: sumarDias(HOY, 2), vencida: false,
+                llegadaDeJulia: true, llegadaOrden: AYER, articulos: [{ nombre: 'Cable acero 1/4', cantidad: 12, unidad: 'metros' }]
+            }]);
+            // La 503 (por aprobar) no tenía fecha: sale la de Julia
+            assert.deepEqual(resumen(thelmaMto.material.ordenes), [['OC-0503', HOY, false, true, null, null]]);
+
+            // Material del día: hoy (504 y 508, por id), luego ayer (505) y hace 5 días (506). Fuera: 501 (Julia la
+            // recorrió), 507 (su fecha es mañana y Julia no la adelanta), 509 (recibida) y 510 (borrador).
+            assert.deepEqual(resumen(r.json.material.ordenes), [
+                ['OC-0504', HOY, false, false, '—', 'LONAS DE LEÓN SA DE CV'],
+                ['OC-0508', HOY, false, true, sumarDias(HOY, -3), 'Aceros Bajío'],
+                ['OC-0505', AYER, true, true, null, 'Toldos tel •••'],
+                ['OC-0506', sumarDias(HOY, -5), true, false, '—', 'SIN FICHA SA']
+            ]);
+        });
+        // Las candidatas del día: en camino, sin recibir, con fecha propia hasta hoy o sin fecha (tope 2 000, sin importes)
+        const delDia = consultas.filter((c) => c.modelo === 'OrdenCompra' && c.opciones.raw).at(-1).opciones;
+        assert.deepEqual(delDia.attributes, ['id', 'fecha_llegada_estimada']);
+        assert.equal(delDia.limit, 2000);
+        assert.deepEqual(delDia.order, [['fecha_llegada_estimada', 'DESC NULLS FIRST'], ['id', 'DESC']]);
+        assert.deepEqual(llamadasJulia.map((ids) => ids.join(',')).sort(), ['501,503', '501,504,505,506,508']);
+    });
+});
+
+test('en-curso con VENCIDAS_USA_JULIA: si orden_seguimiento o la ficha no se pueden leer, sale la de la orden y el nombre completo', async () => {
+    const errores = console.error;
+    console.error = () => {};
+    try {
+        await conBandera('sí', async () => {
+            fallarJulia = true;
+            fallarFichas = true;
+            await conPuerta(async (pedir) => {
+                const r = await pedir('/api/sistemas/v1/produccion/en-curso');
+                assert.equal(r.status, 200);
+                // Un solo aviso aunque se pidió dos veces (obras y material del día); la ficha no avisa: sale el nombre
+                assert.deepEqual(r.json.avisos, ['No se pudo leer la fecha de llegada que dio Julia: sale la de la orden.']);
+                assert.deepEqual(resumen(r.json.obras[0].material.ordenes), [['OC-0501', AYER, true, false, '—', 'ACEROS DEL BAJÍO SA DE CV']]);
+                // Igual que con la bandera apagada: la 505 (sin fecha propia) no entra
+                assert.deepEqual(resumen(r.json.material.ordenes), [
+                    ['OC-0504', HOY, false, false, '—', 'LONAS DE LEÓN SA DE CV'],
+                    ['OC-0501', AYER, true, false, '—', 'ACEROS DEL BAJÍO SA DE CV'],
+                    ['OC-0508', sumarDias(HOY, -3), true, false, '—', 'ACEROS DEL BAJÍO SA DE CV'],
+                    ['OC-0506', sumarDias(HOY, -5), true, false, '—', 'SIN FICHA SA']
+                ]);
+            });
+        });
+    } finally {
+        console.error = errores;
+    }
+});
+
+test('en-curso con VENCIDAS_USA_JULIA apagada (o «0»): no se lee a Julia y el material del día es el de siempre', async () => {
+    for (const valor of [undefined, '0', 'no']) {
+        await conBandera(valor, async () => {
+            await conPuerta(async (pedir) => {
+                const r = await pedir('/api/sistemas/v1/produccion/en-curso');
+                assert.equal(r.status, 200);
+                assert.deepEqual(r.json.avisos, []);
+                assert.deepEqual(resumen(r.json.obras[0].material.ordenes), [['OC-0501', AYER, true, false, '—', 'Aceros Bajío']]);
+                assert.deepEqual(resumen(r.json.material.ordenes), [
+                    ['OC-0504', HOY, false, false, '—', 'LONAS DE LEÓN SA DE CV'],
+                    ['OC-0501', AYER, true, false, '—', 'Aceros Bajío'],
+                    ['OC-0508', sumarDias(HOY, -3), true, false, '—', 'Aceros Bajío'],
+                    ['OC-0506', sumarDias(HOY, -5), true, false, '—', 'SIN FICHA SA']
+                ]);
+            });
+            assert.equal(llamadasJulia.length, 0, `VENCIDAS_USA_JULIA=${valor}`);
+        });
+    }
+});
+
 test('504 si la base no contesta en 2.8 s (la puerta no se queda colgada)', async () => {
     proyectos = CERRADAS;
     lentoMs = 3100;
@@ -809,4 +977,48 @@ test('fechaDeObra: la foto manda; igual al Índice cuenta como Índice; sin foto
     assert.deepEqual(P.fechaDeObra({ id: 3, fecha_limite: '2026-12-01' }, foto), { fecha: '2026-12-01', fuente: 'indice' });
     assert.deepEqual(P.fechaDeObra({ id: 4, fecha_limite: null }, foto), { fecha: null, fuente: null });
     assert.equal(P.leerFoto('no es json').size, 0);
+});
+
+test('llegadaDeOrden: el criterio del aviso de vencidas (fechaLlegadaEfectiva), comparado por día', () => {
+    const oc = (id, dia) => ({ id, fecha_llegada_estimada: dia ? new Date(`${dia}T00:00:00Z`) : null });
+    const julia = new Map([[1, '2026-11-05'], [2, '2026-10-20'], [3, '2026-10-30'], [5, 'la otra semana'], [6, '2026-10-30']]);
+    assert.deepEqual(P.llegadaDeOrden(oc(1, '2026-10-30'), julia), { llegada: '2026-11-05', deJulia: true, deOrden: '2026-10-30' }, 'más nueva: manda Julia');
+    assert.deepEqual(P.llegadaDeOrden(oc(2, '2026-10-30'), julia), { llegada: '2026-10-30', deJulia: false, deOrden: '2026-10-30' }, 'más vieja: la orden');
+    assert.deepEqual(P.llegadaDeOrden(oc(3, null), julia), { llegada: '2026-10-30', deJulia: true, deOrden: null }, 'la orden sin fecha: Julia');
+    assert.deepEqual(P.llegadaDeOrden(oc(4, '2026-10-30'), julia), { llegada: '2026-10-30', deJulia: false, deOrden: '2026-10-30' }, 'sin Julia');
+    assert.deepEqual(P.llegadaDeOrden(oc(5, null), julia), { llegada: null, deJulia: false, deOrden: null }, 'la de Julia ilegible no cuenta');
+    // El mismo día no es «más nueva»: la orden (así no depende de la zona del servidor, como sí pasa con Date local)
+    assert.deepEqual(P.llegadaDeOrden(oc(6, '2026-10-30'), julia), { llegada: '2026-10-30', deJulia: false, deOrden: '2026-10-30' });
+    assert.deepEqual(P.llegadaDeOrden(oc(1, '2026-10-30')), { llegada: '2026-10-30', deJulia: false, deOrden: '2026-10-30' }, 'sin mapa (bandera apagada)');
+    // Con días distintos, decide lo mismo que fechaLlegadaEfectiva de cronJobs.js
+    for (const deOrden of [null, '2026-10-01', '2026-10-30', '2026-12-31']) {
+        for (const deJulia of [undefined, '2026-09-30', '2026-10-02', '2026-10-31', '2027-01-01']) {
+            const nuestra = P.llegadaDeOrden(oc(9, deOrden), new Map(deJulia ? [[9, deJulia]] : []));
+            const delAviso = fechaLlegadaEfectiva(deOrden ? new Date(`${deOrden}T00:00:00Z`) : null, deJulia);
+            assert.equal(nuestra.deJulia, delAviso?.deJulia ?? false, `${deOrden} / ${deJulia}`);
+            assert.equal(nuestra.llegada === null, delAviso === null, `${deOrden} / ${deJulia}`);
+        }
+    }
+});
+
+test('esperadasHasta: las que se esperan hasta hoy con la fecha que manda, hoy primero y luego las vencidas más recientes', () => {
+    const oc = (id, dia) => ({ id, fecha_llegada_estimada: dia ? new Date(`${dia}T00:00:00Z`) : null });
+    const hoy = '2026-10-27';
+    const candidatas = [oc(1, '2026-10-20'), oc(2, null), oc(3, '2026-10-27'), oc(4, '2026-10-26'), oc(5, null), oc(6, '2026-10-25'), oc(7, '2026-10-27')];
+    const julia = new Map([[1, '2026-10-26'], [2, '2026-10-27'], [4, '2026-11-02'], [6, '2026-10-01']]);
+    // 2 y 3 y 7 hoy (por id), 1 ayer por Julia, 6 con la suya; fuera la 4 (Julia la recorrió) y la 5 (sin fecha)
+    assert.deepEqual(P.esperadasHasta(candidatas, julia, hoy), [2, 3, 7, 1, 6]);
+    assert.deepEqual(P.esperadasHasta(candidatas, new Map(), hoy), [3, 7, 4, 6, 1], 'sin Julia, como la consulta de siempre');
+    const muchas = Array.from({ length: 80 }, (_, i) => oc(i + 1, '2026-10-27'));
+    assert.deepEqual(P.esperadasHasta(muchas, new Map(), hoy), Array.from({ length: 50 }, (_, i) => i + 1), 'tope de 50');
+});
+
+test('nombreProveedor: el nombre corto de la ficha si lo tiene; si no, el completo; siempre por sinDatos', () => {
+    const cortos = new Map([[7, 'Aceros Bajío'], [8, '   '], [9, 'Toldos tel 462 555 0101']]);
+    assert.equal(P.nombreProveedor({ id: 7, nombre: 'ACEROS DEL BAJÍO SA DE CV' }, cortos), 'Aceros Bajío');
+    assert.equal(P.nombreProveedor({ id: 8, nombre: 'LONAS DE LEÓN SA DE CV' }, cortos), 'LONAS DE LEÓN SA DE CV', 'nombre corto en blanco');
+    assert.equal(P.nombreProveedor({ id: 9, nombre: 'TOLDOS' }, cortos), 'Toldos tel •••');
+    assert.equal(P.nombreProveedor({ id: 10, nombre: 'SIN FICHA ventas@sin.example' }, cortos), 'SIN FICHA •••');
+    assert.equal(P.nombreProveedor({ id: 7, nombre: 'ACEROS DEL BAJÍO SA DE CV' }), 'ACEROS DEL BAJÍO SA DE CV', 'sin fichas leídas');
+    assert.equal(P.nombreProveedor(null, cortos), null);
 });
