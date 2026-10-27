@@ -83,6 +83,9 @@ const leerCredencialesOAuth = () => {
     return { clientId, clientSecret, refreshToken };
 };
 
+/** ¿Está puesto el permiso para subir (las 3 GOOGLE_OAUTH_*)? Solo dice sí o no; para /salud. */
+export const driveEscrituraConfigurada = () => !!leerCredencialesOAuth();
+
 /**
  * Autenticar para ESCRIBIR en Drive (subir tickets).
  *

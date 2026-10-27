@@ -139,6 +139,7 @@ export const banderasPlanta = async () => {
     const { vencidasUsaJulia, llegadaConDatos } = await import('../models/OrdenSeguimiento.js');
     const { empatePorObra } = await import('../services/obraId.service.js');
     const { modoCuentas3g, emergenciaCuentas3g } = await import('../services/cuentas3g.service.js');
+    const { ticketDriveDesdeServidor } = await import('../services/ticketDrive.service.js');
     const terminal = Object.fromEntries(configTerminal().banderas.map((b) => [b.nombre, b.encendida]));
     return [
         { nombre: 'FALLA_CERRADA', encendida: fallaCerradaEncendida() },
@@ -163,7 +164,9 @@ export const banderasPlanta = async () => {
         // PLA-23 y PLA-24 (E1). CUENTAS3G_MODO: «encendida» = el modo que de verdad aplica no es «apagado» (con la
         // configuración incompleta se queda apagado). CUENTAS3G_EMERGENCIA: la llave está puesta (solo cuenta en «solo»).
         { nombre: 'CUENTAS3G_MODO', encendida: modoCuentas3g() !== 'apagado' },
-        { nombre: 'CUENTAS3G_EMERGENCIA', encendida: emergenciaCuentas3g() }
+        { nombre: 'CUENTAS3G_EMERGENCIA', encendida: emergenciaCuentas3g() },
+        // 27-oct: viene encendida (lo pidió el dueño); 0 regresa la subida del ticket a Drive a la pantalla
+        { nombre: 'TICKET_DRIVE_DESDE_SERVIDOR', encendida: ticketDriveDesdeServidor() }
     ];
 };
 

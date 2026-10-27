@@ -280,8 +280,9 @@ const PedidoPage = () => {
           // Generar PDF (descarga automática + retorna base64)
           const pdfBase64 = await generateTicketPDF(pedidoData);
 
-          // Subir ticket a la carpeta del proyecto en Drive
-          if (pdfBase64 && pedidoData.proyecto) {
+          // Subir ticket a la carpeta del proyecto en Drive. Desde el 27-oct lo sube el servidor solo al crear la
+          // orden (ticket_drive: 'servidor'); la pantalla lo sube solo si el servidor dice que no (bandera en 0).
+          if (pdfBase64 && pedidoData.proyecto && response.data?.ticket_drive !== 'servidor') {
             try {
               await pedidosService.uploadTicketDrive({
                 ticket_id: pedidoData.ticket_id,

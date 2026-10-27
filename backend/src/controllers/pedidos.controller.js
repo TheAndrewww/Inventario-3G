@@ -2,8 +2,9 @@ import { Movimiento, DetalleMovimiento, Articulo, Usuario, Categoria, Ubicacion,
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { crearNotificacion, notificarPorRol } from './notificaciones.controller.js';
-import { buscarCarpetaProyecto, uploadTicket } from '../services/googleDrive.service.js';
-import { avisarTicketSubido, avisarTicketCerrado } from '../services/avisosProduccion.service.js';
+import { uploadTicket } from '../services/googleDrive.service.js';
+import { avisarTicketCerrado } from '../services/avisosProduccion.service.js';
+import { ticketDriveDesdeServidor, encolarTicketDrive, carpetaDelProyecto, avisarYAnotarTicket, ticketYaLoSubeElServidor } from '../services/ticketDrive.service.js';
 import { registrarError } from '../utils/diagnostico.js';
 import admin from 'firebase-admin';
 import { programarBarridoCompras } from '../services/barridoCompras.service.js';
@@ -488,6 +489,12 @@ export const crearPedido = async (req, res) => {
     // nunca: si no se puede, queda sin ID y al cerrar la obra se busca por nombre, como hoy. Apagada no hace nada.
     if (proyecto) await copiarObraIdAlTicket(pedido.id, proyecto);
 
+    // 27-oct-2026 (pedido del dueño): el ticket se sube solo a la carpeta de Drive del proyecto, desde el servidor y
+    // sin esperar a Drive; si falla se reintenta. Con TICKET_DRIVE_DESDE_SERVIDOR=0 (o si no se pudo anotar) lo sube la
+    // pantalla, como antes. Sin proyecto no hay carpeta y la pantalla tampoco sube nada.
+    const ticketDriveServidor = ticketDriveDesdeServidor() && (!proyecto ||
+      await encolarTicketDrive({ movimientoId: pedido.id, ticketId: ticket_id, proyecto }));
+
     // Enviar notificaciones según el tipo de pedido y estado
     try {
       if (estado_inicial === 'pendiente') {
@@ -684,7 +691,9 @@ export const crearPedido = async (req, res) => {
       message: mensaje,
       data: {
         pedido: pedidoCompleto,
-        solicitudes_compra: solicitudesLimpias
+        solicitudes_compra: solicitudesLimpias,
+        // 'servidor': el ticket ya va en camino a Drive y la pantalla no lo sube; 'navegador': lo sube la pantalla
+        ticket_drive: ticketDriveServidor ? 'servidor' : 'navegador'
       }
     });
 
@@ -2749,25 +2758,19 @@ export const uploadTicketToDrive = async (req, res) => {
       });
     }
 
-    // 1. Buscar drive_folder_id en la base de datos (más rápido que Drive API)
-    const proyectoObj = await ProduccionProyecto.findOne({
-      where: { nombre: proyecto, activo: true },
-      attributes: ['id', 'nombre', 'drive_folder_id', 'archivos_ticket']
-    });
-
-    let carpetaId = proyectoObj?.drive_folder_id;
-
-    // 2. Fallback: buscar directamente en Drive por nombre
-    if (!carpetaId) {
-      const carpeta = await buscarCarpetaProyecto(proyecto);
-      if (carpeta) {
-        carpetaId = carpeta.id;
-        // Guardar para futuras búsquedas
-        if (proyectoObj) {
-          await proyectoObj.update({ drive_folder_id: carpeta.id });
-        }
-      }
+    // Desde el 27-oct el servidor sube el ticket solo al crear la orden: si ya se encarga de este, no se sube dos
+    // veces (una pantalla abierta desde antes de publicar todavía llama aquí).
+    if (await ticketYaLoSubeElServidor(ticket_id)) {
+      return res.json({
+        success: true,
+        message: `Ticket ${ticket_id}: lo sube el servidor a la carpeta del proyecto`,
+        data: { archivo: null }
+      });
     }
+
+    // 1 y 2. drive_folder_id guardado en la base (más rápido que Drive) o, si no hay, buscarla en Drive por nombre.
+    // Es la misma búsqueda que usa la subida desde el servidor (services/ticketDrive.service.js).
+    const { carpetaId, proyectoObj } = await carpetaDelProyecto(proyecto);
 
     if (!carpetaId) {
       return res.status(404).json({
@@ -2783,21 +2786,10 @@ export const uploadTicketToDrive = async (req, res) => {
     const archivo = await uploadTicket(carpetaId, pdfBuffer, fileName);
 
     // El grupo de producción se entera de la salida de almacén. Se avisa aquí,
-    // en caliente, para que no dependa de cuándo corra el barrido de Drive.
-    await avisarTicketSubido({ proyecto })
-      .catch(err => console.error('⚠️ No se pudo avisar el ticket al grupo:', err.message));
-
-    // Se anota el ticket como ya visto para que el barrido no lo vuelva a avisar.
-    // El barrido es la red por si esta subida falla y alguien lo sube a mano; si
-    // salió bien, el aviso ya se dio aquí y no debe repetirse dentro de 30 minutos.
-    if (proyectoObj && archivo?.id) {
-      const vistos = proyectoObj.archivos_ticket || [];
-      if (!vistos.some(t => t.id === archivo.id)) {
-        await proyectoObj.update({
-          archivos_ticket: [...vistos, { id: archivo.id, nombre: archivo.name || fileName }]
-        }).catch(err => console.error('⚠️ No se pudo anotar el ticket:', err.message));
-      }
-    }
+    // en caliente, para que no dependa de cuándo corra el barrido de Drive, y se
+    // anota el ticket como ya visto para que el barrido no lo vuelva a avisar.
+    // Si el servidor ya lo había subido y avisado (mismo archivo), no se repite.
+    await avisarYAnotarTicket({ proyecto, proyectoObj, archivo, fileName });
 
     res.json({
       success: true,
