@@ -48,6 +48,12 @@ export const ENVIOS = [
         firma: 'Avisos de Planta', destino: 'Grupo Producción', interruptor: 'HORARIO_AVISOS', silencio: 'cola'
     },
     {
+        // 27-oct: el servidor sube el ticket al crear la orden; esta vuelta reintenta los que fallaron
+        id: 'pla-tickets-drive', nombre: 'Ticket de cada orden de salida a la carpeta de Drive del proyecto (y aviso a Producción)',
+        cron: null, texto: 'Al crear cada orden de salida; si falla, reintenta cada 10 minutos', cadaMs: 10 * 60000, linea: 'contable',
+        firma: 'Avisos de Planta', destino: 'Grupo Producción', interruptor: 'TICKET_DRIVE_DESDE_SERVIDOR', silencio: 'cola'
+    },
+    {
         id: 'pla-correo-orden', nombre: 'Correo de cada orden por autorizar («Aprobar» y «Rechazar»)',
         cron: null, texto: 'Al pedir la autorización de una orden', linea: 'correo', firma: '3G Inventario', destino: 'Dirección (correo)',
         interruptor: 'OC_CORREO_MODO_APROBAR', silencio: null
@@ -104,6 +110,7 @@ export const agendaPlanta = async ({ ahora = new Date() } = {}) => {
     const { ventanaAvisos, textoVentana } = await import('./horarioAvisos.js');
     const { modoCorreoOrdenes } = await import('../services/email.service.js');
     const { cancelacionProgramadaEncendida } = await import('../controllers/ordenesCompra.controller.js');
+    const { ticketDriveDesdeServidor } = await import('../services/ticketDrive.service.js');
     const ventana = ventanaAvisos();
     const modo = modoCorreoOrdenes();
     // Último aviso que Julia publicó de la cola (dato real de la base); si falla, «no se sabe».
@@ -119,6 +126,7 @@ export const agendaPlanta = async ({ ahora = new Date() } = {}) => {
         if (nombre === 'OC_CORREO_MODO') return { variable: 'OC_CORREO_MODO', encendido: modo === 'resumen' };
         if (nombre === 'OC_CORREO_MODO_APROBAR') return { variable: 'OC_CORREO_MODO', encendido: modo === 'aprobar' };
         if (nombre === 'CANCELACION_PROGRAMADA') return { variable: 'CANCELACION_PROGRAMADA', encendido: cancelacionProgramadaEncendida() };
+        if (nombre === 'TICKET_DRIVE_DESDE_SERVIDOR') return { variable: 'TICKET_DRIVE_DESDE_SERVIDOR', encendido: ticketDriveDesdeServidor() };
         return null;
     };
     const silencioCola = ventana

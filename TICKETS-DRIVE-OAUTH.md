@@ -1,5 +1,21 @@
 # Subida de tickets a Drive (Orden de Salida)
 
+## Desde el 27-oct-2026: lo sube el servidor
+
+Al crear la orden de salida, el **servidor** arma el mismo PDF que se descarga
+(`backend/src/utils/ticketPDF.js`) y lo sube solo a la carpeta del proyecto, sin
+esperar al navegador (`backend/src/services/ticketDrive.service.js`). Cada ticket
+queda anotado en la tabla `tickets_drive`; si la subida falla (permiso vencido,
+Drive caído, proyecto todavía sin carpeta) se reintenta cada 10 minutos con espera
+creciente, hasta 7 días. Si un ticket lleva más de una hora sin llegar,
+`/api/inicio3g/v1/salud` lo avisa con el motivo (la pantalla ya no enseña el error).
+Usa las mismas credenciales OAuth de abajo.
+
+- Bandera `TICKET_DRIVE_DESDE_SERVIDOR` en Railway: **encendida sin ponerla**.
+  Con `0` se regresa a como era: la pantalla vuelve a subir el ticket.
+- El endpoint `POST /api/pedidos/ticket-drive` sigue para ese caso; si el servidor
+  ya se encarga del ticket, no lo sube dos veces.
+
 ## El problema
 
 Al crear un ticket en Orden de Salida, la subida del PDF a la carpeta del

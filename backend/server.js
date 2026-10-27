@@ -1325,6 +1325,15 @@ const startServer = async () => {
             console.error('⚠️ Error verificando la tabla solicitudes_almacen:', almacenErr.message);
         }
 
+        // 27-oct: el ticket de cada orden de salida lo sube el servidor a Drive (su propio sync: crea si no existe; nunca alter)
+        try {
+            const { default: TicketDrive } = await import('./src/models/TicketDrive.js');
+            await TicketDrive.sync();
+            console.log('✅ Tabla tickets_drive verificada');
+        } catch (ticketDriveErr) {
+            console.error('⚠️ Error verificando la tabla tickets_drive:', ticketDriveErr.message);
+        }
+
         // C4 · PLA-16: la historia de la orden de compra (su propio sync: crea si no existe; nunca alter)
         try {
             const { default: OrdenSeguimiento } = await import('./src/models/OrdenSeguimiento.js');

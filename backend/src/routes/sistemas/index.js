@@ -201,6 +201,12 @@ const piezasConBase = async () => {
     } catch (e) {
         piezas.push({ id: 'cola-avisos', nombre: 'Avisos de Planta a WhatsApp (la cola que recoge Julia)', estado: 'aviso', mensaje: 'No se pudo revisar la cola' });
     }
+    // 27-oct: los tickets de salida que el servidor sube solos a la carpeta de Drive del proyecto
+    try {
+        const { piezaTicketsDrive } = await import('../../services/ticketDrive.service.js');
+        const pieza = await piezaTicketsDrive({ tope: (p) => conTope(p, ESPERA_BASE_MS) });
+        if (pieza) piezas.push(pieza);
+    } catch { /* sin pieza */ }
     // De dónde salen los festivos (PLA-07)
     try {
         const { estadoCalendarioLaboral } = await import('../../utils/calendarioLaboral.js');
