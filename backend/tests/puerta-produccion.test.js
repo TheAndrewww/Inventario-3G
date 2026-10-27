@@ -68,7 +68,8 @@ const CERRADAS = [
     base({ id: 7, nombre: 'MANTENIMIENTO MTO', tipo_proyecto: 'MTO', etapa_actual: 'instalacion', instalacion_completado_en: horasAtras(3), obra: '3G-26-0107' }),
     base({ id: 8, nombre: 'SIN TIPO', tipo_proyecto: null, etapa_actual: 'instalacion', instalacion_completado_en: horasAtras(120) }),
     base({ id: 9, nombre: 'CERRADA HACE CUARENTA DÍAS', etapa_actual: 'completado', instalacion_completado_en: horasAtras(40 * 24) }),
-    base({ id: 10, nombre: 'DESCERRADA', etapa_actual: 'produccion', obra: '3G-26-0110' })
+    base({ id: 10, nombre: 'DESCERRADA', etapa_actual: 'produccion', obra: '3G-26-0110' }),
+    base({ id: 11, nombre: 'CANCELADA CON ID', tipo_proyecto: 'CANCELADO A', etapa_actual: 'instalacion', instalacion_completado_en: horasAtras(20), obra: '3G-26-0111' })
 ];
 
 const EN_CURSO = [
@@ -395,7 +396,9 @@ test('cerradas: desde inválido, en el futuro, repetido o despuesDe suelto → 4
             'desde=ayer', 'desde=2026-13-01', 'desde=2026-02-30', 'desde=2026-10-20T10:00:00', // sin zona
             `desde=${encodeURIComponent(new Date(AHORA + 3600e3).toISOString())}`,
             'desde=2026-10-20&desde=2026-10-21', 'despuesDe=12', `desde=${encodeURIComponent(horasAtras(5).toISOString())}&despuesDe=abc`,
-            `desde=${encodeURIComponent(horasAtras(5).toISOString())}&despuesDe=-3`
+            `desde=${encodeURIComponent(horasAtras(5).toISOString())}&despuesDe=-3`,
+            // presentes pero vacíos: un cursor mal armado no vuelve a la primera página en silencio
+            'desde=', 'desde=%20', `desde=${encodeURIComponent(horasAtras(5).toISOString())}&despuesDe=`
         ];
         for (const q of malos) {
             const r = await pedir(`/api/sistemas/v1/produccion/cerradas?${q}`);
@@ -427,9 +430,12 @@ test('cerradas: más de 31 días atrás se recorta a 31; el «+» de la zona que
 test('estado: por ID 3G, con «cerrada» y las que no están', async () => {
     proyectos = [...CERRADAS, ...EN_CURSO];
     await conPuerta(async (pedir) => {
-        const r = await pedir('/api/sistemas/v1/produccion/estado?obras=3G-26-0110,3g-26-0101,3G-26-9999,3G-26-0101');
+        const r = await pedir('/api/sistemas/v1/produccion/estado?obras=3G-26-0110,3g-26-0101,3G-26-9999,3G-26-0101,3G-26-0111');
         assert.equal(r.status, 200);
-        assert.deepEqual(r.json.obras.map((o) => [o.obraId, o.cerrada]), [['3G-26-0110', false], ['3G-26-0101', true]]);
+        assert.deepEqual(r.json.obras.map((o) => [o.obraId, o.cerrada, o.cancelada]), [
+            ['3G-26-0110', false, false], ['3G-26-0101', true, false],
+            ['3G-26-0111', false, true] // CANCELADO A en instalación: no cuenta como cerrada (/cerradas tampoco la da)
+        ]);
         assert.deepEqual(r.json.noEncontradas, ['3G-26-9999']);
         assert.equal(r.json.obras[1].fechaInstalacion.fuente, 'calendario');
     });
@@ -439,7 +445,8 @@ test('estado: sin obras, con un ID mal escrito o con más de 50 → 400', async 
     proyectos = CERRADAS;
     await conPuerta(async (pedir) => {
         const muchas = Array.from({ length: 51 }, (_, i) => `3G-26-${String(i + 1).padStart(4, '0')}`).join(',');
-        for (const q of ['', 'obras=', 'obras=OBRA-1', `obras=3G-26-0101,${encodeURIComponent('DROP TABLE')}`, `obras=${muchas}`]) {
+        const vacios = ['obras=3G-26-0101,', 'obras=,3G-26-0101', 'obras=3G-26-0101,,3G-26-0102', 'obras=3G-26-0101,%20'];
+        for (const q of ['', 'obras=', 'obras=OBRA-1', `obras=3G-26-0101,${encodeURIComponent('DROP TABLE')}`, `obras=${muchas}`, ...vacios]) {
             const r = await pedir(`/api/sistemas/v1/produccion/estado?${q}`);
             assert.equal(r.status, 400, q);
             assert.match(r.json.error, /obras|ID 3G/, q);

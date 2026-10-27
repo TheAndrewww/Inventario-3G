@@ -9,20 +9,26 @@
  *     instalacion_completado_en después de `desde`, en orden (cerradaEn, proyectoId). 50 por página.
  *     · `desde`: ISO con zona (2026-10-27T16:00:00-06:00, …Z) o solo el día (AAAA-MM-DD = medianoche de México).
  *       Sin `desde`: los últimos 7 días. Más de 31 días atrás se recorta a 31 (la respuesta dice el que se usó).
- *       Inválido o en el futuro: 400.
+ *       Inválido, vacío («?desde=») o en el futuro: 400.
  *     · Cursor: con `hayMas: true`, la página siguiente se pide con `siguiente.desde` y `siguiente.despuesDe` tal cual.
- *       `despuesDe` sin `desde`: 400. La hora se compara al milisegundo (date_trunc), con el id para desempatar.
+ *       `despuesDe` sin `desde` o vacío: 400. La hora se compara al milisegundo (date_trunc), con el id para desempatar.
+ *     · Sondeo: con `hayMas: false`, `siguiente` es null. El siguiente sondeo NO sale de `cerradaEn` tal cual (va al
+ *       segundo y en hora de México) sin traslape: un cierre se guarda con la hora de antes de escribirlo, así que puede
+ *       aparecer después de un sondeo con una hora anterior a él. Se pide desde el último cursor (o la hora del sondeo
+ *       anterior) menos un margen de 10 min y se descarta lo repetido por obraId.
  *     → { sistema, generado, desde, obras: [OBRA], hayMas, siguiente: { desde, despuesDe } | null }
  *
  *   GET /api/sistemas/v1/produccion/estado?obras=3G-26-0412,3G-26-0415
- *     Las obras por ID 3G (50 como máximo; sin `obras`, con un ID mal escrito o con más de 50: 400). Sirve para revisar
- *     justo antes de llamar que la obra siga cerrada (una obra se puede «descerrar» con regresarEtapa).
+ *     Las obras por ID 3G (50 como máximo; sin `obras`, con un ID mal escrito, un elemento vacío o más de 50: 400). Sirve
+ *     para revisar justo antes de llamar que la obra siga cerrada (una obra se puede «descerrar» con regresarEtapa).
+ *     `cerrada` = etapa instalacion o completado Y sin cancelar: una obra CANCELADO… sale con `cerrada: false`.
  *     → { sistema, generado, obras: [OBRA + { cerrada }], noEncontradas: [ID 3G] }
  *
  *   GET /api/sistemas/v1/produccion/en-curso?despuesDe=<proyectoId>
  *     Lo que hay en el taller para la llamada a Calidad: obras activas, sin cancelar, en pendiente/diseño/compras/producción
  *     que están en etapa producción o tienen planos de Manufactura o Herrería sin terminar (la misma regla de las
- *     pantallas de Manufactura y Herrería, obtenerPorArea). Orden por proyectoId, 50 por página (`despuesDe` = cursor).
+ *     pantallas de Manufactura y Herrería, obtenerPorArea). Orden por proyectoId, 50 por página (`despuesDe` = cursor;
+ *     vacío: 400).
  *     → { sistema, generado, fecha (hoy en México), obras: [OBRA + EN_CURSO], hayMas, siguiente: { despuesDe } | null,
  *         material (solo en la primera página): { hoy, ordenes: [ORDEN_DEL_DIA] | null }, avisos: [texto] }
  *     Si el material no se puede leer, las obras salen igual: `material` de la obra (o `material.ordenes`) va en null y
@@ -175,13 +181,23 @@ const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
 const RE_ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/;
 const RE_ID = /^\d{1,10}$/;
 
-const unValor = (v) => (Array.isArray(v) ? { repetido: true } : { valor: v === undefined || v === null ? '' : String(v).trim() });
+/**
+ * Un parámetro de la consulta: { ausente } si no vino, { repetido } si vino dos veces y, si no, { valor } sin espacios a
+ * los lados. Presente pero vacío («?despuesDe=») NO es lo mismo que ausente: es un cursor mal armado y se contesta 400,
+ * para que Operación no se quede pidiendo la primera página una y otra vez.
+ */
+const unValor = (v) => {
+    if (v === undefined) return { ausente: true, valor: '' };
+    if (Array.isArray(v)) return { repetido: true };
+    return { valor: v === null ? '' : String(v).trim() };
+};
 
 /** El cursor `despuesDe` (id del proyecto). { valor: number|null } o { error }. */
 export const leerDespuesDe = (query = {}) => {
-    const { repetido, valor } = unValor(query.despuesDe);
+    const { ausente, repetido, valor } = unValor(query.despuesDe);
     if (repetido) return { error: '«despuesDe» va una sola vez' };
-    if (!valor) return { valor: null };
+    if (ausente) return { valor: null };
+    if (!valor) return { error: '«despuesDe» llegó vacío (sin página siguiente no se manda)' };
     if (!RE_ID.test(valor) || Number(valor) <= 0) return { error: '«despuesDe» debe ser el proyectoId de la última obra de la página' };
     return { valor: Number(valor) };
 };
@@ -196,7 +212,8 @@ export const leerDesde = (query = {}, ahora = new Date()) => {
     const cursor = leerDespuesDe(query);
     if (cursor.error) return { error: cursor.error };
     let desde;
-    if (!d.valor) {
+    if (!d.ausente && !d.valor) return { error: '«desde» llegó vacío (para los últimos 7 días no se manda)' };
+    if (d.ausente) {
         if (cursor.valor !== null) return { error: '«despuesDe» va junto con «desde» (los dos salen de «siguiente»)' };
         desde = new Date(ahora.getTime() - DIAS_POR_OMISION * DIA_MS);
     } else {
@@ -221,8 +238,11 @@ export const leerDesde = (query = {}, ahora = new Date()) => {
 export const leerObras = (query = {}) => {
     const { repetido, valor } = unValor(query.obras);
     if (repetido) return { error: '«obras» va una sola vez, separada por comas' };
-    const obras = [...new Set(valor.split(',').map((x) => x.trim().toUpperCase()).filter(Boolean))];
-    if (!obras.length) return { error: 'Falta «obras»: los ID 3G separados por comas (3G-26-0412,3G-26-0415)' };
+    if (!valor) return { error: 'Falta «obras»: los ID 3G separados por comas (3G-26-0412,3G-26-0415)' };
+    const partes = valor.split(',').map((x) => x.trim().toUpperCase());
+    // Un elemento vacío («3G-26-0101,») es una lista mal armada: no se descarta en silencio.
+    if (partes.some((x) => !x)) return { error: '«obras» trae un elemento vacío (¿una coma de más?)' };
+    const obras = [...new Set(partes)];
     if (obras.length > MAX_LISTA) return { error: `«obras» trae ${obras.length}; el máximo es ${MAX_LISTA}` };
     const malas = obras.filter((o) => !ES_ID3G.test(o));
     if (malas.length) return { error: `Estos no son ID 3G (3G-AA-NNNN): ${malas.slice(0, 5).map((m) => m.slice(0, 20)).join(', ')}` };
@@ -471,7 +491,9 @@ export const leerEstado = async (req, { ahora = new Date() } = {}) => {
     const extra = await complementos(filas);
     // El ID que se pidió manda (la liga ya dice cuál es de cada proyecto)
     for (const f of ligas) extra.obraIds.set(f.id, f.obra_id);
-    const obras = armarPagina(filas, extra, ahora).map((o) => ({ ...o, cerrada: ETAPAS_CERRADAS.includes(o.etapa) }));
+    // Una obra cancelada (tipo CANCELADO…) nunca cuenta como cerrada, aunque su etapa sea instalación o completado:
+    // /cerradas tampoco la da. Sale en `obras` con `cancelada: true` y `cerrada: false`.
+    const obras = armarPagina(filas, extra, ahora).map((o) => ({ ...o, cerrada: ETAPAS_CERRADAS.includes(o.etapa) && !o.cancelada }));
     const vistas = new Set(obras.map((o) => o.obraId));
     return {
         codigo: 200,
