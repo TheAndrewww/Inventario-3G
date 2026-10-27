@@ -85,7 +85,8 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 const FUTURO_MS = 5 * 60 * 1000; // relojes un poco adelantados
 const MAX_TEXTO = 400;
 const MAX_MATERIAL = 10;
-const MAX_TICKETS_LEIDOS = 400;
+const MAX_TICKETS_LEIDOS = 2000;
+const MAX_SOLICITUDES_LEIDAS = 1000;
 const CLAVE_FOTO = 'produccion_fechas_instalacion'; // la de fechaInstalacion.service.js (revisarAdelantos)
 const ETAPAS_CERRADAS = ['instalacion', 'completado'];
 const ETAPAS_EN_CURSO = ['pendiente', 'diseno', 'compras', 'produccion'];
@@ -274,7 +275,7 @@ export const obraDelTicket = (ticketProyecto, obras) => {
  * compra, las órdenes abiertas y lo que aún no tiene orden. Pura: recibe lo leído de la base.
  * @returns {Map<number, {tickets, ordenes, sinOrden}>}
  */
-export const materialPorObra = (obras, tickets, solicitudes, hoy) => {
+export const materialPorObra = (obras, tickets, solicitudes, hoy, surtido = new Map()) => {
     const res = new Map(obras.map((p) => [p.id, { tickets: [], ordenes: [], sinOrden: [] }]));
     const obraDeTicket = new Map();
     for (const t of tickets) {
@@ -283,8 +284,7 @@ export const materialPorObra = (obras, tickets, solicitudes, hoy) => {
         obraDeTicket.set(t.id, p.id);
         const m = res.get(p.id);
         if (m.tickets.length >= MAX_MATERIAL) continue;
-        const total = t.detalles?.length || 0;
-        const surtidos = (t.detalles || []).filter((d) => d.dispersado).length;
+        const { total = 0, surtidos = 0 } = surtido.get(t.id) || {};
         m.tickets.push({ folio: t.ticket_id, estado: t.estado, fecha: diaMexico(t.fecha_hora), surtido: total ? Math.round((surtidos / total) * 100) : 0 });
     }
     const ordenesPorObra = new Map();
@@ -442,10 +442,27 @@ export const leerEstado = async (req, { ahora = new Date() } = {}) => {
 const leerTicketsAbiertos = () => Movimiento.findAll({
     where: { tipo: 'pedido', estado: { [Op.in]: TICKETS_ABIERTOS } }, // índice de tipo
     attributes: ['id', 'ticket_id', 'proyecto', 'estado', 'fecha_hora'],
-    include: [{ model: DetalleMovimiento, as: 'detalles', attributes: ['dispersado'], required: false }],
     order: [['fecha_hora', 'DESC'], ['id', 'DESC']],
     limit: MAX_TICKETS_LEIDOS
 });
+
+/** Map id del ticket → { total, surtidos } (renglones y renglones ya entregados), solo de los tickets de la página. */
+const leerSurtido = async (ticketIds) => {
+    const mapa = new Map();
+    if (!ticketIds.length) return mapa;
+    const filas = await DetalleMovimiento.findAll({
+        where: { movimiento_id: { [Op.in]: ticketIds } },
+        attributes: [
+            'movimiento_id',
+            [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
+            [sequelize.literal('COUNT(*) FILTER (WHERE dispersado)'), 'surtidos']
+        ],
+        group: ['movimiento_id'],
+        raw: true
+    });
+    for (const f of filas) mapa.set(Number(f.movimiento_id), { total: Number(f.total) || 0, surtidos: Number(f.surtidos) || 0 });
+    return mapa;
+};
 
 const leerSolicitudesDeTickets = (ticketIds) => (ticketIds.length ? SolicitudCompra.findAll({
     where: { pedido_origen_id: { [Op.in]: ticketIds }, estado: { [Op.in]: ['pendiente', 'en_orden'] } },
@@ -459,7 +476,7 @@ const leerSolicitudesDeTickets = (ticketIds) => (ticketIds.length ? SolicitudCom
         }
     ],
     order: [['id', 'ASC']],
-    limit: 500
+    limit: MAX_SOLICITUDES_LEIDAS
 }) : []);
 
 /** Órdenes en camino con llegada estimada hasta hoy y los proyectos de los tickets que las originaron. */
@@ -543,10 +560,15 @@ export const leerEnCurso = async (req, { ahora = new Date() } = {}) => {
     ]);
     let material = null;
     if (tickets) {
-        // Primero los tickets: dicen de qué solicitudes de compra hay que leer las órdenes.
+        if (tickets.length >= MAX_TICKETS_LEIDOS) avisos.push(`Hay más de ${MAX_TICKETS_LEIDOS} tickets abiertos: solo se vieron los más nuevos.`);
+        // Primero los tickets: dicen de qué renglones y de qué solicitudes de compra hay que leer.
         const ticketIds = tickets.filter((t) => obraDelTicket(t.proyecto, pagina)).map((t) => t.id);
-        const solicitudes = await Promise.resolve(leerSolicitudesDeTickets(ticketIds)).catch(sinMaterial('las órdenes de compra de los tickets'));
-        material = materialPorObra(pagina, tickets, solicitudes || [], hoy);
+        const [surtido, solicitudes] = await Promise.all([
+            leerSurtido(ticketIds).catch(sinMaterial('lo surtido de los tickets')),
+            Promise.resolve(leerSolicitudesDeTickets(ticketIds)).catch(sinMaterial('las órdenes de compra de los tickets'))
+        ]);
+        if (solicitudes && solicitudes.length >= MAX_SOLICITUDES_LEIDAS) avisos.push(`Las obras de esta página tienen más de ${MAX_SOLICITUDES_LEIDAS} solicitudes de compra abiertas: no se vieron todas.`);
+        material = materialPorObra(pagina, tickets, solicitudes || [], hoy, surtido || new Map());
     }
     const obras = armarPagina(pagina, extra, ahora).map((o, i) => {
         const p = pagina[i];

@@ -27,7 +27,7 @@ process.env.WHATSAPP_PUENTE_TOKEN = '';
 const express = (await import('express')).default;
 const { Op } = await import('sequelize');
 const { sequelize } = await import('../src/config/database.js');
-const { ProduccionProyecto, Configuracion, Movimiento, SolicitudCompra, OrdenCompra } = await import('../src/models/index.js');
+const { ProduccionProyecto, Configuracion, Movimiento, DetalleMovimiento, SolicitudCompra, OrdenCompra } = await import('../src/models/index.js');
 const { default: LlaveSistema } = await import('../src/models/LlaveSistema.js');
 const { crearPuertas } = await import('../src/routes/sistemas/index.js');
 const P = await import('../src/routes/sistemas/produccion.js');
@@ -167,7 +167,7 @@ let lentoMs = 0;
 let fallarTickets = false;
 const consultas = [];
 const originales = {
-    findAll: ProduccionProyecto.findAll, cfg: Configuracion.findOne, query: sequelize.query, mov: Movimiento.findAll,
+    findAll: ProduccionProyecto.findAll, cfg: Configuracion.findOne, query: sequelize.query, mov: Movimiento.findAll, det: DetalleMovimiento.findAll,
     sol: SolicitudCompra.findAll, oc: OrdenCompra.findAll, llFind: LlaveSistema.findOne, llCreate: LlaveSistema.create
 };
 
@@ -198,8 +198,11 @@ before(() => {
     Movimiento.findAll = async (opciones) => {
         consultas.push({ modelo: 'Movimiento', opciones });
         if (fallarTickets) throw new Error('base caída (prueba)');
-        return TICKETS.filter((t) => t.estado === 'pendiente' || t.estado === 'aprobado');
+        return TICKETS.filter((t) => t.estado === 'pendiente' || t.estado === 'aprobado').map(({ detalles, ...t }) => t);
     };
+    // Renglones de los tickets: total y surtidos por ticket (lo que da el GROUP BY)
+    DetalleMovimiento.findAll = async ({ where }) => TICKETS.filter((t) => where.movimiento_id[Op.in].includes(t.id) && t.detalles.length)
+        .map((t) => ({ movimiento_id: t.id, total: String(t.detalles.length), surtidos: String(t.detalles.filter((d) => d.dispersado).length) }));
     SolicitudCompra.findAll = async ({ where }) => {
         if (where.pedido_origen_id) return SOLICITUDES.filter((s) => where.pedido_origen_id[Op.in].includes(s.pedido_origen_id));
         if (where.orden_compra_id) return [{ orden_compra_id: 501, pedidoOrigen: { proyecto: 'Toldo Restaurante / MTO' } }, { orden_compra_id: 501, pedidoOrigen: { proyecto: 'Toldo Restaurante / MTO' } }];
@@ -215,6 +218,7 @@ after(() => {
     Configuracion.findOne = originales.cfg;
     sequelize.query = originales.query;
     Movimiento.findAll = originales.mov;
+    DetalleMovimiento.findAll = originales.det;
     SolicitudCompra.findAll = originales.sol;
     OrdenCompra.findAll = originales.oc;
     LlaveSistema.findOne = originales.llFind;
