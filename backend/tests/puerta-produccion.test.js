@@ -31,6 +31,7 @@ const { ProduccionProyecto, Configuracion, Movimiento, DetalleMovimiento, Solici
 const { default: LlaveSistema } = await import('../src/models/LlaveSistema.js');
 const { crearPuertas } = await import('../src/routes/sistemas/index.js');
 const P = await import('../src/routes/sistemas/produccion.js');
+const { mismosProyectos } = await import('../src/services/pedidosCleanup.service.js');
 
 // ---------- Llaves inventadas (nunca reales) ----------
 const LLAVE = 'llave-operacion-de-prueba-0020-no-es-real';
@@ -168,6 +169,8 @@ let foto = FOTO;
 let pronosticos = [];
 let lentoMs = 0;
 let fallarTickets = false;
+let tickets = TICKETS;
+let solicitudes = SOLICITUDES;
 const consultas = [];
 const originales = {
     findAll: ProduccionProyecto.findAll, cfg: Configuracion.findOne, query: sequelize.query, mov: Movimiento.findAll, det: DetalleMovimiento.findAll,
@@ -188,6 +191,14 @@ before(() => {
             const filas = proyectos.filter((p) => replacements.ids.includes(p.id) && p.obra).map((p) => ({ id: p.id, obra_id: p.obra }));
             return [filas, filas];
         }
+        // Las obras abiertas para el dueño de cada ticket (los criterios de obrasAbiertas de obraId.service.js)
+        if (/SELECT id, nombre, obra_id FROM produccion_proyectos/.test(sql)) {
+            assert.match(sql, /activo = true AND etapa_actual <> 'completado'/);
+            assert.match(sql, /tipo_proyecto IS NULL OR tipo_proyecto NOT ILIKE 'CANCELADO%'/);
+            const filas = proyectos.filter((p) => p.activo && p.etapa_actual !== 'completado' && !/^CANCELADO/i.test(p.tipo_proyecto || ''))
+                .map((p) => ({ id: p.id, nombre: p.nombre, obra_id: p.obra }));
+            return [filas, filas];
+        }
         if (/WHERE obra_id IN \(:obras\) AND activo = true/.test(sql)) {
             const filas = proyectos.filter((p) => p.activo && replacements.obras.includes(p.obra)).map((p) => ({ id: p.id, obra_id: p.obra }));
             return [filas, filas];
@@ -201,13 +212,13 @@ before(() => {
     Movimiento.findAll = async (opciones) => {
         consultas.push({ modelo: 'Movimiento', opciones });
         if (fallarTickets) throw new Error('base caída (prueba)');
-        return TICKETS.filter((t) => t.estado === 'pendiente' || t.estado === 'aprobado').map(({ detalles, ...t }) => t);
+        return tickets.filter((t) => t.estado === 'pendiente' || t.estado === 'aprobado').map(({ detalles, ...t }) => ({ obra_id: null, ...t }));
     };
     // Renglones de los tickets: total y surtidos por ticket (lo que da el GROUP BY)
-    DetalleMovimiento.findAll = async ({ where }) => TICKETS.filter((t) => where.movimiento_id[Op.in].includes(t.id) && t.detalles.length)
+    DetalleMovimiento.findAll = async ({ where }) => tickets.filter((t) => where.movimiento_id[Op.in].includes(t.id) && t.detalles.length)
         .map((t) => ({ movimiento_id: t.id, total: String(t.detalles.length), surtidos: String(t.detalles.filter((d) => d.dispersado).length) }));
     SolicitudCompra.findAll = async ({ where }) => {
-        if (where.pedido_origen_id) return SOLICITUDES.filter((s) => where.pedido_origen_id[Op.in].includes(s.pedido_origen_id));
+        if (where.pedido_origen_id) return solicitudes.filter((s) => where.pedido_origen_id[Op.in].includes(s.pedido_origen_id));
         if (where.orden_compra_id) return [{ orden_compra_id: 501, pedidoOrigen: { proyecto: 'Toldo Restaurante / MTO' } }, { orden_compra_id: 501, pedidoOrigen: { proyecto: 'Toldo Restaurante / MTO' } }];
         throw new Error('solicitudes: filtro inesperado');
     };
@@ -550,6 +561,96 @@ test('en-curso: tope de 50, cursor por proyectoId y el material del día solo en
             assert.match(r.json.error, /despuesDe/);
         }
     });
+});
+
+test('en-curso: cada ticket sale en una sola obra, la suya, aunque la parecida caiga en otra página o la suya ya no esté en el taller', async () => {
+    // Página 1: 400 a 449; página 2: 450 a 499. Las obras parecidas quedan en páginas distintas.
+    const taller = Array.from({ length: 100 }, (_, i) => base({ id: 400 + i, nombre: `TALLER ${i}`, etapa_actual: 'produccion' }));
+    const nombrar = (id, datos) => { taller[id - 400] = base({ id, etapa_actual: 'produccion', ...datos }); };
+    nombrar(428, { nombre: 'THELMA PADILLA' });
+    nombrar(490, { nombre: 'THELMA PADILLA / MTO', tipo_proyecto: 'MTO', es_extensivo: true });
+    nombrar(460, { nombre: 'LUIS GÓMEZ / MTO', tipo_proyecto: 'MTO', es_extensivo: true });
+    nombrar(431, { nombre: 'TOLDO ESCUELA', obra: '3G-26-0431' });
+    nombrar(440, { nombre: 'VELARIA JARDÍN' });
+    nombrar(470, { nombre: 'Velaria Jardin' }); // homónima: mismo nombre normalizado
+    proyectos = [
+        ...taller,
+        base({ id: 600, nombre: 'LUIS GÓMEZ', etapa_actual: 'instalacion', instalacion_completado_en: horasAtras(5) }), // ya salió del taller
+        base({ id: 700, nombre: 'TOLDO ESCUELA', etapa_actual: 'completado', obra: '3G-26-0700' }) // entregada
+    ];
+    tickets = [
+        { id: 902, ticket_id: 'T-0902', proyecto: 'THELMA PADILLA / MTO', estado: 'pendiente', fecha_hora: horasAtras(9), detalles: [] },
+        { id: 903, ticket_id: 'T-0903', proyecto: 'thelma padilla', estado: 'aprobado', fecha_hora: horasAtras(8), detalles: [] },
+        { id: 904, ticket_id: 'T-0904', proyecto: 'Luis Gomez', estado: 'pendiente', fecha_hora: horasAtras(7), detalles: [] },
+        { id: 905, ticket_id: 'T-0905', proyecto: 'LUIS GÓMEZ / MTO', estado: 'pendiente', fecha_hora: horasAtras(6), detalles: [] },
+        // Con ID 3G (EMPATE_POR_OBRA) el ID manda: aunque el nombre no empate, y aunque empate con otra obra
+        { id: 906, ticket_id: 'T-0906', proyecto: 'Escuela, toldo nuevo', obra_id: '3G-26-0431', estado: 'pendiente', fecha_hora: horasAtras(5), detalles: [] },
+        { id: 907, ticket_id: 'T-0907', proyecto: 'TOLDO ESCUELA', obra_id: '3G-26-0700', estado: 'pendiente', fecha_hora: horasAtras(4), detalles: [] },
+        { id: 908, ticket_id: 'T-0908', proyecto: 'VELARIA JARDIN', estado: 'pendiente', fecha_hora: horasAtras(3), detalles: [] }
+    ];
+    solicitudes = [
+        { id: 31, pedido_origen_id: 902, estado: 'pendiente', cantidad_solicitada: '6', articulo: { nombre: 'Lona PVC 650', unidad: 'metros' }, ordenCompra: null }
+    ];
+    try {
+        await conPuerta(async (pedir) => {
+            const a = await pedir('/api/sistemas/v1/produccion/en-curso');
+            const b = await pedir('/api/sistemas/v1/produccion/en-curso?despuesDe=449');
+            assert.equal(a.status, 200);
+            assert.equal(b.status, 200);
+            assert.deepEqual([a.json.obras.length, b.json.obras.length], [50, 50]);
+            const obras = new Map([...a.json.obras, ...b.json.obras].map((o) => [o.proyectoId, o]));
+            const folios = (id) => obras.get(id).material.tickets.map((t) => t.folio);
+
+            assert.deepEqual(folios(428), ['T-0903'], 'en la página 1 no se cuela el de «THELMA PADILLA / MTO»');
+            assert.deepEqual(obras.get(428).material.sinOrden, []);
+            assert.deepEqual(folios(490), ['T-0902'], 'el de «/ MTO» va a su obra de la página 2');
+            assert.deepEqual(obras.get(490).material.sinOrden, [{ nombre: 'Lona PVC 650', cantidad: 6, unidad: 'metros' }]);
+            assert.deepEqual(folios(460), ['T-0905'], 'el de «LUIS GÓMEZ» es de la obra en instalación, no de la de MTO');
+            assert.deepEqual(folios(431), ['T-0906'], 'por ID 3G; el de la obra entregada (otro ID) no cae aquí');
+            assert.deepEqual([folios(440), folios(470)], [[], []], 'homónimas: el ticket no se le da a ninguna');
+            for (const r of [a, b]) assert.deepEqual(r.json.avisos, ['1 ticket(s) abiertos empatan con más de una obra del mismo nombre: no se pusieron en ninguna.']);
+
+            // Ningún ticket sale dos veces
+            const todos = [...obras.values()].flatMap((o) => o.material.tickets.map((t) => t.folio));
+            assert.deepEqual(todos.sort(), ['T-0902', 'T-0903', 'T-0905', 'T-0906']);
+        });
+    } finally {
+        tickets = TICKETS;
+        solicitudes = SOLICITUDES;
+    }
+});
+
+test('duenoDelTicket: con todas las obras abiertas, la regla de mismosProyectos y el ID 3G primero', () => {
+    const obras = [
+        { id: 1, nombre: 'THELMA PADILLA', obra_id: null },
+        { id: 2, nombre: 'THELMA PADILLA / MTO', obra_id: '3G-26-0002' },
+        { id: 3, nombre: 'Casa Club - Gtia', obra_id: null },
+        { id: 4, nombre: 'CASA CLUB', obra_id: null }
+    ];
+    const indice = P.indiceDeObras(obras);
+    const de = (t) => P.duenoDelTicket(t, indice).obra?.id ?? null;
+    assert.equal(de({ proyecto: 'Thelma Padilla' }), 1);
+    assert.equal(de({ proyecto: 'THELMA PADILLA / MTO' }), 2);
+    assert.equal(de({ proyecto: 'THELMA PADILLA-MTO' }), 1, 'como mismosProyectos: «PADILLA-MTO» no empata con «PADILLA / MTO»');
+    assert.equal(de({ proyecto: 'THELMA PADILLA / MTO / 2' }), null, 'empata con 1 y 2 y no es idéntico a ninguna');
+    assert.equal(de({ proyecto: 'casa club' }), 4);
+    assert.equal(de({ proyecto: 'Casa Club - Gtia' }), 3);
+    assert.equal(de({ proyecto: 'CASA CLUB / LONA' }), 4, 'la obra es prefijo del ticket');
+    assert.equal(de({ proyecto: 'THELMA' }), null);
+    assert.equal(de({ proyecto: null }), null);
+    assert.equal(de({ proyecto: 'otro nombre', obra_id: '3G-26-0002' }), 2, 'el ID manda');
+    assert.equal(de({ proyecto: 'THELMA PADILLA', obra_id: '3G-26-0999' }), null, 'con un ID que no está abierto, ninguna');
+    // Debe dar lo mismo que comparar contra todas con mismosProyectos (la búsqueda por índice no pierde candidatas)
+    const nombres = ['A', 'A / B', 'A/B', 'A - B', 'A-B', 'A B', 'A /B', 'A- B', 'AB', 'A / B / C', 'B', 'Á', ' a ', 'A -B'];
+    const todas = nombres.map((nombre, i) => ({ id: i + 1, nombre, obra_id: null }));
+    const idx = P.indiceDeObras(todas);
+    const normal = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    for (const t of nombres) {
+        const candidatas = todas.filter((o) => mismosProyectos(t, o.nombre));
+        const identicas = candidatas.filter((o) => normal(o.nombre) === normal(t));
+        const esperado = candidatas.length < 2 ? candidatas[0]?.id ?? null : (identicas.length === 1 ? identicas[0].id : null);
+        assert.equal(P.duenoDelTicket({ proyecto: t }, idx).obra?.id ?? null, esperado, t);
+    }
 });
 
 test('en-curso: si los tickets no se pueden leer, las obras salen igual y «avisos» lo dice', async () => {

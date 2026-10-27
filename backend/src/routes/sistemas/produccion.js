@@ -51,8 +51,10 @@
  *       ordenes: [{ folio, estado, proveedor, llegadaEstimada: AAAA-MM-DD|null, vencida,
  *                   articulos: [{ nombre, cantidad, unidad }] }]                                      (10 y 10)
  *       sinOrden: [{ nombre, cantidad, unidad }]   lo que se pidió a Compras y todavía no tiene orden (10) } }
- *   Los tickets son los abiertos del proyecto (pendiente o aprobado, empate por nombre como el aviso de las 16:00 de
- *   tickets-abiertos); las órdenes y lo «sin orden» salen de las solicitudes de compra de esos tickets.
+ *   Los tickets son los abiertos (pendiente o aprobado, como el aviso de las 16:00 de tickets-abiertos). El dueño de
+ *   cada uno se busca entre TODAS las obras abiertas, no solo las de la página: por ID 3G si el ticket lo trae y, si no,
+ *   por nombre (mismosProyectos; si empata con varias, la de nombre idéntico; si hay dos idénticas, ninguna y `avisos`
+ *   lo dice). Cada ticket sale en una sola obra. Las órdenes y lo «sin orden» salen de las solicitudes de esos tickets.
  *
  * ORDEN_DEL_DIA (material de la primera página): órdenes enviadas o parciales, sin recibir, con llegada estimada hasta
  *   hoy (las vencidas también), 50 como máximo, las de hoy primero y luego las vencidas más recientes:
@@ -325,30 +327,81 @@ const articulo = (a, cantidad, extra = {}) => ({
 
 const normalizar = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
-/**
- * La obra de un ticket por su nombre, con la regla de siempre (mismosProyectos: «THELMA PADILLA / MTO» ≈ «THELMA
- * PADILLA»). Si empata con dos obras, gana la de nombre idéntico. null si no es de ninguna.
- */
-export const obraDelTicket = (ticketProyecto, obras) => {
-    const candidatas = obras.filter((o) => mismosProyectos(ticketProyecto, o.nombre));
-    if (candidatas.length < 2) return candidatas[0] || null;
-    const n = normalizar(ticketProyecto);
-    return candidatas.find((o) => normalizar(o.nombre) === n) || candidatas[0];
+// Todos los SEPARADORES de mismosProyectos (« / », «-», …) empiezan con uno de estos.
+const INICIO_SEPARADOR = new Set([' ', '/', '-']);
+const agregarA = (mapa, clave, obra) => {
+    const lista = mapa.get(clave);
+    if (lista) lista.push(obra); else mapa.set(clave, [obra]);
 };
 
 /**
- * El material de cada obra: tickets abiertos (empate por nombre, como tickets-abiertos) y, de sus solicitudes de
- * compra, las órdenes abiertas y lo que aún no tiene orden. Pura: recibe lo leído de la base.
+ * Índice de las obras abiertas ({ id, nombre, obra_id }) para buscar el dueño de cada ticket sin comparar contra todas:
+ * por ID 3G, por nombre normalizado y por cada «prefijo antes de un separador» del nombre. Pura.
+ */
+export const indiceDeObras = (obras) => {
+    const porId = new Map();
+    const porNombre = new Map();
+    const porPrefijo = new Map();
+    for (const o of obras) {
+        if (o.obra_id) agregarA(porId, o.obra_id, o);
+        const n = normalizar(o.nombre);
+        if (!n) continue;
+        agregarA(porNombre, n, o);
+        for (let i = 1; i < n.length; i++) if (INICIO_SEPARADOR.has(n[i])) agregarA(porPrefijo, n.slice(0, i), o);
+    }
+    // Muchos tickets son del mismo proyecto: el dueño por nombre se calcula una vez por nombre (vive lo que la petición).
+    return { porId, porNombre, porPrefijo, porTicket: new Map() };
+};
+
+/** El dueño por nombre (n = nombre normalizado del ticket); lo usa duenoDelTicket. */
+const duenoPorNombre = (proyecto, n, indice) => {
+    // Candidatas: mismo nombre, el ticket es prefijo de la obra o la obra es prefijo del ticket. mismosProyectos decide.
+    const vistas = new Set([...(indice.porNombre.get(n) || []), ...(indice.porPrefijo.get(n) || [])]);
+    for (let i = 1; i < n.length; i++) {
+        if (INICIO_SEPARADOR.has(n[i])) for (const o of indice.porNombre.get(n.slice(0, i)) || []) vistas.add(o);
+    }
+    const candidatas = [...vistas].filter((o) => mismosProyectos(proyecto, o.nombre));
+    if (candidatas.length < 2) return { obra: candidatas[0] || null };
+    const identicas = candidatas.filter((o) => normalizar(o.nombre) === n);
+    return identicas.length === 1 ? { obra: identicas[0] } : { obra: null, empates: identicas.length ? identicas : candidatas };
+};
+
+/**
+ * La obra dueña de un ticket, buscada entre TODAS las obras abiertas (no solo las de una página):
+ *   - Si el ticket trae ID 3G (lo copia EMPATE_POR_OBRA), el ID manda, como en ticketEsDeLaObra: la obra abierta con ese
+ *     ID o ninguna.
+ *   - Si no, por nombre con la regla de siempre (mismosProyectos: «THELMA PADILLA / MTO» ≈ «THELMA PADILLA»). Si empata
+ *     con varias, gana la de nombre idéntico; si aun así quedan dos (homónimas), no se le da a ninguna.
+ * → { obra } | { obra: null, empates: [obras] } (ambiguo) | { obra: null }. Pura.
+ */
+export const duenoDelTicket = (t, indice) => {
+    if (t.obra_id) {
+        const conId = indice.porId.get(t.obra_id) || [];
+        return conId.length === 1 ? { obra: conId[0] } : { obra: null, ...(conId.length ? { empates: conId } : {}) };
+    }
+    const n = normalizar(t.proyecto);
+    if (!n) return { obra: null };
+    const yaVisto = indice.porTicket?.get(t.proyecto);
+    if (yaVisto) return yaVisto;
+    const res = duenoPorNombre(t.proyecto, n, indice);
+    indice.porTicket?.set(t.proyecto, res);
+    return res;
+};
+
+/**
+ * El material de cada obra de la página: sus tickets abiertos (`duenos`: id del ticket → id de la obra, ya resuelto
+ * con duenoDelTicket) y, de sus solicitudes de compra, las órdenes abiertas y lo que aún no tiene orden. Pura: recibe lo
+ * leído de la base.
  * @returns {Map<number, {tickets, ordenes, sinOrden}>}
  */
-export const materialPorObra = (obras, tickets, solicitudes, hoy, surtido = new Map()) => {
+export const materialPorObra = (obras, tickets, solicitudes, hoy, { surtido = new Map(), duenos = new Map() } = {}) => {
     const res = new Map(obras.map((p) => [p.id, { tickets: [], ordenes: [], sinOrden: [] }]));
     const obraDeTicket = new Map();
     for (const t of tickets) {
-        const p = obraDelTicket(t.proyecto, obras);
-        if (!p) continue;
-        obraDeTicket.set(t.id, p.id);
-        const m = res.get(p.id);
+        const pid = duenos.get(t.id);
+        const m = pid === undefined ? null : res.get(pid);
+        if (!m) continue;
+        obraDeTicket.set(t.id, pid);
         if (m.tickets.length >= MAX_MATERIAL) continue;
         const { total = 0, surtidos = 0 } = surtido.get(t.id) || {};
         m.tickets.push({ folio: t.ticket_id, estado: t.estado, fecha: diaMexico(t.fecha_hora), surtido: total ? Math.round((surtidos / total) * 100) : 0 });
@@ -506,13 +559,30 @@ export const leerEstado = async (req, { ahora = new Date() } = {}) => {
     };
 };
 
-/** Tickets abiertos (los más nuevos primero) con lo surtido de cada uno. */
+/**
+ * Tickets abiertos (los más nuevos primero), con su ID 3G si lo trae (`movimientos.obra_id` va fuera del modelo, como en
+ * obraId.service.js; server.js crea la columna al arrancar). `raw` para que la columna llegue tal cual.
+ */
 const leerTicketsAbiertos = () => Movimiento.findAll({
     where: { tipo: 'pedido', estado: { [Op.in]: TICKETS_ABIERTOS } }, // índice de tipo
-    attributes: ['id', 'ticket_id', 'proyecto', 'estado', 'fecha_hora'],
+    attributes: ['id', 'ticket_id', 'proyecto', 'estado', 'fecha_hora', 'obra_id'],
     order: [['fecha_hora', 'DESC'], ['id', 'DESC']],
-    limit: MAX_TICKETS_LEIDOS
+    limit: MAX_TICKETS_LEIDOS,
+    raw: true
 });
+
+/**
+ * Las obras abiertas, todas (no solo las de la página), para saber de quién es cada ticket: activas, sin cancelar y sin
+ * entregar, con su ID 3G. Los mismos criterios que obrasAbiertas de obraId.service.js; solo id, nombre y obra_id.
+ */
+const leerObrasAbiertas = async () => {
+    const [filas] = await sequelize.query(
+        `SELECT id, nombre, obra_id FROM produccion_proyectos
+          WHERE activo = true AND etapa_actual <> 'completado'
+            AND (tipo_proyecto IS NULL OR tipo_proyecto NOT ILIKE 'CANCELADO%')`
+    );
+    return filas;
+};
 
 /** Map id del ticket → { total, surtidos } (renglones y renglones ya entregados), solo de los tickets de la página. */
 const leerSurtido = async (ticketIds) => {
@@ -622,21 +692,36 @@ export const leerEnCurso = async (req, { ahora = new Date() } = {}) => {
     });
     const hayMas = filas.length > MAX_LISTA;
     const pagina = filas.slice(0, MAX_LISTA);
-    const [extra, tickets] = await Promise.all([
+    const [extra, abiertos] = await Promise.all([
         complementos(pagina),
-        pagina.length ? leerTicketsAbiertos().catch(sinMaterial('los tickets abiertos')) : []
+        pagina.length
+            ? Promise.all([leerTicketsAbiertos(), leerObrasAbiertas()]).catch(sinMaterial('los tickets abiertos'))
+            : [[], []]
     ]);
     let material = null;
-    if (tickets) {
+    if (abiertos) {
+        const [tickets, obrasAbiertas] = abiertos;
         if (tickets.length >= MAX_TICKETS_LEIDOS) avisos.push(`Hay más de ${MAX_TICKETS_LEIDOS} tickets abiertos: solo se vieron los más nuevos.`);
+        // El dueño de cada ticket se busca entre todas las obras abiertas y luego se queda solo lo de esta página: así un
+        // ticket no cae en una obra parecida de la página porque la suya esté en otra página o ya en instalación.
+        const indice = indiceDeObras(obrasAbiertas);
+        const enPagina = new Set(pagina.map((p) => p.id));
+        const duenos = new Map();
+        let sinDueno = 0;
+        for (const t of tickets) {
+            const d = duenoDelTicket(t, indice);
+            if (d.obra && enPagina.has(d.obra.id)) duenos.set(t.id, d.obra.id);
+            else if (!d.obra && d.empates?.some((o) => enPagina.has(o.id))) sinDueno++;
+        }
+        if (sinDueno) avisos.push(`${sinDueno} ticket(s) abiertos empatan con más de una obra del mismo nombre: no se pusieron en ninguna.`);
         // Primero los tickets: dicen de qué renglones y de qué solicitudes de compra hay que leer.
-        const ticketIds = tickets.filter((t) => obraDelTicket(t.proyecto, pagina)).map((t) => t.id);
+        const ticketIds = [...duenos.keys()];
         const [surtido, solicitudes] = await Promise.all([
             leerSurtido(ticketIds).catch(sinMaterial('lo surtido de los tickets')),
             Promise.resolve(leerSolicitudesDeTickets(ticketIds)).catch(sinMaterial('las órdenes de compra de los tickets'))
         ]);
         if (solicitudes && solicitudes.length >= MAX_SOLICITUDES_LEIDAS) avisos.push(`Las obras de esta página tienen más de ${MAX_SOLICITUDES_LEIDAS} solicitudes de compra abiertas: no se vieron todas.`);
-        material = materialPorObra(pagina, tickets, solicitudes || [], hoy, surtido || new Map());
+        material = materialPorObra(pagina, tickets, solicitudes || [], hoy, { surtido: surtido || new Map(), duenos });
     }
     const obras = armarPagina(pagina, extra, ahora).map((o, i) => {
         const p = pagina[i];
