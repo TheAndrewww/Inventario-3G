@@ -15,6 +15,10 @@
  *   GET /api/sistemas/v1/proveedores  alcance «proveedores.credito»  la ficha maestra de proveedores para Julia (B3 · PLA-20)
  *   POST /api/sistemas/v1/almacen/solicitudes  alcance «almacen.solicitar»  pedidos de los encargados a Almacén (23-oct; origen «operacion»)
  *   GET /api/sistemas/v1/almacen/solicitudes   alcance «almacen.solicitar»  ?encargado= · el estado de esos pedidos para la tableta
+ *   GET /api/sistemas/v1/produccion/cerradas   alcance «produccion.leer»  ?desde=&despuesDe= · obras que cerraron producción (Carla 3G, flujo C)
+ *   GET /api/sistemas/v1/produccion/estado     alcance «produccion.leer»  ?obras=3G-AA-NNNN,… · ¿sigue cerrada? justo antes de llamar
+ *   GET /api/sistemas/v1/produccion/en-curso   alcance «produccion.leer»  ?despuesDe= · el taller y su material para la llamada a Calidad (flujo A)
+ *       (las tres: origen «operacion», la pareja Operación → Planta; formas de respuesta en produccion.js)
  *
  * Cómo se entra (igual en los cinco sistemas):
  *   - «Authorization: Bearer <llave>» y «X-3G-Origen: <sistema>» (inicio, cuentas, finanzas, ventas…).
@@ -45,6 +49,7 @@ import { registrarSeguimiento } from './ordenes.js';
 import { registrarPronostico } from './pronostico.js';
 import { ALCANCE_PROVEEDORES, recibirCredito, leerProveedores } from './proveedores.js';
 import { ALCANCE_ALMACEN, registrarSolicitudAlmacen, listarSolicitudesAlmacen, TEXTO_TIPO } from './almacen.js';
+import { ALCANCE_PRODUCCION, leerCerradas, leerEstado, leerEnCurso } from './produccion.js';
 
 export const PREFIJO_INICIO = '/api/inicio3g/v1';
 export const PREFIJO_SISTEMAS = '/api/sistemas/v1';
@@ -463,6 +468,16 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
             error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo guardar el dato; intenta de nuevo.');
         }
     }];
+    // Lecturas que pueden contestar 400 (parámetros mal escritos): fn(req) devuelve { codigo, cuerpo }.
+    const leerConCodigo = (alcance, fn) => [exigirAlcance(alcance), async (req, res) => {
+        try {
+            const { codigo, cuerpo } = await conTope(fn(req), 2800);
+            res.status(codigo).json(cuerpo);
+        } catch (e) {
+            console.error(`[puerta] ${req.originalUrl.split('?')[0]}:`, e.message);
+            error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo armar la respuesta; intenta de nuevo.');
+        }
+    }];
     const puestoDe = (req) => {
         const p = String(req.query.puesto || '').trim().toLowerCase();
         return PUESTOS.includes(p) ? p : (p ? '__otro__' : null);
@@ -498,6 +513,10 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
     // 23-oct: los encargados le piden a Almacén desde su tableta (Operación los reenvía) y ven si ya se surtió
     router.post(`${PREFIJO_SISTEMAS}/almacen/solicitudes`, ...escribirCon(ALCANCE_ALMACEN, (req) => registrarSolicitudAlmacen(req.body)));
     router.get(`${PREFIJO_SISTEMAS}/almacen/solicitudes`, ...leer(ALCANCE_ALMACEN, (req) => listarSolicitudesAlmacen(req)));
+    // Carla 3G (v2 · pareja #20): Operación lee producción sin escribir nada; nunca Sheets, teléfonos ni importes
+    router.get(`${PREFIJO_SISTEMAS}/produccion/cerradas`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerCerradas(req)));
+    router.get(`${PREFIJO_SISTEMAS}/produccion/estado`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerEstado(req)));
+    router.get(`${PREFIJO_SISTEMAS}/produccion/en-curso`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerEnCurso(req)));
 
     // Cualquier otra ruta de las puertas
     router.use([PREFIJO_INICIO, PREFIJO_SISTEMAS], (req, res) => error(res, 404, 'No existe esa puerta en Planta.'));
