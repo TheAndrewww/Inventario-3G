@@ -137,6 +137,37 @@ test('subida a Drive: con piezas de mentira sube a la carpeta del proyecto; sin 
     assert.deepEqual(procesadas, [5, 6]);
 });
 
+test('subida a Drive: si el renglón de la hoja ya es otra obra, no sube a la carpeta de esa obra; se reintenta y sube a la suya ya religada', async () => {
+    await obraAvalada();
+    const hoja = repo._hojas[0];
+    // «TOLDO VECINO» (renglón 3) ya tenía su hoja, sin avalar
+    const vecino = repo.agregarProyecto({ id: 3, nombre: 'TOLDO VECINO' });
+    await S.cambiarAtributos(3, { atributos: VELARIA }, ctx);
+    // Antes de subir, el Excel se movió: el renglón 1 ahora es «TOLDO VECINO», la velaria quedó en el 2 y el 3 se vació
+    const p1 = repo._proyectos.get(1);
+    p1.nombre = 'TOLDO VECINO';
+    repo._obraIds.delete(1);
+    vecino.activo = false;
+    repo.agregarProyecto({ id: 2, nombre: 'VELARIA PLAZA CENTRAL' }, '3G-26-0412');
+    const subidas = [];
+    const piezas = {
+        repo, fechaDe, logo: null, escrituraConfigurada: () => true,
+        buscarCarpeta: async (nombre) => ({ carpetaId: `carpeta de ${nombre}` }),
+        subir: async (carpeta, pdf, nombre) => { subidas.push([carpeta, nombre]); return { id: 'archivo-2', name: nombre }; }
+    };
+    // Primera vuelta: el renglón 1 ya no es la velaria; no sube nada (cuenta como error y se reintenta)…
+    await Rep.procesarReporteCalidad(hoja.id, { repo, subirReporte: (id) => Rep.subirReporteCalidad(id, piezas) });
+    assert.deepEqual(subidas, [], 'nada a la carpeta de TOLDO VECINO');
+    assert.equal(hoja.reporte_estado, 'error');
+    assert.match(hoja.reporte_error, /ahora es «TOLDO VECINO»/);
+    // …y en la siguiente, con la hoja ya ligada a su renglón (por el ID 3G), sube a la carpeta de la velaria
+    await S.vistaObra('3G-26-0412', { repo });
+    assert.equal(hoja.proyecto_id, 2);
+    await Rep.procesarReporteCalidad(hoja.id, { repo, subirReporte: (id) => Rep.subirReporteCalidad(id, piezas) });
+    assert.deepEqual(subidas, [['carpeta de VELARIA PLAZA CENTRAL', 'CALIDAD - 3G-26-0412 - 2026-10-28.pdf']]);
+    assert.equal(hoja.reporte_estado, 'subido');
+});
+
 test('agenda: el reporte de calidad solo aparece con PANEL_CALIDAD; apagada la agenda es la de antes', async () => {
     banderas({});
     const apagada = await agendaPlanta({ ahora: new Date('2026-10-28T15:00:00Z') });

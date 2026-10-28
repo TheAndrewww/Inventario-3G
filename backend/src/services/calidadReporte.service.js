@@ -266,6 +266,13 @@ export const subirReporteCalidad = async (hojaId, piezas = {}) => {
     if (!escrituraConfigurada()) throw new Error('Drive no está autorizado para subir archivos');
     const obra = await S.cargarObra(hoja.proyecto_id, { repo });
     if (!obra) return { estado: 'no_aplica', motivo: 'La obra ya no está activa' };
+    // El sync del Excel liga por renglón: desde el aval, el renglón de esta hoja pudo pasar a otra obra. Antes de buscar
+    // la carpeta se confirma que la obra de ese renglón sigue siendo la de esta hoja (ligarHoja la vuelve a ligar si
+    // puede); si no, se reintenta en la siguiente vuelta en vez de subir a la carpeta de otra obra.
+    const ligada = await S.ligarHoja(obra, { repo, escribir: true });
+    if (!ligada || ligada.id !== hoja.id) {
+        throw new Error(`El renglón ${hoja.proyecto_id} del Índice ahora es «${obra.nombre}», no «${hoja.proyecto_nombre}»: se reintenta cuando la hoja vuelva a ligarse`);
+    }
     const { carpetaId } = await buscarCarpeta(obra.nombre);
     if (!carpetaId) return { estado: 'sin_carpeta', motivo: `Carpeta del proyecto "${obra.nombre}" no encontrada en Drive` };
     const { pdf, nombreArchivo } = await generar(hoja.proyecto_id);
