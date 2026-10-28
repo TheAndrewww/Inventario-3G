@@ -5,6 +5,8 @@ import { festivosNegocio } from '../utils/calendarioLaboral.js';
 import { pronosticoParaTablero } from '../routes/sistemas/pronostico.js';
 import { obraIdsDeProyectos } from '../services/obraId.service.js';
 import { clasificarCodigo, contarTerminal, revisarAreaDeEtapa } from '../middleware/codigoTerminal.middleware.js';
+import { calidadDetieneCierre, anotarPreparadoManual, correccionesParaArea } from '../services/calidad.service.js';
+import { panelCalidad } from '../utils/banderasCalidad.js';
 import {
     avisarArchivosNuevos,
     avisarTicketSubido,
@@ -165,6 +167,16 @@ export const obtenerPorArea = async (req, res) => {
             proyectos = await ProduccionProyecto.obtenerPorEtapa(area);
         }
 
+        // 28-oct · PANEL_CALIDAD: en Manufactura y Herrería, «Calidad pide corregir» (los defectos de SU hoja que no
+        // salen así). Solo las obras que tienen; apagada no se pide nada y la respuesta queda igual que hoy.
+        let correcciones = new Map();
+        if (panelCalidad() && (area === 'manufactura' || area === 'herreria') && proyectos.length) {
+            correcciones = await correccionesParaArea(proyectos, area).catch((e) => {
+                console.error('[calidad] no se pudieron leer las correcciones para la terminal:', e.message);
+                return new Map();
+            });
+        }
+
         res.json({
             success: true,
             data: {
@@ -174,7 +186,8 @@ export const obtenerPorArea = async (req, res) => {
                     ...p.toJSON(),
                     diasRestantes: p.getDiasRestantes(),
                     porcentaje: p.getPorcentajeAvance(),
-                    estadoSubEtapas: p.getEstadoSubEtapas()
+                    estadoSubEtapas: p.getEstadoSubEtapas(),
+                    ...(correcciones.has(p.id) ? { calidadCorregir: correcciones.get(p.id) } : {})
                 })),
                 total: proyectos.length
             }
@@ -235,8 +248,22 @@ export const completarEtapa = async (req, res) => {
         const otraArea = revisarAreaDeEtapa(req, proyecto.etapa_actual);
         if (otraArea) return res.status(403).json(otraArea);
 
+        // 28-oct · CALIDAD_AVAL_CIERRA: sin sesión (terminal) la producción no se cierra por aquí si la obra espera el aval
+        // de Calidad. Con sesión es el cierre manual de la oficina: sigue funcionando y queda en la bitácora de calidad.
+        // Apagada, calidadDetieneCierre contesta false sin tocar la base: como hoy.
+        if (!req.usuario && proyecto.etapa_actual === 'produccion' && await calidadDetieneCierre(proyecto)) {
+            return res.status(409).json({
+                success: false,
+                codigo: 'ESPERA_CALIDAD',
+                message: 'La obra espera el aval de Calidad para pasar a Preparado.'
+            });
+        }
+
         const etapaAnterior = proyecto.etapa_actual;
         await proyecto.completarEtapaActual(usuarioId, observaciones);
+        if (req.usuario && etapaAnterior === 'produccion' && proyecto.etapa_actual === 'instalacion') {
+            await anotarPreparadoManual(proyecto, { quien: req.usuario.nombre || null });
+        }
 
         console.log(`✅ Proyecto "${proyecto.nombre}" avanzó de ${etapaAnterior} a ${proyecto.etapa_actual}`);
 
@@ -392,7 +419,9 @@ export const completarSubEtapa = async (req, res) => {
                 },
                 subEtapaCompletada: subEtapa,
                 puedeAvanzarAInstalacion: resultado.puedeAvanzarAInstalacion,
-                estadoSubEtapas: resultado.estadoSubEtapas
+                estadoSubEtapas: resultado.estadoSubEtapas,
+                // 28-oct · CALIDAD_AVAL_CIERRA: terminó producción pero espera el aval (solo aparece en ese caso)
+                ...(resultado.esperaCalidad ? { esperaCalidad: true } : {})
             }
         });
     } catch (error) {
@@ -675,8 +704,15 @@ export const toggleEtapa = async (req, res) => {
         // → 'instalacion' (= "Completado" en UI, pantalla de Completados).
         // NO usamos 'completado' aquí: ese estado está reservado para los
         // proyectos cerrados desde el índice (casilla E del Excel).
+        let esperaCalidad = false;
         if ((manDone && herDone) || proyecto.instalacion_completado_en) {
             nuevaEtapa = 'instalacion';
+            // 28-oct · CALIDAD_AVAL_CIERRA: si llegó ahí sola (sin «Preparado» marcado), espera el aval de Calidad en
+            // producción. Apagada, calidadDetieneCierre contesta false sin tocar la base: como hoy.
+            if (!proyecto.instalacion_completado_en && await calidadDetieneCierre(proyecto)) {
+                nuevaEtapa = 'produccion';
+                esperaCalidad = true;
+            }
         }
         // Si alguna sub-etapa está marcada → Producción
         else if (manDone || herDone || proyecto.compras_completado_en) {
@@ -716,6 +752,11 @@ export const toggleEtapa = async (req, res) => {
                 etapaPrevia,
                 usuario: req.usuario?.nombre
             });
+            // Con CALIDAD_AVAL_CIERRA el «Preparado» manual sigue funcionando y queda en la bitácora de calidad
+            // (apagada no hace nada).
+            if (etapa === 'instalacion' && etapaPrevia !== 'instalacion' && nuevaEtapa === 'instalacion') {
+                await anotarPreparadoManual(proyecto, { quien: req.usuario?.nombre || null });
+            }
         }
 
         res.json({
@@ -726,7 +767,8 @@ export const toggleEtapa = async (req, res) => {
                     diasRestantes: proyecto.getDiasRestantes(),
                     porcentaje: proyecto.getPorcentajeAvance(),
                     estadoSubEtapas: proyecto.getEstadoSubEtapas()
-                }
+                },
+                ...(esperaCalidad ? { esperaCalidad: true } : {})
             }
         });
 

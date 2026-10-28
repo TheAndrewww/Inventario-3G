@@ -7,6 +7,7 @@ import {
     empatePorObra, columnaId3G, ultimaColumnaConEncabezado, letraColumna, renglonesBK, idsPorRenglon, guardarObraIdProyecto,
     obraIdsDeMes
 } from './obraId.service.js';
+import { calidadDetieneCierre } from './calidad.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -297,6 +298,28 @@ const interpretarRenglones = (rows, mes, ids) => {
 const conflictosAvisados = new Set();
 
 /**
+ * Recuperación de la sincronización: si ambas sub-etapas están marcadas pero la etapa no es 'instalacion' ni
+ * 'completado' (= ya cerrado desde el Excel), promover a 'instalacion' (pantalla de Completados). Regresa los cambios
+ * que hay que sumar (o {}).
+ * 28-oct · CALIDAD_AVAL_CIERRA: una obra que espera el aval de Calidad no es un estado inconsistente; se queda en
+ * producción hasta el aval. Apagada, calidadDetieneCierre contesta false sin tocar la base y todo queda como antes.
+ */
+export const recuperarPorSubetapas = async (existente, etapaFinalCambios, nombre = existente.nombre) => {
+    const cambios = {};
+    const ambasSubEtapasDone = existente.manufactura_completado && existente.herreria_completado;
+    if (ambasSubEtapasDone && etapaFinalCambios !== 'instalacion' && etapaFinalCambios !== 'completado') {
+        if (!existente.instalacion_completado_en && await calidadDetieneCierre(existente)) {
+            if (etapaFinalCambios !== 'produccion') cambios.etapa_actual = 'produccion';
+        } else {
+            cambios.etapa_actual = 'instalacion';
+            if (!existente.instalacion_completado_en) cambios.instalacion_completado_en = new Date();
+            console.log(`🔧 Proyecto "${nombre}" tenía manufactura+herrería completas pero etapa=${etapaFinalCambios}; promoviendo a instalacion`);
+        }
+    }
+    return cambios;
+};
+
+/**
  * Sincronizar proyectos de un solo mes con la base de datos.
  * Función interna, no exportada.
  * @param {string} mes - Nombre del mes (ENERO, FEBRERO, etc.)
@@ -380,17 +403,8 @@ const sincronizarMes = async (mes) => {
                 console.log(`⚠️ Proyecto "${proyecto.nombre}" desmarcado como completado en Excel, revirtiendo a diseño`);
             }
 
-            // Recuperación: arreglar proyectos que quedaron en estado inconsistente.
-            // Si ambas sub-etapas están marcadas pero la etapa no es 'instalacion' ni
-            // 'completado' (= ya cerrado desde el Excel), promover a 'instalacion'
-            // (pantalla de Completados).
-            const ambasSubEtapasDone = existente.manufactura_completado && existente.herreria_completado;
-            const etapaFinalCambios = cambios.etapa_actual ?? existente.etapa_actual;
-            if (ambasSubEtapasDone && etapaFinalCambios !== 'instalacion' && etapaFinalCambios !== 'completado') {
-                cambios.etapa_actual = 'instalacion';
-                if (!existente.instalacion_completado_en) cambios.instalacion_completado_en = new Date();
-                console.log(`🔧 Proyecto "${proyecto.nombre}" tenía manufactura+herrería completas pero etapa=${etapaFinalCambios}; promoviendo a instalacion`);
-            }
+            // Recuperación: arreglar proyectos que quedaron en estado inconsistente (ver recuperarPorSubetapas).
+            Object.assign(cambios, await recuperarPorSubetapas(existente, cambios.etapa_actual ?? existente.etapa_actual, proyecto.nombre));
 
             if (proyecto.tipoProyecto && existente.tipo_proyecto !== proyecto.tipoProyecto.toUpperCase()) {
                 cambios.tipo_proyecto = proyecto.tipoProyecto.toUpperCase();
