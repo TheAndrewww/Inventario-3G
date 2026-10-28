@@ -175,6 +175,15 @@ test('idempotencia: el mismo cambioId dos veces responde igual sin repetir; uno 
     const futuro = await S.marcarPunto(4, 'M1', { estado: 'ok', cambioId: 'tab1-0005', cuando: '2030-01-01T00:00:00Z' }, ctx);
     assert.ok(new Date(futuro.punto.actualizadoEn).getTime() <= Date.now());
     assert.equal(tardeOtraVez.repetido, true);
+    // …y el repetido dice lo mismo que la primera vez: no se aplicó (la tableta no debe darlo por bueno)
+    assert.equal(tardeOtraVez.aplicado, false);
+    assert.equal(tardeOtraVez.motivo, tarde.motivo);
+    // El mismo cambioId en OTRO cambio (otro punto, los atributos o el aval) no se contesta «repetido»: 409
+    await espera(() => S.marcarPunto(4, 'M3', { estado: 'ok', cambioId: 'tab1-0001' }, ctx), 409, /otro cambio/);
+    await espera(() => S.marcarPunto(4, 'M3', { estado: 'ok', cambioId: 'tab1-attr-1' }, ctx), 409, /otro cambio/);
+    await espera(() => S.cambiarAtributos(4, { atributos: { lleva_costura: true }, cambioId: 'tab1-0001' }, ctx), 409, /otro cambio/);
+    await espera(() => S.avalar(4, { nombre: 'Charly', cambioId: 'tab1-0001' }, ctx), 409, /otro cambio/);
+    assert.equal(repo._puntos.find((p) => p.punto_id === 'M3'), undefined, 'M3 no se marcó');
 
     // Dos cambios a la vez con el mismo cambioId (la tableta reintenta mientras el primero se guarda): uno solo se aplica
     const [x, y] = await Promise.all([

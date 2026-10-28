@@ -471,8 +471,22 @@ const leerCuando = (v, ahora) => {
     return d.getTime() > ahora.getTime() + FUTURO_MS ? ahora : d; // un reloj adelantado no gana a los demás
 };
 
-/** Si ese cambio ya se aplicó, la respuesta de ahora sin repetirlo. */
-const yaAplicado = async (repo, cambioId) => (cambioId ? !!(await repo.eventoPorCambioId(cambioId)) : false);
+const MOTIVO_TARDE = 'Ya había un cambio más nuevo de este punto';
+
+/**
+ * Si ese cambio ya llegó, su evento (si no, null). El mismo cambioId en OTRO cambio (otro punto, los atributos o el aval)
+ * es un error de la app: 409, para no contestar «repetido» a algo que nunca se aplicó y que la tableta daría por mandado.
+ */
+const cambioPrevio = async (repo, cambioId, { tipos, puntoId = null }) => {
+    if (!cambioId) return null;
+    const e = await repo.eventoPorCambioId(cambioId);
+    if (!e) return null;
+    if (!tipos.includes(e.tipo) || (puntoId && e.punto_id !== puntoId)) falla(409, 'Ese cambioId ya se usó en otro cambio.');
+    return e;
+};
+
+/** Lo que dice la respuesta repetida: si aquel cambio llegó tarde y no se aplicó, lo dice igual que la primera vez. */
+const comoRepetido = (e) => (e?.tipo === 'marco_tarde' ? { repetido: true, aplicado: false, motivo: MOTIVO_TARDE } : { repetido: true });
 
 const esDuplicado = (e) => e?.name === 'SequelizeUniqueConstraintError' || e?.codigoDuplicado === true;
 
@@ -521,10 +535,9 @@ export const marcarPunto = async (ref, puntoIdCrudo, datos = {}, ctx = {}) => {
     if (!obra) falla(404, 'No existe esa obra (o ya no está activa).');
 
     return conCandado(`obra:${obra.id}`, async () => {
-        if (await yaAplicado(repo, cambioId)) {
-            const hoja = await ligarHoja(obra, { repo, escribir: false });
-            return respuestaCambio(repo, obra, hoja, { repetido: true }, def.punto.id);
-        }
+        const comoPunto = { tipos: ['marco', 'marco_tarde'], puntoId: def.punto.id };
+        const previo = await cambioPrevio(repo, cambioId, comoPunto);
+        if (previo) return respuestaCambio(repo, obra, await ligarHoja(obra, { repo, escribir: false }), comoRepetido(previo), def.punto.id);
         const hoja = await hojaDeObra(obra, { repo });
         if (hoja.avalada_en) falla(409, 'La hoja ya está avalada: para cambiar algo hay que reabrirla.');
         if (!tieneAtributos(hoja.atributos)) falla(409, 'Primero di qué lleva la obra (atributos).');
@@ -542,10 +555,10 @@ export const marcarPunto = async (ref, puntoIdCrudo, datos = {}, ctx = {}) => {
                 quien, origen, cambio_id: cambioId, datos: { estado, nota, saleAsi, cuando: cuando.toISOString() }
             });
         } catch (e) {
-            if (esDuplicado(e)) return respuestaCambio(repo, obra, hoja, { repetido: true }, def.punto.id);
+            if (esDuplicado(e)) return respuestaCambio(repo, obra, hoja, comoRepetido(await cambioPrevio(repo, cambioId, comoPunto)), def.punto.id);
             throw e;
         }
-        if (tarde) return respuestaCambio(repo, obra, hoja, { aplicado: false, motivo: 'Ya había un cambio más nuevo de este punto' }, def.punto.id);
+        if (tarde) return respuestaCambio(repo, obra, hoja, { aplicado: false, motivo: MOTIVO_TARDE }, def.punto.id);
         try {
             await repo.guardarPunto(hoja.id, {
                 hoja: def.hoja.id, punto_id: def.punto.id, estado,
@@ -572,7 +585,7 @@ export const cambiarAtributos = async (ref, datos = {}, ctx = {}) => {
     const obra = await cargarObra(ref, { repo });
     if (!obra) falla(404, 'No existe esa obra (o ya no está activa).');
     return conCandado(`obra:${obra.id}`, async () => {
-        if (await yaAplicado(repo, cambioId)) return respuestaCambio(repo, obra, await ligarHoja(obra, { repo, escribir: false }), { repetido: true });
+        if (await cambioPrevio(repo, cambioId, { tipos: ['atributos'] })) return respuestaCambio(repo, obra, await ligarHoja(obra, { repo, escribir: false }), { repetido: true });
         const hoja = await hojaDeObra(obra, { repo });
         if (hoja.avalada_en) falla(409, 'La hoja ya está avalada: para cambiar algo hay que reabrirla.');
         const m = mezclarAtributos(datos.atributos, hoja.atributos);
@@ -583,7 +596,7 @@ export const cambiarAtributos = async (ref, datos = {}, ctx = {}) => {
                 detalle: 'Cambió qué lleva la obra', datos: { antes: hoja.atributos || null, despues: m.atributos }
             });
         } catch (e) {
-            if (esDuplicado(e)) return respuestaCambio(repo, obra, hoja, { repetido: true });
+            if (esDuplicado(e) && await cambioPrevio(repo, cambioId, { tipos: ['atributos'] })) return respuestaCambio(repo, obra, hoja, { repetido: true });
             throw e;
         }
         await repo.actualizarHoja(hoja, { atributos: m.atributos, version_config: VERSION_CONFIG });
@@ -608,7 +621,7 @@ export const avalar = async (ref, datos = {}, ctx = {}) => {
     const obra = await cargarObra(ref, { repo });
     if (!obra) falla(404, 'No existe esa obra (o ya no está activa).');
     return conCandado(`obra:${obra.id}`, async () => {
-        if (await yaAplicado(repo, cambioId)) return respuestaCambio(repo, obra, await ligarHoja(obra, { repo, escribir: false }), { repetido: true });
+        if (await cambioPrevio(repo, cambioId, { tipos: ['avalo'] })) return respuestaCambio(repo, obra, await ligarHoja(obra, { repo, escribir: false }), { repetido: true });
         const hoja = await hojaDeObra(obra, { repo });
         if (hoja.avalada_en) falla(409, 'La hoja ya está avalada.');
         const calc = calcularHoja(hoja, await repo.puntos(hoja.id));
@@ -619,7 +632,7 @@ export const avalar = async (ref, datos = {}, ctx = {}) => {
                 detalle: `Avaló ${nombre}${observaciones ? ` · Para instalación: ${observaciones}` : ''}`
             });
         } catch (e) {
-            if (esDuplicado(e)) return respuestaCambio(repo, obra, hoja, { repetido: true });
+            if (esDuplicado(e) && await cambioPrevio(repo, cambioId, { tipos: ['avalo'] })) return respuestaCambio(repo, obra, hoja, { repetido: true });
             throw e;
         }
         await repo.actualizarHoja(hoja, {
