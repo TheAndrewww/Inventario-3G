@@ -38,7 +38,9 @@ del reporte en Drive) · `calidad_puntos` (único por hoja y punto; `cambio_id` 
 
 El `id` de `produccion_proyectos` cambia si se mueven renglones del Excel; la hoja se busca por ID 3G, luego por
 `proyecto_id` con el mismo nombre y, si el renglón se movió, se vuelve a ligar por nombre exacto (sin acentos) y se
-anota en la bitácora.
+anota en la bitácora. Si el renglón de la hoja ahora tiene otro nombre que ya nadie tiene, puede ser un cambio de nombre
+en el Índice o una obra borrada cuyo renglón ocupó otra: la hoja solo se pasa si no está avalada y no trae ID 3G (un aval
+no se le pasa a otra obra); si no, la obra empieza su propia hoja y la otra se conserva.
 
 ## Checklist
 
@@ -59,7 +61,7 @@ Entra la tableta con `Authorization: Bearer cal_…` (el token que recibió al v
 | `GET /yo`, `GET /config` | quién llama, banderas `{ avalCierra, defectoReabre }`; el checklist y su versión |
 | `GET /obras?vista=taller\|listas\|avaladas` | obras en producción (regla de `/en-curso`) y las ya en Preparado sin instalar; avaladas de los últimos 30 días |
 | `GET /obras/:obra` | la hoja completa (`:obra` = proyectoId o ID 3G) |
-| `PUT /obras/:obra/atributos` · `PUT /obras/:obra/puntos/:punto` | con `cambioId` (el mismo dos veces responde igual sin repetir) y `cuando` (uno viejo no pisa a uno nuevo) |
+| `PUT /obras/:obra/atributos` · `PUT /obras/:obra/puntos/:punto` | con `cambioId` (el mismo dos veces responde igual sin repetir, también el «no aplicado» de uno que llegó tarde; el mismo `cambioId` en otro cambio da 409) y `cuando` (uno viejo no pisa a uno nuevo) |
 | `POST /obras/:obra/avalar` · `POST /obras/:obra/reabrir` | aval (hoja lista; Charly por omisión) y reabrir (con motivo; no descierra la obra) |
 | `GET /obras/:obra/reporte.pdf` | el reporte (vista previa si no está avalada) |
 | `POST /sugerencias/:id/aplicar` · `/descartar` | lo que dijo la llamada de las 16:00 |
@@ -74,6 +76,8 @@ PDF interno (Charly, supervisor e instalador; el cliente no lo recibe) armado co
 direcciones ni montos. Al avalar se sube a la carpeta de Drive del proyecto con lo mismo que el ticket de salida
 (`carpetaDelProyecto`, `uploadTicket`, reintentos con espera creciente hasta 7 días). Nombre:
 `CALIDAD - <ID 3G o proyecto> - <AAAA-MM-DD>.pdf`; el barrido de Drive lo ignora (no es plano ni ticket ni archivo nuevo).
+Antes de subir confirma que el renglón de la hoja sigue siendo de esa obra; si el Excel se movió, reintenta en vez de
+subirlo a la carpeta de otra.
 Sin WhatsApp: llega a los supervisores por Operación y por Drive. En la agenda es `pla-calidad-reporte` (solo aparece con
 `PANEL_CALIDAD`).
 
@@ -85,7 +89,8 @@ Sin WhatsApp: llega a los supervisores por Operación y por Drive. En la agenda 
 - `POST /api/sistemas/v1/calidad/sugerencias` (alcance `calidad.sugerir`, `Idempotency-Key`):
   `{ fecha, llamadaId, sugerencias: [{ obraId | folio, punto, estado, nota, saleAsi, discrepancia }] }`. Cada una queda
   `pendiente` en la hoja de su obra (ID 3G o nombre exacto) o `sin_obra`; un punto que no existe se guarda con
-  `punto_id` null y la nota completa. La misma `llamadaId` no se duplica.
+  `punto_id` null y la nota completa. La misma `llamadaId` no se duplica. El cuerpo se revisa completo antes de guardar:
+  con una sugerencia mala responde 400 sin guardar ninguna.
 
 ## Pruebas
 
