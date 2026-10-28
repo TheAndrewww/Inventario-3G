@@ -17,6 +17,7 @@ import { ejecutarAutoMigracion } from './src/utils/autoMigrate.js';
 import { verificarToken, esAdministrador, verificarTokenOpcional } from './src/middleware/auth.middleware.js';
 import { avisarConfigAlArrancar, cerrarSiFalta, cerrarTerminalSiFalta, cuerpoSalud } from './src/utils/revisarConfig.js';
 import crearPuertas from './src/routes/sistemas/index.js';
+import { crearRutasCalidad, PREFIJO_CALIDAD } from './src/routes/calidad.routes.js';
 
 // Cargar variables de entorno solo en desarrollo
 // En producción (Railway, Heroku), las variables están en process.env directamente
@@ -119,6 +120,10 @@ app.use(['/api/ordenes-compra/aprobar-email', '/api/ordenes-compra/rechazar-emai
 // (huella SHA-256 y alcances en variables). Van antes de todas las rutas con sesión: ninguna pasa por verificarToken.
 // Sin llaves configuradas responden 503 «puerta sin configurar»; lo demás de Planta no cambia.
 app.use(crearPuertas());
+
+// 28-oct · Panel de calidad (3G Calidad): la tableta de Charly (token propio) y la web (sesión de administración o
+// almacén). Con PANEL_CALIDAD apagada todo /api/calidad responde 404. Va antes de las rutas montadas en /api con sesión.
+app.use(PREFIJO_CALIDAD, crearRutasCalidad());
 
 // Importar rutas
 import authRoutes from './src/routes/auth.routes.js';
