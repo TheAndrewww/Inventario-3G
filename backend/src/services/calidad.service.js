@@ -117,6 +117,7 @@ export const repoSequelize = {
     },
     async sugerenciaPorId(id) { return CalidadSugerencia.findByPk(id); },
     async crearSugerencia(datos) { return CalidadSugerencia.create(datos); },
+    async sugerenciasDeLlamada(llamadaId, origen) { return CalidadSugerencia.findAll({ where: { llamada_id: llamadaId, origen }, order: [['id', 'ASC']], limit: 500 }); },
     async actualizarSugerencia(s, cambios) { return s.update(cambios); },
     async proyectosEnTaller() {
         // La misma regla que /en-curso de la puerta y las pantallas de Manufactura y Herrería (obtenerPorArea)
@@ -163,6 +164,7 @@ export const repoSequelize = {
 // que también el modelo y los controladores (que llaman sin `repo`) usen el doble en memoria.
 let repoActivo = repoSequelize;
 export const usarRepoCalidad = (r) => { repoActivo = r || repoSequelize; };
+export const repoCalidad = () => repoActivo;
 
 // Un cambio a la vez por obra (dos toques seguidos de la tableta, o la tableta y la web): sin hojas repetidas ni estados
 // cruzados. Planta corre en una sola instancia; el candado es de este proceso.
@@ -819,6 +821,14 @@ export const recibirSugerencias = async (cuerpo, { origen = 'operacion', repo = 
     const fecha = cuerpo.fecha === undefined || cuerpo.fecha === null || cuerpo.fecha === '' ? null : String(cuerpo.fecha).slice(0, 10);
     if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return error('«fecha» debe ser AAAA-MM-DD.');
     const llamadaId = textoLimpio(cuerpo.llamadaId, 120);
+    // La misma llamada dos veces (Operación reintenta tras un 504 con otra Idempotency-Key): no se duplica
+    if (llamadaId) {
+        const previas = await repo.sugerenciasDeLlamada(llamadaId, origen);
+        if (previas.length) {
+            const lista2 = previas.map((s) => ({ id: s.id, obraId: s.obra_id, punto: s.punto_id, estado: s.estado_sugerencia === 'sin_obra' ? 'sin_obra' : 'pendiente' }));
+            return { codigo: 200, cuerpo: { recibidas: previas.length, pendientes: lista2.filter((g) => g.estado === 'pendiente').length, sinObra: lista2.filter((g) => g.estado === 'sin_obra').length, sugerencias: lista2, repetida: true } };
+        }
+    }
     const guardadas = [];
     const obras = new Map(); // ref → obra (una búsqueda por obra aunque traiga varios puntos)
     for (let i = 0; i < lista.length; i++) {

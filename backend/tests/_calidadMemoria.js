@@ -81,6 +81,7 @@ export const crearRepoMemoria = (ProduccionProyecto) => {
         async eventos(hojaId, limite = 20) { return eventos.filter((e) => e.hoja_id === hojaId).sort((a, b) => b.created_at - a.created_at || b.id - a.id).slice(0, limite); },
         async sugerenciasPendientes(ids) { return sugerencias.filter((s) => ids.includes(s.hoja_id) && s.estado_sugerencia === 'pendiente'); },
         async sugerenciaPorId(i) { return sugerencias.find((s) => s.id === i) || null; },
+        async sugerenciasDeLlamada(l, o) { return sugerencias.filter((s) => s.llamada_id === l && s.origen === o); },
         async crearSugerencia(d) { const s = { id: id(), created_at: ahora(), ...d }; sugerencias.push(s); return s; },
         async actualizarSugerencia(s, c) { return Object.assign(s, c); },
         async proyectosEnTaller() {

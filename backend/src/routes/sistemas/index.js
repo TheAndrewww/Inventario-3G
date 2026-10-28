@@ -19,6 +19,8 @@
  *   GET /api/sistemas/v1/produccion/estado     alcance «produccion.leer»  ?obras=3G-AA-NNNN,… · ¿sigue cerrada? justo antes de llamar
  *   GET /api/sistemas/v1/produccion/en-curso   alcance «produccion.leer»  ?despuesDe= · el taller y su material para la llamada a Calidad (flujo A)
  *       (las tres: origen «operacion», la pareja Operación → Planta; formas de respuesta en produccion.js)
+ *   POST /api/sistemas/v1/calidad/sugerencias  alcance «calidad.sugerir»  lo que dijo la llamada de las 16:00 a Calidad
+ *       (28-oct; origen «operacion»). Solo con PANEL_CALIDAD: apagada responde 404 como cualquier puerta que no existe.
  *
  * Cómo se entra (igual en los cinco sistemas):
  *   - «Authorization: Bearer <llave>» y «X-3G-Origen: <sistema>» (inicio, cuentas, finanzas, ventas…).
@@ -50,6 +52,10 @@ import { registrarPronostico } from './pronostico.js';
 import { ALCANCE_PROVEEDORES, recibirCredito, leerProveedores } from './proveedores.js';
 import { ALCANCE_ALMACEN, registrarSolicitudAlmacen, listarSolicitudesAlmacen, TEXTO_TIPO } from './almacen.js';
 import { ALCANCE_PRODUCCION, leerCerradas, leerEstado, leerEnCurso } from './produccion.js';
+import { panelCalidad } from '../../utils/banderasCalidad.js';
+import { recibirSugerencias } from '../../services/calidad.service.js';
+
+export const ALCANCE_CALIDAD = 'calidad.sugerir';
 
 export const PREFIJO_INICIO = '/api/inicio3g/v1';
 export const PREFIJO_SISTEMAS = '/api/sistemas/v1';
@@ -517,6 +523,10 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
     router.get(`${PREFIJO_SISTEMAS}/produccion/cerradas`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerCerradas(req)));
     router.get(`${PREFIJO_SISTEMAS}/produccion/estado`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerEstado(req)));
     router.get(`${PREFIJO_SISTEMAS}/produccion/en-curso`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerEnCurso(req)));
+    // 28-oct · PANEL_CALIDAD: las sugerencias de la llamada de las 16:00 a Calidad (Operación, flujo A). Apagada: 404 como
+    // cualquier puerta que no existe (next('route') salta al «No existe esa puerta»).
+    router.post(`${PREFIJO_SISTEMAS}/calidad/sugerencias`, (req, res, next) => (panelCalidad() ? next() : next('route')),
+        ...escribirCon(ALCANCE_CALIDAD, (req) => recibirSugerencias(req.body, { origen: req.puerta.origen })));
 
     // Cualquier otra ruta de las puertas
     router.use([PREFIJO_INICIO, PREFIJO_SISTEMAS], (req, res) => error(res, 404, 'No existe esa puerta en Planta.'));

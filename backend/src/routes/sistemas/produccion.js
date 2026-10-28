@@ -41,7 +41,10 @@
  *     areas: { manufactura: { aplica, lista, listaEn }, herreria: { aplica, lista, listaEn, soldadura, pintura },
  *              pendientes: ['manufactura'|'herreria'|'herreria_armado'|'herreria_pintado'], sinPlanos, produccionCerrada },
  *     fechaInstalacion: { fecha: AAAA-MM-DD|null, fuente: 'calendario'|'indice'|null }, fechaIndice, pausado,
- *     pronostico: el sí o el no de Producción por WhatsApp (PLA-17, sin el autor) o null }
+ *     pronostico: el sí o el no de Producción por WhatsApp (PLA-17, sin el autor) o null,
+ *     calidad (28-oct, SOLO con PANEL_CALIDAD; apagada el campo no va): { estado, avaladaEn, avaladaPor, faltanAtributos,
+ *       pendientes: [{ punto, texto }], defectos: [{ punto, texto, nota, saleAsi }], observacionesInstalacion } o null si
+ *       no se pudo leer. Mismas reglas de sinDatos en el texto libre. }
  *
  * EN_CURSO (se suma a OBRA en /en-curso):
  *   { prioridad (1 = más urgente), areas.diseno: { lista }, areas.compras: { lista, enProceso },
@@ -98,6 +101,8 @@ import { resumenProduccion, sumarDias } from '../../services/fechaInstalacion.se
 import { obraIdsDeProyectos, ES_ID3G } from '../../services/obraId.service.js';
 import { mismosProyectos } from '../../services/pedidosCleanup.service.js';
 import { pronosticoParaTablero } from './pronostico.js';
+import { panelCalidad } from '../../utils/banderasCalidad.js';
+import { calidadDeObras } from '../../services/calidad.service.js';
 
 export const ALCANCE_PRODUCCION = 'produccion.leer';
 export const MAX_LISTA = 50;
@@ -187,7 +192,7 @@ const diaUTC = (v) => {
     return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 };
 const DIA_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' });
-const diaMexico = (v) => (v ? DIA_MX.format(v instanceof Date ? v : new Date(v)) : null);
+export const diaMexico = (v) => (v ? DIA_MX.format(v instanceof Date ? v : new Date(v)) : null);
 const numero = (v) => {
     const n = Number.parseFloat(v);
     return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
@@ -294,8 +299,11 @@ const pronosticoLimpio = (p) => ({
     fechaPropuesta: sinDatos(p.fechaPropuesta, 120)
 });
 
-/** Lo que Operación ve de cada obra. Pura. */
-export const armarObra = (p, { obraId = null, foto = null, pronostico = null, ahora = new Date() } = {}) => {
+/**
+ * Lo que Operación ve de cada obra. Pura. `calidad` (28-oct, solo con PANEL_CALIDAD): la hoja de calidad de la obra
+ * (calidad.service › calidadDeObras) o null si no se pudo leer; sin la bandera el campo no va y la obra sale como hoy.
+ */
+export const armarObra = (p, { obraId = null, foto = null, pronostico = null, ahora = new Date(), calidad } = {}) => {
     const tipo = p.tipo_proyecto ? String(p.tipo_proyecto).trim().toUpperCase() : null;
     const r = resumenProduccion(p);
     return {
@@ -328,7 +336,8 @@ export const armarObra = (p, { obraId = null, foto = null, pronostico = null, ah
         fechaInstalacion: fechaDeObra(p, foto),
         fechaIndice: p.fecha_limite || null,
         pausado: !!p.pausado,
-        pronostico: pronostico ? pronosticoLimpio(pronosticoParaTablero(pronostico, ahora)) : null
+        pronostico: pronostico ? pronosticoLimpio(pronosticoParaTablero(pronostico, ahora)) : null,
+        ...(calidad !== undefined ? { calidad } : {})
     };
 };
 
@@ -500,7 +509,7 @@ export const ordenesDelDia = (ordenes, proyectosDeOrden, hoy, { fechasJulia = ne
 
 // ---------- Consultas ----------
 
-const leerFotoDeBase = async () => {
+export const leerFotoDeBase = async () => {
     try {
         const fila = await Configuracion.findOne({ where: { clave: CLAVE_FOTO }, attributes: ['valor'] });
         return leerFoto(fila?.valor);
@@ -510,7 +519,21 @@ const leerFotoDeBase = async () => {
     }
 };
 
-/** ID 3G, foto de fechas y pronósticos de una página de obras, en paralelo. */
+/**
+ * La hoja de calidad de cada obra de la página (solo con PANEL_CALIDAD; si no, null y la obra sale como hoy). Si no se
+ * puede leer, cada obra lleva `calidad: null` y la respuesta sale igual (lo principal es la obra).
+ */
+const leerCalidad = async (filas, obraIds) => {
+    if (!panelCalidad()) return null;
+    try {
+        return await calidadDeObras(filas, obraIds, { limpiar: sinDatos, isoFecha: iso });
+    } catch (e) {
+        console.error('[puerta] produccion: no se pudo leer la hoja de calidad (sale null):', e.message);
+        return new Map();
+    }
+};
+
+/** ID 3G, foto de fechas y pronósticos de una página de obras, en paralelo (y, con PANEL_CALIDAD, su hoja de calidad). */
 const complementos = async (filas) => {
     const ids = filas.map((p) => p.id);
     const [obraIds, foto, pronosticos] = await Promise.all([
@@ -518,11 +541,12 @@ const complementos = async (filas) => {
         leerFotoDeBase(),
         ProduccionProyecto.pronosticosVigentes(ids)
     ]);
-    return { obraIds, foto, pronosticos };
+    return { obraIds, foto, pronosticos, calidad: await leerCalidad(filas, obraIds) };
 };
 
-const armarPagina = (filas, { obraIds, foto, pronosticos }, ahora) => filas.map((p) => armarObra(p, {
-    obraId: obraIds.get(p.id), foto, pronostico: pronosticos.get(p.id), ahora
+const armarPagina = (filas, { obraIds, foto, pronosticos, calidad }, ahora) => filas.map((p) => armarObra(p, {
+    obraId: obraIds.get(p.id), foto, pronostico: pronosticos.get(p.id), ahora,
+    ...(calidad ? { calidad: calidad.get(p.id) ?? null } : {})
 }));
 
 const cuerpoError = (texto) => ({ codigo: 400, cuerpo: { error: texto } });
