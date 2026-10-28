@@ -834,6 +834,10 @@ export const recibirSugerencias = async (cuerpo, { origen = 'operacion', repo = 
     if (lista.length > MAX_SUGERENCIAS) return error(`Son ${lista.length} sugerencias; el máximo es ${MAX_SUGERENCIAS}.`);
     const fecha = cuerpo.fecha === undefined || cuerpo.fecha === null || cuerpo.fecha === '' ? null : String(cuerpo.fecha).slice(0, 10);
     if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return error('«fecha» debe ser AAAA-MM-DD.');
+    // Todo el cuerpo se revisa ANTES de guardar nada: un 400 a media lista dejaría guardadas las primeras y, como la
+    // misma llamada no se duplica (abajo), el reenvío corregido ya no guardaría las demás.
+    const malo = lista.findIndex((x) => !x || typeof x !== 'object' || Array.isArray(x));
+    if (malo >= 0) return error(`La sugerencia ${malo + 1} no es un objeto.`);
     const llamadaId = textoLimpio(cuerpo.llamadaId, 120);
     // La misma llamada dos veces (Operación reintenta tras un 504 con otra Idempotency-Key): no se duplica
     if (llamadaId) {
@@ -847,8 +851,7 @@ export const recibirSugerencias = async (cuerpo, { origen = 'operacion', repo = 
     const obras = new Map(); // ref → obra (una búsqueda por obra aunque traiga varios puntos)
     for (let i = 0; i < lista.length; i++) {
         const x = lista[i];
-        if (!x || typeof x !== 'object') return error(`La sugerencia ${i + 1} no es un objeto.`);
-        const ref = textoLimpio(x.obraId ?? x.folio, 200);
+        const ref =textoLimpio(x.obraId ?? x.folio, 200);
         if (!obras.has(ref)) {
             let obra = null;
             if (ref && ES_ID3G.test(ref.toUpperCase())) obra = await cargarObra(ref.toUpperCase(), { repo });

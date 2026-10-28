@@ -579,6 +579,22 @@ test('sugerencias: se guardan por ID 3G o nombre exacto, sin obra quedan «sin_o
     assert.equal((await S.recibirSugerencias(null, { repo })).codigo, 400);
 });
 
+test('sugerencias: un cuerpo con una sugerencia mala no guarda ninguna, y el reenvío corregido de la misma llamada se guarda completo', async () => {
+    repo.agregarProyecto({ id: 105, nombre: 'TOLDO TERRAZA' }, '3G-26-0505');
+    await S.cambiarAtributos(105, { atributos: SOLO_MEMBRANA }, ctx);
+    const buenas = [{ obraId: '3G-26-0505', punto: 'M1', estado: 'ok' }, { obraId: '3G-26-0505', punto: 'M2', estado: 'ok' }];
+    for (const mala of [null, 'M3 ok', ['M3']]) {
+        const r = await S.recibirSugerencias({ fecha: '2026-10-28', llamadaId: 'llamada-calidad-0105', sugerencias: [...buenas, mala] }, { origen: 'operacion', repo });
+        assert.equal(r.codigo, 400);
+        assert.match(r.cuerpo.error, /sugerencia 3/);
+        assert.equal(repo._sugerencias.length, 0, 'nada a medias');
+    }
+    const r = await S.recibirSugerencias({ fecha: '2026-10-28', llamadaId: 'llamada-calidad-0105', sugerencias: [...buenas, { obraId: '3G-26-0505', punto: 'M3', estado: 'ok' }] }, { origen: 'operacion', repo });
+    assert.equal(r.codigo, 200);
+    assert.equal(r.cuerpo.repetida, undefined);
+    assert.deepEqual(repo._sugerencias.map((s) => s.punto_id), ['M1', 'M2', 'M3']);
+});
+
 // ---------- Para la puerta y la terminal ----------
 
 test('calidad de varias obras (puerta) y «Calidad pide corregir» (terminal), solo leyendo', async () => {
