@@ -335,6 +335,29 @@ export const esArchivoNoProduccion = (nombreNormalizado) =>
     ES_REPORTE_DIARIO.test(nombreNormalizado) || ES_DE_LA_TABLET.test(nombreNormalizado);
 
 /**
+ * 28-oct · El reporte de calidad de salida («CALIDAD - <ID 3G o proyecto> - <AAAA-MM-DD>.pdf», lo sube el servidor al
+ * avalar) tampoco es producción ni ticket: no cuenta como manufactura o herrería ni se avisa como archivo nuevo. Se mira
+ * antes que HERRERIA porque el nombre del proyecto puede traer esa palabra. Solo ese formato exacto.
+ */
+export const ES_REPORTE_CALIDAD = /^CALIDAD - .+ - \d{4}-\d{2}-\d{2}\.PDF$/;
+
+/**
+ * Cómo cuenta un PDF de la carpeta según su nombre: 'herreria' | 'ticket' | 'ignorado' | 'manufactura'. Pura (la usa
+ * clasificarArchivosPDF; misma regla de siempre más el reporte de calidad).
+ */
+export const clasificarNombrePDF = (nombre = '') => {
+    const nombreNormalizado = String(nombre)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase();
+    if (ES_REPORTE_CALIDAD.test(nombreNormalizado.trim())) return 'ignorado';
+    if (nombreNormalizado.includes('HERRERIA')) return 'herreria';
+    if (nombreNormalizado.startsWith('TICKET')) return 'ticket';
+    if (esArchivoNoProduccion(nombreNormalizado)) return 'ignorado';
+    return 'manufactura';
+};
+
+/**
  * Clasificar archivos PDF de una carpeta según la lógica de negocio
  * - HERRERIA*.pdf → Herrería
  * - Ticket*.pdf → Ticket de salida (no es producción, pero se avisa al grupo)
@@ -385,13 +408,10 @@ export const clasificarArchivosPDF = async (carpetaId) => {
                 continue;
             }
 
-            // Normalizar nombre: quitar acentos y convertir a mayúsculas
-            const nombreNormalizado = archivo.name
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '')
-                .toUpperCase();
+            // Por el nombre (sin acentos y en mayúsculas): clasificarNombrePDF
+            const clase = clasificarNombrePDF(archivo.name);
 
-            if (nombreNormalizado.includes('HERRERIA')) {
+            if (clase === 'herreria') {
                 resultado.herreria.push({
                     id: archivo.id,
                     nombre: archivo.name,
@@ -401,7 +421,7 @@ export const clasificarArchivosPDF = async (carpetaId) => {
                     creado: archivo.createdTime
                 });
 
-            } else if (nombreNormalizado.startsWith('TICKET')) {
+            } else if (clase === 'ticket') {
                 // El ticket no es producción —no entra a las TV de manufactura ni
                 // herrería—, pero sí se avisa al grupo cuando aparece uno nuevo:
                 // puede llegar por el endpoint o subido a mano si aquel falló.
@@ -411,7 +431,8 @@ export const clasificarArchivosPDF = async (carpetaId) => {
                     creado: archivo.createdTime
                 });
 
-            } else if (esArchivoNoProduccion(nombreNormalizado)) {
+            } else if (clase === 'ignorado') {
+                // REPORTE_DIARIO, lo de la tablet de los supervisores y el reporte de calidad (28-oct)
                 resultado.ignorados.push(archivo.name);
 
             } else {

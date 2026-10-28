@@ -7,6 +7,8 @@ import { iniciarJobSincronizacion } from '../jobs/sincronizarDrive.job.js';
 import { iniciarJobSincronizacionSheets } from '../jobs/sincronizarSheets.job.js';
 // 27-oct: reintentos del ticket de cada orden de salida a la carpeta de Drive del proyecto
 import { iniciarReintentosTicketsDrive } from '../services/ticketDrive.service.js';
+// 28-oct: reintentos del reporte de calidad de cada obra avalada a Drive (solo con PANEL_CALIDAD)
+import { iniciarReintentosReportesCalidad } from '../services/calidadReporte.service.js';
 // D3 · PLA-13: la hora de cada tarea que manda avisos sale de la agenda (la misma que publica /agenda) y cada tarea
 // anota cuándo corrió. Las expresiones no cambian.
 import { cronDe, anotarCorrida } from './agendaPlanta.js';
@@ -320,5 +322,6 @@ export const iniciarCronJobs = () => {
   iniciarJobSincronizacion();
   iniciarJobSincronizacionSheets();
   iniciarReintentosTicketsDrive();
+  iniciarReintentosReportesCalidad();
   console.log('✅ Todos los cron jobs han sido iniciados');
 };
