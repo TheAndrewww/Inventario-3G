@@ -48,6 +48,8 @@ const falla = (codigo, texto, extra) => { throw new ErrorCalidad(codigo, texto, 
 export const claveNombre = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+// Cómo se dice cada estado en la bitácora (la que lee la oficina)
+const ESTADO_EN_PALABRAS = { pendiente: 'pendiente', ok: 'bien', defecto: 'defecto', na: 'no aplica' };
 const textoLimpio = (v, max) => {
     if (v === undefined || v === null) return null;
     const t = String(v).replace(/\s+/g, ' ').trim();
@@ -523,8 +525,8 @@ export const marcarPunto = async (ref, puntoIdCrudo, datos = {}, ctx = {}) => {
             evento = await anotar(repo, {
                 hoja_id: hoja.id, proyecto_id: obra.id, tipo: tarde ? 'marco_tarde' : 'marco', punto_id: def.punto.id,
                 detalle: tarde
-                    ? `${def.punto.id}: llegó tarde «${estado}» (ya había un cambio más nuevo); no se aplicó`
-                    : `${def.punto.id}: ${antes.estado} → ${estado}${saleAsi ? ' (sale así)' : ''}${nota ? ` · ${nota}` : ''}`,
+                    ? `${def.punto.id}: llegó tarde «${ESTADO_EN_PALABRAS[estado]}» (ya había un cambio más nuevo); no se aplicó`
+                    : `${def.punto.id}: ${ESTADO_EN_PALABRAS[antes.estado] || antes.estado} → ${ESTADO_EN_PALABRAS[estado]}${saleAsi ? ' (sale así)' : ''}${nota ? ` · ${nota}` : ''}`,
                 quien, origen, cambio_id: cambioId, datos: { estado, nota, saleAsi, cuando: cuando.toISOString() }
             });
         } catch (e) {
