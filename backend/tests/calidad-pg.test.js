@@ -193,4 +193,22 @@ test('Postgres: puerta, lista, sugerencias y la consulta de reintentos del repor
     await S.avalar(p.id, {}, ctx);
     const porReintentar = await Rep.hojasPorReintentar(new Date(Date.now() + 10 * 60000));
     assert.ok(porReintentar.some((h) => h.proyecto_id === p.id), 'la hoja pendiente de subir aparece después de 2 minutos');
+    // Un id que no es número no llega a Postgres (findByPk(NaN) falla en la base): 404
+    for (const malo of ['abc', '1.5']) {
+        await assert.rejects(() => S.aplicarSugerencia(malo, ctx), (e) => e.codigo === 404);
+        await assert.rejects(() => S.descartarSugerencia(malo, ctx), (e) => e.codigo === 404);
+    }
+});
+
+test('Postgres: un renglón borrado no le pasa la hoja avalada a la obra que sube a su lugar', { skip: SALTAR }, async () => {
+    banderas({ PANEL_CALIDAD: '1', CALIDAD_AVAL_CIERRA: '1' });
+    const a = await nuevo({ nombre: 'RENGLON BORRADO A', tiene_herreria: false });
+    await llenar(a.id);
+    await S.avalar(a.id, { nombre: 'Charly' }, ctx);
+    // El sync liga por renglón: se borró A y su renglón ahora es B, en producción
+    await a.update({ nombre: `${MARCA}-RENGLON BORRADO B`, etapa_actual: 'produccion', instalacion_completado_en: null });
+    const b = await ProduccionProyecto.findByPk(a.id);
+    assert.equal(await S.calidadDetieneCierre(b), true, 'B espera su propio aval');
+    const [hojas] = await sequelize.query('SELECT proyecto_nombre, avalada_en IS NOT NULL AS avalada FROM calidad_hojas WHERE proyecto_id = :id ORDER BY id', { replacements: { id: a.id } });
+    assert.deepEqual(hojas.map((h) => [h.proyecto_nombre, h.avalada]), [[`${MARCA}-RENGLON BORRADO A`, true], [`${MARCA}-RENGLON BORRADO B`, false]]);
 });
