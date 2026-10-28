@@ -1334,6 +1334,16 @@ const startServer = async () => {
             console.error('⚠️ Error verificando la tabla tickets_drive:', ticketDriveErr.message);
         }
 
+        // 28-oct: panel de calidad (3G Calidad). Seis tablas, cada una con su propio sync (crea si no existe; nunca alter).
+        // Se crean siempre; con PANEL_CALIDAD apagada nada las escribe.
+        try {
+            const { MODELOS_CALIDAD } = await import('./src/models/Calidad.js');
+            for (const modelo of MODELOS_CALIDAD) await modelo.sync();
+            console.log('✅ Tablas de calidad verificadas');
+        } catch (calidadErr) {
+            console.error('⚠️ Error verificando las tablas de calidad:', calidadErr.message);
+        }
+
         // C4 · PLA-16: la historia de la orden de compra (su propio sync: crea si no existe; nunca alter)
         try {
             const { default: OrdenSeguimiento } = await import('./src/models/OrdenSeguimiento.js');
