@@ -304,7 +304,8 @@ export const crearRutasCalidad = (o = {}) => {
     router.get('/dispositivos', soloAdministrador, manejar(async () => ({ dispositivos: (await repoDisp.dispositivos()).map(vistaDispositivo) })));
 
     router.post('/dispositivos/:id/revocar', soloAdministrador, manejar(async (req) => {
-        const d = await repoDisp.dispositivoPorId(Number(req.params.id));
+        const id = S.idDeRuta(req.params.id);
+        const d = id ? await repoDisp.dispositivoPorId(id) : null;
         if (!d) return { __codigo: 404, cuerpo: { error: 'No existe esa tableta.' } };
         if (!d.revocado) await repoDisp.revocar(d, new Date());
         return { ok: true, dispositivo: vistaDispositivo(d) };

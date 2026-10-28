@@ -790,10 +790,20 @@ export const reabrirPorDefecto = async (obra, hoja, def, { repo = repoActivo, qu
 
 // ---------- Sugerencias de la llamada de las 16:00 ----------
 
+/**
+ * Un id de la ruta como número, o null. «abc» o «1.5» no llegan a la base: Postgres falla con ellos (findByPk(NaN) da
+ * «column "nan" does not exist») y la tableta recibiría un 500 que reintentaría para siempre en vez de un 404.
+ */
+export const idDeRuta = (v) => {
+    const t = String(v ?? '').trim();
+    return /^\d{1,10}$/.test(t) && Number(t) > 0 ? Number(t) : null;
+};
+
 /** Aplicar una sugerencia de Carla: se marca el punto como lo dijo la llamada (origen «carla»). */
 export const aplicarSugerencia = async (id, ctx = {}) => {
     const { repo = repoActivo, ahora = new Date(), quien = null, origen = 'tableta' } = ctx;
-    const s = await repo.sugerenciaPorId(Number(id));
+    const n = idDeRuta(id);
+    const s = n ? await repo.sugerenciaPorId(n) : null;
     if (!s) falla(404, 'No existe esa sugerencia.');
     if (s.estado_sugerencia !== 'pendiente') falla(409, `Esa sugerencia ya está ${s.estado_sugerencia === 'sin_obra' ? 'sin obra' : s.estado_sugerencia}.`);
     if (!s.hoja_id || !s.punto_id || !ESTADOS_PUNTO.includes(s.estado || '')) {
@@ -812,7 +822,8 @@ export const aplicarSugerencia = async (id, ctx = {}) => {
 
 export const descartarSugerencia = async (id, ctx = {}) => {
     const { repo = repoActivo, ahora = new Date(), quien = null, origen = 'tableta' } = ctx;
-    const s = await repo.sugerenciaPorId(Number(id));
+    const n = idDeRuta(id);
+    const s = n ? await repo.sugerenciaPorId(n) : null;
     if (!s) falla(404, 'No existe esa sugerencia.');
     if (s.estado_sugerencia !== 'pendiente') falla(409, `Esa sugerencia ya está ${s.estado_sugerencia === 'sin_obra' ? 'sin obra' : s.estado_sugerencia}.`);
     await repo.actualizarSugerencia(s, { estado_sugerencia: 'descartada', resuelta_en: ahora, resuelta_por: quien });

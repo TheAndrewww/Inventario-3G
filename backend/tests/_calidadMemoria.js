@@ -5,6 +5,11 @@
  * Los únicos se respetan como en la base (cambio_id de eventos y puntos; hoja + punto).
  */
 const duplicado = (que) => Object.assign(new Error(`duplicado: ${que}`), { codigoDuplicado: true });
+// Como Postgres: findByPk(NaN) no regresa null, falla («column "nan" does not exist»); comprobado contra la base de prueba
+export const comoPostgres = (i) => {
+    if (!Number.isInteger(i)) throw Object.assign(new Error(`column "${String(i).toLowerCase()}" does not exist`), { name: 'SequelizeDatabaseError' });
+    return i;
+};
 const clave = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 export const crearRepoMemoria = (ProduccionProyecto) => {
@@ -80,7 +85,7 @@ export const crearRepoMemoria = (ProduccionProyecto) => {
         async borrarEvento(i) { const k = eventos.findIndex((e) => e.id === i); if (k >= 0) eventos.splice(k, 1); },
         async eventos(hojaId, limite = 20) { return eventos.filter((e) => e.hoja_id === hojaId).sort((a, b) => b.created_at - a.created_at || b.id - a.id).slice(0, limite); },
         async sugerenciasPendientes(ids) { return sugerencias.filter((s) => ids.includes(s.hoja_id) && s.estado_sugerencia === 'pendiente'); },
-        async sugerenciaPorId(i) { return sugerencias.find((s) => s.id === i) || null; },
+        async sugerenciaPorId(i) { comoPostgres(i); return sugerencias.find((s) => s.id === i) || null; },
         async sugerenciasDeLlamada(l, o) { return sugerencias.filter((s) => s.llamada_id === l && s.origen === o); },
         async crearSugerencia(d) { const s = { id: id(), created_at: ahora(), ...d }; sugerencias.push(s); return s; },
         async actualizarSugerencia(s, c) { return Object.assign(s, c); },

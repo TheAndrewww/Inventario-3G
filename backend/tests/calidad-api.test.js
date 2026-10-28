@@ -18,7 +18,7 @@ const express = (await import('express')).default;
 const { ProduccionProyecto } = await import('../src/models/index.js');
 const S = await import('../src/services/calidad.service.js');
 const R = await import('../src/routes/calidad.routes.js');
-const { crearRepoMemoria } = await import('./_calidadMemoria.js');
+const { crearRepoMemoria, comoPostgres } = await import('./_calidadMemoria.js');
 const { servir } = await import('./_servidorPrueba.js');
 
 const BANDERAS = ['PANEL_CALIDAD', 'CALIDAD_AVAL_CIERRA', 'CALIDAD_DEFECTO_REABRE'];
@@ -43,7 +43,7 @@ const repoDispositivosMemoria = () => {
         async dispositivoPorHuella(h) { return dispositivos.find((d) => d.token_hash === h) || null; },
         async tocarDispositivo(id, ahora) { dispositivos.find((d) => d.id === id).ultimo_uso = ahora; },
         async dispositivos() { return [...dispositivos]; },
-        async dispositivoPorId(id) { return dispositivos.find((d) => d.id === id) || null; },
+        async dispositivoPorId(id) { comoPostgres(id); return dispositivos.find((d) => d.id === id) || null; },
         async revocar(d, ahora) { d.revocado = true; d.revocado_en = ahora; return d; },
         async limpiarCodigos() {}
     };
@@ -203,6 +203,16 @@ test('quién puede qué: tableta, almacén y administración; revocada ya no ent
     assert.equal(fuera.json.codigo, 'TABLETA_NO_VINCULADA');
     assert.equal((await s.pedir('POST', '/api/calidad/dispositivos/9999/revocar', sesion('administrador'))).status, 404);
     assert.equal((await s.pedir('GET', '/api/calidad/no-existe', sesion('administrador'))).status, 404);
+    // Un id que no es número no llega a la base (Postgres fallaría con un 500 que la tableta reintentaría): 404
+    for (const malo of ['abc', '1.5', '-3', '0']) {
+        const r = await s.pedir('POST', `/api/calidad/dispositivos/${malo}/revocar`, sesion('administrador'));
+        assert.equal(r.status, 404, `dispositivo «${malo}»`);
+        for (const accion of ['aplicar', 'descartar']) {
+            const x = await s.pedir('POST', `/api/calidad/sugerencias/${malo}/${accion}`, sesion('almacen'));
+            assert.equal(x.status, 404, `sugerencia «${malo}» ${accion}: ${x.texto}`);
+            assert.equal(x.json.error, 'No existe esa sugerencia.');
+        }
+    }
 });
 
 test('la tableta: atributos, puntos, cambioId repetido, obra que cambió de renglón, aval y reporte en PDF', async () => {
