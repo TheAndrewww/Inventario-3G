@@ -252,7 +252,9 @@ const CarpetaProyectoModal = ({
   rutaArchivo,
   datosProyecto = null,
   grupos = null,
-  onDatos = null
+  onDatos = null,
+  // 28-oct · algo propio de quien abre la carpeta, debajo de «Datos de la obra» (Producción: la hoja de calidad)
+  extra = null
 }) => {
   const [cargando, setCargando] = useState(false);
   const [datos, setDatos] = useState(null);
@@ -329,7 +331,7 @@ const CarpetaProyectoModal = ({
     return (
       <VistaCarpeta
         titulo={titulo} subtitulo={subtitulo} textoCargando={textoCargando} cargando={cargando} error={error} datos={datos}
-        archivoAbierto={archivoAbierto} ejecutar={ejecutar} onClose={onClose} datosProyecto={datosProyecto} grupos={grupos}
+        archivoAbierto={archivoAbierto} ejecutar={ejecutar} onClose={onClose} datosProyecto={datosProyecto} grupos={grupos} extra={extra}
         secciones={grupos ? secciones : [{ titulo: `Archivos · ${archivos.length}`, archivos }]} archivos={archivos}
         pintarMiniatura={(archivo) => (
           <Miniatura archivo={archivo} ruta={rutaArchivo(archivo.id, archivo)} onClick={() => setArchivoAbierto(archivo)} />

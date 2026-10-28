@@ -9,6 +9,7 @@ import { ETAPAS_CONFIG } from './constants';
 import { useDiseno3G } from '../../rediseno2/fundacion/useDiseno3G';
 import { estadoDe, tipoTrabajo } from '../../rediseno2/fundacion/vocabulario';
 import { fechaExacta } from '../../rediseno2/fundacion/formato';
+import { SeccionCalidadObra } from '../../rediseno2/calidad/SeccionCalidadObra';
 
 const rutaArchivo = (id) => `/produccion/carpeta/archivo/${id}`;
 
@@ -84,6 +85,8 @@ const ProyectoCarpetaModal = ({ isOpen, onClose, proyecto }) => {
       rutaArchivo={rutaArchivo}
       datosProyecto={datosProyecto}
       grupos={GRUPOS}
+      // 28-oct · la hoja de calidad de la obra, de solo lectura (solo con PANEL_CALIDAD y para administración y almacén)
+      extra={proyectoId ? <SeccionCalidadObra proyectoId={proyectoId} /> : null}
     />
   );
 };

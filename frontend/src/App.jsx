@@ -54,6 +54,8 @@ import { rolPuedeVerG3 } from './diseno-3g/menuPlanta';
 import { useDiseno3G } from './diseno-3g/useDiseno3G';
 import { useDiseno3G as useDiseno3GR2 } from './rediseno2/fundacion/useDiseno3G';
 import { AvisosFlotantes } from './rediseno2/fundacion/armazon/AvisosFlotantes';
+import VistaTabletasCalidad from './rediseno2/calidad/VistaTabletasCalidad';
+import { usePanelCalidad } from './rediseno2/calidad/usePanelCalidad';
 
 const IndexRedirect = () => {
   const { user } = useAuth();
@@ -76,6 +78,16 @@ const SoloConDiseno3G = ({ path, children }) => {
   if (!g3 || !rolPuedeVerG3(user?.rol, path)) {
     return <Navigate to={rutaInicialPorRol(user?.rol)} replace />;
   }
+  return children;
+};
+
+// 28-oct · Panel de calidad: «Tabletas de calidad» solo existe con PANEL_CALIDAD encendida y para administración
+const SoloConCalidad = ({ children }) => {
+  const { user } = useAuth();
+  const panel = usePanelCalidad();
+  if (user?.rol !== 'administrador') return <Navigate to={rutaInicialPorRol(user?.rol)} replace />;
+  if (panel.cargando) return null;
+  if (!panel.activo) return <Navigate to={rutaInicialPorRol(user?.rol)} replace />;
   return children;
 };
 
@@ -182,6 +194,7 @@ function App() {
                       <Route path="stock-bajo" element={<StockBajoPage />} />
                       <Route path="entradas-salidas" element={<EntradasSalidasPage />} />
                       <Route path="perfil" element={<PerfilPage />} />
+                      <Route path="calidad/tabletas" element={<SoloConCalidad><VistaTabletasCalidad /></SoloConCalidad>} />
 
                       {/* Ruta 404 para rutas privadas no encontradas */}
                       <Route path="*" element={<IndexRedirect />} />

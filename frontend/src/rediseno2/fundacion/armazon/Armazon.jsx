@@ -17,8 +17,9 @@ import { BarraSuperior } from './BarraSuperior';
 import { BarraInferior } from './BarraInferior';
 import {
   rielR2, areaDeRuta, tituloDeRutaR2, inferiorR2, inicioDeRol, pestanasDeRuta,
-  claveOcultosG3, claveOrdenG3, guardarSubOrdenG3, EVENTO_SUBORDEN_G3, heredarAjustesDelMenu,
+  claveOcultosG3, claveOrdenG3, guardarSubOrdenG3, EVENTO_SUBORDEN_G3, heredarAjustesDelMenu, EVENTO_PANEL_CALIDAD,
 } from './menuR2';
+import { usePanelCalidad } from '../../calidad/usePanelCalidad';
 import { MENU_GRUPOS } from '../../../components/layout/Sidebar';
 import { clases } from '../formato';
 
@@ -42,8 +43,15 @@ export default function Armazon() {
   useEffect(() => {
     const alCambiar = () => setVersionSub((v) => v + 1);
     window.addEventListener(EVENTO_SUBORDEN_G3, alCambiar);
-    return () => window.removeEventListener(EVENTO_SUBORDEN_G3, alCambiar);
+    // 28-oct · el panel de calidad se enciende o apaga: «Tabletas de calidad» entra o sale del riel
+    window.addEventListener(EVENTO_PANEL_CALIDAD, alCambiar);
+    return () => {
+      window.removeEventListener(EVENTO_SUBORDEN_G3, alCambiar);
+      window.removeEventListener(EVENTO_PANEL_CALIDAD, alCambiar);
+    };
   }, []);
+  // Pregunta una vez si el panel de calidad está encendido (solo administración y almacén; apagado no cambia nada)
+  usePanelCalidad();
   useEffect(() => { setAbierto(false); }, [pathname]);
 
   // Las vistas nuevas (<Pagina>) se registran aquí

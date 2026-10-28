@@ -4,7 +4,7 @@
 import {
   Package, ClipboardList, ArrowUpDown, ClipboardCheck, Inbox, Layers, PackageOpen, Wand2, AlertCircle, FileText,
   PackageCheck, AlertTriangle, Truck, Factory, Gauge, Flag, CalendarDays, Briefcase, Wrench, UserRound, UserCog,
-  BarChart3, ShoppingCart, History, ShoppingBag, Megaphone,
+  BarChart3, ShoppingCart, History, ShoppingBag, Megaphone, Tablet,
 } from 'lucide-react';
 import { ALL_MENU_ITEMS, MENU_GRUPOS } from '../components/layout/Sidebar';
 
@@ -100,7 +100,19 @@ export const TITULOS = {
   '/usuarios': 'Usuarios',
   '/reportes': 'Reportes',
   '/perfil': 'Mi perfil',
+  '/calidad/tabletas': 'Tabletas de calidad',
 };
+
+// 28-oct · Panel de calidad: «Tabletas de calidad» solo sale en el riel con PANEL_CALIDAD encendida en el servidor (lo
+// dice /api/calidad/yo, ver rediseno2/calidad/usePanelCalidad.js). Apagada, el riel es el de siempre.
+let panelCalidadActivo = false;
+export const EVENTO_PANEL_CALIDAD = 'g3-panel-calidad';
+export const marcarPanelCalidad = (activo) => {
+  if (panelCalidadActivo === !!activo) return;
+  panelCalidadActivo = !!activo;
+  window.dispatchEvent(new Event(EVENTO_PANEL_CALIDAD));
+};
+export const panelCalidadEncendido = () => panelCalidadActivo;
 export const tituloDeRuta = (ruta) => TITULOS[ruta] || 'Planta';
 
 // Secciones con pestañas: varias pantallas (rutas de siempre) bajo un solo renglón del riel.
@@ -183,6 +195,8 @@ export const GRUPOS_RIEL = [
     { path: '/reportes', icono: BarChart3 },
     // A12.2 · PLA-11: Control de campaña pasa de Producción a Administración (mismos roles y misma ruta)
     { path: '/control-campana', icono: Flag },
+    // 28-oct · Panel de calidad: vincular y revocar las tabletas de Charly (solo administración y con PANEL_CALIDAD)
+    { path: '/calidad/tabletas', icono: Tablet, soloG3: true, soloCalidad: true, roles: ['administrador'] },
   ] },
 ];
 // B6 · PLA-11: el rol ventas ya no ve «Órdenes de compra» ni «Solicitudes de compra». Los permisos de este riel salen
@@ -200,6 +214,7 @@ export const rielParaRol = (rol, userId, ocultos = new Set()) => GRUPOS_RIEL.map
       if (!pestanas.length) return null;
       return { ...it, clave: it.seccion, destino: pestanas[0].path, rutas: pestanas.map((p) => p.path), oculto: ocultos.has(it.seccion) || pestanas.every((p) => ocultos.has(p.path)) };
     }
+    if (it.soloCalidad && !panelCalidadActivo) return null;
     const base = it.soloG3 ? it : ALL_MENU_ITEMS.find((i) => i.path === it.path);
     if (!base || !base.roles.includes(rol)) return null;
     return { ...it, clave: it.path, destino: it.path, rutas: [it.path], etiqueta: TITULOS[it.path] || base.label, oculto: ocultos.has(it.path) };

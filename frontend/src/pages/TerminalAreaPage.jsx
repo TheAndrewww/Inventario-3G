@@ -613,7 +613,10 @@ const TerminalView = ({ area, codigo, onLogout, onCodigoRechazado }) => {
                     if (d3) {
                         // Rediseño 2: el mismo aviso, sin emojis y diciendo qué sigue
                         toast.success(
-                            response.data.puedeAvanzarAInstalacion
+                            // 28-oct · CALIDAD_AVAL_CIERRA: producción terminó, pero la obra espera el aval de Calidad
+                            response.data.esperaCalidad
+                                ? `${areaConfig.nombre} terminada. La obra espera el aval de Calidad para quedar lista.`
+                                : response.data.puedeAvanzarAInstalacion
                                 ? `${areaConfig.nombre} terminada. La obra queda lista para instalar.`
                                 : `${areaConfig.nombre} terminada. Falta ${areaConfig.subEtapa === 'manufactura' ? 'herrería' : 'manufactura'}.`,
                             { duration: 4000 }
