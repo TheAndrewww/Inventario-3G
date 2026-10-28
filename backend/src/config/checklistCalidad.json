@@ -1,0 +1,197 @@
+{
+  "version": "2026-10-16",
+  "_nota": "Configuración del panel de calidad de producción. Cada hoja y cada punto se muestra solo si se cumple su condición con los atributos del proyecto. Los puntos con permite_na=true los puede marcar Calidad como N/A. Estados posibles: pendiente, ok, defecto (requiere nota), na.",
+  "atributos_proyecto": {
+    "lleva_membrana": "bool",
+    "lleva_estructura": "bool",
+    "lleva_costura": "bool",
+    "lleva_vulcanizado": "bool",
+    "lleva_cables": "bool",
+    "lleva_placas_vertice": "bool",
+    "lleva_mecanismo": "bool (flecha, contrapeso, mecanismos)",
+    "lleva_rolados": "bool",
+    "lleva_placas_base": "bool",
+    "acabado_estructura": "pintura | galvanizado | ninguno"
+  },
+  "hojas": [
+    {
+      "id": "MANUFACTURA",
+      "titulo": "Control de calidad · Manufactura",
+      "aplica_si": "lleva_membrana",
+      "firma": "Autoriza",
+      "puntos": [
+        {
+          "id": "M1",
+          "texto": "Tipo, marca y color de membrana correctos según orden de producción.",
+          "aplica_si": "siempre",
+          "permite_na": false
+        },
+        {
+          "id": "M2",
+          "texto": "Dimensiones finales verificadas contra patrón / plano.",
+          "aplica_si": "siempre",
+          "permite_na": false
+        },
+        {
+          "id": "M3",
+          "texto": "Calidad del hilo según orden de producción.",
+          "aplica_si": "lleva_costura",
+          "permite_na": true
+        },
+        {
+          "id": "M4",
+          "texto": "Costuras y vulcanizados inspeccionados (sin despegues ni puntadas saltadas).",
+          "aplica_si": "lleva_costura || lleva_vulcanizado",
+          "permite_na": true
+        },
+        {
+          "id": "M5",
+          "texto": "Refuerzos perimetrales completos: jaretas, relingas, refuerzos de esquina.",
+          "aplica_si": "siempre",
+          "permite_na": true
+        },
+        {
+          "id": "M6",
+          "texto": "Cables cortados a la longitud correcta y con terminales prensados verificados.",
+          "aplica_si": "lleva_cables",
+          "permite_na": true
+        },
+        {
+          "id": "M7",
+          "texto": "Placas de vértice instaladas correctamente.",
+          "aplica_si": "lleva_placas_vertice",
+          "permite_na": true
+        },
+        {
+          "id": "M8",
+          "texto": "Dimensiones verificadas de flecha, contrapeso, estructura.",
+          "aplica_si": "lleva_mecanismo || lleva_estructura",
+          "permite_na": true
+        },
+        {
+          "id": "M9",
+          "texto": "Herrajes completos (flecha, contrapeso, mecanismos, tornillería, soportes).",
+          "aplica_si": "siempre",
+          "permite_na": true
+        },
+        {
+          "id": "M10",
+          "texto": "Acabado completo: pintura/galvanizado seco, sin raspones ni faltantes.",
+          "aplica_si": "lleva_mecanismo || lleva_placas_vertice || lleva_estructura",
+          "permite_na": true
+        },
+        {
+          "id": "M11",
+          "texto": "Sin manchas, perforaciones, rasgaduras ni defectos visibles.",
+          "aplica_si": "siempre",
+          "permite_na": false
+        },
+        {
+          "id": "M12",
+          "texto": "Brandeada.",
+          "aplica_si": "siempre",
+          "permite_na": false
+        },
+        {
+          "id": "M13",
+          "texto": "Emplayado, identificado y etiquetado con la orden de producción.",
+          "aplica_si": "siempre",
+          "permite_na": false
+        },
+        {
+          "id": "M14",
+          "texto": "Resguardada en producto terminado, lejos de filos y partes calientes.",
+          "aplica_si": "siempre",
+          "permite_na": false
+        }
+      ]
+    },
+    {
+      "id": "HERRERIA",
+      "titulo": "Control de calidad · Herrería",
+      "aplica_si": "lleva_estructura",
+      "firma": "Autoriza",
+      "puntos": [
+        {
+          "id": "H1",
+          "texto": "Tubulares / perfiles correctos según orden de producción.",
+          "aplica_si": "siempre",
+          "permite_na": false
+        },
+        {
+          "id": "H2",
+          "texto": "Dimensiones finales verificadas contra patrón / plano.",
+          "aplica_si": "siempre",
+          "permite_na": false
+        },
+        {
+          "id": "H3",
+          "texto": "Rolados con dimensiones y tolerancias correctas.",
+          "aplica_si": "lleva_rolados",
+          "permite_na": true
+        },
+        {
+          "id": "H4",
+          "texto": "Barrenos y placas base con dimensiones y tolerancias correctas.",
+          "aplica_si": "lleva_placas_base",
+          "permite_na": true
+        },
+        {
+          "id": "H5",
+          "texto": "Soldaduras inspeccionadas: sin grietas, poros, escoria.",
+          "aplica_si": "siempre",
+          "permite_na": true
+        },
+        {
+          "id": "H6",
+          "texto": "Cantidad total de piezas verificadas contra orden de producción (doble conteo).",
+          "aplica_si": "siempre",
+          "permite_na": false
+        },
+        {
+          "id": "H7",
+          "texto": "Desengrasado de estructura correcto.",
+          "aplica_si": "acabado_estructura == 'pintura'",
+          "permite_na": true
+        },
+        {
+          "id": "H8",
+          "texto": "Empastado y sellado adecuado.",
+          "aplica_si": "acabado_estructura == 'pintura'",
+          "permite_na": true
+        },
+        {
+          "id": "H9",
+          "texto": "Lijado de estructura uniforme.",
+          "aplica_si": "acabado_estructura == 'pintura'",
+          "permite_na": true
+        },
+        {
+          "id": "H10",
+          "texto": "Aplicación de primario uniforme, sin escurrimientos, sin defectos visibles.",
+          "aplica_si": "acabado_estructura == 'pintura'",
+          "permite_na": true
+        },
+        {
+          "id": "H11",
+          "texto": "Acabado completo: pintura seca, uniforme, sin escurrimientos, sin defectos visibles, sin raspones.",
+          "aplica_si": "acabado_estructura == 'pintura'",
+          "permite_na": true
+        },
+        {
+          "id": "H12",
+          "texto": "Emplayado, identificado y etiquetado con la orden de producción.",
+          "aplica_si": "siempre",
+          "permite_na": false
+        },
+        {
+          "id": "H13",
+          "texto": "Resguardada en producto terminado.",
+          "aplica_si": "siempre",
+          "permite_na": false
+        }
+      ]
+    }
+  ],
+  "fuera_de_alcance": "Las hojas de Control de Salida (documentación, subcontratos, almacén y vehículo) pasan al sistema del instalador y no forman parte de este panel."
+}

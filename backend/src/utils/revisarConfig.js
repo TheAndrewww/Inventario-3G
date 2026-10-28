@@ -140,6 +140,7 @@ export const banderasPlanta = async () => {
     const { empatePorObra } = await import('../services/obraId.service.js');
     const { modoCuentas3g, emergenciaCuentas3g } = await import('../services/cuentas3g.service.js');
     const { ticketDriveDesdeServidor } = await import('../services/ticketDrive.service.js');
+    const { panelCalidad, calidadAvalCierra, calidadDefectoReabre } = await import('./banderasCalidad.js');
     const terminal = Object.fromEntries(configTerminal().banderas.map((b) => [b.nombre, b.encendida]));
     return [
         { nombre: 'FALLA_CERRADA', encendida: fallaCerradaEncendida() },
@@ -166,7 +167,11 @@ export const banderasPlanta = async () => {
         { nombre: 'CUENTAS3G_MODO', encendida: modoCuentas3g() !== 'apagado' },
         { nombre: 'CUENTAS3G_EMERGENCIA', encendida: emergenciaCuentas3g() },
         // 27-oct: viene encendida (lo pidió el dueño); 0 regresa la subida del ticket a Drive a la pantalla
-        { nombre: 'TICKET_DRIVE_DESDE_SERVIDOR', encendida: ticketDriveDesdeServidor() }
+        { nombre: 'TICKET_DRIVE_DESDE_SERVIDOR', encendida: ticketDriveDesdeServidor() },
+        // 28-oct: panel de calidad de Charly (3G Calidad). Las dos últimas solo cuentan con PANEL_CALIDAD encendida.
+        { nombre: 'PANEL_CALIDAD', encendida: panelCalidad() },
+        { nombre: 'CALIDAD_AVAL_CIERRA', encendida: calidadAvalCierra() },
+        { nombre: 'CALIDAD_DEFECTO_REABRE', encendida: calidadDefectoReabre() }
     ];
 };
 
