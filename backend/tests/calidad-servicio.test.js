@@ -408,6 +408,52 @@ test('religar por nombre exacto cuando la obra llega por el renglón nuevo prime
     assert.equal(await S.ligarHoja({ id: 80, nombre: 'Toldo X', obraId: null }, { repo }), null);
 });
 
+test('religar tras borrar un renglón: la obra que sube no hereda la hoja avalada ni la que trae ID 3G; si tiene la suya, se queda con la suya', async () => {
+    banderas({ PANEL_CALIDAD: '1', CALIDAD_AVAL_CIERRA: '1' });
+    // (a) «TOLDO A» se avaló y pasó a Preparado; luego se borró su renglón y el renglón 90 (el sync liga por renglón)
+    // ahora es «TOLDO B», que no tenía hoja. B no puede cerrar con la firma de A.
+    const a = repo.agregarProyecto({ id: 90, nombre: 'TOLDO A', tiene_herreria: false });
+    await llenar(90, SOLO_MEMBRANA);
+    await S.avalar(90, { nombre: 'Charly' }, ctx);
+    assert.equal(a.etapa_actual, 'instalacion');
+    const hojaA = repo._hojas.find((h) => h.proyecto_id === 90);
+    a.nombre = 'TOLDO B';
+    a.etapa_actual = 'produccion';
+    a.instalacion_completado_en = null;
+    assert.equal(await S.calidadDetieneCierre(a, { repo }), true, 'B espera su propio aval');
+    const vB = await S.vistaObra(90, { repo });
+    assert.notEqual(vB.hoja.id, hojaA.id);
+    assert.equal(vB.hoja.estado, 'sin_revisar');
+    assert.equal(hojaA.proyecto_nombre, 'TOLDO A', 'la hoja avalada de A se conserva tal cual');
+    assert.ok(hojaA.avalada_en);
+    assert.ok(!repo._eventos.some((e) => e.tipo === 'religo' && /cambió de nombre/.test(e.detalle)));
+
+    // (b) Las dos tenían hoja: se borra «LONA C» (renglón 91) y «LONA D» sube del 92 al 91; el 92 ahora es «LONA E».
+    // D se queda con SU hoja (la del nombre exacto) y la de C no se renombra.
+    const c = repo.agregarProyecto({ id: 91, nombre: 'LONA C' });
+    const d = repo.agregarProyecto({ id: 92, nombre: 'LONA D' });
+    await S.cambiarAtributos(91, { atributos: SOLO_MEMBRANA }, ctx);
+    await S.marcarPunto(91, 'M1', { estado: 'defecto', nota: 'Color equivocado' }, ctx);
+    await S.cambiarAtributos(92, { atributos: SOLO_MEMBRANA }, ctx);
+    await S.marcarPunto(92, 'M1', { estado: 'ok' }, ctx);
+    const hojaC = repo._hojas.find((h) => h.proyecto_id === 91);
+    const hojaD = repo._hojas.find((h) => h.proyecto_id === 92);
+    c.nombre = 'LONA D';
+    d.nombre = 'LONA E';
+    const vD = await S.vistaObra(91, { repo });
+    assert.equal(vD.hoja.id, hojaD.id, 'D sigue con su hoja');
+    assert.equal(vD.hojas[0].puntos.find((p) => p.id === 'M1').estado, 'ok');
+    assert.equal(hojaC.proyecto_nombre, 'LONA C', 'la hoja de C no se le pasó a D');
+
+    // (c) Una hoja con ID 3G no se pasa por un cambio de nombre: el ID 3G ya dice de qué obra es
+    const x = repo.agregarProyecto({ id: 93, nombre: 'CUBIERTA X' }, '3G-26-0500');
+    await S.cambiarAtributos(93, { atributos: SOLO_MEMBRANA }, ctx);
+    repo._obraIds.delete(93);
+    x.nombre = 'CUBIERTA Y';
+    assert.equal((await S.vistaObra(93, { repo })).hoja.id, null);
+    assert.equal(repo._hojas.find((h) => h.obra_id === '3G-26-0500').proyecto_nombre, 'CUBIERTA X');
+});
+
 // ---------- El cierre automático: CALIDAD_AVAL_CIERRA ----------
 
 test('cierre automático con las banderas apagadas: completarSubEtapaProduccion hace lo de hoy y no toca calidad', async () => {

@@ -258,10 +258,15 @@ const anotar = (repo, datos) => repo.anotarEvento({ origen: null, quien: null, .
 /**
  * La hoja de la obra, si ya tiene una. `escribir`: vuelve a ligarla si el renglón cambió (y lo anota en la bitácora).
  *   1. Por ID 3G (si la obra lo tiene): es la llave estable.
- *   2. Por proyecto_id con el mismo nombre. Si el nombre es otro: si otro proyecto activo tiene el nombre de la hoja, la
- *      hoja es de ese (el renglón se movió) y se le pasa; si nadie lo tiene, el proyecto cambió de nombre y se queda.
+ *   2. Por proyecto_id con el mismo nombre. Si el nombre es otro y otro proyecto activo tiene el nombre de la hoja, la
+ *      hoja es de ese (el renglón se movió) y se le pasa.
  *   3. Por nombre exacto (normalizado): una hoja con ese nombre cuyo proyecto ya no es suyo (no existe, está inactivo o
  *      ahora se llama distinto). Si hay más de una, no se adivina.
+ *   4. Solo si nada de lo anterior la encontró: la hoja de este renglón con otro nombre que ya nadie tiene puede ser un
+ *      cambio de nombre en el Índice… o el renglón de una obra que se borró y que ahora ocupa otra (el sync liga por
+ *      renglón). Por eso se pasa SOLO si no está avalada y no trae ID 3G: un aval es la firma de una obra y el ID 3G ya
+ *      la identifica; pasarlos a otra la dejaría cerrar sin su propia revisión (28-oct, revisión). En esos casos la obra
+ *      empieza una hoja nueva y la otra se conserva.
  */
 export const ligarHoja = async (obra, { repo = repoActivo, escribir = true } = {}) => {
     const clave = claveNombre(obra.nombre);
@@ -292,19 +297,13 @@ export const ligarHoja = async (obra, { repo = repoActivo, escribir = true } = {
         return mismaClave;
     }
     const otra = propias[0] || null;
+    // La hoja de este renglón con otro nombre que ya ningún proyecto activo tiene: quizá se renombró (paso 4)
+    let sinDueno = null;
     if (otra) {
         const duenos = await repo.proyectosActivosPorClave(otra.proyecto_clave, obra.id);
-        if (!duenos.length) {
-            // Mismo renglón, otro nombre: el proyecto se renombró en el Índice
-            if (escribir) {
-                const antes = otra.proyecto_nombre;
-                await repo.actualizarHoja(otra, { proyecto_nombre: obra.nombre, proyecto_clave: clave, ...(obra.obraId && !otra.obra_id ? { obra_id: obra.obraId } : {}) });
-                await anotar(repo, { hoja_id: otra.id, proyecto_id: obra.id, tipo: 'religo', detalle: `El proyecto cambió de nombre: «${antes}» → «${obra.nombre}»` });
-            }
-            return otra;
-        }
+        if (!duenos.length) sinDueno = otra;
         // El renglón se movió: la hoja es del proyecto que ahora tiene su nombre
-        if (escribir && duenos.length === 1) {
+        else if (escribir && duenos.length === 1) {
             await repo.actualizarHoja(otra, { proyecto_id: duenos[0].id });
             await anotar(repo, {
                 hoja_id: otra.id, proyecto_id: duenos[0].id, tipo: 'religo',
@@ -331,6 +330,19 @@ export const ligarHoja = async (obra, { repo = repoActivo, escribir = true } = {
         return h;
     }
     if (libres.length > 1) console.warn(`[calidad] «${obra.nombre}»: ${libres.length} hojas con ese nombre sin dueño; no se adivina cuál es`);
+    if (sinDueno) {
+        if (sinDueno.avalada_en || sinDueno.obra_id) {
+            console.warn(`[calidad] «${obra.nombre}» (renglón ${obra.id}): la hoja de «${sinDueno.proyecto_nombre}» ${sinDueno.avalada_en ? 'está avalada' : `trae el ID 3G ${sinDueno.obra_id}`}; no se pasa por un cambio de nombre (la obra empieza su propia hoja)`);
+            return null;
+        }
+        // Mismo renglón, otro nombre: el proyecto se renombró en el Índice
+        if (escribir) {
+            const antes = sinDueno.proyecto_nombre;
+            await repo.actualizarHoja(sinDueno, { proyecto_nombre: obra.nombre, proyecto_clave: clave, ...(obra.obraId ? { obra_id: obra.obraId } : {}) });
+            await anotar(repo, { hoja_id: sinDueno.id, proyecto_id: obra.id, tipo: 'religo', detalle: `El proyecto cambió de nombre: «${antes}» → «${obra.nombre}»` });
+        }
+        return sinDueno;
+    }
     return null;
 };
 
