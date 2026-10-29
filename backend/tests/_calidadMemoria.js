@@ -4,6 +4,8 @@
  * solo cuenta: así regresarEtapa, marcarPreparado y completarSubEtapaProduccion corren su lógica real.
  * Los únicos se respetan como en la base (cambio_id de eventos y puntos; hoja + punto).
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 const duplicado = (que) => Object.assign(new Error(`duplicado: ${que}`), { codigoDuplicado: true });
 // Como Postgres: findByPk(NaN) no regresa null, falla («column "nan" does not exist»); comprobado contra la base de prueba
 export const comoPostgres = (i) => {
@@ -22,9 +24,41 @@ export const crearRepoMemoria = (ProduccionProyecto) => {
     const eventos = [];
     const sugerencias = [];
     const guardados = [];
-    let enTx = false;
     let reloj = Date.parse('2026-10-28T15:00:00Z');
     const ahora = () => new Date((reloj += 1000));
+
+    // Como la transacción de Postgres: si `fn` falla, todo regresa a como estaba (hojas, puntos, eventos, sugerencias y los
+    // campos de los proyectos); los objetos se restauran en su lugar para que nadie quede con uno viejo.
+    const transaccion = async (fn) => {
+        const copia = (lista) => lista.map((x) => [x, { ...x }]);
+        const foto = { hojas: copia(hojas), puntos: copia(puntos), eventos: copia(eventos), sugerencias: copia(sugerencias), guardados: guardados.length };
+        const fotoProyectos = [...proyectos.values()].map((p) => [p, { ...p.dataValues }]);
+        const restaurar = (lista, f) => {
+            lista.length = 0;
+            for (const [x, antes] of f) {
+                for (const k of Object.keys(x)) if (!(k in antes)) delete x[k];
+                lista.push(Object.assign(x, antes));
+            }
+        };
+        try {
+            return await fn();
+        } catch (e) {
+            restaurar(hojas, foto.hojas);
+            restaurar(puntos, foto.puntos);
+            restaurar(eventos, foto.eventos);
+            restaurar(sugerencias, foto.sugerencias);
+            guardados.length = foto.guardados;
+            for (const [p, antes] of fotoProyectos) {
+                for (const k of Object.keys(p.dataValues)) if (!(k in antes)) delete p.dataValues[k];
+                Object.assign(p.dataValues, antes);
+            }
+            throw e;
+        }
+    };
+    // Las transacciones van de una en una (cola): así el fallo de una nunca deshace lo que otra ya guardó. La de adentro
+    // de otra (mismo contexto asíncrono) corre dentro de la de afuera, como en el servicio.
+    const txDoble = new AsyncLocalStorage();
+    let colaTx = Promise.resolve();
 
     const repo = {
         // ---- para armar los casos ----
@@ -41,37 +75,11 @@ export const crearRepoMemoria = (ProduccionProyecto) => {
             return p;
         },
         // ---- la forma de repoSequelize ----
-        // Como la transacción de Postgres: si `fn` falla, todo regresa a como estaba (hojas, puntos, eventos,
-        // sugerencias y los campos de los proyectos); los objetos se restauran en su lugar para que nadie quede con uno viejo.
         async enTransaccion(fn) {
-            if (enTx) return fn();
-            const copia = (lista) => lista.map((x) => [x, { ...x }]);
-            const foto = { hojas: copia(hojas), puntos: copia(puntos), eventos: copia(eventos), sugerencias: copia(sugerencias), guardados: guardados.length };
-            const fotoProyectos = [...proyectos.values()].map((p) => [p, { ...p.dataValues }]);
-            const restaurar = (lista, f) => {
-                lista.length = 0;
-                for (const [x, antes] of f) {
-                    for (const k of Object.keys(x)) if (!(k in antes)) delete x[k];
-                    lista.push(Object.assign(x, antes));
-                }
-            };
-            enTx = true;
-            try {
-                return await fn();
-            } catch (e) {
-                restaurar(hojas, foto.hojas);
-                restaurar(puntos, foto.puntos);
-                restaurar(eventos, foto.eventos);
-                restaurar(sugerencias, foto.sugerencias);
-                guardados.length = foto.guardados;
-                for (const [p, antes] of fotoProyectos) {
-                    for (const k of Object.keys(p.dataValues)) if (!(k in antes)) delete p.dataValues[k];
-                    Object.assign(p.dataValues, antes);
-                }
-                throw e;
-            } finally {
-                enTx = false;
-            }
+            if (txDoble.getStore()) return fn();
+            const turno = colaTx.then(() => txDoble.run(true, () => transaccion(fn)));
+            colaTx = turno.catch(() => {});
+            return turno;
         },
         async proyectoAlDia(i) { return proyectos.get(i) || null; },
         async proyectoPorId(i) { return proyectos.get(i) || null; },

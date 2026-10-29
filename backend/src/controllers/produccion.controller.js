@@ -5,7 +5,7 @@ import { festivosNegocio } from '../utils/calendarioLaboral.js';
 import { pronosticoParaTablero } from '../routes/sistemas/pronostico.js';
 import { obraIdsDeProyectos } from '../services/obraId.service.js';
 import { clasificarCodigo, contarTerminal, revisarAreaDeEtapa } from '../middleware/codigoTerminal.middleware.js';
-import { calidadDetieneCierre, anotarPreparadoManual, correccionesParaArea } from '../services/calidad.service.js';
+import { calidadDetieneCierre, proyectoCerradoPorElAval, anotarPreparadoManual, correccionesParaArea } from '../services/calidad.service.js';
 import { panelCalidad } from '../utils/banderasCalidad.js';
 import {
     avisarArchivosNuevos,
@@ -256,6 +256,15 @@ export const completarEtapa = async (req, res) => {
                 success: false,
                 codigo: 'ESPERA_CALIDAD',
                 message: 'La obra espera el aval de Calidad para pasar a Preparado.'
+            });
+        }
+        // 29-oct · El aval la pasó a Preparado mientras esta petición esperaba: no se avanza otra etapa ni se avisa otra vez.
+        // Apagada, proyectoCerradoPorElAval contesta null sin tocar la base.
+        if (proyecto.etapa_actual === 'produccion' && await proyectoCerradoPorElAval(proyecto)) {
+            return res.status(409).json({
+                success: false,
+                codigo: 'YA_PREPARADO',
+                message: 'La obra ya pasó a Preparado con el aval de Calidad.'
             });
         }
 
@@ -705,6 +714,7 @@ export const toggleEtapa = async (req, res) => {
         // NO usamos 'completado' aquí: ese estado está reservado para los
         // proyectos cerrados desde el índice (casilla E del Excel).
         let esperaCalidad = false;
+        let cerroElAval = false;
         if ((manDone && herDone) || proyecto.instalacion_completado_en) {
             nuevaEtapa = 'instalacion';
             // 28-oct · CALIDAD_AVAL_CIERRA: si llegó ahí sola (sin «Preparado» marcado), espera el aval de Calidad en
@@ -712,6 +722,15 @@ export const toggleEtapa = async (req, res) => {
             if (!proyecto.instalacion_completado_en && await calidadDetieneCierre(proyecto)) {
                 nuevaEtapa = 'produccion';
                 esperaCalidad = true;
+            } else if (!proyecto.instalacion_completado_en) {
+                // 29-oct · El aval la pasó a Preparado mientras tanto: se queda con su sello y «Proyecto completado» no
+                // sale otra vez (apagada, proyectoCerradoPorElAval contesta null sin tocar la base)
+                const enBase = await proyectoCerradoPorElAval(proyecto);
+                if (enBase) {
+                    proyecto.instalacion_completado_en = enBase.instalacion_completado_en;
+                    proyecto.instalacion_completado_por = enBase.instalacion_completado_por;
+                    cerroElAval = true;
+                }
             }
         }
         // Si alguna sub-etapa está marcada → Producción
@@ -749,7 +768,8 @@ export const toggleEtapa = async (req, res) => {
                 proyecto,
                 etapa: etapa === 'instalacion' ? null : etapa,
                 etapaNueva: nuevaEtapa,
-                etapaPrevia,
+                // Si ya la cerró el aval, «Proyecto completado» ya salió: solo se avisa la etapa que se marcó
+                etapaPrevia: cerroElAval ? 'instalacion' : etapaPrevia,
                 usuario: req.usuario?.nombre
             });
             // Con CALIDAD_AVAL_CIERRA el «Preparado» manual sigue funcionando y queda en la bitácora de calidad

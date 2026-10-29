@@ -193,6 +193,35 @@ test('Postgres: si el aval falla después de guardar la obra en Preparado, la ba
     assert.equal((await S.marcarPunto(q.id, 'M1', { estado: 'ok', cambioId: `${MARCA}-pm` }, ctx)).repetido, true);
 });
 
+test('Postgres: el aval y la terminal cierran la misma obra al mismo tiempo: se cierra una vez, con un solo «Proyecto completado»', { skip: SALTAR }, async () => {
+    banderas({ PANEL_CALIDAD: '1', CALIDAD_AVAL_CIERRA: '1' });
+    const avisos = [];
+    const ctxAviso = { ...ctx, avisar: async (d) => { avisos.push(d.proyecto); } };
+    for (let i = 0; i < 4; i++) {
+        const p = await nuevo({ nombre: `CARRERA ${i}`, manufactura_completado: true, herreria_armado_completado: true });
+        await llenar(p.id, { lleva_membrana: true, lleva_estructura: true, acabado_estructura: 'galvanizado' });
+        // La terminal de Herrería la tiene leída de antes (como la petición que llega con su propia copia)
+        const deLaTerminal = await ProduccionProyecto.findByPk(p.id);
+        const [aval, terminal] = await Promise.all([
+            S.avalar(p.id, { nombre: 'Charly' }, ctxAviso),
+            deLaTerminal.completarSubEtapaProduccion('herreria', null)
+        ]);
+        // La terminal cerró solo si ganó el candado con la hoja ya avalada… y entonces el aval no; o al revés. Nunca los dos.
+        const cierres = (aval.cierre?.cerro ? 1 : 0) + (terminal.autoAvanzado ? 1 : 0);
+        assert.equal(cierres, 1, `obra ${i}: aval cerro=${aval.cierre?.cerro} · terminal autoAvanzado=${terminal.autoAvanzado}`);
+        const enBase = await ProduccionProyecto.findByPk(p.id);
+        assert.equal(enBase.etapa_actual, 'instalacion');
+        assert.equal(enBase.herreria_completado, true);
+    }
+    assert.ok(avisos.length <= 4, 'el aval avisa a lo más una vez por obra');
+    // Apagada, la terminal cierra como hoy y no se lee nada de más
+    banderas({});
+    const q = await nuevo({ nombre: 'CARRERA APAGADA', manufactura_completado: true, herreria_armado_completado: true });
+    const r = await q.completarSubEtapaProduccion('herreria', null);
+    assert.equal(r.autoAvanzado, true);
+    assert.equal(await S.proyectoCerradoPorElAval(q), null);
+});
+
 test('Postgres: volver a ligar por ID 3G y por nombre con acentos (translate en SQL)', { skip: SALTAR }, async () => {
     banderas({ PANEL_CALIDAD: '1' });
     const obraId = `3G-26-${String(9000 + (process.pid % 999)).padStart(4, '0')}`;

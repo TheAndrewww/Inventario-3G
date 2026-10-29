@@ -657,7 +657,8 @@ export const avalar = async (ref, datos = {}, ctx = {}) => {
     const notaAval = textoLimpio(datos.nota, MAX_NOTA);
     const obra = await cargarObra(ref, { repo });
     if (!obra) falla(404, 'No existe esa obra (o ya no está activa).');
-    return conCandado(`obra:${obra.id}`, async () => {
+    let avisarCierre = false;
+    const respuesta = await conCandado(`obra:${obra.id}`, async () => {
         if (await cambioPrevio(repo, cambioId, { tipos: ['avalo'] })) return respuestaCambio(repo, obra, await ligarHoja(obra, { repo, escribir: false }), { repetido: true });
         const hoja = await hojaDeObra(obra, { repo });
         if (hoja.avalada_en) falla(409, 'La hoja ya está avalada.');
@@ -686,11 +687,13 @@ export const avalar = async (ref, datos = {}, ctx = {}) => {
             }
             throw e;
         }
-        // Lo de afuera de la base, ya guardado el aval: el aviso al grupo y el reporte
-        if (cierre?.cerro) await avisarCompletado(avisar, obra.proyecto);
+        avisarCierre = !!cierre?.cerro;
         try { encolarReporte(hoja.id); } catch (e) { console.error('[calidad] no se pudo encolar el reporte:', e.message); }
         return respuestaCambio(repo, obra, hoja, { cierre });
     });
+    // El aviso al grupo, ya guardado todo y fuera del candado: la terminal que espera esta obra no espera a WhatsApp
+    if (avisarCierre) await avisarCompletado(avisar, obra.proyecto);
+    return respuesta;
 };
 
 /**
@@ -787,6 +790,25 @@ export const calidadDetieneCierre = async (proyecto, { repo = repoActivo } = {})
     }
 };
 
+/**
+ * ¿El aval ya pasó esta obra a «Preparado» mientras quien llama la tenía leída de antes? (29-oct, revisión). Va justo
+ * después de calidadDetieneCierre === false: si la terminal terminó la última área mientras Charly avalaba, esperó el
+ * candado de la obra, encontró la hoja avalada y, con su copia vieja («produccion»), la habría cerrado y avisado otra
+ * vez. → el proyecto como está en la base si ya está en Preparado (o cerrado), o null. Solo con CALIDAD_AVAL_CIERRA
+ * (apagada: null sin tocar la base, como hoy). Si la lectura falla, null: cierra como siempre.
+ */
+export const proyectoCerradoPorElAval = async (proyecto, { repo = repoActivo } = {}) => {
+    if (!calidadAvalCierra() || !proyecto?.id) return null;
+    if (['instalacion', 'completado'].includes(proyecto.etapa_actual)) return null;
+    try {
+        const enBase = await repo.proyectoPorId(proyecto.id);
+        return enBase && enBase !== proyecto && ['instalacion', 'completado'].includes(enBase.etapa_actual) ? enBase : null;
+    } catch (e) {
+        console.error(`[calidad] no se pudo releer «${proyecto?.nombre}» después del aval:`, e.message);
+        return null;
+    }
+};
+
 /** El «Preparado» manual de la oficina con CALIDAD_AVAL_CIERRA: sigue funcionando y queda en la bitácora de calidad. */
 export const anotarPreparadoManual = async (proyecto, { quien = null, repo = repoActivo } = {}) => {
     if (!calidadAvalCierra()) return;
@@ -877,6 +899,9 @@ export const aplicarSugerencia = async (id, ctx = {}) => {
     const r = await marcarPunto(hoja.proyecto_id, s.punto_id, { estado: s.estado, nota, saleAsi: s.sale_asi === true, cuando: ahora }, {
         repo, ahora, quien: quien ? `Carla (lo aplicó ${quien})` : 'Carla', origen: 'carla'
     });
+    // El punto ya traía un cambio más nuevo (un reloj de tableta adelantado): no se aplicó y la sugerencia sigue pendiente.
+    // 409 para que la tableta lo diga en vez de darla por aplicada (queda en la bitácora como «llegó tarde»).
+    if (r.aplicado === false) falla(409, `No se aplicó: ${String(r.motivo || MOTIVO_TARDE).toLowerCase()}. Márcalo a mano o descarta la sugerencia.`);
     await repo.actualizarSugerencia(s, { estado_sugerencia: 'aplicada', resuelta_en: ahora, resuelta_por: quien });
     await anotar(repo, { hoja_id: hoja.id, proyecto_id: hoja.proyecto_id, tipo: 'sugerencia_aplicada', punto_id: s.punto_id, quien, origen, detalle: `Se aplicó lo que dijo la llamada: ${s.punto_id} ${s.estado}` });
     return { ...r, sugerencia: { id: s.id, estado: 'aplicada' } };
@@ -1141,7 +1166,7 @@ const encolarReportePorOmision = (hojaId) => {
 
 export default {
     panelCalidad, claveNombre, calcularHoja, cargarObra, ligarHoja, hojaDeObra, vistaObra, marcarPunto, cambiarAtributos,
-    avalar, reabrir, pasarAPreparadoPorAval, calidadDetieneCierre, anotarPreparadoManual, reabrirPorDefecto,
+    avalar, reabrir, pasarAPreparadoPorAval, calidadDetieneCierre, proyectoCerradoPorElAval, anotarPreparadoManual, reabrirPorDefecto,
     aplicarSugerencia, descartarSugerencia, recibirSugerencias, empatarHojas, calidadDeObras, correccionesParaArea,
     listarObras, configParaApp, repoSequelize
 };

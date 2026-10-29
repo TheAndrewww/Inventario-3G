@@ -680,6 +680,45 @@ test('sugerencias: se guardan por ID 3G o nombre exacto, sin obra quedan «sin_o
     assert.equal((await S.recibirSugerencias(null, { repo })).codigo, 400);
 });
 
+test('sugerencias: si el punto ya traía un cambio más nuevo, «Aplicar» contesta 409 y la sugerencia sigue pendiente', async () => {
+    repo.agregarProyecto({ id: 102, nombre: 'LONA RELOJ ADELANTADO' }, '3G-26-0502');
+    await S.cambiarAtributos(102, { atributos: SOLO_MEMBRANA }, ctx);
+    await S.recibirSugerencias({ fecha: '2026-10-28', llamadaId: 'llamada-reloj', sugerencias: [{ obraId: '3G-26-0502', punto: 'M1', estado: 'defecto', nota: 'Dice que hay un hilo suelto' }] }, { origen: 'operacion', repo });
+    const s = repo._sugerencias.at(-1);
+    // La tableta marcó M1 con su reloj 4 minutos adelantado (se acepta hasta 5): ese cambio es «más nuevo» que el de ahora
+    const ahora = new Date('2026-10-28T20:00:00Z');
+    await S.marcarPunto(102, 'M1', { estado: 'ok', cuando: new Date(ahora.getTime() + 4 * 60000).toISOString() }, { ...ctx, ahora });
+    await espera(() => S.aplicarSugerencia(s.id, { ...ctx, ahora, quien: 'Charly' }), 409, /No se aplicó: ya había un cambio más nuevo/);
+    assert.equal(s.estado_sugerencia, 'pendiente', 'antes quedaba «aplicada» sin haberse aplicado');
+    assert.equal(repo._puntos.find((x) => x.punto_id === 'M1').estado, 'ok');
+    assert.ok(repo._eventos.some((e) => e.tipo === 'marco_tarde' && e.punto_id === 'M1'), 'el intento queda en la bitácora');
+    assert.equal(repo._eventos.some((e) => e.tipo === 'sugerencia_aplicada'), false);
+    // Se puede descartar como siempre
+    assert.equal((await S.descartarSugerencia(s.id, ctx)).sugerencia.estado, 'descartada');
+});
+
+test('doble en memoria: el fallo de una obra no deshace lo que otra guardó al mismo tiempo (como Postgres)', async () => {
+    repo.agregarProyecto({ id: 103, nombre: 'OBRA QUE FALLA' });
+    repo.agregarProyecto({ id: 104, nombre: 'OBRA QUE SALE' });
+    await S.cambiarAtributos(103, { atributos: SOLO_MEMBRANA }, ctx);
+    await S.cambiarAtributos(104, { atributos: SOLO_MEMBRANA }, ctx);
+    const real = repo.guardarPunto;
+    repo.guardarPunto = async (hojaId, d) => {
+        if (d.cambio_id === 'falla-103') { await new Promise((r) => setTimeout(r, 30)); throw new Error('se cayó la base'); }
+        return real(hojaId, d);
+    };
+    const [a, b] = await Promise.allSettled([
+        S.marcarPunto(103, 'M1', { estado: 'ok', cambioId: 'falla-103' }, ctx),
+        S.marcarPunto(104, 'M1', { estado: 'ok', cambioId: 'sale-104' }, ctx)
+    ]);
+    repo.guardarPunto = real;
+    assert.equal(a.status, 'rejected');
+    assert.equal(b.value.punto.estado, 'ok');
+    assert.ok(repo._eventos.some((e) => e.cambio_id === 'sale-104'), 'el evento de la otra obra se quedó');
+    assert.ok(repo._puntos.some((x) => x.cambio_id === 'sale-104'), 'y su punto también');
+    assert.equal(repo._eventos.some((e) => e.cambio_id === 'falla-103'), false);
+});
+
 test('sugerencias: un cuerpo con una sugerencia mala no guarda ninguna, y el reenvío corregido de la misma llamada se guarda completo', async () => {
     repo.agregarProyecto({ id: 105, nombre: 'TOLDO TERRAZA' }, '3G-26-0505');
     await S.cambiarAtributos(105, { atributos: SOLO_MEMBRANA }, ctx);

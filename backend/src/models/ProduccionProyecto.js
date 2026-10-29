@@ -543,13 +543,16 @@ ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEt
     if (puedeAvanzar && this.etapa_actual !== 'instalacion' && this.etapa_actual !== 'completado') {
         // 28-oct · CALIDAD_AVAL_CIERRA: con la bandera la obra espera el aval de Calidad en producción («Espera
         // calidad») y la pasa el aval. Apagada, calidadDetieneCierre contesta false sin tocar la base: como hoy.
-        const { calidadDetieneCierre } = await import('../services/calidad.service.js');
+        const { calidadDetieneCierre, proyectoCerradoPorElAval } = await import('../services/calidad.service.js');
         if (await calidadDetieneCierre(this)) {
             esperaCalidad = true;
             if (this.etapa_actual !== 'produccion') {
                 this.etapa_actual = 'produccion';
                 await this.save();
             }
+        } else if (await proyectoCerradoPorElAval(this)) {
+            // 29-oct · el aval la pasó a Preparado mientras esta terminal esperaba: no se cierra ni se avisa otra vez
+            await this.reload();
         } else {
             this.etapa_actual = 'instalacion';
             this.instalacion_completado_en = ahora;

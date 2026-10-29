@@ -7,7 +7,7 @@ import {
     empatePorObra, columnaId3G, ultimaColumnaConEncabezado, letraColumna, renglonesBK, idsPorRenglon, guardarObraIdProyecto,
     obraIdsDeMes
 } from './obraId.service.js';
-import { calidadDetieneCierre } from './calidad.service.js';
+import { calidadDetieneCierre, proyectoCerradoPorElAval } from './calidad.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -310,6 +310,8 @@ export const recuperarPorSubetapas = async (existente, etapaFinalCambios, nombre
     if (ambasSubEtapasDone && etapaFinalCambios !== 'instalacion' && etapaFinalCambios !== 'completado') {
         if (!existente.instalacion_completado_en && await calidadDetieneCierre(existente)) {
             if (etapaFinalCambios !== 'produccion') cambios.etapa_actual = 'produccion';
+        } else if (!existente.instalacion_completado_en && await proyectoCerradoPorElAval(existente)) {
+            // 29-oct · el aval ya la pasó a Preparado mientras tanto: no hay nada que recuperar
         } else {
             cambios.etapa_actual = 'instalacion';
             if (!existente.instalacion_completado_en) cambios.instalacion_completado_en = new Date();
