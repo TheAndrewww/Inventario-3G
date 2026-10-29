@@ -102,9 +102,10 @@ export default function PedidosEncargadosPage() {
     }
   };
 
-  const botonBorrar = (s) => (esAdmin ? (
-    <Boton nivel="peligro" tamano="chico" icono={Trash2} alHacer={() => borrar(s)} deshabilitado={procesando === s.id}>Borrar</Boton>
-  ) : null);
+  // Borrar va en el «⋯» (la columna de acciones no cabe con un cuarto botón)
+  const masAcciones = esAdmin ? (s) => [
+    { texto: 'Borrar pedido', icono: Trash2, alHacer: () => borrar(s), peligro: true, deshabilitado: procesando === s.id },
+  ] : undefined;
 
   const acciones = (s) => (s.estado === 'pendiente' ? (
     <>
@@ -112,9 +113,8 @@ export default function PedidosEncargadosPage() {
         deshabilitado={procesando === s.id}>Surtido</Boton>
       <Boton nivel="contorno" tamano="chico" alHacer={() => responder(s, 'parcial')} deshabilitado={procesando === s.id}>Parcial</Boton>
       <Boton nivel="fantasma" tamano="chico" alHacer={() => responder(s, 'rechazada')} deshabilitado={procesando === s.id}>No se puede</Boton>
-      {botonBorrar(s)}
     </>
-  ) : botonBorrar(s));
+  ) : null);
 
   const estadoDe = (s) => {
     const [tono, texto] = ESTADO[s.estado] || ['neutro', s.estado];
@@ -146,6 +146,7 @@ export default function PedidosEncargadosPage() {
       <Pestanas etiqueta="Pedidos por estado" valor={pestana} alCambiar={setPestana}
         pestanas={PESTANAS.map((p) => ({ ...p, cuenta: p.id === 'pendiente' && pendientes != null ? pendientes : undefined }))} />
       <Tabla etiqueta="Pedidos" columnas={columnas} filas={solicitudes} clave="id" cargando={cargando && !solicitudes.length} accion={acciones}
+        masAcciones={masAcciones} nombreFila={(s) => `${titulo(s.encargado)}: ${s.texto}`}
         error={error && !cargando ? { mensaje: 'No se pudieron cargar los pedidos de los encargados.', motivo: error, alReintentar: () => cargar() } : undefined}
         filaCelular={(s) => ({
           principal: `${titulo(s.encargado)} · ${TIPO[s.tipo] || s.tipo}`,
