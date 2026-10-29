@@ -64,11 +64,18 @@ Entra la tableta con `Authorization: Bearer cal_…` (el token que recibió al v
 | `PUT /obras/:obra/atributos` · `PUT /obras/:obra/puntos/:punto` | con `cambioId` (el mismo dos veces responde igual sin repetir, también el «no aplicado» de uno que llegó tarde; el mismo `cambioId` en otro cambio da 409) y `cuando` (uno viejo no pisa a uno nuevo) |
 | `POST /obras/:obra/avalar` · `POST /obras/:obra/reabrir` | aval (hoja lista; Charly por omisión) y reabrir (con motivo; no descierra la obra) |
 | `GET /obras/:obra/reporte.pdf` | el reporte (vista previa si no está avalada) |
-| `POST /sugerencias/:id/aplicar` · `/descartar` | lo que dijo la llamada de las 16:00 |
+| `POST /sugerencias/:id/aplicar` · `/descartar` | lo que dijo la llamada de las 16:00 (si el punto ya traía un cambio más nuevo, «aplicar» da 409 y la sugerencia sigue pendiente) |
 | `POST /codigos` · `GET /dispositivos` · `POST /dispositivos/:id/revocar` | solo administración |
 
 Las escrituras pueden traer `proyecto` (el nombre que la tableta tiene guardado): si el renglón se movió responde 409
 `OBRA_CAMBIO` en vez de escribir en otra obra.
+
+Cada cambio se guarda completo o nada (29-oct): el evento con su `cambioId`, el punto o los atributos, el estado de la
+hoja y lo que se mueve de la obra (el paso a Preparado del aval, la subetapa que reabre un defecto) van en una
+transacción. Si algo falla a medio camino no queda nada y el reintento de la tableta lo aplica de nuevo. El aviso
+«Proyecto completado» y el reporte salen ya guardado el aval. Si la terminal termina la última área mientras se avala,
+la obra se cierra una sola vez (`proyectoCerradoPorElAval` en los cuatro cierres; la terminal sin sesión recibe 409
+`YA_PREPARADO`).
 
 ## Reporte de salida
 
