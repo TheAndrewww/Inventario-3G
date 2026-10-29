@@ -145,6 +145,54 @@ test('Postgres: el aval con CALIDAD_AVAL_CIERRA y la espera del cierre se guarda
     assert.equal(c, 0, 'apagada no escribe nada de calidad');
 });
 
+test('Postgres: si el aval falla después de guardar la obra en Preparado, la base deshace todo y el reintento con el mismo cambioId cierra', { skip: SALTAR }, async () => {
+    banderas({ PANEL_CALIDAD: '1', CALIDAD_AVAL_CIERRA: '1' });
+    const p = await nuevo({ nombre: 'AVAL A MEDIAS', tiene_manufactura: false, herreria_completado: true, herreria_armado_completado: true, herreria_pintado_completado: true });
+    await llenar(p.id, { lleva_membrana: false, lleva_estructura: true, acabado_estructura: 'galvanizado' });
+    // marcarPreparado sí escribe (UPDATE dentro de la transacción) y después algo truena: el peor caso
+    const real = ProduccionProyecto.prototype.marcarPreparado;
+    ProduccionProyecto.prototype.marcarPreparado = async function (...a) {
+        await real.apply(this, a);
+        throw new Error('se cayó la base después del UPDATE');
+    };
+    const cambioId = `${MARCA}-aval-medias`;
+    try {
+        await assert.rejects(() => S.avalar(p.id, { nombre: 'Charly', cambioId }, ctx), /después del UPDATE/);
+    } finally {
+        ProduccionProyecto.prototype.marcarPreparado = real;
+    }
+    const tras = await ProduccionProyecto.findByPk(p.id);
+    assert.equal(tras.etapa_actual, 'produccion', 'el UPDATE de produccion_proyectos se deshizo');
+    assert.equal(tras.instalacion_completado_en, null);
+    const [[h]] = await sequelize.query('SELECT estado, avalada_en FROM calidad_hojas WHERE proyecto_id = :id', { replacements: { id: p.id } });
+    assert.deepEqual(h, { estado: 'lista', avalada_en: null });
+    const [[{ n }]] = await sequelize.query('SELECT COUNT(*)::int AS n FROM calidad_eventos WHERE cambio_id = :c', { replacements: { c: cambioId } });
+    assert.equal(n, 0, 'el evento del aval tampoco quedó');
+    const r = await S.avalar(p.id, { nombre: 'Charly', cambioId }, ctx);
+    assert.deepEqual([r.repetido, r.cierre.cerro], [false, true]);
+    assert.equal((await ProduccionProyecto.findByPk(p.id)).etapa_actual, 'instalacion');
+    const otra = await S.avalar(p.id, { nombre: 'Charly', cambioId }, ctx);
+    assert.equal(otra.repetido, true);
+    // Lo mismo con un punto: el repetido del mismo cambioId en otra transacción se contesta «repetido», sin 500
+    const q = await nuevo({ nombre: 'PUNTO A MEDIAS', tiene_herreria: false });
+    await S.cambiarAtributos(q.id, { atributos: SOLO_MEMBRANA }, ctx);
+    const realGuardar = S.repoSequelize.guardarPunto;
+    S.repoSequelize.guardarPunto = async function (...a) {
+        await realGuardar.apply(this, a);
+        throw new Error('se cayó la base después del punto');
+    };
+    try {
+        await assert.rejects(() => S.marcarPunto(q.id, 'M1', { estado: 'ok', cambioId: `${MARCA}-pm` }, ctx), /después del punto/);
+    } finally {
+        S.repoSequelize.guardarPunto = realGuardar;
+    }
+    const [[{ np }]] = await sequelize.query('SELECT COUNT(*)::int AS np FROM calidad_puntos WHERE cambio_id = :c', { replacements: { c: `${MARCA}-pm` } });
+    assert.equal(np, 0);
+    const m = await S.marcarPunto(q.id, 'M1', { estado: 'ok', cambioId: `${MARCA}-pm` }, ctx);
+    assert.deepEqual([m.repetido, m.punto.estado], [false, 'ok']);
+    assert.equal((await S.marcarPunto(q.id, 'M1', { estado: 'ok', cambioId: `${MARCA}-pm` }, ctx)).repetido, true);
+});
+
 test('Postgres: volver a ligar por ID 3G y por nombre con acentos (translate en SQL)', { skip: SALTAR }, async () => {
     banderas({ PANEL_CALIDAD: '1' });
     const obraId = `3G-26-${String(9000 + (process.pid % 999)).padStart(4, '0')}`;

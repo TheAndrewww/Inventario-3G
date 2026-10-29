@@ -248,6 +248,98 @@ test('aval con CALIDAD_AVAL_CIERRA: pasa la obra a Preparado con la lógica del 
     assert.equal(avisos.length, 1);
 });
 
+/** Hace que la siguiente llamada a `obj[metodo]` falle una vez (como la base que se cae a medio camino). */
+const fallaUnaVez = (obj, metodo, texto = 'se cayó la base') => {
+    const real = obj[metodo];
+    obj[metodo] = async function (...a) {
+        obj[metodo] = real;
+        throw new Error(texto);
+    };
+};
+
+test('aval con CALIDAD_AVAL_CIERRA: si el paso a Preparado falla no queda nada a medias, y el reintento con el mismo cambioId cierra (un aviso)', async () => {
+    banderas({ PANEL_CALIDAD: '1', CALIDAD_AVAL_CIERRA: '1' });
+    const p = repo.agregarProyecto({ id: 8, nombre: 'ESTRUCTURA ATORADA', tiene_manufactura: false, herreria_completado: true, herreria_armado_completado: true, herreria_pintado_completado: true, etapa_actual: 'produccion' });
+    await llenar(8, { lleva_membrana: false, lleva_estructura: true, acabado_estructura: 'galvanizado' });
+    fallaUnaVez(p, 'save');
+    await assert.rejects(() => S.avalar(8, { nombre: 'Charly', cambioId: 'tab1-aval-8' }, ctx), /se cayó la base/);
+    const hoja = repo._hojas.find((h) => h.proyecto_id === 8);
+    assert.equal(hoja.avalada_en ?? null, null, 'la hoja no quedó avalada');
+    assert.equal(hoja.estado, 'lista');
+    assert.equal(repo._eventos.some((e) => e.cambio_id === 'tab1-aval-8' || e.tipo === 'cerro_produccion'), false, 'ni el aval ni el cierre quedaron en la bitácora');
+    assert.equal(p.etapa_actual, 'produccion');
+    assert.equal(p.instalacion_completado_en ?? null, null);
+    assert.equal(p.manufactura_completado, false, 'lo que marcarPreparado alcanzó a cambiar también se deshizo');
+    assert.deepEqual([avisos, reportes], [[], []], 'sin aviso ni reporte de algo que no se guardó');
+    // Antes, este reintento contestaba «repetido» y la obra se quedaba esperando para siempre
+    const r = await S.avalar(8, { nombre: 'Charly', cambioId: 'tab1-aval-8' }, ctx);
+    assert.equal(r.repetido, false);
+    assert.deepEqual(r.cierre, { cerro: true, etapaAntes: 'produccion', etapa: 'instalacion' });
+    assert.equal(r.hoja.estado, 'avalada');
+    assert.equal(p.etapa_actual, 'instalacion');
+    const r2 = await S.avalar(8, { nombre: 'Charly', cambioId: 'tab1-aval-8' }, ctx);
+    assert.equal(r2.repetido, true);
+    assert.deepEqual(avisos, [{ proyecto: 'ESTRUCTURA ATORADA' }], 'un solo aviso');
+    assert.equal(reportes.length, 1);
+    // Si lo que falla es la bitácora del cierre, la obra tampoco queda en Preparado
+    const q = repo.agregarProyecto({ id: 18, nombre: 'BITACORA CAIDA', tiene_manufactura: false, herreria_completado: true, herreria_armado_completado: true, herreria_pintado_completado: true, etapa_actual: 'produccion' });
+    await llenar(18, { lleva_membrana: false, lleva_estructura: true, acabado_estructura: 'galvanizado' });
+    const anotarReal = repo.anotarEvento;
+    repo.anotarEvento = async (d) => { if (d.tipo === 'cerro_produccion') throw new Error('se cayó la base'); return anotarReal(d); };
+    await assert.rejects(() => S.avalar(18, { nombre: 'Charly', cambioId: 'tab1-aval-18' }, ctx), /se cayó la base/);
+    repo.anotarEvento = anotarReal;
+    assert.equal(q.etapa_actual, 'produccion');
+    assert.equal(repo._hojas.find((h) => h.proyecto_id === 18).avalada_en ?? null, null);
+    assert.equal(avisos.length, 1);
+});
+
+test('aval: si otra cosa ya pasó la obra a Preparado mientras tanto, el aval no la vuelve a cerrar ni avisa otra vez', async () => {
+    banderas({ PANEL_CALIDAD: '1', CALIDAD_AVAL_CIERRA: '1' });
+    const p = repo.agregarProyecto({ id: 9, nombre: 'CERRADA A MANO', tiene_manufactura: false, herreria_completado: true, herreria_armado_completado: true, herreria_pintado_completado: true, etapa_actual: 'produccion' });
+    await llenar(9, { lleva_membrana: false, lleva_estructura: true, acabado_estructura: 'galvanizado' });
+    const cuando = new Date('2026-10-28T19:00:00Z');
+    // La obra que leyó el aval dice «produccion»; en la base ya está en Preparado (la oficina la cerró a mano en ese momento)
+    repo.proyectoAlDia = async (i) => {
+        const fresco = ProduccionProyecto.build({ ...repo._proyectos.get(i).dataValues, etapa_actual: 'instalacion', instalacion_completado_en: cuando }, { isNewRecord: false });
+        fresco.save = async () => { throw new Error('no debía guardarse'); };
+        return fresco;
+    };
+    const r = await S.avalar(9, { nombre: 'Charly' }, ctx);
+    assert.deepEqual(r.cierre, { cerro: false, etapa: 'instalacion' });
+    assert.equal(r.hoja.estado, 'avalada');
+    assert.equal(r.obra.etapa, 'instalacion', 'la respuesta dice cómo está ahora');
+    assert.deepEqual(avisos, []);
+    assert.equal(repo._eventos.some((e) => e.tipo === 'cerro_produccion'), false);
+    assert.equal(p.instalacion_completado_en ?? null, null, 'no se tocó la obra');
+});
+
+test('punto y qué lleva: si guardar falla a medio camino no queda el evento, y el reintento con el mismo cambioId lo aplica', async () => {
+    banderas({ PANEL_CALIDAD: '1', CALIDAD_DEFECTO_REABRE: '1' });
+    const p = repo.agregarProyecto({ id: 10, nombre: 'LONA CAIDA', tiene_herreria: false, manufactura_completado: true });
+    fallaUnaVez(repo, 'actualizarHoja');
+    await assert.rejects(() => S.cambiarAtributos(10, { atributos: SOLO_MEMBRANA, cambioId: 'tab1-attr-10' }, ctx), /se cayó la base/);
+    assert.equal(repo._eventos.some((e) => e.cambio_id === 'tab1-attr-10'), false);
+    const a = await S.cambiarAtributos(10, { atributos: SOLO_MEMBRANA, cambioId: 'tab1-attr-10' }, ctx);
+    assert.equal(a.repetido, false);
+    assert.equal(a.hoja.faltanAtributos, false);
+
+    fallaUnaVez(repo, 'guardarPunto');
+    await assert.rejects(() => S.marcarPunto(10, 'M1', { estado: 'ok', cambioId: 'tab1-p-10' }, ctx), /se cayó la base/);
+    assert.equal(repo._eventos.some((e) => e.cambio_id === 'tab1-p-10'), false, 'antes quedaba el evento sin el punto y el reintento decía «repetido»');
+    const b = await S.marcarPunto(10, 'M1', { estado: 'ok', cambioId: 'tab1-p-10' }, ctx);
+    assert.deepEqual([b.repetido, b.aplicado, b.punto.estado], [false, true, 'ok']);
+
+    // Un defecto que reabre manufactura: si guardar la obra falla, ni el punto ni la reapertura quedan
+    fallaUnaVez(p, 'save');
+    await assert.rejects(() => S.marcarPunto(10, 'M2', { estado: 'defecto', nota: 'Costura abierta', cambioId: 'tab1-p-11' }, ctx), /se cayó la base/);
+    assert.equal(repo._puntos.some((x) => x.punto_id === 'M2'), false);
+    assert.equal(repo._eventos.some((e) => e.cambio_id === 'tab1-p-11' || e.tipo === 'defecto_reabrio'), false);
+    assert.equal(p.manufactura_completado, true, 'manufactura sigue terminada');
+    const c = await S.marcarPunto(10, 'M2', { estado: 'defecto', nota: 'Costura abierta', cambioId: 'tab1-p-11' }, ctx);
+    assert.equal(c.reabrio.area, 'manufactura');
+    assert.equal(p.manufactura_completado, false);
+});
+
 test('reabrir: pide motivo, quita el aval y con CALIDAD_AVAL_CIERRA no descierra la obra (lo anota)', async () => {
     banderas({ PANEL_CALIDAD: '1', CALIDAD_AVAL_CIERRA: '1' });
     const p = repo.agregarProyecto({ id: 8, nombre: 'CUBIERTA ALBERCA', tiene_herreria: false, manufactura_completado: true, etapa_actual: 'produccion' });

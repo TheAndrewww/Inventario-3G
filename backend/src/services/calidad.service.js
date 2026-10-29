@@ -17,6 +17,7 @@
  * La base se usa por medio de `repo` (repoSequelize aquí; en las pruebas, uno en memoria con la misma forma), para que
  * la lógica se pruebe sin Postgres y también contra un Postgres de verdad.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { ProduccionProyecto } from '../models/index.js';
@@ -62,57 +63,73 @@ const textoLimpio = (v, max) => {
 // con claveNombre). translate cubre las vocales acentuadas del español y la ñ.
 const SQL_CLAVE = `btrim(regexp_replace(translate(lower(nombre), 'áéíóúüñàèìòùâêîôûäëïö', 'aeiouunaeiouaeiouaeio'), '\\s+', ' ', 'g'))`;
 
+// La transacción en curso de un cambio (avalar, marcar un punto, qué lleva). Cada consulta de repoSequelize la toma de
+// aquí: dentro de enTransaccion todo va por la misma conexión (ve lo que ya escribió y no se espera a sí misma); fuera,
+// conTx() no agrega nada y la consulta es la de siempre.
+const txCalidad = new AsyncLocalStorage();
+const conTx = (opciones = {}) => {
+    const t = txCalidad.getStore();
+    return t ? { ...opciones, transaction: t } : opciones;
+};
+
 export const repoSequelize = {
-    async proyectoPorId(id) { return ProduccionProyecto.findByPk(id); },
+    /** Todo lo de `fn` se guarda junto o nada (si algo falla, Postgres deshace lo anterior). */
+    async enTransaccion(fn) {
+        if (txCalidad.getStore()) return fn();
+        return sequelize.transaction((t) => txCalidad.run(t, fn));
+    },
+    async proyectoPorId(id) { return ProduccionProyecto.findByPk(id, conTx()); },
+    /** El proyecto como está en la base, apartado (FOR UPDATE) hasta que termine la transacción del cambio. */
+    async proyectoAlDia(id) { return ProduccionProyecto.findByPk(id, conTx(txCalidad.getStore() ? { lock: true } : {})); },
     async proyectoPorObraId(obraId) {
         const [filas] = await sequelize.query(
             'SELECT id FROM produccion_proyectos WHERE obra_id = :obraId AND activo = true ORDER BY id DESC LIMIT 2',
-            { replacements: { obraId } }
+            conTx({ replacements: { obraId } })
         );
         if (filas.length !== 1) return null; // ninguno, o dos activos con el mismo ID (el sync no lo permite): no se adivina
-        return ProduccionProyecto.findByPk(filas[0].id);
+        return ProduccionProyecto.findByPk(filas[0].id, conTx());
     },
     async obraIdDe(id) { return (await obraIdsDeProyectos([id])).get(id) || null; },
     async proyectoResumen(id) {
-        const p = await ProduccionProyecto.findByPk(id, { attributes: ['id', 'nombre', 'activo'] });
+        const p = await ProduccionProyecto.findByPk(id, conTx({ attributes: ['id', 'nombre', 'activo'] }));
         return p ? { id: p.id, nombre: p.nombre, activo: p.activo } : null;
     },
     async proyectosActivosPorClave(clave, exceptoId = null) {
         const [filas] = await sequelize.query(
             `SELECT id, nombre FROM produccion_proyectos WHERE activo = true AND ${SQL_CLAVE} = :clave${exceptoId ? ' AND id <> :exceptoId' : ''}`,
-            { replacements: { clave, exceptoId } }
+            conTx({ replacements: { clave, exceptoId } })
         );
         return filas.filter((f) => claveNombre(f.nombre) === clave);
     },
-    async hojaPorId(id) { return CalidadHoja.findByPk(id); },
-    async hojaPorObraId(obraId) { return CalidadHoja.findOne({ where: { obra_id: obraId }, order: [['id', 'ASC']] }); },
-    async hojasPorProyectoId(id) { return CalidadHoja.findAll({ where: { proyecto_id: id }, order: [['id', 'ASC']] }); },
-    async hojasPorClave(clave) { return CalidadHoja.findAll({ where: { proyecto_clave: clave }, order: [['id', 'ASC']] }); },
+    async hojaPorId(id) { return CalidadHoja.findByPk(id, conTx()); },
+    async hojaPorObraId(obraId) { return CalidadHoja.findOne(conTx({ where: { obra_id: obraId }, order: [['id', 'ASC']] })); },
+    async hojasPorProyectoId(id) { return CalidadHoja.findAll(conTx({ where: { proyecto_id: id }, order: [['id', 'ASC']] })); },
+    async hojasPorClave(clave) { return CalidadHoja.findAll(conTx({ where: { proyecto_clave: clave }, order: [['id', 'ASC']] })); },
     async hojasDeObras({ ids = [], obraIds = [], claves = [] }) {
         const o = [];
         if (ids.length) o.push({ proyecto_id: { [Op.in]: ids } });
         if (obraIds.length) o.push({ obra_id: { [Op.in]: obraIds } });
         if (claves.length) o.push({ proyecto_clave: { [Op.in]: claves } });
         if (!o.length) return [];
-        return CalidadHoja.findAll({ where: { [Op.or]: o }, order: [['id', 'ASC']] });
+        return CalidadHoja.findAll(conTx({ where: { [Op.or]: o }, order: [['id', 'ASC']] }));
     },
     async hojasAvaladasDesde(desde) {
-        return CalidadHoja.findAll({ where: { avalada_en: { [Op.gte]: desde } }, order: [['avalada_en', 'DESC']], limit: 200 });
+        return CalidadHoja.findAll(conTx({ where: { avalada_en: { [Op.gte]: desde } }, order: [['avalada_en', 'DESC']], limit: 200 }));
     },
-    async crearHoja(datos) { return CalidadHoja.create(datos); },
-    async actualizarHoja(hoja, cambios) { return hoja.update(cambios); },
-    async puntos(hojaId) { return CalidadPunto.findAll({ where: { hoja_id: hojaId }, order: [['id', 'ASC']] }); },
-    async puntosDeHojas(ids) { return ids.length ? CalidadPunto.findAll({ where: { hoja_id: { [Op.in]: ids } } }) : []; },
+    async crearHoja(datos) { return CalidadHoja.create(datos, conTx()); },
+    async actualizarHoja(hoja, cambios) { return hoja.update(cambios, conTx()); },
+    async puntos(hojaId) { return CalidadPunto.findAll(conTx({ where: { hoja_id: hojaId }, order: [['id', 'ASC']] })); },
+    async puntosDeHojas(ids) { return ids.length ? CalidadPunto.findAll(conTx({ where: { hoja_id: { [Op.in]: ids } } })) : []; },
     async guardarPunto(hojaId, datos) {
-        const fila = await CalidadPunto.findOne({ where: { hoja_id: hojaId, punto_id: datos.punto_id } });
-        if (fila) return fila.update(datos);
-        return CalidadPunto.create({ hoja_id: hojaId, ...datos });
+        const fila = await CalidadPunto.findOne(conTx({ where: { hoja_id: hojaId, punto_id: datos.punto_id } }));
+        if (fila) return fila.update(datos, conTx());
+        return CalidadPunto.create({ hoja_id: hojaId, ...datos }, conTx());
     },
-    async eventoPorCambioId(cambioId) { return CalidadEvento.findOne({ where: { cambio_id: cambioId } }); },
-    async anotarEvento(datos) { return CalidadEvento.create(datos); },
-    async borrarEvento(id) { await CalidadEvento.destroy({ where: { id } }); },
+    async eventoPorCambioId(cambioId) { return CalidadEvento.findOne(conTx({ where: { cambio_id: cambioId } })); },
+    async anotarEvento(datos) { return CalidadEvento.create(datos, conTx()); },
+    async borrarEvento(id) { await CalidadEvento.destroy(conTx({ where: { id } })); },
     async eventos(hojaId, limite = 20) {
-        return CalidadEvento.findAll({ where: { hoja_id: hojaId }, order: [['created_at', 'DESC'], ['id', 'DESC']], limit: limite });
+        return CalidadEvento.findAll(conTx({ where: { hoja_id: hojaId }, order: [['created_at', 'DESC'], ['id', 'DESC']], limit: limite }));
     },
     async sugerenciasPendientes(hojaIds) {
         return hojaIds.length ? CalidadSugerencia.findAll({ where: { hoja_id: { [Op.in]: hojaIds }, estado_sugerencia: 'pendiente' }, order: [['id', 'ASC']] }) : [];
@@ -490,6 +507,22 @@ const comoRepetido = (e) => (e?.tipo === 'marco_tarde' ? { repetido: true, aplic
 
 const esDuplicado = (e) => e?.name === 'SequelizeUniqueConstraintError' || e?.codigoDuplicado === true;
 
+/**
+ * Un cambio se guarda completo o no se guarda (29-oct, revisión): si algo falla a medio camino, el evento con su cambioId
+ * tampoco queda, y el reintento de la tableta lo aplica de nuevo en vez de contestar «repetido» sobre algo a medias.
+ * Un único repetido dentro de la transacción la deja inservible en Postgres: se marca en qué paso fue (`paso`) y se
+ * resuelve afuera, ya deshecha.
+ */
+const enTransaccion = (repo, fn) => (repo.enTransaccion ? repo.enTransaccion(fn) : fn());
+const marcarPaso = async (paso, fn) => {
+    try {
+        return await fn();
+    } catch (e) {
+        if (esDuplicado(e)) e.pasoCalidad = paso;
+        throw e;
+    }
+};
+
 /** La respuesta de cualquier cambio: cómo quedó la hoja (y el punto, si fue un punto). */
 const respuestaCambio = async (repo, obra, hoja, extra = {}, puntoId = null) => {
     const puntos = hoja ? await repo.puntos(hoja.id) : [];
@@ -545,35 +578,35 @@ export const marcarPunto = async (ref, puntoIdCrudo, datos = {}, ctx = {}) => {
         const fila = (await repo.puntos(hoja.id)).find((p) => p.punto_id === def.punto.id) || null;
         const antes = { estado: fila?.estado || 'pendiente', saleAsi: !!fila?.sale_asi };
         const tarde = fila?.actualizado_en && new Date(fila.actualizado_en).getTime() > cuando.getTime();
-        let evento;
+        let reabrio = null;
         try {
-            evento = await anotar(repo, {
-                hoja_id: hoja.id, proyecto_id: obra.id, tipo: tarde ? 'marco_tarde' : 'marco', punto_id: def.punto.id,
-                detalle: tarde
-                    ? `${def.punto.id}: llegó tarde «${ESTADO_EN_PALABRAS[estado]}» (ya había un cambio más nuevo); no se aplicó`
-                    : `${def.punto.id}: ${ESTADO_EN_PALABRAS[antes.estado] || antes.estado} → ${ESTADO_EN_PALABRAS[estado]}${saleAsi ? ' (sale así)' : ''}${nota ? ` · ${nota}` : ''}`,
-                quien, origen, cambio_id: cambioId, datos: { estado, nota, saleAsi, cuando: cuando.toISOString() }
+            // El evento, el punto, el estado de la hoja y la subetapa reabierta: juntos o nada
+            await enTransaccion(repo, async () => {
+                await marcarPaso('evento', () => anotar(repo, {
+                    hoja_id: hoja.id, proyecto_id: obra.id, tipo: tarde ? 'marco_tarde' : 'marco', punto_id: def.punto.id,
+                    detalle: tarde
+                        ? `${def.punto.id}: llegó tarde «${ESTADO_EN_PALABRAS[estado]}» (ya había un cambio más nuevo); no se aplicó`
+                        : `${def.punto.id}: ${ESTADO_EN_PALABRAS[antes.estado] || antes.estado} → ${ESTADO_EN_PALABRAS[estado]}${saleAsi ? ' (sale así)' : ''}${nota ? ` · ${nota}` : ''}`,
+                    quien, origen, cambio_id: cambioId, datos: { estado, nota, saleAsi, cuando: cuando.toISOString() }
+                }));
+                if (tarde) return;
+                await marcarPaso('punto', () => repo.guardarPunto(hoja.id, {
+                    hoja: def.hoja.id, punto_id: def.punto.id, estado,
+                    nota: estado === 'pendiente' ? null : nota, sale_asi: saleAsi,
+                    actualizado_por: quien, actualizado_en: cuando, origen, cambio_id: cambioId
+                }));
+                await recalcular(repo, hoja);
+                const nuevoDefecto = estado === 'defecto' && !saleAsi && !(antes.estado === 'defecto' && !antes.saleAsi);
+                if (nuevoDefecto && calidadDefectoReabre()) reabrio = await reabrirPorDefecto(obra, hoja, def, { repo, ahora, quien, origen });
             });
         } catch (e) {
-            if (esDuplicado(e)) return respuestaCambio(repo, obra, hoja, comoRepetido(await cambioPrevio(repo, cambioId, comoPunto)), def.punto.id);
+            if (e.pasoCalidad === 'evento') {
+                return respuestaCambio(repo, obra, await ligarHoja(obra, { repo, escribir: false }), comoRepetido(await cambioPrevio(repo, cambioId, comoPunto)), def.punto.id);
+            }
+            if (e.pasoCalidad === 'punto') falla(409, 'Ese cambioId ya se usó en otro punto.');
             throw e;
         }
         if (tarde) return respuestaCambio(repo, obra, hoja, { aplicado: false, motivo: MOTIVO_TARDE }, def.punto.id);
-        try {
-            await repo.guardarPunto(hoja.id, {
-                hoja: def.hoja.id, punto_id: def.punto.id, estado,
-                nota: estado === 'pendiente' ? null : nota, sale_asi: saleAsi,
-                actualizado_por: quien, actualizado_en: cuando, origen, cambio_id: cambioId
-            });
-        } catch (e) {
-            await repo.borrarEvento(evento.id).catch(() => {});
-            if (esDuplicado(e)) falla(409, 'Ese cambioId ya se usó en otro punto.');
-            throw e;
-        }
-        await recalcular(repo, hoja);
-        let reabrio = null;
-        const nuevoDefecto = estado === 'defecto' && !saleAsi && !(antes.estado === 'defecto' && !antes.saleAsi);
-        if (nuevoDefecto && calidadDefectoReabre()) reabrio = await reabrirPorDefecto(obra, hoja, def, { repo, ahora, quien, origen });
         return respuestaCambio(repo, obra, hoja, reabrio ? { reabrio } : {}, def.punto.id);
     });
 };
@@ -591,16 +624,20 @@ export const cambiarAtributos = async (ref, datos = {}, ctx = {}) => {
         const m = mezclarAtributos(datos.atributos, hoja.atributos);
         if (m.error) falla(400, m.error);
         try {
-            await anotar(repo, {
-                hoja_id: hoja.id, proyecto_id: obra.id, tipo: 'atributos', quien, origen, cambio_id: cambioId,
-                detalle: 'Cambió qué lleva la obra', datos: { antes: hoja.atributos || null, despues: m.atributos }
+            await enTransaccion(repo, async () => {
+                await marcarPaso('evento', () => anotar(repo, {
+                    hoja_id: hoja.id, proyecto_id: obra.id, tipo: 'atributos', quien, origen, cambio_id: cambioId,
+                    detalle: 'Cambió qué lleva la obra', datos: { antes: hoja.atributos || null, despues: m.atributos }
+                }));
+                await repo.actualizarHoja(hoja, { atributos: m.atributos, version_config: VERSION_CONFIG });
+                await recalcular(repo, hoja);
             });
         } catch (e) {
-            if (esDuplicado(e) && await cambioPrevio(repo, cambioId, { tipos: ['atributos'] })) return respuestaCambio(repo, obra, hoja, { repetido: true });
+            if (e.pasoCalidad === 'evento' && await cambioPrevio(repo, cambioId, { tipos: ['atributos'] })) {
+                return respuestaCambio(repo, obra, await ligarHoja(obra, { repo, escribir: false }), { repetido: true });
+            }
             throw e;
         }
-        await repo.actualizarHoja(hoja, { atributos: m.atributos, version_config: VERSION_CONFIG });
-        await recalcular(repo, hoja);
         return respuestaCambio(repo, obra, hoja);
     });
 };
@@ -626,22 +663,31 @@ export const avalar = async (ref, datos = {}, ctx = {}) => {
         if (hoja.avalada_en) falla(409, 'La hoja ya está avalada.');
         const calc = calcularHoja(hoja, await repo.puntos(hoja.id));
         if (!calc.listaParaAvalar) falla(409, `Todavía no se puede avalar: ${calc.porQueNo.join('; ')}.`, { porQueNo: calc.porQueNo });
+        let cierre = null;
         try {
-            await anotar(repo, {
-                hoja_id: hoja.id, proyecto_id: obra.id, tipo: 'avalo', quien: quien || nombre, origen, cambio_id: cambioId,
-                detalle: `Avaló ${nombre}${observaciones ? ` · Para instalación: ${observaciones}` : ''}`
+            // El aval, su evento y (con CALIDAD_AVAL_CIERRA) el paso a «Preparado»: juntos o nada. Si el cierre falla, la
+            // hoja no queda avalada y el reintento de la tableta vuelve a intentar todo (antes quedaba avalada, la obra
+            // esperando y el reintento contestaba «repetido» sin cerrarla).
+            cierre = await enTransaccion(repo, async () => {
+                await marcarPaso('evento', () => anotar(repo, {
+                    hoja_id: hoja.id, proyecto_id: obra.id, tipo: 'avalo', quien: quien || nombre, origen, cambio_id: cambioId,
+                    detalle: `Avaló ${nombre}${observaciones ? ` · Para instalación: ${observaciones}` : ''}`
+                }));
+                await repo.actualizarHoja(hoja, {
+                    estado: 'avalada', avalada_en: ahora, avalada_por: nombre, aval_nota: notaAval, observaciones_instalacion: observaciones,
+                    version_config: VERSION_CONFIG,
+                    reporte_estado: 'pendiente', reporte_intentos: 0, reporte_siguiente_intento: null, reporte_error: null
+                });
+                return calidadAvalCierra() ? pasarAPreparadoPorAval(obra, { usuarioId, avisar: null, repo, hoja, quien: quien || nombre, origen }) : null;
             });
         } catch (e) {
-            if (esDuplicado(e) && await cambioPrevio(repo, cambioId, { tipos: ['avalo'] })) return respuestaCambio(repo, obra, hoja, { repetido: true });
+            if (e.pasoCalidad === 'evento' && await cambioPrevio(repo, cambioId, { tipos: ['avalo'] })) {
+                return respuestaCambio(repo, obra, await ligarHoja(obra, { repo, escribir: false }), { repetido: true });
+            }
             throw e;
         }
-        await repo.actualizarHoja(hoja, {
-            estado: 'avalada', avalada_en: ahora, avalada_por: nombre, aval_nota: notaAval, observaciones_instalacion: observaciones,
-            version_config: VERSION_CONFIG,
-            reporte_estado: 'pendiente', reporte_intentos: 0, reporte_siguiente_intento: null, reporte_error: null
-        });
-        let cierre = null;
-        if (calidadAvalCierra()) cierre = await pasarAPreparadoPorAval(obra, { usuarioId, avisar, repo, hoja, quien: quien || nombre, origen });
+        // Lo de afuera de la base, ya guardado el aval: el aviso al grupo y el reporte
+        if (cierre?.cerro) await avisarCompletado(avisar, obra.proyecto);
         try { encolarReporte(hoja.id); } catch (e) { console.error('[calidad] no se pudo encolar el reporte:', e.message); }
         return respuestaCambio(repo, obra, hoja, { cierre });
     });
@@ -679,22 +725,38 @@ const avisoPorOmision = async ({ proyecto }) => {
     return avisarProyectoCompletado({ proyecto });
 };
 
-/**
- * Con CALIDAD_AVAL_CIERRA: la obra pasa a «Preparado» al avalar, con la lógica del «Preparado» manual
- * (ProduccionProyecto.marcarPreparado) y el aviso de siempre al grupo («Proyecto completado»). Si ya estaba en
- * Preparado o cerrada en el Índice no se toca.
- */
-export const pasarAPreparadoPorAval = async (obra, { usuarioId = null, avisar = avisoPorOmision, repo = repoActivo, hoja = null, quien = null, origen = null } = {}) => {
-    const p = obra.proyecto;
-    const antes = p.etapa_actual;
-    if (['instalacion', 'completado'].includes(antes)) return { cerro: false, etapa: antes };
-    await p.marcarPreparado(usuarioId);
-    if (hoja) await anotar(repo, { hoja_id: hoja.id, proyecto_id: obra.id, tipo: 'cerro_produccion', quien, origen, detalle: `Con el aval, la obra pasó de ${antes} a Preparado` });
+const avisarCompletado = async (avisar, p) => {
     try {
         await avisar({ proyecto: p.nombre });
     } catch (e) {
         console.error('⚠️ No se pudo avisar al grupo de producción:', e.message);
     }
+};
+
+/**
+ * El proyecto de la obra como está ahora en la base (dentro de la transacción, apartado hasta que termine): si entre
+ * que se leyó la obra y este cambio otra cosa la movió (el «Preparado» manual, la terminal, el Excel), se decide con lo
+ * de ahora y no con lo de antes. Queda en obra.proyecto para la respuesta.
+ */
+const proyectoAlDia = async (repo, obra) => {
+    const p = (repo.proyectoAlDia ? await repo.proyectoAlDia(obra.proyecto.id) : null) || obra.proyecto;
+    obra.proyecto = p;
+    return p;
+};
+
+/**
+ * Con CALIDAD_AVAL_CIERRA: la obra pasa a «Preparado» al avalar, con la lógica del «Preparado» manual
+ * (ProduccionProyecto.marcarPreparado) y el aviso de siempre al grupo («Proyecto completado»). Si ya estaba en
+ * Preparado o cerrada en el Índice no se toca. El aval la llama dentro de su transacción con `avisar: null` y avisa él
+ * mismo ya guardado todo (un aviso no se puede deshacer).
+ */
+export const pasarAPreparadoPorAval = async (obra, { usuarioId = null, avisar = avisoPorOmision, repo = repoActivo, hoja = null, quien = null, origen = null } = {}) => {
+    const p = await proyectoAlDia(repo, obra);
+    const antes = p.etapa_actual;
+    if (['instalacion', 'completado'].includes(antes)) return { cerro: false, etapa: antes };
+    await p.marcarPreparado(usuarioId, conTx());
+    if (hoja) await anotar(repo, { hoja_id: hoja.id, proyecto_id: obra.id, tipo: 'cerro_produccion', quien, origen, detalle: `Con el aval, la obra pasó de ${antes} a Preparado` });
+    if (avisar) await avisarCompletado(avisar, p);
     return { cerro: true, etapaAntes: antes, etapa: p.etapa_actual };
 };
 
@@ -754,7 +816,7 @@ const quitar = (p, area) => {
  * Índice (completado) no se toca: solo se anota.
  */
 export const reabrirPorDefecto = async (obra, hoja, def, { repo = repoActivo, quien = null, origen = null } = {}) => {
-    const p = obra.proyecto;
+    const p = await proyectoAlDia(repo, obra);
     const hojaId = def.hoja.id;
     const pintura = hojaId === 'HERRERIA' && PUNTOS_PINTURA.has(def.punto.id);
     const area = hojaId === 'MANUFACTURA' ? 'manufactura' : pintura ? 'pintura y herrería' : 'herrería';
@@ -768,7 +830,7 @@ export const reabrirPorDefecto = async (obra, hoja, def, { repo = repoActivo, qu
     };
     let regreso = false;
     if (p.etapa_actual === 'instalacion') {
-        await p.regresarEtapa(null);
+        await p.regresarEtapa(null, conTx());
         regreso = true;
         // regresarEtapa reabre las dos áreas: la que no tiene que ver con el defecto se queda como estaba
         const otra = hojaId === 'MANUFACTURA' ? 'herreria' : 'manufactura';
@@ -780,7 +842,7 @@ export const reabrirPorDefecto = async (obra, hoja, def, { repo = repoActivo, qu
         if (pintura) p.herreria_pintado_completado = false;
         else p.herreria_armado_completado = false;
     }
-    await p.save();
+    await p.save(conTx());
     await anotar(repo, {
         hoja_id: hoja.id, proyecto_id: obra.id, tipo: 'defecto_reabrio', punto_id: def.punto.id, quien, origen,
         detalle: `${def.punto.id}: se reabrió ${area} para corregirlo${regreso ? ' (la obra regresó de Preparado a producción)' : ''}`

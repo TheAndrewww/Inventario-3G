@@ -22,6 +22,7 @@ export const crearRepoMemoria = (ProduccionProyecto) => {
     const eventos = [];
     const sugerencias = [];
     const guardados = [];
+    let enTx = false;
     let reloj = Date.parse('2026-10-28T15:00:00Z');
     const ahora = () => new Date((reloj += 1000));
 
@@ -40,6 +41,39 @@ export const crearRepoMemoria = (ProduccionProyecto) => {
             return p;
         },
         // ---- la forma de repoSequelize ----
+        // Como la transacción de Postgres: si `fn` falla, todo regresa a como estaba (hojas, puntos, eventos,
+        // sugerencias y los campos de los proyectos); los objetos se restauran en su lugar para que nadie quede con uno viejo.
+        async enTransaccion(fn) {
+            if (enTx) return fn();
+            const copia = (lista) => lista.map((x) => [x, { ...x }]);
+            const foto = { hojas: copia(hojas), puntos: copia(puntos), eventos: copia(eventos), sugerencias: copia(sugerencias), guardados: guardados.length };
+            const fotoProyectos = [...proyectos.values()].map((p) => [p, { ...p.dataValues }]);
+            const restaurar = (lista, f) => {
+                lista.length = 0;
+                for (const [x, antes] of f) {
+                    for (const k of Object.keys(x)) if (!(k in antes)) delete x[k];
+                    lista.push(Object.assign(x, antes));
+                }
+            };
+            enTx = true;
+            try {
+                return await fn();
+            } catch (e) {
+                restaurar(hojas, foto.hojas);
+                restaurar(puntos, foto.puntos);
+                restaurar(eventos, foto.eventos);
+                restaurar(sugerencias, foto.sugerencias);
+                guardados.length = foto.guardados;
+                for (const [p, antes] of fotoProyectos) {
+                    for (const k of Object.keys(p.dataValues)) if (!(k in antes)) delete p.dataValues[k];
+                    Object.assign(p.dataValues, antes);
+                }
+                throw e;
+            } finally {
+                enTx = false;
+            }
+        },
+        async proyectoAlDia(i) { return proyectos.get(i) || null; },
         async proyectoPorId(i) { return proyectos.get(i) || null; },
         async proyectoPorObraId(o) {
             const ids = [...obraIds].filter(([pid, v]) => v === o && proyectos.get(pid)?.activo).map(([pid]) => pid);

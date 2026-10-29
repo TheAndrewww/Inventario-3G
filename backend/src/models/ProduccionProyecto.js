@@ -429,8 +429,9 @@ ProduccionProyecto.prototype.completarEtapaActual = async function (usuarioId, o
 /**
  * Regresa a la etapa anterior
  * @param {number} usuarioId - ID del usuario que revierte la etapa
+ * @param {object} [opcionesGuardar] - Opciones del save (la transacción de Calidad cuando un defecto la regresa)
  */
-ProduccionProyecto.prototype.regresarEtapa = async function (usuarioId) {
+ProduccionProyecto.prototype.regresarEtapa = async function (usuarioId, opcionesGuardar = {}) {
     const etapaActual = this.etapa_actual;
 
     // Flujo inverso: etapa actual → etapa anterior + campos a limpiar
@@ -473,7 +474,7 @@ ProduccionProyecto.prototype.regresarEtapa = async function (usuarioId) {
     // Regresar a la etapa anterior
     this.etapa_actual = config.anterior;
 
-    await this.save();
+    await this.save(opcionesGuardar);
     return this;
 };
 
@@ -575,9 +576,10 @@ ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEt
  * «Preparado» (etapa interna 'instalacion') con la misma lógica que el interruptor «Lista» de la oficina (toggleEtapa
  * con etapa 'instalacion' y completado = true): sella instalacion_completado_en/_por, marca terminadas manufactura y
  * herrería (y soldadura y pintura) si faltaban y pasa la etapa a 'instalacion'. Lo usa el aval de Calidad con
- * CALIDAD_AVAL_CIERRA (28-oct); el aviso al grupo lo manda quien lo llama, igual que toggleEtapa.
+ * CALIDAD_AVAL_CIERRA (28-oct); el aviso al grupo lo manda quien lo llama, igual que toggleEtapa. `opcionesGuardar`
+ * lleva la transacción del aval (29-oct).
  */
-ProduccionProyecto.prototype.marcarPreparado = async function (usuarioId = null) {
+ProduccionProyecto.prototype.marcarPreparado = async function (usuarioId = null, opcionesGuardar = {}) {
     const ahora = new Date();
     this.instalacion_completado_en = ahora;
     this.instalacion_completado_por = usuarioId;
@@ -595,7 +597,7 @@ ProduccionProyecto.prototype.marcarPreparado = async function (usuarioId = null)
     this.herreria_pintado_completado = true;
     this.etapa_actual = 'instalacion';
     this.fecha_completado = null;
-    await this.save();
+    await this.save(opcionesGuardar);
     return this;
 };
 
