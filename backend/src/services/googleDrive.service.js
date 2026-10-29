@@ -323,6 +323,18 @@ export const buscarCarpetaProyecto = async (nombreProyecto, mesHint = null) => {
 const ES_REPORTE_DIARIO = /REPORTE[ _-]?DIARIO/;
 
 /**
+ * Lo que la tablet de los supervisores (Carla, Operaciones) guarda en la carpeta
+ * de PRODUCCIÓN desde el 23-oct: «CHECK DE INSTALACION/SERVICIO/GARANTIA - X.pdf»
+ * y «AVANCE DIA N - X.pdf». Tampoco es producción: el jefe pidió (28-oct) que no
+ * se avise al grupo como «Se subió producción de MANUFACTURA».
+ */
+const ES_DE_LA_TABLET = /^(CHECK DE |AVANCE( DIA \d+)? - )/;
+
+/** ¿El nombre (ya normalizado) es de un archivo que no es producción? */
+export const esArchivoNoProduccion = (nombreNormalizado) =>
+    ES_REPORTE_DIARIO.test(nombreNormalizado) || ES_DE_LA_TABLET.test(nombreNormalizado);
+
+/**
  * Clasificar archivos PDF de una carpeta según la lógica de negocio
  * - HERRERIA*.pdf → Herrería
  * - Ticket*.pdf → Ticket de salida (no es producción, pero se avisa al grupo)
@@ -399,7 +411,7 @@ export const clasificarArchivosPDF = async (carpetaId) => {
                     creado: archivo.createdTime
                 });
 
-            } else if (ES_REPORTE_DIARIO.test(nombreNormalizado)) {
+            } else if (esArchivoNoProduccion(nombreNormalizado)) {
                 resultado.ignorados.push(archivo.name);
 
             } else {
