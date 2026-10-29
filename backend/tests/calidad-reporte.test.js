@@ -185,7 +185,7 @@ test('agenda: el reporte de calidad solo aparece con PANEL_CALIDAD; apagada la a
     assert.ok(!('soloCon' in e));
 });
 
-test('clasificador del barrido de Drive: «CALIDAD - …pdf» se ignora; lo demás como siempre', () => {
+test('clasificador del barrido de Drive: «CALIDAD - …pdf» y lo de la tablet se ignoran; lo demás como siempre', () => {
     const casos = [
         ['CALIDAD - 3G-26-0412 - 2026-10-28.pdf', 'ignorado'],
         ['CALIDAD - VELARIA HERRERIA NORTE - 2026-10-28.pdf', 'ignorado'],
@@ -198,7 +198,12 @@ test('clasificador del barrido de Drive: «CALIDAD - …pdf» se ignora; lo dem�
         // Lo que se parece pero no es el reporte: como siempre
         ['CALIDAD DE LONA.pdf', 'manufactura'],
         ['CONTROL DE CALIDAD HERRERIA.pdf', 'herreria'],
-        ['CALIDAD - SIN FECHA.pdf', 'manufactura']
+        ['CALIDAD - SIN FECHA.pdf', 'manufactura'],
+        // Lo de la tablet de los supervisores (main, 28-oct) se sigue ignorando con el reporte de calidad junto
+        ['CHECK DE INSTALACION - VELARIA DEPORTIVA 28-10-2026.pdf', 'ignorado'],
+        ['CHECK DE GARANTÍA - X.pdf', 'ignorado'],
+        ['AVANCE DIA 3 - PERGOLA CASA CLUB.pdf', 'ignorado'],
+        ['AVANCE - PERGOLA CASA CLUB.pdf', 'ignorado']
     ];
     for (const [nombre, esperado] of casos) assert.equal(clasificarNombrePDF(nombre), esperado, nombre);
 });
