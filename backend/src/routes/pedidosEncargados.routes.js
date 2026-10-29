@@ -1,5 +1,5 @@
 import express from 'express';
-import { listarPedidosEncargados, contarPedidosEncargados, responderPedidoEncargado } from '../controllers/pedidosEncargados.controller.js';
+import { listarPedidosEncargados, contarPedidosEncargados, responderPedidoEncargado, borrarPedidoEncargado } from '../controllers/pedidosEncargados.controller.js';
 import { verificarToken, verificarRol } from '../middleware/auth.middleware.js';
 
 // Pedidos de los encargados a Almacén (23-oct-2026): solo Almacén y el administrador
@@ -8,5 +8,7 @@ router.use(verificarToken, verificarRol('administrador', 'almacen'));
 router.get('/', listarPedidosEncargados);
 router.get('/contador', contarPedidosEncargados);
 router.patch('/:id', responderPedidoEncargado);
+// Borrar (29-oct-2026): solo el administrador, para quitar los de prueba
+router.delete('/:id', verificarRol('administrador'), borrarPedidoEncargado);
 
 export default router;

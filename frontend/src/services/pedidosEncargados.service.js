@@ -13,6 +13,10 @@ const pedidosEncargadosService = {
   responder: async (id, estado, nota) => {
     const response = await api.patch(`/pedidos-encargados/${id}`, { estado, nota });
     return response.data;
+  },
+  borrar: async (id) => {
+    const response = await api.delete(`/pedidos-encargados/${id}`);
+    return response.data;
   }
 };
 

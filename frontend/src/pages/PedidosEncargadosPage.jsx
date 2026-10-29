@@ -3,7 +3,7 @@
 // sistemas. Aquí Almacén lo atiende: Surtido, Parcial o No se puede (estos dos con nota, que el encargado ve en su
 // tableta). Solo Rediseño 2 (desde el 16-oct todos lo ven).
 import { useEffect, useState } from 'react';
-import { RefreshCw, Check } from 'lucide-react';
+import { RefreshCw, Check, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Pagina } from '../rediseno2/fundacion/piezas/Pagina';
 import { EncabezadoPagina } from '../rediseno2/fundacion/piezas/EncabezadoPagina';
@@ -13,9 +13,10 @@ import { Estado } from '../rediseno2/fundacion/piezas/Estado';
 import { Fecha } from '../rediseno2/fundacion/piezas/Fecha';
 import { Boton } from '../rediseno2/fundacion/piezas/Boton';
 import { Vacio } from '../rediseno2/fundacion/piezas/Estados';
-import { pedirTextoG3 } from '../rediseno2/fundacion/piezas/dialogos';
+import { pedirTextoG3, confirmarG3 } from '../rediseno2/fundacion/piezas/dialogos';
 import { numero } from '../rediseno2/fundacion/formato';
 import pedidosEncargadosService from '../services/pedidosEncargados.service';
+import { useAuth } from '../context/AuthContext';
 
 const PESTANAS = [
   { id: 'pendiente', texto: 'Por atender' },
@@ -33,6 +34,8 @@ const motivo = (e) => e?.response?.data?.message || e?.message || 'Error de cone
 const titulo = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase() : '—');
 
 export default function PedidosEncargadosPage() {
+  const { user } = useAuth();
+  const esAdmin = user?.rol === 'administrador';
   const [pestana, setPestana] = useState('pendiente');
   const [solicitudes, setSolicitudes] = useState([]);
   const [pendientes, setPendientes] = useState(null);
@@ -78,14 +81,40 @@ export default function PedidosEncargadosPage() {
     }
   };
 
+  // Solo el administrador: quitar los pedidos de prueba (29-oct-2026)
+  const borrar = async (s) => {
+    if (!(await confirmarG3({
+      titulo: '¿Borrar este pedido?',
+      aviso: 'No se puede deshacer.',
+      datos: [['Encargado', titulo(s.encargado)], ['Pide', s.texto]],
+      pasa: ['Desaparece de esta lista y de la tableta del encargado.'],
+      confirmar: 'Borrar pedido', cancelar: 'No borrar', peligro: true,
+    }))) return;
+    setProcesando(s.id);
+    try {
+      await pedidosEncargadosService.borrar(s.id);
+      toast.success('Pedido borrado');
+      await cargar();
+    } catch (e) {
+      toast.error(motivo(e));
+    } finally {
+      setProcesando(null);
+    }
+  };
+
+  const botonBorrar = (s) => (esAdmin ? (
+    <Boton nivel="peligro" tamano="chico" icono={Trash2} alHacer={() => borrar(s)} deshabilitado={procesando === s.id}>Borrar</Boton>
+  ) : null);
+
   const acciones = (s) => (s.estado === 'pendiente' ? (
     <>
       <Boton nivel="tonal" tamano="chico" icono={Check} alHacer={() => responder(s, 'surtida')} cargando={procesando === s.id}
         deshabilitado={procesando === s.id}>Surtido</Boton>
       <Boton nivel="contorno" tamano="chico" alHacer={() => responder(s, 'parcial')} deshabilitado={procesando === s.id}>Parcial</Boton>
       <Boton nivel="fantasma" tamano="chico" alHacer={() => responder(s, 'rechazada')} deshabilitado={procesando === s.id}>No se puede</Boton>
+      {botonBorrar(s)}
     </>
-  ) : null);
+  ) : botonBorrar(s));
 
   const estadoDe = (s) => {
     const [tono, texto] = ESTADO[s.estado] || ['neutro', s.estado];

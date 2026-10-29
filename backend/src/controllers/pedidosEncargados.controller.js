@@ -64,3 +64,18 @@ export const responderPedidoEncargado = async (req, res) => {
         res.status(500).json({ success: false, message: 'No se pudo guardar la respuesta' });
     }
 };
+
+/** DELETE /api/pedidos-encargados/:id — solo el administrador (29-oct-2026): para quitar los pedidos de prueba.
+ *  Se borra de verdad; la tableta deja de verlo en su lista. */
+export const borrarPedidoEncargado = async (req, res) => {
+    try {
+        const fila = await SolicitudAlmacen.findByPk(req.params.id);
+        if (!fila) return res.status(404).json({ success: false, message: 'No existe ese pedido' });
+        await fila.destroy();
+        console.log(`🗑️ Pedido de encargado #${fila.id} (${fila.encargado}: «${fila.texto}») borrado por ${req.usuario?.nombre || '?'}`);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('borrarPedidoEncargado:', e);
+        res.status(500).json({ success: false, message: 'No se pudo borrar el pedido' });
+    }
+};
