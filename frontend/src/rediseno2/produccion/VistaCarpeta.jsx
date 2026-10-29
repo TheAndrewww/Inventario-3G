@@ -14,7 +14,7 @@ import './produccion.css';
 
 export default function VistaCarpeta({
   titulo, subtitulo, textoCargando, cargando, error, datos, archivoAbierto, ejecutar, onClose, datosProyecto, grupos, secciones,
-  archivos, pintarMiniatura, pintarVisor,
+  archivos, pintarMiniatura, pintarVisor, extra = null,
 }) {
   const ref = useRef(null);
   // Esc lo atiende la carpeta de siempre (cierra primero el visor); aquí solo el foco, Tab y el orden de capas
@@ -25,7 +25,7 @@ export default function VistaCarpeta({
   if (cargando) {
     cuerpo = <Cargando forma="ficha" filas={6} etiqueta={textoCargando} />;
   } else if (error) {
-    cuerpo = <ErrorCarga mensaje="No se pudo leer la carpeta." motivo={error} alReintentar={ejecutar} />;
+    cuerpo = <>{extra}<ErrorCarga mensaje="No se pudo leer la carpeta." motivo={error} alReintentar={ejecutar} /></>;
   } else if (archivoAbierto) {
     cuerpo = pintarVisor();
   } else {
@@ -38,6 +38,8 @@ export default function VistaCarpeta({
             </dl>
           </SeccionCajon>
         )}
+        {/* 28-oct · lo propio de quien abre (Producción: «Calidad», solo con PANEL_CALIDAD; apagado no pinta nada) */}
+        {extra}
         {!datos?.carpeta ? (
           <Vacio icono={FolderOpen} titulo="Sin carpeta" texto={datos?.mensaje || 'Todavía no hay carpeta para este proyecto'} compacto />
         ) : archivos.length === 0 ? (

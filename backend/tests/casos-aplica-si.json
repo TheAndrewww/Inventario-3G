@@ -1,0 +1,76 @@
+{
+  "_nota": "Casos compartidos del evaluador de aplica_si (Planta y la app 3G Calidad deben dar lo mismo). Los escribe Planta (backend/tests/casos-aplica-si.json; copia en Calidad-3G/docs/casos-aplica-si.json). 'expresiones': una expresión con unos atributos da 'aplica' y 'conocida' (false = no se entendió: el punto aplica y se avisa en el registro). 'obras': con esos atributos, qué puntos aplican de cada hoja (lista vacía = la hoja no aplica). Sin atributos capturados ninguna hoja aplica. Gramática: siempre, atributo de atributos_proyecto, ||, &&, atributo == 'texto', paréntesis. Nunca se ejecuta como código.",
+  "version_config": "2026-10-16",
+  "expresiones": [
+    { "expresion": "siempre", "atributos": {}, "aplica": true, "conocida": true },
+    { "expresion": "lleva_membrana", "atributos": { "lleva_membrana": true }, "aplica": true, "conocida": true },
+    { "expresion": "lleva_membrana", "atributos": { "lleva_membrana": false }, "aplica": false, "conocida": true },
+    { "expresion": "lleva_membrana", "atributos": {}, "aplica": false, "conocida": true },
+    { "expresion": "lleva_costura || lleva_vulcanizado", "atributos": { "lleva_costura": false, "lleva_vulcanizado": true }, "aplica": true, "conocida": true },
+    { "expresion": "lleva_costura || lleva_vulcanizado", "atributos": { "lleva_costura": false, "lleva_vulcanizado": false }, "aplica": false, "conocida": true },
+    { "expresion": "lleva_mecanismo || lleva_placas_vertice || lleva_estructura", "atributos": { "lleva_estructura": true }, "aplica": true, "conocida": true },
+    { "expresion": "lleva_mecanismo && lleva_estructura", "atributos": { "lleva_mecanismo": true, "lleva_estructura": false }, "aplica": false, "conocida": true },
+    { "expresion": "lleva_mecanismo && lleva_estructura", "atributos": { "lleva_mecanismo": true, "lleva_estructura": true }, "aplica": true, "conocida": true },
+    { "expresion": "acabado_estructura == 'pintura'", "atributos": { "acabado_estructura": "pintura" }, "aplica": true, "conocida": true },
+    { "expresion": "acabado_estructura == 'pintura'", "atributos": { "acabado_estructura": "galvanizado" }, "aplica": false, "conocida": true },
+    { "expresion": "acabado_estructura == 'pintura'", "atributos": {}, "aplica": false, "conocida": true },
+    { "expresion": "acabado_estructura=='galvanizado'", "atributos": { "acabado_estructura": "galvanizado" }, "aplica": true, "conocida": true },
+    { "expresion": "(lleva_cables || lleva_rolados) && acabado_estructura == 'pintura'", "atributos": { "lleva_rolados": true, "acabado_estructura": "pintura" }, "aplica": true, "conocida": true },
+    { "expresion": "(lleva_cables || lleva_rolados) && acabado_estructura == 'pintura'", "atributos": { "lleva_rolados": true, "acabado_estructura": "ninguno" }, "aplica": false, "conocida": true },
+    { "expresion": "lleva_cables || lleva_rolados && lleva_placas_base", "atributos": { "lleva_cables": true }, "aplica": true, "conocida": true },
+    { "expresion": "lleva_cables || lleva_rolados && lleva_placas_base", "atributos": { "lleva_rolados": true }, "aplica": false, "conocida": true },
+    { "expresion": "  lleva_membrana  ", "atributos": { "lleva_membrana": true }, "aplica": true, "conocida": true },
+    { "expresion": "lleva_lona", "atributos": { "lleva_membrana": false }, "aplica": true, "conocida": false },
+    { "expresion": "!lleva_membrana", "atributos": { "lleva_membrana": true }, "aplica": true, "conocida": false },
+    { "expresion": "lleva_membrana ||", "atributos": { "lleva_membrana": false }, "aplica": true, "conocida": false },
+    { "expresion": "(lleva_membrana", "atributos": { "lleva_membrana": false }, "aplica": true, "conocida": false },
+    { "expresion": "acabado_estructura == 'pintura", "atributos": { "acabado_estructura": "galvanizado" }, "aplica": true, "conocida": false },
+    { "expresion": "acabado_estructura != 'pintura'", "atributos": { "acabado_estructura": "pintura" }, "aplica": true, "conocida": false },
+    { "expresion": "process.exit(1)", "atributos": {}, "aplica": true, "conocida": false },
+    { "expresion": "", "atributos": {}, "aplica": true, "conocida": false },
+    { "expresion": "lleva_membrana or lleva_estructura", "atributos": { "lleva_membrana": false, "lleva_estructura": false }, "aplica": true, "conocida": false }
+  ],
+  "obras": [
+    {
+      "nombre": "Sin atributos capturados: ninguna hoja aplica",
+      "atributos": {},
+      "puntos": { "MANUFACTURA": [], "HERRERIA": [] }
+    },
+    {
+      "nombre": "Solo membrana con costura",
+      "atributos": { "lleva_membrana": true, "lleva_costura": true, "lleva_estructura": false, "acabado_estructura": "ninguno" },
+      "puntos": {
+        "MANUFACTURA": ["M1", "M2", "M3", "M4", "M5", "M9", "M11", "M12", "M13", "M14"],
+        "HERRERIA": []
+      }
+    },
+    {
+      "nombre": "Velaria completa con estructura pintada",
+      "atributos": {
+        "lleva_membrana": true, "lleva_estructura": true, "lleva_costura": true, "lleva_vulcanizado": false, "lleva_cables": true,
+        "lleva_placas_vertice": true, "lleva_mecanismo": false, "lleva_rolados": true, "lleva_placas_base": true,
+        "acabado_estructura": "pintura"
+      },
+      "puntos": {
+        "MANUFACTURA": ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14"],
+        "HERRERIA": ["H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10", "H11", "H12", "H13"]
+      }
+    },
+    {
+      "nombre": "Solo estructura galvanizada",
+      "atributos": { "lleva_membrana": false, "lleva_estructura": true, "lleva_rolados": false, "lleva_placas_base": true, "acabado_estructura": "galvanizado" },
+      "puntos": {
+        "MANUFACTURA": [],
+        "HERRERIA": ["H1", "H2", "H4", "H5", "H6", "H12", "H13"]
+      }
+    },
+    {
+      "nombre": "Membrana con mecanismo y estructura sin acabado",
+      "atributos": { "lleva_membrana": true, "lleva_estructura": true, "lleva_mecanismo": true, "acabado_estructura": "ninguno" },
+      "puntos": {
+        "MANUFACTURA": ["M1", "M2", "M5", "M8", "M9", "M10", "M11", "M12", "M13", "M14"],
+        "HERRERIA": ["H1", "H2", "H5", "H6", "H12", "H13"]
+      }
+    }
+  ]
+}

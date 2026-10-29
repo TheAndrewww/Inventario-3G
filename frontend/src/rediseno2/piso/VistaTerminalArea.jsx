@@ -19,6 +19,7 @@ import {
 } from '../fundacion';
 import { ligaPlano, nombreCortoPlano, plazoHabil, tipoDe, urgentePorPrioridad } from './obrasPiso';
 import './piso.css';
+import '../calidad/calidad.css';
 
 // Tableta vertical o celular (< 1024 px): una cosa a la vez (lista → ficha), como las clases de la fundación
 const CONSULTA = '(max-width: 1023px)';
@@ -137,6 +138,8 @@ export default function VistaTerminalArea({
               <span className="r2-pi-fila-plazo">
                 <PlazoObra p={p} />
                 {urgentePorPrioridad(p) && <span className="r2-pi-urgente">Urgente</span>}
+                {/* 28-oct · solo llega con PANEL_CALIDAD (sin la bandera el campo no existe) */}
+                {p.calidadCorregir?.length > 0 && <span className="r2c-etiqueta-corregir">Calidad pide corregir</span>}
               </span>
             )}
             derecha={conPlanos ? textoPlanos(planos[p.id]) : null}
@@ -172,6 +175,16 @@ export default function VistaTerminalArea({
           <div><dt>Prioridad</dt><dd>Urgente</dd></div>
         )}
       </dl>
+      {obra.calidadCorregir?.length > 0 && (
+        <section className="r2c-corregir" aria-label="Calidad pide corregir">
+          <p className="r2c-corregir-titulo">Calidad pide corregir</p>
+          <ul>
+            {obra.calidadCorregir.map((d) => (
+              <li key={d.punto}><b>{d.punto}</b><span>{d.texto}{d.nota && <span>{d.nota}</span>}</span></li>
+            ))}
+          </ul>
+        </section>
+      )}
       {conPlanos && (
         <div className="r2-pi-planos">
           <p className="r2-terminal-etiqueta">{estadoPlanos?.lista?.length ? `Planos (${estadoPlanos.lista.length})` : 'Planos'}</p>

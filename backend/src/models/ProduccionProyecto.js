@@ -429,8 +429,9 @@ ProduccionProyecto.prototype.completarEtapaActual = async function (usuarioId, o
 /**
  * Regresa a la etapa anterior
  * @param {number} usuarioId - ID del usuario que revierte la etapa
+ * @param {object} [opcionesGuardar] - Opciones del save (la transacción de Calidad cuando un defecto la regresa)
  */
-ProduccionProyecto.prototype.regresarEtapa = async function (usuarioId) {
+ProduccionProyecto.prototype.regresarEtapa = async function (usuarioId, opcionesGuardar = {}) {
     const etapaActual = this.etapa_actual;
 
     // Flujo inverso: etapa actual → etapa anterior + campos a limpiar
@@ -473,7 +474,7 @@ ProduccionProyecto.prototype.regresarEtapa = async function (usuarioId) {
     // Regresar a la etapa anterior
     this.etapa_actual = config.anterior;
 
-    await this.save();
+    await this.save(opcionesGuardar);
     return this;
 };
 
@@ -538,12 +539,27 @@ ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEt
     // etapa='completado' porque ese estado está reservado para los proyectos
     // cerrados desde el índice (casilla E del Excel) y queda oculto del dashboard.
     let autoAvanzado = false;
+    let esperaCalidad = false;
     if (puedeAvanzar && this.etapa_actual !== 'instalacion' && this.etapa_actual !== 'completado') {
-        this.etapa_actual = 'instalacion';
-        this.instalacion_completado_en = ahora;
-        this.instalacion_completado_por = usuarioId;
-        await this.save();
-        autoAvanzado = true;
+        // 28-oct · CALIDAD_AVAL_CIERRA: con la bandera la obra espera el aval de Calidad en producción («Espera
+        // calidad») y la pasa el aval. Apagada, calidadDetieneCierre contesta false sin tocar la base: como hoy.
+        const { calidadDetieneCierre, proyectoCerradoPorElAval } = await import('../services/calidad.service.js');
+        if (await calidadDetieneCierre(this)) {
+            esperaCalidad = true;
+            if (this.etapa_actual !== 'produccion') {
+                this.etapa_actual = 'produccion';
+                await this.save();
+            }
+        } else if (await proyectoCerradoPorElAval(this)) {
+            // 29-oct · el aval la pasó a Preparado mientras esta terminal esperaba: no se cierra ni se avisa otra vez
+            await this.reload();
+        } else {
+            this.etapa_actual = 'instalacion';
+            this.instalacion_completado_en = ahora;
+            this.instalacion_completado_por = usuarioId;
+            await this.save();
+            autoAvanzado = true;
+        }
     }
 
     return {
@@ -551,11 +567,41 @@ ProduccionProyecto.prototype.completarSubEtapaProduccion = async function (subEt
         subEtapaCompletada: subEtapa,
         puedeAvanzarAInstalacion: puedeAvanzar,
         autoAvanzado,
+        ...(esperaCalidad ? { esperaCalidad: true } : {}),
         estadoSubEtapas: {
             manufactura: this.manufactura_completado,
             herreria: this.herreria_completado
         }
     };
+};
+
+/**
+ * «Preparado» (etapa interna 'instalacion') con la misma lógica que el interruptor «Lista» de la oficina (toggleEtapa
+ * con etapa 'instalacion' y completado = true): sella instalacion_completado_en/_por, marca terminadas manufactura y
+ * herrería (y soldadura y pintura) si faltaban y pasa la etapa a 'instalacion'. Lo usa el aval de Calidad con
+ * CALIDAD_AVAL_CIERRA (28-oct); el aviso al grupo lo manda quien lo llama, igual que toggleEtapa. `opcionesGuardar`
+ * lleva la transacción del aval (29-oct).
+ */
+ProduccionProyecto.prototype.marcarPreparado = async function (usuarioId = null, opcionesGuardar = {}) {
+    const ahora = new Date();
+    this.instalacion_completado_en = ahora;
+    this.instalacion_completado_por = usuarioId;
+    if (!this.manufactura_completado) {
+        this.manufactura_completado = true;
+        this.manufactura_completado_en = ahora;
+        this.manufactura_completado_por = usuarioId;
+    }
+    if (!this.herreria_completado) {
+        this.herreria_completado = true;
+        this.herreria_completado_en = ahora;
+        this.herreria_completado_por = usuarioId;
+    }
+    this.herreria_armado_completado = true;
+    this.herreria_pintado_completado = true;
+    this.etapa_actual = 'instalacion';
+    this.fecha_completado = null;
+    await this.save(opcionesGuardar);
+    return this;
 };
 
 /**

@@ -12,10 +12,10 @@ import { ShoppingBag, Package, ClipboardList, CalendarDays, Factory, UserRound, 
 import { rutaInicialPorRol } from '../../../components/layout/Sidebar';
 import {
   rielParaRol, pestanasDeSeccion, seccionDeRuta, SECCIONES, TITULOS,
-  claveOcultosG3, claveOrdenG3, guardarSubOrdenG3, EVENTO_SUBORDEN_G3, heredarAjustesDelMenu,
+  claveOcultosG3, claveOrdenG3, guardarSubOrdenG3, EVENTO_SUBORDEN_G3, heredarAjustesDelMenu, EVENTO_PANEL_CALIDAD,
 } from '../../../diseno-3g/menuPlanta';
 
-export { claveOcultosG3, claveOrdenG3, guardarSubOrdenG3, EVENTO_SUBORDEN_G3, heredarAjustesDelMenu, SECCIONES, seccionDeRuta };
+export { claveOcultosG3, claveOrdenG3, guardarSubOrdenG3, EVENTO_SUBORDEN_G3, heredarAjustesDelMenu, SECCIONES, seccionDeRuta, EVENTO_PANEL_CALIDAD };
 
 // Nombre corto de cada pantalla cuando es pestaña de su sección (el encabezado ya dice la sección)
 const PESTANA = {

@@ -17,6 +17,7 @@ import { ejecutarAutoMigracion } from './src/utils/autoMigrate.js';
 import { verificarToken, esAdministrador, verificarTokenOpcional } from './src/middleware/auth.middleware.js';
 import { avisarConfigAlArrancar, cerrarSiFalta, cerrarTerminalSiFalta, cuerpoSalud } from './src/utils/revisarConfig.js';
 import crearPuertas from './src/routes/sistemas/index.js';
+import { crearRutasCalidad, PREFIJO_CALIDAD } from './src/routes/calidad.routes.js';
 
 // Cargar variables de entorno solo en desarrollo
 // En producción (Railway, Heroku), las variables están en process.env directamente
@@ -119,6 +120,10 @@ app.use(['/api/ordenes-compra/aprobar-email', '/api/ordenes-compra/rechazar-emai
 // (huella SHA-256 y alcances en variables). Van antes de todas las rutas con sesión: ninguna pasa por verificarToken.
 // Sin llaves configuradas responden 503 «puerta sin configurar»; lo demás de Planta no cambia.
 app.use(crearPuertas());
+
+// 28-oct · Panel de calidad (3G Calidad): la tableta de Charly (token propio) y la web (sesión de administración o
+// almacén). Con PANEL_CALIDAD apagada todo /api/calidad responde 404. Va antes de las rutas montadas en /api con sesión.
+app.use(PREFIJO_CALIDAD, crearRutasCalidad());
 
 // Importar rutas
 import authRoutes from './src/routes/auth.routes.js';
@@ -1332,6 +1337,16 @@ const startServer = async () => {
             console.log('✅ Tabla tickets_drive verificada');
         } catch (ticketDriveErr) {
             console.error('⚠️ Error verificando la tabla tickets_drive:', ticketDriveErr.message);
+        }
+
+        // 28-oct: panel de calidad (3G Calidad). Seis tablas, cada una con su propio sync (crea si no existe; nunca alter).
+        // Se crean siempre; con PANEL_CALIDAD apagada nada las escribe.
+        try {
+            const { MODELOS_CALIDAD } = await import('./src/models/Calidad.js');
+            for (const modelo of MODELOS_CALIDAD) await modelo.sync();
+            console.log('✅ Tablas de calidad verificadas');
+        } catch (calidadErr) {
+            console.error('⚠️ Error verificando las tablas de calidad:', calidadErr.message);
         }
 
         // C4 · PLA-16: la historia de la orden de compra (su propio sync: crea si no existe; nunca alter)

@@ -54,6 +54,13 @@ export const ENVIOS = [
         firma: 'Avisos de Planta', destino: 'Grupo Producción', interruptor: 'TICKET_DRIVE_DESDE_SERVIDOR', silencio: 'cola'
     },
     {
+        // 28-oct · PANEL_CALIDAD: el reporte de calidad de cada obra avalada (sin aviso de WhatsApp). Apagada no sale aquí.
+        id: 'pla-calidad-reporte', nombre: 'Reporte de calidad de cada obra avalada a la carpeta de Drive del proyecto',
+        cron: null, texto: 'Al avalar cada obra; si falla, reintenta cada 10 minutos', cadaMs: 10 * 60000, linea: 'drive',
+        firma: 'Planta', destino: 'Carpeta de Drive del proyecto (sin aviso)', interruptor: 'PANEL_CALIDAD', silencio: null,
+        soloCon: 'PANEL_CALIDAD'
+    },
+    {
         id: 'pla-correo-orden', nombre: 'Correo de cada orden por autorizar («Aprobar» y «Rechazar»)',
         cron: null, texto: 'Al pedir la autorización de una orden', linea: 'correo', firma: '3G Inventario', destino: 'Dirección (correo)',
         interruptor: 'OC_CORREO_MODO_APROBAR', silencio: null
@@ -111,6 +118,7 @@ export const agendaPlanta = async ({ ahora = new Date() } = {}) => {
     const { modoCorreoOrdenes } = await import('../services/email.service.js');
     const { cancelacionProgramadaEncendida } = await import('../controllers/ordenesCompra.controller.js');
     const { ticketDriveDesdeServidor } = await import('../services/ticketDrive.service.js');
+    const { panelCalidad } = await import('./banderasCalidad.js');
     const ventana = ventanaAvisos();
     const modo = modoCorreoOrdenes();
     // Último aviso que Julia publicó de la cola (dato real de la base); si falla, «no se sabe».
@@ -127,13 +135,16 @@ export const agendaPlanta = async ({ ahora = new Date() } = {}) => {
         if (nombre === 'OC_CORREO_MODO_APROBAR') return { variable: 'OC_CORREO_MODO', encendido: modo === 'aprobar' };
         if (nombre === 'CANCELACION_PROGRAMADA') return { variable: 'CANCELACION_PROGRAMADA', encendido: cancelacionProgramadaEncendida() };
         if (nombre === 'TICKET_DRIVE_DESDE_SERVIDOR') return { variable: 'TICKET_DRIVE_DESDE_SERVIDOR', encendido: ticketDriveDesdeServidor() };
+        if (nombre === 'PANEL_CALIDAD') return { variable: 'PANEL_CALIDAD', encendido: panelCalidad() };
         return null;
     };
     const silencioCola = ventana
         ? `Solo ${textoVentana(ventana)}: lo de la noche y del domingo sale al abrir (lo urgente pasa)`
         : 'Hoy ninguna: sale también de noche y en domingo';
 
-    const envios = ENVIOS.map((e) => {
+    // Lo que solo existe con una bandera (soloCon) no aparece con ella apagada: la agenda queda igual que antes
+    const encendida = (nombre) => (nombre === 'PANEL_CALIDAD' ? panelCalidad() : true);
+    const envios = ENVIOS.filter((e) => !e.soloCon || encendida(e.soloCon)).map((e) => {
         const ultima = e.id === 'pla-avisos-cola' ? ultimoDeLaCola : (corridas.get(e.id) || null);
         let proxima = e.cron ? siguienteEjecucion(e.cron, ahora) : null;
         if (!proxima && e.cadaMs && ultima) proxima = new Date(new Date(ultima).getTime() + e.cadaMs);
