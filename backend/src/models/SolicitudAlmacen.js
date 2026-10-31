@@ -10,13 +10,14 @@ import { sequelize } from '../config/database.js';
  * `referencia` es el id del pedido en Operación: la misma referencia no se anota dos veces.
  * Tabla con su propio sync() al arrancar (crea si no existe; nunca alter).
  */
-export const TIPOS_SOLICITUD_ALMACEN = ['REPOSICION', 'HERRAMIENTA_ESPECIAL'];
+// 30-oct (jefe): MATERIAL para una obra (pintura, soldadura…).
+export const TIPOS_SOLICITUD_ALMACEN = ['MATERIAL', 'REPOSICION', 'HERRAMIENTA_ESPECIAL'];
 export const ESTADOS_SOLICITUD_ALMACEN = ['pendiente', 'surtida', 'parcial', 'rechazada'];
 
 const SolicitudAlmacen = sequelize.define('SolicitudAlmacen', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     encargado: { type: DataTypes.STRING(40), allowNull: false, comment: 'Quién lo pide: GERAS, MIGUEL, MANE…' },
-    tipo: { type: DataTypes.STRING(30), allowNull: false, comment: 'REPOSICION | HERRAMIENTA_ESPECIAL' },
+    tipo: { type: DataTypes.STRING(30), allowNull: false, comment: 'MATERIAL | REPOSICION | HERRAMIENTA_ESPECIAL' },
     texto: { type: DataTypes.TEXT, allowNull: false, comment: 'Lo que pide, como lo escribió' },
     para_fecha: { type: DataTypes.DATEONLY, allowNull: true, comment: 'Para cuándo lo necesita (AAAA-MM-DD)' },
     proyecto: { type: DataTypes.STRING(200), allowNull: true },

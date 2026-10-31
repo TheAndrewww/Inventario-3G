@@ -22,7 +22,7 @@ const PESTANAS = [
   { id: 'pendiente', texto: 'Por atender' },
   { id: 'atendidas', texto: 'Atendidos' },
 ];
-const TIPO = { REPOSICION: 'Reposición de stock', HERRAMIENTA_ESPECIAL: 'Herramienta especial' };
+const TIPO = { MATERIAL: 'Material', REPOSICION: 'Reposición de stock', HERRAMIENTA_ESPECIAL: 'Herramienta especial' };
 const ESTADO = {
   pendiente: ['aviso', 'Por atender'],
   surtida: ['ok', 'Surtido'],

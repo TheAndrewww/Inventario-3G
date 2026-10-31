@@ -2,7 +2,7 @@
  * Pedidos de los encargados a Almacén (23-oct-2026) — origen «operacion», alcance «almacen.solicitar».
  *
  *   POST /api/sistemas/v1/almacen/solicitudes
- *     Cuerpo: { encargado, tipo: "REPOSICION"|"HERRAMIENTA_ESPECIAL", texto, paraFecha? (AAAA-MM-DD), proyecto?,
+ *     Cuerpo: { encargado, tipo: "MATERIAL"|"REPOSICION"|"HERRAMIENTA_ESPECIAL", texto, paraFecha? (AAAA-MM-DD), proyecto?,
  *               obra? (ID 3G «3G-AA-NNNN»), referencia (id del pedido en Operación) }
  *     Respuestas: 201 { ok, id: "almacen-N", estado, duplicado: false, recibido } · 200 { ok, id, estado, duplicado: true }
  *     si esa referencia ya estaba (aunque llegue con otra Idempotency-Key) · 400 { error } si falta o sobra algo.
@@ -44,7 +44,7 @@ export const leerSolicitudAlmacen = (b) => {
     const encargado = String(b?.encargado ?? '').trim().replace(/\s+/g, ' ').toUpperCase();
     if (!RE_ENCARGADO.test(encargado)) errores.push('«encargado» debe ser el nombre del encargado (GERAS, MIGUEL…)');
     const tipo = String(b?.tipo ?? '').trim().toUpperCase();
-    if (!TIPOS_SOLICITUD_ALMACEN.includes(tipo)) errores.push('«tipo» debe ser REPOSICION o HERRAMIENTA_ESPECIAL');
+    if (!TIPOS_SOLICITUD_ALMACEN.includes(tipo)) errores.push('«tipo» debe ser MATERIAL, REPOSICION o HERRAMIENTA_ESPECIAL');
     const texto = typeof b?.texto === 'string' ? b.texto.trim() : '';
     if (!texto) errores.push('Falta «texto»');
     else if (texto.length > MAX_TEXTO) errores.push(`«texto» pasa de ${MAX_TEXTO} caracteres`);
@@ -66,7 +66,7 @@ export const leerSolicitudAlmacen = (b) => {
     };
 };
 
-export const TEXTO_TIPO = { REPOSICION: 'Reposición de stock', HERRAMIENTA_ESPECIAL: 'Herramienta especial' };
+export const TEXTO_TIPO = { MATERIAL: 'Material', REPOSICION: 'Reposición de stock', HERRAMIENTA_ESPECIAL: 'Herramienta especial' };
 
 /** Campana y push a Almacén (y al administrador). No tumba el registro si falla. */
 const avisarAlmacen = async (fila) => {
