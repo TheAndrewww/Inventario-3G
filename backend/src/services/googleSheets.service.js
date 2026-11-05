@@ -328,10 +328,14 @@ export const leerCalendarioMes = async (mes = 'NOVIEMBRE') => {
               comentariosHoja[`${letraColumna(colProyecto)}${filaHoja}`] ||
               null;
 
-            // Parsear el proyecto (formato: "NOMBRE / CLIENTE" o "NOMBRE")
+            // Parsear el proyecto (formato: "NOMBRE / CLIENTE" o "NOMBRE"). Todo lo que va después
+            // de la primera diagonal se queda en `cliente`: con solo la segunda parte se perdía la
+            // tercera, que es donde dice de qué es la cita. "TERESA MURILLO/MTO/ RETIRO" quedaba
+            // como MTO y el retiro contaba como instalación; "CRIT ECATEPEC / GTIA / CIMENTACIÓN"
+            // quedaba como GTIA y a Charly se le preguntó por una cimentación (5-nov-2026).
             const partes = nombreProyecto.split('/').map(p => p.trim());
             const nombre = partes[0];
-            const cliente = partes.length > 1 ? partes[1] : null;
+            const cliente = partes.length > 1 ? partes.slice(1).filter(Boolean).join(' / ') || null : null;
 
             // Resolver la fecha real (YYYY-MM-DD) según el mes al que pertenece
             // el día (considerando semanas cruzadas entre meses).

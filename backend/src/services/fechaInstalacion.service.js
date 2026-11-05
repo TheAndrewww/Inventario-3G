@@ -122,6 +122,22 @@ const citasPorNombre = (citas) => {
     return mapa;
 };
 
+/**
+ * Las citas de CIMENTACIÓN, aparte: no son la instalación, pero dicen que la instalación todavía
+ * no llega. Si el proyecto tiene cimentación el mismo día o después de su fecha del Índice, esa
+ * fecha ya no sirve: la instalación va cuando termine la cimentación y se pregunta cuando aparezca
+ * en el calendario (regla del usuario, 5-nov-2026: CRIT ECATEPEC / GTIA / CIMENTACIÓN).
+ */
+const citasDeCimentacion = (citas) => {
+    const mapa = {};
+    for (const cp of citas || []) {
+        const key = normalizarNombre(cp.nombre);
+        if (!key || !cp.fecha || !normalizarNombre(`${cp.nombre} ${cp.cliente || ''}`).includes('cimentacion')) continue;
+        (mapa[key] = mapa[key] || []).push({ fecha: cp.fecha, retiro: false });
+    }
+    return mapa;
+};
+
 const buscarFechaInstalacion = (nombreProyecto, mapa) => {
     const nombreProd = normalizarNombre(nombreProyecto);
     if (!nombreProd) return null;
@@ -296,6 +312,12 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico(), {
         return retiros.some(r => bases.has(r.base) && r.fecha < cita);
     };
 
+    const cimentaciones = citasDeCimentacion(citas);
+    const ultimaCimentacion = (p) => {
+        const r = buscarFechaInstalacion(p.nombre, cimentaciones);
+        return r ? [...r.fechas].sort().pop() || null : null;
+    };
+
     const res = new Map();
     for (const p of proyectos) {
         const indice = p.fecha_limite || null;
@@ -306,7 +328,9 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico(), {
             const conHora = (nombresDeProyecto.get(p.id) || []).some(n => (mapa[n] || []).some(c => c.fecha === cita && !c.retiro && c.conHora));
             res.set(p.id, { fecha: cita, fuente: 'calendario', conHora, retiroPrevio: huboRetiro(p.id, cita) });
         } else {
-            res.set(p.id, { fecha: indice, fuente: 'indice' });
+            const cimentacion = indice ? ultimaCimentacion(p) : null;
+            if (cimentacion && cimentacion >= indice) res.set(p.id, { fecha: null, fuente: 'cimentacion', cimentacion });
+            else res.set(p.id, { fecha: indice, fuente: 'indice' });
         }
     }
     return res;
