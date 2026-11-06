@@ -21,7 +21,7 @@ const esLocal = (() => {
 })();
 const SALTAR = esLocal ? false : 'sin PRUEBA_PG_URL local: prueba de integración saltada';
 const MARCA = `PRUEBA-SEG-${process.pid}`;
-const CLAVES = ['pedidos_encargados_recordatorios', 'tickets_drive_alertados', 'pedidos_recordatorio_no_salio', 'avisos_encargado_no_salieron'];
+const CLAVES = ['pedidos_encargados_recordatorios', 'tickets_drive_alertados', 'pedidos_recordatorio_no_salio', 'avisos_encargado_no_salieron', 'resumen_planta_diario'];
 
 let sequelize;
 let S;
@@ -109,4 +109,27 @@ test('Postgres: pedidos por atender, recordatorio guardado, tickets atorados y p
     assert.ok(p.avisos.some((x) => x.includes('no salió (ni WhatsApp ni campana)')));
     assert.ok(p.tickets.masDe7Dias >= 1);
     assert.ok(p.pedidos.lista.some((x) => x.texto.startsWith(MARCA)));
+});
+
+// Vuelta 1 de la verificación integrada: lo mismo que el verificador reprodujo por HTTP (alta, borrar, contestar), ahora
+// con el controlador y la tabla de verdad; y el resumen de las 8:00 que no sale queda en `configuracion`.
+test('Postgres: contestar un pedido que el administrador quitó da 404 y no lo revive; el resumen que no sale queda anotado', { skip: SALTAR }, async () => {
+    const { borrarPedidoEncargado, responderPedidoEncargado } = await import('../src/controllers/pedidosEncargados.controller.js');
+    const res = () => ({ status(c) { this.codigo = c; return this; }, json(b) { this.cuerpo = b; return this; } });
+    const p = await SolicitudAlmacen.create({ encargado: 'PRUEBA', tipo: 'MATERIAL', texto: `${MARCA} quitado`, referencia: `${MARCA}-4` });
+    const r1 = res();
+    await borrarPedidoEncargado({ params: { id: String(p.id) }, usuario: { nombre: 'Admin' } }, r1);
+    assert.equal(r1.cuerpo.success, true);
+    const r2 = res();
+    await responderPedidoEncargado({ params: { id: String(p.id) }, body: { estado: 'surtida' }, usuario: { nombre: 'Charly' } }, r2);
+    assert.equal(r2.codigo, 404);
+    assert.equal((await SolicitudAlmacen.findByPk(p.id)).estado, 'cancelada');
+
+    const ahora = new Date();
+    const r = await S.enviarResumenDiario({ ahora, env: { PLANTA_SEGUIMIENTO: 'resumen' }, notificar: async () => { throw new Error('campana caída'); } });
+    assert.equal(r.enviado, false);
+    const anotado = JSON.parse((await Configuracion.findOne({ where: { clave: 'resumen_planta_diario' } })).valor);
+    assert.equal(anotado.noSalio.intentos, 1);
+    const q = await S.pendientesDePlanta({ ahora, env: {} });
+    assert.ok(q.avisos.some((x) => x.startsWith('El resumen de las 8:00 al administrador de hoy no salió')), q.avisos.join(' | '));
 });

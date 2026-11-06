@@ -55,6 +55,9 @@ export const responderPedidoEncargado = async (req, res) => {
         if (r.error) return res.status(400).json({ success: false, message: r.error });
         const fila = await SolicitudAlmacen.findByPk(req.params.id);
         if (!fila) return res.status(404).json({ success: false, message: 'No existe ese pedido' });
+        // Vuelta 1: un pedido que el administrador ya quitó no revive (antes de «cancelada» el renglón se borraba y esto
+        // daba 404; Charly podía contestarlo con la lista de antes abierta y la tableta pasaba de «No se puede» a «Surtido»).
+        if (fila.estado === ESTADO_CANCELADA) return res.status(404).json({ success: false, message: 'Ese pedido lo quitó el administrador' });
         await fila.update({
             estado: r.estado,
             nota_almacen: r.nota,

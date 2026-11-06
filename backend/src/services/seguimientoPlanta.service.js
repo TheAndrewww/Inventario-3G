@@ -6,7 +6,8 @@
  * Bandera PLANTA_SEGUIMIENTO (APAGADA por omisión: sin ella no sale ningún aviso nuevo). `1` (o `todo`) enciende las
  * cuatro piezas; también acepta una lista: `pedidos,encargado`.
  *   resumen    8:00 lun-sáb · campana (y push) al administrador: celdas del calendario que Planta no entiende, pedidos de
- *              encargados vencidos, tickets sin llegar a Drive y cuántos tickets se subieron ayer.
+ *              encargados vencidos, tickets sin llegar a Drive y cuántos tickets se subieron ayer. Si no sale, queda
+ *              anotado (la puerta lo dice en `avisos`) y se reintenta cada hora hasta las 18:00 (vuelta 1).
  *   pedidos    cada hora de 9:00 a 18:00 lun-sáb · a Almacén (Charly): campana y un mensaje al grupo Requisiciones con los
  *              pedidos que llevan más de PEDIDOS_RECORDAR_HORAS (4 por omisión) «por atender». Una vez al día por pedido
  *              y dos días como máximo; después el pedido queda VENCIDO (salida segura): ya no se le insiste a Charly, sale
@@ -61,6 +62,8 @@ const CLAVE_TICKETS_ALERTADOS = 'tickets_drive_alertados';
 const CLAVE_CELDAS = 'calendario_celdas_no_entendidas'; // la escribe fechaInstalacion.service cada 5 min
 const CLAVE_RECORDATORIO_NO_SALIO = 'pedidos_recordatorio_no_salio'; // la última vuelta del recordatorio que no salió completa
 const CLAVE_AVISOS_ENCARGADO = 'avisos_encargado_no_salieron';       // avisos al encargado que no salieron (7 días)
+const CLAVE_RESUMEN = 'resumen_planta_diario';                     // { enviado: día en que salió, noSalio: { dia, cuando, intentos, motivo } }
+const CLAVE_VISTA_PREVIA = 'calendario_vocabulario_vista_previa';  // la escribe fechaInstalacion.service cada 5 min (vuelta 1)
 const ESTADOS_SIN_LLEGAR = ['pendiente', 'error', 'sin_carpeta'];
 
 const hoyMexico = (ahora = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(ahora);
@@ -451,10 +454,20 @@ export const pendientesDePlanta = async ({ ahora = new Date(), modelos = {}, cfg
     // Lo que el seguimiento intentó avisar y no salió (piezas «pedidos» y «encargado»): se dice, no se calla.
     let avisosNoSalieron = null;
     try {
-        const [recordatorio, encargado] = await Promise.all([leerJson(CLAVE_RECORDATORIO_NO_SALIO, cfg), leerJson(CLAVE_AVISOS_ENCARGADO, cfg)]);
+        const [recordatorio, encargado, resumen] = await Promise.all([
+            leerJson(CLAVE_RECORDATORIO_NO_SALIO, cfg), leerJson(CLAVE_AVISOS_ENCARGADO, cfg), leerJson(CLAVE_RESUMEN, cfg)
+        ]);
         const hace24 = new Date(ahora.getTime() - DIA_MS).toISOString();
         const alEncargado = Array.isArray(encargado?.lista) ? encargado.lista : [];
-        avisosNoSalieron = { recordatorioAlmacen: recordatorio?.cuando ? recordatorio : null, alEncargado };
+        // El resumen de las 8:00 que no salió (y no ha salido ese día): vuelta 1, antes solo quedaba en el log.
+        const resumenNoSalio = resumen?.noSalio?.cuando && resumen.enviado !== resumen.noSalio.dia ? resumen.noSalio : null;
+        avisosNoSalieron = { recordatorioAlmacen: recordatorio?.cuando ? recordatorio : null, alEncargado, resumenDiario: resumenNoSalio };
+        if (resumenNoSalio && resumenNoSalio.cuando >= hace24) {
+            const deHoy = resumenNoSalio.dia === hoyMexico(ahora);
+            avisos.push(`El resumen de las 8:00 al administrador ${deHoy ? 'de hoy' : `del ${diaCorto(resumenNoSalio.dia)}`} no salió ` +
+                `(${resumenNoSalio.intentos} ${resumenNoSalio.intentos === 1 ? 'intento' : 'intentos'}): ${resumenNoSalio.motivo}` +
+                (deHoy ? '. Se reintenta cada hora hasta las 18:00' : ''));
+        }
         if (recordatorio?.cuando >= hace24) {
             avisos.push(recordatorio.salioPor
                 ? `El recordatorio a Almacén de las ${horaMexico(recordatorio.cuando)} salió solo por ${recordatorio.salioPor === 'campana' ? 'la campana' : 'WhatsApp'}: ${recordatorio.motivo}`
@@ -473,6 +486,22 @@ export const pendientesDePlanta = async ({ ahora = new Date(), modelos = {}, cfg
         const c = await leerCeldasNoEntendidas({ ahora, cfg });
         calendario = { celdasNoEntendidas: c.celdas.length, revisadoEl: c.revisadoEl, alDia: c.alDia, lista: c.celdas };
         if (!c.alDia) avisos.push('La lista de celdas del calendario no es de hoy: la lectura del calendario no ha corrido hoy');
+        // Vuelta 1: qué obras cambiarían de fecha al mover CALENDARIO_VOCABULARIO_UNICO. Se revisa ANTES de encenderla.
+        try {
+            const vista = await leerJson(CLAVE_VISTA_PREVIA, cfg);
+            if (vista) {
+                calendario.alCambiarVocabulario = {
+                    hoyEsta: vista.encendida ? 'encendida' : 'apagada',
+                    revisadoEl: vista.dia || null,
+                    obrasQueCambian: Number(vista.total) || 0,
+                    lista: (Array.isArray(vista.obras) ? vista.obras : []).slice(0, MAX_LISTA)
+                        .map((o) => ({ id: o.id, proyecto: corto(o.proyecto, 120), ahora: o.ahora || null, conLaOtraRegla: o.conLaOtraRegla || null }))
+                };
+            }
+        } catch (e) {
+            avisos.push('No se pudo leer qué obras cambiarían de fecha con CALENDARIO_VOCABULARIO_UNICO');
+            console.error('[pendientes] vista previa del vocabulario:', e.message);
+        }
     } catch (e) {
         avisos.push('No se pudo leer la lista de celdas del calendario');
         console.error('[pendientes] calendario:', e.message);
@@ -513,11 +542,26 @@ export const textoResumen = (p, { ahora = new Date() } = {}) => {
     return partes.join(' · ');
 };
 
-/** Pieza «resumen»: campana (y push) al administrador a las 8:00. Nunca lanza. */
-export const enviarResumenDiario = async ({ ahora = new Date(), env = process.env, notificar = notificarPorOmision, armar = pendientesDePlanta } = {}) => {
+/**
+ * Pieza «resumen»: campana (y push) al administrador a las 8:00. Corre cada hora de 8:00 a 18:00 (agendaPlanta), pero
+ * sale una vez al día: si ya salió hoy, no hace nada. Si no sale (vuelta 1), queda anotado en `configuracion` con su
+ * motivo, la puerta lo dice en `avisos` y se reintenta en la siguiente hora. Antes se perdía con un console.error.
+ * Nunca lanza.
+ */
+export const enviarResumenDiario = async ({ ahora = new Date(), env = process.env, notificar = notificarPorOmision, armar = pendientesDePlanta, cfg = null } = {}) => {
     if (!seguimientoEncendido('resumen', env)) return { enviado: false, apagada: true };
+    const hoy = hoyMexico(ahora);
+    let estado = {};
     try {
-        const p = await armar({ ahora, env });
+        estado = (await leerJson(CLAVE_RESUMEN, cfg)) || {};
+    } catch (e) {
+        // Sin saber si ya salió, se intenta: mejor uno de más que ninguno.
+        console.error('⚠️ No se pudo leer si el resumen de hoy ya salió:', e.message);
+    }
+    if (estado.enviado === hoy) return { enviado: false, yaSalio: true };
+    const reintento = estado.noSalio?.dia === hoy;
+    try {
+        const p = await armar({ ahora, env, cfg });
         const urgente = (p.calendario?.celdasNoEntendidas || 0) + (p.pedidos?.vencidos || 0) + (p.tickets?.sinSubir || 0) + (p.avisos?.length || 0);
         await notificar({
             roles: ['administrador'],
@@ -525,12 +569,26 @@ export const enviarResumenDiario = async ({ ahora = new Date(), env = process.en
             titulo: urgente ? `Pendientes de Planta (${urgente})` : 'Pendientes de Planta: todo al día',
             mensaje: textoResumen(p, { ahora }),
             url: '/pedidos-encargados',
-            datos_adicionales: { resumen_planta: hoyMexico(ahora) }
+            datos_adicionales: { resumen_planta: hoy }
         });
-        return { enviado: true, urgente };
+        try {
+            // El fallo de un día anterior se conserva (la puerta lo dice 24 h); el de hoy ya se resolvió.
+            await guardarJson(CLAVE_RESUMEN, { enviado: hoy, noSalio: reintento ? null : estado.noSalio || null }, 'Resumen de las 8:00 de Planta: día en que salió y el último que no salió (PLANTA_SEGUIMIENTO)', cfg);
+        } catch (e) {
+            console.error('⚠️ El resumen de Planta salió, pero no se pudo anotar (puede repetirse en la siguiente hora):', e.message);
+        }
+        if (reintento) console.log(`⏰ Resumen de Planta: salió al reintentar (antes ${estado.noSalio.intentos} intento(s) sin salir)`);
+        return { enviado: true, urgente, reintento };
     } catch (e) {
-        console.error('⚠️ Resumen diario de pendientes de Planta:', e.message);
-        return { enviado: false, error: e.message };
+        const intentos = reintento ? (Number(estado.noSalio.intentos) || 0) + 1 : 1;
+        console.error(`⚠️ El resumen de las 8:00 de Planta no salió (intento ${intentos}): ${e.message}. Se reintenta cada hora hasta las 18:00`);
+        try {
+            await guardarJson(CLAVE_RESUMEN, { enviado: estado.enviado || null, noSalio: { dia: hoy, cuando: ahora.toISOString(), intentos, motivo: corto(e.message, 200) } },
+                'Resumen de las 8:00 de Planta: día en que salió y el último que no salió (PLANTA_SEGUIMIENTO)', cfg);
+        } catch (e2) {
+            console.error('⚠️ Tampoco se pudo anotar que el resumen no salió:', e2.message);
+        }
+        return { enviado: false, error: e.message, intentos };
     }
 };
 
@@ -541,8 +599,9 @@ export const iniciarSeguimientoPlanta = async () => {
     const zona = { timezone: 'America/Mexico_City' };
     cron.schedule(cronDe('pla-seguimiento-resumen'), async () => {
         if (!seguimientoEncendido('resumen')) return;
-        anotarCorrida('pla-seguimiento-resumen');
-        await enviarResumenDiario();
+        // Corre cada hora de 8:00 a 18:00, pero solo la primera que sale cuenta (las demás son el reintento).
+        const r = await enviarResumenDiario();
+        if (!r.yaSalio) anotarCorrida('pla-seguimiento-resumen');
     }, zona);
     cron.schedule(cronDe('pla-seguimiento-pedidos'), async () => {
         if (!seguimientoEncendido('pedidos')) return;

@@ -63,8 +63,8 @@ export const ENVIOS = [
     {
         // 6-nov-2026 (revisión, punto 9) · PLANTA_SEGUIMIENTO: solo aparecen con la bandera (y su pieza) encendida
         id: 'pla-seguimiento-resumen', nombre: 'Pendientes de Planta: celdas del calendario sin entender, pedidos vencidos y tickets sin subir',
-        cron: '0 8 * * 1-6', texto: '8:00, lunes a sábado', linea: 'campana', firma: 'Planta', destino: 'Administrador (campana y push)',
-        interruptor: 'PLANTA_SEGUIMIENTO', silencio: 'Domingo no', soloCon: 'PLANTA_SEGUIMIENTO:resumen'
+        cron: '0 8-18 * * 1-6', texto: '8:00, lunes a sábado (si no sale, se reintenta cada hora hasta las 18:00)', linea: 'campana', firma: 'Planta', destino: 'Administrador (campana y push)',
+        interruptor: 'PLANTA_SEGUIMIENTO', silencio: 'Domingo no; de 9:00 a 18:00 solo si el de las 8:00 no salió', soloCon: 'PLANTA_SEGUIMIENTO:resumen'
     },
     {
         id: 'pla-seguimiento-pedidos', nombre: 'Recordatorio a Almacén de los pedidos de encargados sin atender',

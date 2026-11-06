@@ -215,7 +215,7 @@ test('aviso al encargado que no sale: queda anotado, campana al administrador (u
 
 test('«borrar» un pedido lo deja cancelado: la tableta lo recibe como «No se puede» con su nota y Planta ya no lo lista', async () => {
     const { default: SolicitudAlmacen } = await import('../src/models/SolicitudAlmacen.js');
-    const { borrarPedidoEncargado, listarPedidosEncargados } = await import('../src/controllers/pedidosEncargados.controller.js');
+    const { borrarPedidoEncargado, listarPedidosEncargados, responderPedidoEncargado } = await import('../src/controllers/pedidosEncargados.controller.js');
     const { listarSolicitudesAlmacen } = await import('../src/routes/sistemas/almacen.js');
     const originales = { findByPk: SolicitudAlmacen.findByPk, findAll: SolicitudAlmacen.findAll, count: SolicitudAlmacen.count };
     const fila = { id: 9, encargado: 'PRUEBA', texto: 'prueba', estado: 'pendiente', referencia: 'operacion:abc', created_at: new Date('2026-11-05T15:00:00Z'),
@@ -247,6 +247,14 @@ test('«borrar» un pedido lo deja cancelado: la tableta lo recibe como «No se 
         // Borrar otra vez: ya no existe
         await borrarPedidoEncargado({ params: { id: '9' }, usuario: { nombre: 'Admin' } }, res);
         assert.equal(res.codigo, 404);
+        // Vuelta 1: Charly contesta con la lista de antes abierta. Ya no lo revive (antes daba 200 y pasaba a «surtida»).
+        process.env.PLANTA_SEGUIMIENTO = 'encargado';
+        const resPatch = { status(c) { this.codigo = c; return this; }, json(b) { this.cuerpo = b; return this; } };
+        await responderPedidoEncargado({ params: { id: '9' }, body: { estado: 'surtida' }, usuario: { nombre: 'Charly' } }, resPatch);
+        assert.equal(resPatch.codigo, 404);
+        assert.equal(resPatch.cuerpo.message, 'Ese pedido lo quitó el administrador');
+        assert.equal(fila.estado, 'cancelada', 'sigue cancelado');
+        assert.equal(fila.atendida_por, 'Admin', 'nadie lo pisó');
     } finally {
         Object.assign(SolicitudAlmacen, originales);
     }
@@ -348,14 +356,94 @@ test('pendientes de Planta: pedidos, tickets y celdas en una respuesta; lo que n
 
     // El resumen de las 8:00 al administrador
     const campanas = [];
-    const r = await S.enviarResumenDiario({ ahora, env: ENCENDIDO, notificar: async (n) => { campanas.push(n); }, armar: async () => p });
+    const r = await S.enviarResumenDiario({ ahora, env: ENCENDIDO, notificar: async (n) => { campanas.push(n); }, armar: async () => p, cfg: configuracion() });
     assert.equal(r.enviado, true);
     assert.deepEqual(campanas[0].roles, ['administrador']);
     assert.match(campanas[0].titulo, /Pendientes de Planta \(3\)/);
     assert.match(campanas[0].mensaje, /1 celda del calendario sin entender: «ROSA PÉREZ \/ RETRIO»/);
     assert.match(campanas[0].mensaje, /1 pedido de encargado vencido: Prueba/);
     assert.match(campanas[0].mensaje, /1 ticket de salida sin llegar a Drive/);
-    assert.equal((await S.enviarResumenDiario({ ahora, env: {}, notificar: async () => { throw new Error('no debe'); }, armar: async () => p })).apagada, true);
+    assert.equal((await S.enviarResumenDiario({ ahora, env: {}, notificar: async () => { throw new Error('no debe'); }, armar: async () => p, cfg: configuracion() })).apagada, true);
+});
+
+test('vuelta 1 · el resumen de las 8:00 que no sale: queda anotado, la puerta lo dice y se reintenta en la siguiente hora (una vez al día)', async () => {
+    const cfg = configuracion();
+    const vacia = { pedidos: modelo([]), tickets: modelo([]) };
+    const armar = (o) => S.pendientesDePlanta({ ...o, modelos: vacia, cfg });
+    let falla = true;
+    const campanas = [];
+    const notificar = async (n) => { if (falla) throw new Error('no hay conexión con la base'); campanas.push(n); };
+    // 8:00 (14:00 UTC): falla
+    const a = await S.enviarResumenDiario({ ahora: reloj('2026-11-06T14:00:00Z'), env: ENCENDIDO, notificar, armar, cfg });
+    assert.deepEqual([a.enviado, a.intentos], [false, 1]);
+    const guardado = JSON.parse(cfg.datos.get('resumen_planta_diario'));
+    assert.equal(guardado.noSalio.dia, '2026-11-06');
+    assert.match(guardado.noSalio.motivo, /no hay conexión/);
+    // La puerta lo dice (nada se calla)
+    const p = await S.pendientesDePlanta({ ahora: reloj('2026-11-06T14:30:00Z'), modelos: vacia, cfg, env: {} });
+    assert.ok(p.avisos.includes('El resumen de las 8:00 al administrador de hoy no salió (1 intento): no hay conexión con la base. Se reintenta cada hora hasta las 18:00'), p.avisos.join(' | '));
+    assert.equal(p.avisosNoSalieron.resumenDiario.intentos, 1);
+    // 9:00: vuelve a fallar; 10:00: sale, y dice en el texto que el de las 8:00 no salió
+    assert.equal((await S.enviarResumenDiario({ ahora: reloj('2026-11-06T15:00:00Z'), env: ENCENDIDO, notificar, armar, cfg })).intentos, 2);
+    falla = false;
+    const c = await S.enviarResumenDiario({ ahora: reloj('2026-11-06T16:00:00Z'), env: ENCENDIDO, notificar, armar, cfg });
+    assert.deepEqual([c.enviado, c.reintento], [true, true]);
+    assert.equal(campanas.length, 1);
+    assert.match(campanas[0].mensaje, /no salió \(2 intentos\)/);
+    // 11:00 en adelante: ya salió hoy, no se repite; y la puerta ya no lo dice
+    assert.equal((await S.enviarResumenDiario({ ahora: reloj('2026-11-06T17:00:00Z'), env: ENCENDIDO, notificar, armar, cfg })).yaSalio, true);
+    assert.equal(campanas.length, 1);
+    const q = await S.pendientesDePlanta({ ahora: reloj('2026-11-06T17:30:00Z'), modelos: vacia, cfg, env: {} });
+    assert.ok(!q.avisos.some((x) => /resumen/.test(x)), q.avisos.join(' | '));
+    assert.equal(q.avisosNoSalieron.resumenDiario, null);
+    // Al día siguiente sale otra vez a las 8:00
+    assert.equal((await S.enviarResumenDiario({ ahora: reloj('2026-11-07T14:00:00Z'), env: ENCENDIDO, notificar, armar, cfg })).enviado, true);
+    assert.equal(campanas.length, 2);
+    // Un día que no salió nunca: al día siguiente la puerta dice de qué día era
+    falla = true;
+    await S.enviarResumenDiario({ ahora: reloj('2026-11-09T14:00:00Z'), env: ENCENDIDO, notificar, armar, cfg });
+    await S.enviarResumenDiario({ ahora: reloj('2026-11-10T00:00:00Z'), env: ENCENDIDO, notificar, armar, cfg }); // 18:00 del 9
+    falla = false;
+    await S.enviarResumenDiario({ ahora: reloj('2026-11-10T14:00:00Z'), env: ENCENDIDO, notificar, armar, cfg });
+    const r = await S.pendientesDePlanta({ ahora: reloj('2026-11-10T14:30:00Z'), modelos: vacia, cfg, env: {} });
+    assert.ok(r.avisos.includes('El resumen de las 8:00 al administrador del 9 nov no salió (2 intentos): no hay conexión con la base'), r.avisos.join(' | '));
+    // La agenda lo programa de 8:00 a 18:00 (el reintento)
+    const { cronDe } = await import('../src/utils/agendaPlanta.js');
+    assert.equal(cronDe('pla-seguimiento-resumen'), '0 8-18 * * 1-6');
+});
+
+test('vuelta 1 · la puerta dice qué obras cambiarían de fecha al mover CALENDARIO_VOCABULARIO_UNICO', async () => {
+    const cfg = configuracion();
+    cfg.datos.set('calendario_celdas_no_entendidas', JSON.stringify({ dia: '2026-11-06', celdas: [] }));
+    cfg.datos.set('calendario_vocabulario_vista_previa', JSON.stringify({ dia: '2026-11-06', encendida: false, total: 2, obras: [
+        { id: 1, proyecto: 'ROSA INVENTADA', ahora: '2026-11-09', conLaOtraRegla: '2026-11-20' },
+        { id: 2, proyecto: 'PARQUE SUR', ahora: '2026-11-12', conLaOtraRegla: null }
+    ] }));
+    const p = await S.pendientesDePlanta({ ahora: reloj('2026-11-06T18:00:00Z'), modelos: { pedidos: modelo([]), tickets: modelo([]) }, cfg, env: {} });
+    assert.deepEqual(p.calendario.alCambiarVocabulario, {
+        hoyEsta: 'apagada', revisadoEl: '2026-11-06', obrasQueCambian: 2,
+        lista: [
+            { id: 1, proyecto: 'ROSA INVENTADA', ahora: '2026-11-09', conLaOtraRegla: '2026-11-20' },
+            { id: 2, proyecto: 'PARQUE SUR', ahora: '2026-11-12', conLaOtraRegla: null }
+        ]
+    });
+    assert.deepEqual(p.avisos, []);
+});
+
+// Contrato de mensajes P9 (CONTRATOS-mensajes.md): Julia reconoce estos dos encabezados cuando un encargado contesta un
+// aviso de Planta en Requisiciones, y lo copia a Compras como respuesta, no como «📥 *Requisición*». No se cambian.
+test('contrato P9 · los dos encabezados de los avisos de Planta en Requisiciones quedan fijos', () => {
+    const RE_JULIA = /^(⏰ \*Pedidos de encargados sin atender\*|(✅|🟡|❌) \*Almacén contestó a )/u;
+    const ahora = reloj('2026-11-06T18:00:00Z');
+    const recordatorio = S.textoRecordatorioPedidos([S.estadoPedido(pedido(3, '2026-11-06T12:00:00Z'), { ahora })], { ahora });
+    assert.match(recordatorio, RE_JULIA);
+    assert.equal(recordatorio.split('\n')[0], '⏰ *Pedidos de encargados sin atender* (1)');
+    const primeros = { surtida: '✅ *Almacén contestó a Prueba* · Surtido', parcial: '🟡 *Almacén contestó a Prueba* · Surtido en parte', rechazada: '❌ *Almacén contestó a Prueba* · No se puede' };
+    for (const [estado, primero] of Object.entries(primeros)) {
+        const texto = S.textoRespuestaEncargado({ id: 1, encargado: 'PRUEBA', texto: 'tornillos de prueba', estado, nota_almacen: estado === 'surtida' ? null : 'nota de prueba' });
+        assert.match(texto, RE_JULIA, estado);
+        assert.equal(texto.split('\n')[0], primero);
+    }
 });
 
 test('agenda: las tres tareas nuevas solo aparecen con su pieza encendida', async () => {
