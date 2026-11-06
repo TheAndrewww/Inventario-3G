@@ -7,13 +7,16 @@
  *     Respuestas: 201 { ok, id: "almacen-N", estado, duplicado: false, recibido } · 200 { ok, id, estado, duplicado: true }
  *     si esa referencia ya estaba (aunque llegue con otra Idempotency-Key) · 400 { error } si falta o sobra algo.
  *   GET /api/sistemas/v1/almacen/solicitudes?encargado=GERAS
- *     { solicitudes: [{ id, referencia, tipo, texto, paraFecha, estado, nota, atendidaEn, creada }] } (50 como máximo, la
- *     más nueva primero). Sin «encargado», las de todos.
+ *     { solicitudes: [{ id, referencia, tipo, texto, paraFecha, estado, nota, atendidaEn, creada, cancelada }] } (50 como
+ *     máximo, la más nueva primero). Sin «encargado», las de todos.
+ *     `estado` es siempre pendiente, surtida, parcial o rechazada: lo que la tableta conoce. Un pedido que el administrador
+ *     quitó en Planta sale como «rechazada» con la nota «Lo quitó el administrador en Planta» y `cancelada: true`
+ *     (campo nuevo del 6-nov-2026).
  *
  * El encargado lo pide desde su tableta (Operación lo reenvía aquí) y Charly lo atiende en Planta › Pedidos de encargados
  * (surtido, parcial o no se puede, con su nota). Al llegar uno nuevo se avisa en la campana (y push) a Almacén.
  */
-import SolicitudAlmacen, { TIPOS_SOLICITUD_ALMACEN } from '../../models/SolicitudAlmacen.js';
+import SolicitudAlmacen, { TIPOS_SOLICITUD_ALMACEN, ESTADOS_SOLICITUD_ALMACEN, ESTADO_CANCELADA, NOTA_CANCELADA } from '../../models/SolicitudAlmacen.js';
 import { isoMexico } from '../../utils/revisarConfig.js';
 import { sinTelefonos, RE_OBRA } from './bitacora.js';
 
@@ -111,7 +114,7 @@ export const textoRequisicion = (f) => {
 export const registrarSolicitudAlmacen = async (cuerpo, { modelo = SolicitudAlmacen, avisar = avisarAlmacen } = {}) => {
     const { errores, datos } = leerSolicitudAlmacen(cuerpo);
     if (errores.length) return { codigo: 400, cuerpo: { error: `No se anotó: ${errores.join('; ')}.` } };
-    const duplicado = (f) => ({ codigo: 200, cuerpo: { ok: true, id: f ? `almacen-${f.id}` : null, estado: f?.estado ?? null, duplicado: true } });
+    const duplicado = (f) => ({ codigo: 200, cuerpo: { ok: true, id: f ? `almacen-${f.id}` : null, estado: f ? estadoParaTableta(f.estado).estado : null, duplicado: true } });
     const previa = await modelo.findOne({ where: { referencia: datos.referencia }, attributes: ['id', 'estado'] });
     if (previa) return duplicado(previa);
     try {
@@ -127,18 +130,32 @@ export const registrarSolicitudAlmacen = async (cuerpo, { modelo = SolicitudAlma
     }
 };
 
+/**
+ * El estado como lo entiende la tableta (6-nov-2026). La app nativa solo conoce surtida, parcial y rechazada; cualquier
+ * otro valor lo pinta «Esperando a Charly». Por eso un pedido cancelado en Planta sale como «rechazada» («No se puede»)
+ * con su nota, y nunca sale un estado fuera de pendiente, surtida, parcial o rechazada. Pura.
+ */
+export const estadoParaTableta = (estado) => {
+    if (estado === ESTADO_CANCELADA) return { estado: 'rechazada', cancelada: true };
+    return { estado: ESTADOS_SOLICITUD_ALMACEN.includes(estado) ? estado : 'pendiente', cancelada: false };
+};
+
 /** Lo que ve la tableta: el estado de sus pedidos. */
-export const formaSolicitud = (f) => ({
-    id: `almacen-${f.id}`,
-    referencia: f.referencia,
-    tipo: f.tipo,
-    texto: f.texto,
-    paraFecha: f.para_fecha || null,
-    estado: f.estado,
-    nota: f.nota_almacen || null,
-    atendidaEn: f.atendida_en ? isoMexico(new Date(f.atendida_en)) : null,
-    creada: f.created_at ? isoMexico(new Date(f.created_at)) : null
-});
+export const formaSolicitud = (f) => {
+    const { estado, cancelada } = estadoParaTableta(f.estado);
+    return {
+        id: `almacen-${f.id}`,
+        referencia: f.referencia,
+        tipo: f.tipo,
+        texto: f.texto,
+        paraFecha: f.para_fecha || null,
+        estado,
+        nota: cancelada ? NOTA_CANCELADA : f.nota_almacen || null,
+        atendidaEn: f.atendida_en ? isoMexico(new Date(f.atendida_en)) : null,
+        creada: f.created_at ? isoMexico(new Date(f.created_at)) : null,
+        cancelada
+    };
+};
 
 export const listarSolicitudesAlmacen = async (req, { modelo = SolicitudAlmacen } = {}) => {
     const encargado = String(req.query?.encargado ?? '').trim().replace(/\s+/g, ' ').toUpperCase();

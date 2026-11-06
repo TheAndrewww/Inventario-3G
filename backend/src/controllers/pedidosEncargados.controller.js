@@ -4,7 +4,9 @@
  * atienden (surtido, parcial o no se puede, con su nota). La tableta del encargado lee el estado por la puerta.
  */
 import { Op } from 'sequelize';
-import SolicitudAlmacen, { ESTADOS_SOLICITUD_ALMACEN } from '../models/SolicitudAlmacen.js';
+import SolicitudAlmacen, { ESTADOS_SOLICITUD_ALMACEN, ESTADO_CANCELADA, NOTA_CANCELADA } from '../models/SolicitudAlmacen.js';
+// 6-nov-2026 (revisión, punto 9 c): aviso al encargado cuando Almacén contesta (pieza «encargado» de PLANTA_SEGUIMIENTO)
+import { avisarRespuestaAlEncargado } from '../services/seguimientoPlanta.service.js';
 
 const MAX_NOTA = 1000;
 
@@ -12,8 +14,9 @@ const MAX_NOTA = 1000;
 export const listarPedidosEncargados = async (req, res) => {
     try {
         const estado = String(req.query.estado || '').trim();
+        // Los cancelados (borrados por el administrador) ya no salen en Planta; la tableta sí los ve como «cancelada».
         const where = estado === 'pendiente' ? { estado: 'pendiente' }
-            : estado === 'atendidas' ? { estado: { [Op.ne]: 'pendiente' } } : {};
+            : estado === 'atendidas' ? { estado: { [Op.notIn]: ['pendiente', ESTADO_CANCELADA] } } : { estado: { [Op.ne]: ESTADO_CANCELADA } };
         const [solicitudes, pendientes] = await Promise.all([
             SolicitudAlmacen.findAll({ where, order: [['created_at', 'DESC'], ['id', 'DESC']], limit: 200 }),
             SolicitudAlmacen.count({ where: { estado: 'pendiente' } })
@@ -58,7 +61,9 @@ export const responderPedidoEncargado = async (req, res) => {
             atendida_por: req.usuario?.nombre || null,
             atendida_en: new Date()
         });
-        res.json({ success: true, data: fila });
+        // null = pieza «encargado» apagada · true = salió · false = no salió (ya quedó anotado y el administrador tiene campana)
+        const avisoEncargado = await avisarRespuestaAlEncargado(fila);
+        res.json({ success: true, data: fila, avisoEncargado });
     } catch (e) {
         console.error('responderPedidoEncargado:', e);
         res.status(500).json({ success: false, message: 'No se pudo guardar la respuesta' });
@@ -66,13 +71,22 @@ export const responderPedidoEncargado = async (req, res) => {
 };
 
 /** DELETE /api/pedidos-encargados/:id — solo el administrador (29-oct-2026): para quitar los pedidos de prueba.
- *  Se borra de verdad; la tableta deja de verlo en su lista. */
+ *  6-nov-2026: ya no se borra el renglón, se marca «cancelada». Antes la tableta se quedaba con «por atender» para
+ *  siempre, porque Operación guarda su copia y el pedido borrado ya no le llegaba en la lista. Ahora le llega por
+ *  GET /api/sistemas/v1/almacen/solicitudes como «rechazada» con la nota «Lo quitó el administrador en Planta» (la
+ *  tableta lo pinta «No se puede»), y en Planta deja de salir en las listas. */
 export const borrarPedidoEncargado = async (req, res) => {
     try {
         const fila = await SolicitudAlmacen.findByPk(req.params.id);
         if (!fila) return res.status(404).json({ success: false, message: 'No existe ese pedido' });
-        await fila.destroy();
-        console.log(`🗑️ Pedido de encargado #${fila.id} (${fila.encargado}: «${fila.texto}») borrado por ${req.usuario?.nombre || '?'}`);
+        if (fila.estado === ESTADO_CANCELADA) return res.status(404).json({ success: false, message: 'No existe ese pedido' });
+        await fila.update({
+            estado: ESTADO_CANCELADA,
+            nota_almacen: NOTA_CANCELADA,
+            atendida_por: req.usuario?.nombre || null,
+            atendida_en: new Date()
+        });
+        console.log(`🗑️ Pedido de encargado #${fila.id} (${fila.encargado}: «${fila.texto}») cancelado por ${req.usuario?.nombre || '?'}`);
         res.json({ success: true });
     } catch (e) {
         console.error('borrarPedidoEncargado:', e);

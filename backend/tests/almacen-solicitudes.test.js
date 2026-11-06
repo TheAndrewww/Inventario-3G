@@ -90,3 +90,28 @@ test('26-oct: la requisición del encargado va al grupo Requisiciones con un tex
     const t = textoRequisicion({ encargado: 'GERAS', tipo: 'REPOSICION', texto: '2 cajas de tornillo 1/4', para_fecha: '2026-10-27', proyecto: null });
     assert.equal(t, '📋 *Requisición de Geras* · Reposición de stock\n2 cajas de tornillo 1/4\nPara el 27 oct\nSe atiende en Inventario › Pedidos de encargados.');
 });
+
+// 6-nov-2026 (verificación de la revisión, punto 9 c.3): la app nativa solo conoce surtida, parcial y rechazada, y todo lo
+// demás lo pinta «Esperando a Charly». La puerta nunca manda otro estado; un cancelado sale como «No se puede» con su nota.
+test('la puerta nunca le manda a la tableta un estado que no conoce; un cancelado sale «rechazada» con su nota', async () => {
+    const { formaSolicitud, estadoParaTableta } = await import('../src/routes/sistemas/almacen.js');
+    const QUE_CONOCE = ['pendiente', 'surtida', 'parcial', 'rechazada'];
+    for (const estado of ['pendiente', 'surtida', 'parcial', 'rechazada', 'cancelada', 'otro', '', null, undefined]) {
+        const f = formaSolicitud({ id: 1, referencia: 'operacion:x', tipo: 'MATERIAL', texto: 'tornillos de prueba', estado, nota_almacen: 'nota de prueba', created_at: new Date('2026-11-05T15:00:00Z') });
+        assert.ok(QUE_CONOCE.includes(f.estado), `«${estado}» sale como «${f.estado}»`);
+        assert.equal(f.cancelada, estado === 'cancelada');
+    }
+    const cancelado = formaSolicitud({ id: 2, referencia: 'operacion:y', tipo: 'MATERIAL', texto: 'tornillos de prueba', estado: 'cancelada', nota_almacen: null });
+    assert.deepEqual([cancelado.estado, cancelado.nota, cancelado.cancelada], ['rechazada', 'Lo quitó el administrador en Planta', true]);
+    const atendido = formaSolicitud({ id: 3, referencia: 'operacion:z', tipo: 'MATERIAL', texto: 'tornillos de prueba', estado: 'parcial', nota_almacen: 'Solo había la mitad' });
+    assert.deepEqual([atendido.estado, atendido.nota, atendido.cancelada], ['parcial', 'Solo había la mitad', false], 'lo demás sale igual que antes');
+    assert.deepEqual(estadoParaTableta('cancelada'), { estado: 'rechazada', cancelada: true });
+
+    // El «ya estaba» del POST tampoco regresa «cancelada» (Operación guarda ese estado tal cual)
+    const modelo = modeloEnMemoria();
+    await registrarSolicitudAlmacen({ ...BUENO, encargado: 'PRUEBA', referencia: 'ope-alm-90' }, { modelo, avisar: async () => {} });
+    modelo.filas[0].estado = 'cancelada';
+    const otra = await registrarSolicitudAlmacen({ ...BUENO, encargado: 'PRUEBA', referencia: 'ope-alm-90' }, { modelo, avisar: async () => {} });
+    assert.equal(otra.cuerpo.duplicado, true);
+    assert.equal(otra.cuerpo.estado, 'rechazada');
+});

@@ -19,6 +19,9 @@
  *   GET /api/sistemas/v1/produccion/estado     alcance «produccion.leer»  ?obras=3G-AA-NNNN,… · ¿sigue cerrada? justo antes de llamar
  *   GET /api/sistemas/v1/produccion/en-curso   alcance «produccion.leer»  ?despuesDe= · el taller y su material para la llamada a Calidad (flujo A)
  *       (las tres: origen «operacion», la pareja Operación → Planta; formas de respuesta en produccion.js)
+ *   GET /api/sistemas/v1/pendientes-planta  alcance «produccion.leer» o «inicio.leer»  pedidos de encargados sin atender,
+ *       tickets de salida sin llegar a Drive y celdas del calendario que Planta no entiende, para el resumen diario de
+ *       Operación (6-nov-2026, revisión punto 9 e; services/seguimientoPlanta.service.js › pendientesDePlanta)
  *   POST /api/sistemas/v1/calidad/sugerencias  alcance «calidad.sugerir»  lo que dijo la llamada de las 16:00 a Calidad
  *       (28-oct; origen «operacion»). Solo con PANEL_CALIDAD: apagada responde 404 como cualquier puerta que no existe.
  *
@@ -130,6 +133,10 @@ export const autenticarPuerta = (registro, { ventanas = new Map() } = {}) => (re
 export const exigirAlcance = (alcance) => (req, res, next) => (req.puerta?.alcances.includes(alcance)
     ? next()
     : error(res, 403, `Esta llave no tiene el alcance «${alcance}».`));
+/** Basta con uno de esos alcances (la puerta de pendientes la leen Operación y el Inicio con las llaves que ya tienen). */
+export const exigirAlgunAlcance = (alcances) => (req, res, next) => (alcances.some((a) => req.puerta?.alcances.includes(a))
+    ? next()
+    : error(res, 403, `Esta llave no tiene el alcance «${alcances.join('» ni «')}».`));
 
 /**
  * Escrituras entre sistemas: Idempotency-Key obligatoria y recordada 7 días por origen y ruta.
@@ -523,6 +530,16 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
     router.get(`${PREFIJO_SISTEMAS}/produccion/cerradas`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerCerradas(req)));
     router.get(`${PREFIJO_SISTEMAS}/produccion/estado`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerEstado(req)));
     router.get(`${PREFIJO_SISTEMAS}/produccion/en-curso`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerEnCurso(req)));
+    // 6-nov-2026 (revisión, punto 9 e): pendientes de Planta para el resumen diario de Operación. Solo lee; sin bandera.
+    router.get(`${PREFIJO_SISTEMAS}/pendientes-planta`, exigirAlgunAlcance([ALCANCE_PRODUCCION, 'inicio.leer']), async (req, res) => {
+        try {
+            const { pendientesDePlanta } = await import('../../services/seguimientoPlanta.service.js');
+            res.json(await conTope(pendientesDePlanta(), 2800));
+        } catch (e) {
+            console.error('[puerta] /pendientes-planta:', e.message);
+            error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo armar la respuesta; intenta de nuevo.');
+        }
+    });
     // 28-oct · PANEL_CALIDAD: las sugerencias de la llamada de las 16:00 a Calidad (Operación, flujo A). Apagada: 404 como
     // cualquier puerta que no existe (next('route') salta al «No existe esa puerta»).
     router.post(`${PREFIJO_SISTEMAS}/calidad/sugerencias`, (req, res, next) => (panelCalidad() ? next() : next('route')),

@@ -323,5 +323,9 @@ export const iniciarCronJobs = () => {
   iniciarJobSincronizacionSheets();
   iniciarReintentosTicketsDrive();
   iniciarReintentosReportesCalidad();
+  // 6-nov-2026 (revisión, punto 9): recordatorios de pedidos, tickets atorados y resumen diario (con PLANTA_SEGUIMIENTO)
+  import('../services/seguimientoPlanta.service.js')
+    .then(({ iniciarSeguimientoPlanta }) => iniciarSeguimientoPlanta())
+    .catch((e) => console.error('⚠️ No se pudo iniciar el seguimiento de Planta:', e.message));
   console.log('✅ Todos los cron jobs han sido iniciados');
 };
