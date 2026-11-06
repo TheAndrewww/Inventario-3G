@@ -3,8 +3,9 @@
  *
  * Antes cada pantalla entendía la celda con sus propias palabras: la agenda y el tablero pedían la palabra exacta
  * «RETIRO», las citas del día buscaban «retiro» en cualquier parte, Operación acepta cualquier palabra que empiece con
- * «RETIR», y nadie decía si la obra era EXTENSIVO. Aquí vive la lectura única de una celda, la misma que usa Operación
- * (tipoReal en carlaCitas): RETIRO, CIMENTACION, EXTENSIVO, MTO, GTIA o INSTALACION, en ese orden de prioridad.
+ * «RETIR», y nadie decía si la obra era EXTENSIVO. Aquí vive la lectura única de una celda: el contrato «tipo de cita v1»
+ * (CONTRATOS-puertas.md, A1), la MISMA regla que Operación (tipoReal + tipoDeCita) y Julia (separarCitasDeCarla, con
+ * `tipo_cita`). Da RETIRO, EXTENSIVO, CIMENTACION, GTIA, MTO o INSTALACION (ver clasificarCita).
  *
  * Bandera CALENDARIO_VOCABULARIO_UNICO (APAGADA por omisión):
  *   apagada  Planta decide fechas y tipos como hasta hoy (reglaAnterior*). El tipo único se calcula igual y viaja en
@@ -21,7 +22,8 @@
 const SI = new Set(['1', 'true', 'si', 'sí', 'on']);
 export const vocabularioUnico = () => SI.has(String(process.env.CALENDARIO_VOCABULARIO_UNICO ?? '').trim().toLowerCase());
 
-export const TIPOS_CITA = ['RETIRO', 'CIMENTACION', 'EXTENSIVO', 'MTO', 'GTIA', 'INSTALACION'];
+// En el orden del contrato «tipo de cita v1»: si una obra tiene dos celdas el mismo día, gana la primera de esta lista.
+export const TIPOS_CITA = ['RETIRO', 'EXTENSIVO', 'CIMENTACION', 'GTIA', 'MTO', 'INSTALACION'];
 
 const sinAcentos = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '');
 /** Texto de la celda en mayúsculas, sin acentos y con las diagonales como espacios: «ROSA INVENTADA MTO RETIRO». */
@@ -37,27 +39,45 @@ const RE_MTO = /\b(MTO|MTTO|MANTTO|MANT)\b|\bMANTENIM/;        // MTO y sus abre
 const RE_GTIA = /\b(GTIA|GTIAS)\b|\bGARANT/;
 
 /**
- * Lo que dice una celda, con el vocabulario único. `esExtensivo` = la obra es EXTENSIVO en el Índice (columna J).
- * El color de la celda (tipoProyecto: MANTENIMIENTO o GARANTIA) cuenta si el texto no dice MTO ni GTIA.
+ * Lo que dice una celda: contrato «tipo de cita v1» (CONTRATOS-puertas.md, A1), igual en Planta, Operación y Julia.
+ * El texto es la celda completa («NOMBRE / resto») sin acentos, en mayúsculas y con todo lo que no es A-Z o 0-9 como
+ * espacio. `esExtensivo` = el producto de la obra es EXTENSIVO en el Índice (columna J). El color es el fondo de la celda
+ * (tipoProyecto: MANTENIMIENTO, GARANTIA o NORMAL). La primera regla que aplica decide:
+ *   1) RETIR…                                   → RETIRO
+ *   2) EXTENSIV… en el texto                    → EXTENSIVO
+ *   3) producto EXTENSIVO y no es garantía      → EXTENSIVO  («es garantía» = color GARANTIA, o sin color de MTO ni de
+ *                                                  GTIA y el texto dice GTIA/GARANT. L14 sin decidir: si el dueño dice
+ *                                                  otra cosa, se quita «y no es garantía» en los tres el mismo día)
+ *   4) CIMENTACI…                               → CIMENTACION
+ *   5) color GARANTIA → GTIA; color MANTENIMIENTO → MTO
+ *   6) GTIA, GTIAS, GARANT…                     → GTIA
+ *   7) MTO, MTTO, MANTTO, MANT, MANTENIM…, RE INST… → MTO
+ *   8) lo demás                                 → INSTALACION
+ * Si se cambia algo aquí, se cambia el mismo día en Operación y en Julia (prueba: la tabla de 20 celdas).
  * @returns {{ tipo: string, retiro: boolean, cimentacion: boolean, extensivo: boolean, reinstalacion: boolean }}
  */
 export const clasificarCita = (cita, { esExtensivo = false } = {}) => {
     const t = textoDeCita(cita);
     const retiro = RE_RETIRO.test(t);
     const cimentacion = RE_CIMENTACION.test(t);
-    const extensivo = !!esExtensivo || RE_EXTENSIVO.test(t);
+    const extensivoTexto = RE_EXTENSIVO.test(t);
+    const extensivo = !!esExtensivo || extensivoTexto;
     const reinstalacion = RE_REINSTALACION.test(t);
     const mtoTexto = RE_MTO.test(t) || reinstalacion;
     const gtiaTexto = RE_GTIA.test(t);
     const color = String(cita?.tipoProyecto || '').toUpperCase();
+    const colorMto = color === 'MANTENIMIENTO';
+    const colorGtia = color === 'GARANTIA';
+    const esGarantia = colorGtia || (!colorMto && gtiaTexto);
     let tipo = 'INSTALACION';
     if (retiro) tipo = 'RETIRO';
+    else if (extensivoTexto) tipo = 'EXTENSIVO';
+    else if (esExtensivo && !esGarantia) tipo = 'EXTENSIVO';
     else if (cimentacion) tipo = 'CIMENTACION';
-    else if (extensivo) tipo = 'EXTENSIVO';
-    else if (mtoTexto) tipo = 'MTO';
+    else if (colorGtia) tipo = 'GTIA';
+    else if (colorMto) tipo = 'MTO';
     else if (gtiaTexto) tipo = 'GTIA';
-    else if (color === 'MANTENIMIENTO') tipo = 'MTO';
-    else if (color === 'GARANTIA') tipo = 'GTIA';
+    else if (mtoTexto) tipo = 'MTO';
     return { tipo, retiro, cimentacion, extensivo, reinstalacion };
 };
 
@@ -84,20 +104,37 @@ export const reglaAnteriorTipoCitas = (cita) => {
  *   encendida el tipo único solo si es RETIRO, MTO o GTIA («RETIRAR LONA», «MANTTO» o el color de la celda ya se
  *             reconocen); si es EXTENSIVO, CIMENTACION o INSTALACION, la regla de antes. Así encender la bandera solo
  *             puede pasar una cita de INSTALACION a la lista de Carla, nunca al revés.
+ * El tipo único de aquí se calcula SIN el producto de la obra (sin esExtensivo; vuelta 1 de la verificación integrada):
+ * con él, «X / MANTTO» o una celda pintada de mantenimiento de una obra EXTENSIVO daban EXTENSIVO, caían a la regla de
+ * antes y salían como INSTALACION, mientras que la misma celda en otra obra daba MTO.
  * Quien quiera el vocabulario nuevo lee `tipo_cita` y `es_extensivo`.
  */
 export const TIPOS_CITA_ANTERIORES = ['RETIRO', 'GTIA', 'MTO', 'INSTALACION'];
-export const tipoAnteriorDeCita = (cita, { clasificada = null, unico = vocabularioUnico() } = {}) => {
+export const tipoAnteriorDeCita = (cita, { unico = vocabularioUnico() } = {}) => {
     const antes = reglaAnteriorTipoCitas(cita);
     if (!unico) return antes;
-    const nuevo = (clasificada || clasificarCita(cita)).tipo;
+    const nuevo = clasificarCita(cita).tipo;
     return ['RETIRO', 'MTO', 'GTIA'].includes(nuevo) ? nuevo : antes;
 };
 
-/** ¿Esta cita es un retiro? Con la bandera, el vocabulario único; sin ella, la regla de antes. */
-export const esRetiro = (cita) => (vocabularioUnico() ? clasificarCita(cita).retiro : reglaAnteriorRetiro(cita));
+/**
+ * Los tres campos de tipo de una cita de GET /produccion/citas (lo que lee Julia para repartir las citas):
+ *  · tipo         el campo viejo (tipoAnteriorDeCita): RETIRO, GTIA, MTO o INSTALACION, sin el producto de la obra;
+ *  · tipo_cita    el contrato «tipo de cita v1», con el producto de la obra (`esExtensivo`);
+ *  · es_extensivo el producto es EXTENSIVO o la celda lo dice.
+ */
+export const tiposDeCitaDelDia = (cita, { esExtensivo = false, unico = vocabularioUnico() } = {}) => {
+    const clasificada = clasificarCita(cita, { esExtensivo });
+    return { tipo: tipoAnteriorDeCita(cita, { unico }), tipo_cita: clasificada.tipo, es_extensivo: clasificada.extensivo };
+};
+
+/**
+ * ¿Esta cita es un retiro? Con la bandera, el vocabulario único; sin ella, la regla de antes. `unico` deja calcular con
+ * la otra regla (la pasada de 5 min compara contra la foto con la regla con que se tomó la foto).
+ */
+export const esRetiro = (cita, unico = vocabularioUnico()) => (unico ? clasificarCita(cita).retiro : reglaAnteriorRetiro(cita));
 /** ¿Esta cita es una cimentación? Con la bandera, el vocabulario único; sin ella, la regla de antes. */
-export const esCimentacion = (cita) => (vocabularioUnico() ? clasificarCita(cita).cimentacion : reglaAnteriorCimentacion(cita));
+export const esCimentacion = (cita, unico = vocabularioUnico()) => (unico ? clasificarCita(cita).cimentacion : reglaAnteriorCimentacion(cita));
 
 // ---------- Celdas que Planta no entiende ----------
 const levenshtein = (a, b) => {
@@ -116,13 +153,15 @@ const LARGAS = ['RETIRO', 'CIMENTACION', 'EXTENSIVO', 'REINSTALACION', 'MANTENIM
 // Palabras cortas: solo a una letra.
 const CORTAS = ['MTO', 'GTIA'];
 // Las dos (largas y cortas) se revisan solo después de la primera diagonal de la celda: antes va el nombre del cliente,
-// y ahí daban falsos avisos («RAMIRO GONZALEZ / MTO» salía como RETIRO mal escrito; verificación del 6-nov-2026).
+// y ahí daban falsos avisos («RAMIRO GONZALEZ / MTO» salía como RETIRO mal escrito; verificación del 6-nov-2026). En una
+// celda sin diagonal, solo las 2 últimas palabras (ver motivosNoEntendida).
 const conocida = (p) => RE_RETIRO.test(p) || RE_CIMENTACION.test(p) || RE_EXTENSIVO.test(p) || RE_REINSTALACION.test(p)
     || RE_MTO.test(p) || RE_GTIA.test(p) || /^INSTALACION(ES)?$/.test(p);
 // Palabras de uso común que quedan cerca de una del vocabulario y no son error (se amplía si sale alguna en la lista).
 // MTZ (Martínez) y RAMIRO: nombres que también llegan después de la diagonal («OBRA / JUAN MTZ / MTO»).
+// EXTENSION, INTENSIVO, METRO y MTY (Monterrey): palabras normales que también caen en una celda sin diagonal (vuelta 1).
 const COMUNES = new Set(['RETIRA', 'GARANTIZA', 'INSTALADO', 'INSTALADA', 'INSTALAR', 'MOTO', 'GOTA', 'META', 'MITO', 'MATO', 'MOTA', 'GITA', 'GATO', 'GUIA', 'TIA',
-    'MTZ', 'RAMIRO']);
+    'MTZ', 'RAMIRO', 'EXTENSION', 'INTENSIVO', 'METRO', 'MTY']);
 
 /**
  * Por qué Planta no entiende una celda (lista vacía = la entiende). Tres casos, los que hacen que una pantalla adivine:
@@ -135,16 +174,17 @@ export const motivosNoEntendida = (cita) => {
     const motivos = [];
     // La celda completa partida por sus diagonales; la primera parte (el nombre del cliente) no se revisa.
     const partes = [cita?.nombre, cita?.cliente].filter(Boolean).join(' / ').split('/').map((p) => sinAcentos(p).toUpperCase());
-    partes.forEach((parte, i) => {
-        if (i === 0) return;
-        for (const palabra of parte.replace(/[^A-Z0-9]+/g, ' ').trim().split(' ')) {
-            if (palabra.length < 3 || conocida(palabra) || COMUNES.has(palabra)) continue;
-            const larga = palabra.length >= 5 && LARGAS.find((k) => Math.abs(k.length - palabra.length) <= 2 && levenshtein(palabra, k) <= 2);
-            const corta = palabra.length <= 5 && CORTAS.find((k) => levenshtein(palabra, k) === 1);
-            const parecida = larga || corta;
-            if (parecida) motivos.push(`«${palabra}» parece ${parecida} mal escrito`);
-        }
-    });
+    const palabrasDe = (parte) => parte.replace(/[^A-Z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+    // Una celda sin diagonal («ROSA PEREZ RETRIO») también se revisa, pero solo en sus 2 últimas palabras (donde suele ir
+    // el tipo) y nunca en la primera (el nombre de pila). Vuelta 1 de la verificación integrada: antes no se revisaba.
+    const revisar = partes.length > 1 ? partes.slice(1).flatMap(palabrasDe) : palabrasDe(partes[0] || '').slice(1).slice(-2);
+    for (const palabra of revisar) {
+        if (palabra.length < 3 || conocida(palabra) || COMUNES.has(palabra)) continue;
+        const larga = palabra.length >= 5 && LARGAS.find((k) => Math.abs(k.length - palabra.length) <= 2 && levenshtein(palabra, k) <= 2);
+        const corta = palabra.length <= 5 && CORTAS.find((k) => levenshtein(palabra, k) === 1);
+        const parecida = larga || corta;
+        if (parecida) motivos.push(`«${palabra}» parece ${parecida} mal escrito`);
+    }
     const c = clasificarCita(cita);
     const t = textoDeCita(cita);
     const color = String(cita?.tipoProyecto || '').toUpperCase();
@@ -191,9 +231,9 @@ export const conVocabulario = (resultado) => {
         ...resultado,
         data: {
             ...resultado.data,
-            proyectos: proyectos.map((c) => ({ ...c, tipoCita: clasificarCita(c).tipo, esRetiro: esRetiro(c), esCimentacion: esCimentacion(c), unaFecha }))
+            proyectos: proyectos.map((c) => ({ ...c, tipoCita: clasificarCita(c).tipo, esRetiro: esRetiro(c, unaFecha), esCimentacion: esCimentacion(c, unaFecha), unaFecha }))
         }
     };
 };
 
-export default { vocabularioUnico, clasificarCita, tipoAnteriorDeCita, esRetiro, esCimentacion, motivosNoEntendida, celdasNoEntendidas, conVocabulario };
+export default { vocabularioUnico, clasificarCita, tipoAnteriorDeCita, tiposDeCitaDelDia, esRetiro, esCimentacion, motivosNoEntendida, celdasNoEntendidas, conVocabulario };

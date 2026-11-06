@@ -23,7 +23,7 @@ import { leerCalendarioMes } from './googleSheets.service.js';
 import { ProduccionProyecto, AvisoWhatsApp, Configuracion } from '../models/index.js';
 import { isWhatsAppEnabled } from './whatsapp.service.js';
 // 6-nov-2026 (revisión, punto 9): retiro, cimentación y tipo de cita salen del vocabulario único del calendario.
-import { esRetiro, esCimentacion, clasificarCita, TIPOS_CITA, celdasNoEntendidas } from '../utils/vocabularioCalendario.js';
+import { esRetiro, esCimentacion, clasificarCita, TIPOS_CITA, celdasNoEntendidas, vocabularioUnico } from '../utils/vocabularioCalendario.js';
 
 const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
     'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
@@ -101,26 +101,28 @@ const inicioUltimoBloque = (fechasAsc) => {
     return inicio;
 };
 
-const citasPorNombre = (citas) => {
+const citasPorNombre = (citas, unico = vocabularioUnico()) => {
     const mapa = {};
     for (const cp of citas || []) {
         const key = normalizarNombre(cp.nombre);
         // CIMENTACIÓN = trabajo de producción en la obra; la instalación va DESPUÉS, cuando
         // termina (CONDOMINIOS MAYORCA: cimentación mar-mié, instalación jueves). Casi siempre
         // va en el 2o renglón (`cliente`): mirando solo el nombre, el martes salía como instalación.
-        if (!key || esCimentacion(cp) || !cp.fecha) continue;
+        if (!key || esCimentacion(cp, unico) || !cp.fecha) continue;
         const lista = (mapa[key] = mapa[key] || []);
         // El RETIRO casi siempre va en el segundo renglón de la celda ("LUIS RÍOS" + "MTO RETIRO"),
         // que llega como `cliente`. Mirando solo el nombre, el retiro contaba como instalación y
         // a Charly se le preguntaba por una producción que ni ha llegado al taller (19-oct-2026).
-        const retiro = esRetiro(cp);
+        const retiro = esRetiro(cp, unico);
         // Tipo de la cita con el vocabulario único (solo se informa: tipo_cita de la agenda y tipoCita de la puerta).
+        // Dos: sin y con producto EXTENSIVO, porque aquí todavía no se sabe de qué obra es (contrato «tipo de cita v1»).
         const tipo = clasificarCita(cp).tipo;
+        const tipoExt = clasificarCita(cp, { esExtensivo: true }).tipo;
         // D8 · PLA-22: un día con hora (en cualquiera de sus renglones) es una cita agendada; sin hora es la fecha
         // límite que escribe Operación. Solo se anota: qué fecha manda no cambia.
         const previa = lista.find(c => c.fecha === cp.fecha);
-        if (previa) { if (cp.hora) previa.conHora = true; if (!retiro) previa.retiro = false; if (!retiro) previa.tipos.add(tipo); }
-        else lista.push({ fecha: cp.fecha, retiro, conHora: !!cp.hora, tipos: new Set(retiro ? [] : [tipo]) });
+        if (previa) { if (cp.hora) previa.conHora = true; if (!retiro) { previa.retiro = false; previa.tipos.add(tipo); previa.tiposExt.add(tipoExt); } }
+        else lista.push({ fecha: cp.fecha, retiro, conHora: !!cp.hora, tipos: new Set(retiro ? [] : [tipo]), tiposExt: new Set(retiro ? [] : [tipoExt]) });
     }
     return mapa;
 };
@@ -131,11 +133,11 @@ const citasPorNombre = (citas) => {
  * fecha ya no sirve: la instalación va cuando termine la cimentación y se pregunta cuando aparezca
  * en el calendario (regla del usuario, 5-nov-2026: CRIT ECATEPEC / GTIA / CIMENTACIÓN).
  */
-const citasDeCimentacion = (citas) => {
+const citasDeCimentacion = (citas, unico = vocabularioUnico()) => {
     const mapa = {};
     for (const cp of citas || []) {
         const key = normalizarNombre(cp.nombre);
-        if (!key || !cp.fecha || !esCimentacion(cp)) continue;
+        if (!key || !cp.fecha || !esCimentacion(cp, unico)) continue;
         (mapa[key] = mapa[key] || []).push({ fecha: cp.fecha, retiro: false });
     }
     return mapa;
@@ -231,26 +233,28 @@ const conReintento = async (fn, etiqueta, intentos = 3) => {
 };
 
 /**
- * El tipo de cita de una obra (vocabulario único): el de mayor prioridad entre las citas de su día (RETIRO, CIMENTACION,
- * EXTENSIVO, MTO, GTIA, INSTALACION) y, si la obra es EXTENSIVO en el Índice, EXTENSIVO (salvo retiro o cimentación).
- * Sin cita (fecha del Índice), el tipo del Índice. Solo informa: no cambia qué fecha manda.
+ * El tipo de cita de una obra (vocabulario único, contrato «tipo de cita v1»): el de mayor prioridad entre las citas de
+ * su día (en el orden de TIPOS_CITA). Si la obra es EXTENSIVO en el Índice, cada celda se lee con el producto EXTENSIVO
+ * (`tiposSiEsExtensivo`): EXTENSIVO, salvo el retiro y la garantía. Sin cita (fecha del Índice): el tipo del Índice, y
+ * EXTENSIVO si la obra lo es (salvo una GTIA). Solo informa: no cambia qué fecha manda.
  */
-export const tipoDeObra = (p, tiposDelDia = []) => {
+export const tipoDeObra = (p, tiposDelDia = [], tiposSiEsExtensivo = null) => {
     const tipoIndice = String(p?.tipo_proyecto || '').trim().toUpperCase();
-    let tipo = tiposDelDia.length
-        ? TIPOS_CITA.find(t => tiposDelDia.includes(t))
-        : (tipoIndice === 'MTO' ? 'MTO' : tipoIndice === 'GTIA' ? 'GTIA' : 'INSTALACION');
-    if (p?.es_extensivo && !['RETIRO', 'CIMENTACION'].includes(tipo)) tipo = 'EXTENSIVO';
-    return tipo;
+    const tipos = p?.es_extensivo && tiposSiEsExtensivo ? tiposSiEsExtensivo : tiposDelDia;
+    if (tipos.length) return TIPOS_CITA.find(t => tipos.includes(t));
+    if (p?.es_extensivo) return tipoIndice === 'GTIA' ? 'GTIA' : 'EXTENSIVO';
+    return tipoIndice === 'MTO' ? 'MTO' : tipoIndice === 'GTIA' ? 'GTIA' : 'INSTALACION';
 };
 
 /**
  * Fecha de instalación que manda para cada proyecto, con la regla del dashboard.
+ * `unico` = con qué regla se leen retiro y cimentación (CALENDARIO_VOCABULARIO_UNICO por omisión). La pasada de 5 min
+ * la usa para comparar contra la foto con la misma regla con que se tomó (vuelta 1 de la verificación integrada).
  * @returns {Map<number, {fecha: string|null, fuente: 'calendario'|'indice'}>}
  */
-export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico(), { citasAnteriores = [] } = {}) => {
+export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico(), { citasAnteriores = [], unico = vocabularioUnico() } = {}) => {
     const mesEnCurso = hoy.slice(0, 7);
-    const mapa = citasPorNombre(citas);
+    const mapa = citasPorNombre(citas, unico);
 
     // 1) Cruce normal, el mismo del dashboard.
     const fechasDeProyecto = new Map();   // id → Set(fechas)
@@ -322,14 +326,14 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico(), {
     // luego se reinstala: solo esa reinstalación le toca a producción (regla del usuario,
     // 19-oct-2026). Una cita MTO sin retiro antes ES el retiro, aunque no lo diga (LUIS RÍOS).
     // Se mira también el mes anterior completo, porque el retiro suele ir semanas antes.
-    const retiros = Object.entries(citasPorNombre([...citasAnteriores, ...(citas || [])]))
+    const retiros = Object.entries(citasPorNombre([...citasAnteriores, ...(citas || [])], unico))
         .flatMap(([n, l]) => l.filter(c => c.retiro).map(c => ({ base: nombreBase(n), fecha: c.fecha })));
     const huboRetiro = (id, cita) => {
         const bases = new Set((nombresDeProyecto.get(id) || []).map(nombreBase));
         return retiros.some(r => bases.has(r.base) && r.fecha < cita);
     };
 
-    const cimentaciones = citasDeCimentacion(citas);
+    const cimentaciones = citasDeCimentacion(citas, unico);
     const ultimaCimentacion = (p) => {
         const r = buscarFechaInstalacion(p.nombre, cimentaciones);
         return r ? [...r.fechas].sort().pop() || null : null;
@@ -343,8 +347,10 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico(), {
         if (cita && (soloCalendario || !indice || cita <= indice || cita.slice(0, 7) <= mesEnCurso)) {
             // conHora (D8 · PLA-22): ese día tiene una cita con hora, no solo la fecha límite. Nadie más lo lee.
             const conHora = (nombresDeProyecto.get(p.id) || []).some(n => (mapa[n] || []).some(c => c.fecha === cita && !c.retiro && c.conHora));
-            const tipos = (nombresDeProyecto.get(p.id) || []).flatMap(n => (mapa[n] || []).filter(c => c.fecha === cita && !c.retiro).flatMap(c => [...c.tipos]));
-            res.set(p.id, { fecha: cita, fuente: 'calendario', conHora, retiroPrevio: huboRetiro(p.id, cita), tipoCita: tipoDeObra(p, tipos), nombres: nombresDeProyecto.get(p.id) || [] });
+            const delDia = (nombresDeProyecto.get(p.id) || []).flatMap(n => (mapa[n] || []).filter(c => c.fecha === cita && !c.retiro));
+            const tipos = delDia.flatMap(c => [...c.tipos]);
+            const tiposExt = delDia.flatMap(c => [...c.tiposExt]);
+            res.set(p.id, { fecha: cita, fuente: 'calendario', conHora, retiroPrevio: huboRetiro(p.id, cita), tipoCita: tipoDeObra(p, tipos, tiposExt), nombres: nombresDeProyecto.get(p.id) || [] });
         } else {
             const cimentacion = indice ? ultimaCimentacion(p) : null;
             if (cimentacion && cimentacion >= indice) res.set(p.id, { fecha: null, fuente: 'cimentacion', cimentacion, tipoCita: 'CIMENTACION', nombres: nombresDeProyecto.get(p.id) || [] });
@@ -364,6 +370,27 @@ export const extensivoDeCita = (proyectos, citas, hoy = hoyMexico()) => {
     const nombres = new Set();
     for (const p of proyectos) if (p.es_extensivo) for (const n of fechas.get(p.id)?.nombres || []) nombres.add(n);
     return (cita) => nombres.has(normalizarNombre(cita?.nombre));
+};
+
+/**
+ * extensivoDeCita sin esperar de más a la base (vuelta 1 de la verificación integrada). GET /produccion/citas antes no
+ * tocaba la base y Julia la corta a los 20 s: con el pool lleno, leer las obras podía tardar hasta 30 s y tumbar la
+ * confirmación del calendario. Si las obras no llegan en `ms` (3 s) o la base da error, ninguna cita cuenta como de una
+ * obra EXTENSIVO (solo la palabra de la celda) y `motivo` dice por qué. Nunca lanza.
+ * @returns {Promise<{ esExtensivoDe: (cita) => boolean, motivo: string|null }>}
+ */
+export const ESPERA_OBRAS_MS = 3000;
+export const extensivoDeCitaConTope = async (citas, { leer = () => proyectosAbiertos(), ms = ESPERA_OBRAS_MS, hoy = hoyMexico() } = {}) => {
+    let t;
+    try {
+        const tope = new Promise((_, mal) => { t = setTimeout(() => mal(new Error(`las obras no llegaron en ${ms / 1000} s`)), ms); });
+        const proyectos = await Promise.race([Promise.resolve().then(leer), tope]);
+        return { esExtensivoDe: extensivoDeCita(proyectos, citas, hoy), motivo: null };
+    } catch (e) {
+        return { esExtensivoDe: () => false, motivo: e?.message || String(e) };
+    } finally {
+        clearTimeout(t);
+    }
 };
 
 /**
@@ -545,6 +572,60 @@ const cargarFoto = async () => {
     return ultimaFecha;
 };
 
+/**
+ * Con qué regla del vocabulario se tomó la foto (vuelta 1 de la verificación integrada): «anterior» o «unico»
+ * (CALENDARIO_VOCABULARIO_UNICO). Al encender o apagar la bandera, la siguiente pasada vería otras fechas sin que nadie
+ * moviera el calendario y avisaría «Cambió una instalación» al grupo de Producción. Con esto, esa pasada compara con la
+ * regla de la foto, retoma la foto con la regla nueva y no avisa nada que solo cambió por la regla.
+ * Sin la clave, la foto es de antes de la bandera: se tomó con la regla de antes.
+ */
+const CLAVE_REGLA_FOTO = 'produccion_fechas_instalacion_regla';
+const CLAVE_CAMBIO_DE_REGLA = 'calendario_cambio_de_regla';
+export const CLAVE_VISTA_PREVIA = 'calendario_vocabulario_vista_previa';
+export const reglaDe = (unico) => (unico ? 'unico' : 'anterior');
+let reglaDeFoto = null;
+
+const cargarReglaFoto = async () => {
+    if (reglaDeFoto) return reglaDeFoto;
+    try {
+        const fila = await Configuracion.findOne({ where: { clave: CLAVE_REGLA_FOTO } });
+        reglaDeFoto = fila?.valor === 'unico' ? 'unico' : 'anterior';
+        return reglaDeFoto;
+    } catch (e) {
+        // No se sabe: se compara con la regla de hoy, como antes de este arreglo.
+        console.error('⚠️ No se pudo leer con qué regla se tomó la foto de fechas de instalación:', e.message);
+        return null;
+    }
+};
+
+/**
+ * Las fechas de esta pasada y las que se comparan contra la foto. Pura. Si la foto se tomó con la otra regla
+ * (`reglaFoto` ≠ la de `unico`), `deFoto` son las fechas con la regla de la foto; si no, las mismas `fechas`.
+ */
+export const fechasContraFoto = (proyectos, citas, { hoy = hoyMexico(), unico = vocabularioUnico(), reglaFoto = null } = {}) => {
+    const fechas = resolverFechasInstalacion(proyectos, citas, hoy, { unico });
+    const cambioDeRegla = !!reglaFoto && reglaFoto !== reglaDe(unico);
+    const deFoto = cambioDeRegla ? resolverFechasInstalacion(proyectos, citas, hoy, { unico: reglaFoto === 'unico' }) : fechas;
+    return { fechas, deFoto, cambioDeRegla };
+};
+
+/**
+ * ¿La fecha de una obra cambió desde la foto? Pura.
+ *  · 'igual'  no hay con qué comparar o no cambió.
+ *  · 'regla'  solo cambió la regla del vocabulario: con la regla de la foto sigue igual. No se avisa.
+ *  · 'cambio' alguien movió el calendario: se avisa con la fecha de hoy (la regla nueva), como siempre.
+ */
+export const cambioContraFoto = ({ anterior, nueva, nuevaConReglaDeFoto }) => {
+    if (!anterior || nueva === anterior) return 'igual';
+    if (nuevaConReglaDeFoto === anterior) return 'regla';
+    return 'cambio';
+};
+
+/** Las obras cuya fecha es distinta entre dos cálculos (con una regla y con la otra). Pura. */
+export const obrasQueCambianDeFecha = (proyectos, fechasA, fechasB) => proyectos
+    .map(p => ({ id: p.id, proyecto: p.nombre, ahora: fechasA.get(p.id)?.fecha || null, conLaOtraRegla: fechasB.get(p.id)?.fecha || null }))
+    .filter(o => o.ahora !== o.conLaOtraRegla);
+
 const guardarFoto = async (mapa) => {
     const valor = JSON.stringify(Object.fromEntries(mapa));
     const [fila, creada] = await Configuracion.findOrCreate({
@@ -566,7 +647,7 @@ const guardarFoto = async (mapa) => {
 export const CLAVE_DETALLE_FECHAS = 'produccion_fechas_detalle';
 export const CLAVE_CELDAS = 'calendario_celdas_no_entendidas';
 const MAX_CELDAS = 100;
-const guardarSeguimientoCalendario = async ({ proyectos, fechas, citas, hoy }) => {
+const guardarSeguimientoCalendario = async ({ proyectos, fechas, citas, hoy, unico = vocabularioUnico() }) => {
     try {
         const detalle = {};
         for (const p of proyectos) {
@@ -578,6 +659,12 @@ const guardarSeguimientoCalendario = async ({ proyectos, fechas, citas, hoy }) =
         const celdas = celdasNoEntendidas((citas || []).filter(c => c.fecha && c.fecha >= hoy)).slice(0, MAX_CELDAS);
         await guardarClave(CLAVE_CELDAS, JSON.stringify({ dia: hoy, celdas }),
             'Celdas del calendario que Planta no entiende, de hoy en adelante (revisión 6-nov-2026)');
+        // Vista previa (vuelta 1): qué obras cambiarían de fecha si se enciende (o apaga) CALENDARIO_VOCABULARIO_UNICO.
+        // La puerta «pendientes de Planta» la enseña para revisarla ANTES de mover la bandera.
+        const conLaOtra = resolverFechasInstalacion(proyectos, citas, hoy, { unico: !unico });
+        const obras = obrasQueCambianDeFecha(proyectos, fechas, conLaOtra);
+        await guardarClave(CLAVE_VISTA_PREVIA, JSON.stringify({ dia: hoy, encendida: unico, total: obras.length, obras: obras.slice(0, MAX_CELDAS) }),
+            'Obras que cambiarían de fecha al mover CALENDARIO_VOCABULARIO_UNICO (vuelta 1 de la verificación integrada)');
     } catch (e) {
         console.error('⚠️ No se pudo guardar el detalle del calendario (tipo de cita y celdas no entendidas):', e.message);
     }
@@ -605,12 +692,16 @@ export const revisarAdelantos = () => {
 const revisarCambiosUnaVez = async () => {
     const proyectos = await proyectosAbiertos();
     const citas = await leerCitasCercanas();
-    const fechas = resolverFechasInstalacion(proyectos, citas);
     const hoy = hoyMexico();
-    const manana = sumarDias(hoy, 1);
+    const unico = vocabularioUnico();
     const foto = await cargarFoto();
     // Sin foto guardada (la primera vez que corre) no se sabe qué cambió: solo se toma.
     const primeraPasada = foto.size === 0;
+    // Si la foto se tomó con la otra regla del vocabulario, se compara con esa regla (vuelta 1): encender la bandera no
+    // es «Cambió una instalación».
+    const reglaFoto = primeraPasada ? null : await cargarReglaFoto();
+    const { fechas, deFoto, cambioDeRegla } = fechasContraFoto(proyectos, citas, { hoy, unico, reglaFoto });
+    const soloPorLaRegla = [];
     const vistos = new Map();
     // D8 · PLA-22: con SIN_HORA_ES_LIMITE en «medir» o «1» se guarda, junto a la fecha, si tenía hora.
     const modoSinHora = modoSinHoraEsLimite();
@@ -628,7 +719,10 @@ const revisarCambiosUnaVez = async () => {
             const h = info?.fecha && info.fuente === 'calendario' ? !!info.conHora : null;
             detalleNuevo.set(p.id, { h, a: !!detalleHora.get(p.id)?.a || h === true });
         }
-        if (primeraPasada || !anterior || nueva === anterior) continue;
+        if (primeraPasada) continue;
+        const queCambio = cambioContraFoto({ anterior, nueva, nuevaConReglaDeFoto: deFoto.get(p.id)?.fecha || null });
+        if (queCambio === 'igual') continue;
+        if (queCambio === 'regla') { soloPorLaRegla.push({ id: p.id, proyecto: p.nombre, antes: anterior, ahora: nueva }); continue; }
 
         const r = resumenProduccion(p);
         if (r.sin_planos || r.produccion_cerrada) continue;
@@ -685,14 +779,32 @@ const revisarCambiosUnaVez = async () => {
         console.log(`📅 Cambio de instalación avisado (${tipo}): "${p.nombre}" ${anterior} → ${nueva || 'sin fecha'}`);
         avisados++;
     }
-    await guardarSeguimientoCalendario({ proyectos, fechas, citas, hoy });
+    await guardarSeguimientoCalendario({ proyectos, fechas, citas, hoy, unico });
+    if (cambioDeRegla) await anotarCambioDeRegla({ de: reglaFoto, a: reglaDe(unico), obras: soloPorLaRegla });
     // La foto se queda solo con los proyectos abiertos: los cerrados salen solos.
     ultimaFecha = vistos;
-    try { await guardarFoto(vistos); } catch (e) { console.error('⚠️ No se pudo guardar la foto de fechas de instalación:', e.message); }
+    reglaDeFoto = reglaDe(unico); // la foto en memoria ya es de la regla de hoy
+    try {
+        await guardarFoto(vistos);
+        // En la base, la regla va después de la foto: si la foto no se guardó, tras un reinicio se compara con la vieja.
+        await guardarClave(CLAVE_REGLA_FOTO, reglaDe(unico), 'Con qué regla del vocabulario se tomó la foto de fechas de instalación (CALENDARIO_VOCABULARIO_UNICO)');
+    } catch (e) { console.error('⚠️ No se pudo guardar la foto de fechas de instalación:', e.message); }
     if (detalleHora) {
         try { await guardarDetalleHora(detalleNuevo); } catch (e) { console.error('⚠️ No se pudo guardar si las fechas tenían hora:', e.message); }
         if (sinHora.length) await anotarSinHora(sinHora);
-        return { avisados, primeraPasada, sinHora: sinHora.length };
+        return { avisados, primeraPasada, sinHora: sinHora.length, soloPorLaRegla: soloPorLaRegla.length };
     }
-    return { avisados, primeraPasada };
+    return { avisados, primeraPasada, soloPorLaRegla: soloPorLaRegla.length };
+};
+
+/** Deja escrito (log y `configuracion`) qué obras cambiaron de fecha solo por mover la bandera, sin avisar. Nunca lanza. */
+const anotarCambioDeRegla = async ({ de, a, obras }) => {
+    console.log(`📅 CALENDARIO_VOCABULARIO_UNICO cambió (regla ${de} → ${a}): ${obras.length} obra(s) cambian de fecha solo por la regla y NO se avisan al grupo` +
+        (obras.length ? `: ${obras.slice(0, 20).map(o => `"${o.proyecto}" ${o.antes} → ${o.ahora || 'sin fecha'}`).join('; ')}` : ''));
+    try {
+        await guardarClave(CLAVE_CAMBIO_DE_REGLA, JSON.stringify({ cuando: new Date().toISOString(), de, a, total: obras.length, obras: obras.slice(0, MAX_CELDAS) }),
+            'Último cambio de CALENDARIO_VOCABULARIO_UNICO: obras que cambiaron de fecha solo por la regla (no se avisaron)');
+    } catch (e) {
+        console.error('⚠️ No se pudo anotar el cambio de regla del calendario:', e.message);
+    }
 };

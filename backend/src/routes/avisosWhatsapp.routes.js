@@ -7,9 +7,9 @@
 
 import express from 'express';
 import { Op } from 'sequelize';
-import { proyectosAbiertos, resolverFechasInstalacion, leerCitasCercanas, leerCitasMesAnterior, resumenProduccion, tipoDeObra, extensivoDeCita } from '../services/fechaInstalacion.service.js';
+import { proyectosAbiertos, resolverFechasInstalacion, leerCitasCercanas, leerCitasMesAnterior, resumenProduccion, tipoDeObra, extensivoDeCitaConTope } from '../services/fechaInstalacion.service.js';
 // 6-nov-2026 (revisión, punto 9 b): el tipo de cita del vocabulario único viaja en campos nuevos (tipo_cita, es_extensivo).
-import { clasificarCita, tipoAnteriorDeCita, vocabularioUnico } from '../utils/vocabularioCalendario.js';
+import { tiposDeCitaDelDia, vocabularioUnico } from '../utils/vocabularioCalendario.js';
 import { obtenerDistribucionEquipos } from '../services/googleSheets.service.js';
 import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor, ProduccionProyecto, SolicitudCompra, Movimiento, DetalleMovimiento, Equipo } from '../models/index.js';
 import { urlSolicitudes } from '../services/barridoCompras.service.js';
@@ -677,11 +677,10 @@ router.get('/produccion/citas', async (req, res) => {
         }
 
         const cercanas = await leerCitasCercanas();
-        // ¿La obra de cada cita es EXTENSIVO en el Índice? Si la base no contesta, solo cuenta la palabra de la celda.
-        let esExtensivoDe = () => false;
-        try { esExtensivoDe = extensivoDeCita(await proyectosAbiertos(), cercanas); } catch (e) {
-            console.error('Citas del día: no se pudo cruzar con las obras (es_extensivo solo por la celda):', e.message);
-        }
+        // ¿La obra de cada cita es EXTENSIVO en el Índice? Si la base da error o no contesta en 3 s, solo cuenta la palabra
+        // de la celda (vuelta 1: Julia corta a los 20 s, y antes esta ruta no tocaba la base).
+        const { esExtensivoDe, motivo: sinObras } = await extensivoDeCitaConTope(cercanas);
+        if (sinObras) console.error('Citas del día: no se pudo cruzar con las obras (es_extensivo solo por la celda):', sinObras);
         const unico = vocabularioUnico();
         const citas = cercanas
             // Sin horario no es una cita: son las notas del calendario (ASUETO, "27 CUMPLE
@@ -694,7 +693,6 @@ router.get('/produccion/citas', async (req, res) => {
                 // suele decir de qué es la cita: "MARCO ANTONIO ZAVALA" + "MTO".
                 const completo = cliente ? `${nombre} / ${cliente}` : nombre;
                 const equipo = c.equipoHora || porColor.get(claveColor(c.colorHora)) || null;
-                const clasificada = clasificarCita(c, { esExtensivo: esExtensivoDe(c) });
                 return {
                     nombre,
                     cliente: cliente || null,
@@ -704,11 +702,10 @@ router.get('/produccion/citas', async (req, res) => {
                     // sabe quién va, y entonces no hay a quién nombrar.
                     equipo: equipo || null,
                     responsable: (equipo && responsables.get(equipo)) || null,
-                    // `tipo` SIEMPRE es RETIRO, GTIA, MTO o INSTALACION, con la bandera apagada o encendida: Julia reparte
-                    // con él (tipoAnteriorDeCita). `tipo_cita` y `es_extensivo` son nuevos (6-nov-2026): el vocabulario único.
-                    tipo: tipoAnteriorDeCita(c, { clasificada, unico }),
-                    tipo_cita: clasificada.tipo,
-                    es_extensivo: clasificada.extensivo,
+                    // `tipo` SIEMPRE es RETIRO, GTIA, MTO o INSTALACION, con la bandera apagada o encendida, y sin el producto
+                    // de la obra (tipoAnteriorDeCita). `tipo_cita` y `es_extensivo` son nuevos (6-nov-2026): el contrato «tipo
+                    // de cita v1», con el producto de la obra. Julia reparte con `tipo_cita` si viene; si no, con `tipo`.
+                    ...tiposDeCitaDelDia(c, { esExtensivo: esExtensivoDe(c), unico }),
                     falla: c.equipoHora === 'FALLA'
                 };
             });
