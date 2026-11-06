@@ -9,6 +9,8 @@ import {
   obtenerArchivoVentas
 } from '../services/driveVentas.service.js';
 import { ProduccionProyecto } from '../models/index.js';
+// 6-nov-2026: cada cita lleva su tipo y la regla de retiro/cimentación que usa la agenda, para que el tablero diga lo mismo
+import { conVocabulario } from '../utils/vocabularioCalendario.js';
 
 /**
  * Obtener calendario completo del mes
@@ -23,7 +25,7 @@ export const obtenerCalendarioMes = async (req, res) => {
 
     const resultado = await leerCalendarioMes(mesNormalizado);
 
-    res.json(resultado);
+    res.json(conVocabulario(resultado));
   } catch (error) {
     console.error('Error en obtenerCalendarioMes:', error);
     res.status(500).json({
@@ -99,7 +101,7 @@ export const obtenerCalendarioActual = async (req, res) => {
 
     const resultado = await leerCalendarioMes(mesActual);
 
-    res.json(resultado);
+    res.json(conVocabulario(resultado));
   } catch (error) {
     console.error('Error en obtenerCalendarioActual:', error);
     res.status(500).json({

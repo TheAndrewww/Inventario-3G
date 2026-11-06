@@ -22,6 +22,8 @@ import { Op } from 'sequelize';
 import { leerCalendarioMes } from './googleSheets.service.js';
 import { ProduccionProyecto, AvisoWhatsApp, Configuracion } from '../models/index.js';
 import { isWhatsAppEnabled } from './whatsapp.service.js';
+// 6-nov-2026 (revisión, punto 9): retiro, cimentación y tipo de cita salen del vocabulario único del calendario.
+import { esRetiro, esCimentacion, clasificarCita, TIPOS_CITA, celdasNoEntendidas } from '../utils/vocabularioCalendario.js';
 
 const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
     'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
@@ -37,7 +39,7 @@ export const sumarDias = (isoFecha, n) => {
 };
 
 // ---------- Cruce de nombres (copia de frontend/src/utils/produccion.js) ----------
-const normalizarNombre = (str) => {
+export const normalizarNombre = (str) => {
     if (!str) return '';
     return str
         .toLowerCase()
@@ -77,7 +79,6 @@ const PALABRAS_DE_OBRA = new Set([
 const NUMERALES = new Set(['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
 const numeralesDe = (n) => n.split(' ').filter(t => NUMERALES.has(t)).sort().join(' ');
 const nombreBase = (n) => n.split(' ').filter(t => t && !PALABRAS_DE_CITA.has(t)).join(' ');
-const esCitaRetiro = (n) => n.split(' ').includes('retiro');
 
 const matchNombre = (nombreA, nombreB) => {
     const a = normalizarNombre(nombreA);
@@ -107,17 +108,19 @@ const citasPorNombre = (citas) => {
         // CIMENTACIÓN = trabajo de producción en la obra; la instalación va DESPUÉS, cuando
         // termina (CONDOMINIOS MAYORCA: cimentación mar-mié, instalación jueves). Casi siempre
         // va en el 2o renglón (`cliente`): mirando solo el nombre, el martes salía como instalación.
-        if (!key || normalizarNombre(`${cp.nombre} ${cp.cliente || ''}`).includes('cimentacion') || !cp.fecha) continue;
+        if (!key || esCimentacion(cp) || !cp.fecha) continue;
         const lista = (mapa[key] = mapa[key] || []);
         // El RETIRO casi siempre va en el segundo renglón de la celda ("LUIS RÍOS" + "MTO RETIRO"),
         // que llega como `cliente`. Mirando solo el nombre, el retiro contaba como instalación y
         // a Charly se le preguntaba por una producción que ni ha llegado al taller (19-oct-2026).
-        const retiro = esCitaRetiro(normalizarNombre(`${cp.nombre} ${cp.cliente || ''}`));
+        const retiro = esRetiro(cp);
+        // Tipo de la cita con el vocabulario único (solo se informa: tipo_cita de la agenda y tipoCita de la puerta).
+        const tipo = clasificarCita(cp).tipo;
         // D8 · PLA-22: un día con hora (en cualquiera de sus renglones) es una cita agendada; sin hora es la fecha
         // límite que escribe Operación. Solo se anota: qué fecha manda no cambia.
         const previa = lista.find(c => c.fecha === cp.fecha);
-        if (previa) { if (cp.hora) previa.conHora = true; if (!retiro) previa.retiro = false; }
-        else lista.push({ fecha: cp.fecha, retiro, conHora: !!cp.hora });
+        if (previa) { if (cp.hora) previa.conHora = true; if (!retiro) previa.retiro = false; if (!retiro) previa.tipos.add(tipo); }
+        else lista.push({ fecha: cp.fecha, retiro, conHora: !!cp.hora, tipos: new Set(retiro ? [] : [tipo]) });
     }
     return mapa;
 };
@@ -132,7 +135,7 @@ const citasDeCimentacion = (citas) => {
     const mapa = {};
     for (const cp of citas || []) {
         const key = normalizarNombre(cp.nombre);
-        if (!key || !cp.fecha || !normalizarNombre(`${cp.nombre} ${cp.cliente || ''}`).includes('cimentacion')) continue;
+        if (!key || !cp.fecha || !esCimentacion(cp)) continue;
         (mapa[key] = mapa[key] || []).push({ fecha: cp.fecha, retiro: false });
     }
     return mapa;
@@ -225,6 +228,20 @@ const conReintento = async (fn, etiqueta, intentos = 3) => {
         }
     }
     throw ultimo;
+};
+
+/**
+ * El tipo de cita de una obra (vocabulario único): el de mayor prioridad entre las citas de su día (RETIRO, CIMENTACION,
+ * EXTENSIVO, MTO, GTIA, INSTALACION) y, si la obra es EXTENSIVO en el Índice, EXTENSIVO (salvo retiro o cimentación).
+ * Sin cita (fecha del Índice), el tipo del Índice. Solo informa: no cambia qué fecha manda.
+ */
+export const tipoDeObra = (p, tiposDelDia = []) => {
+    const tipoIndice = String(p?.tipo_proyecto || '').trim().toUpperCase();
+    let tipo = tiposDelDia.length
+        ? TIPOS_CITA.find(t => tiposDelDia.includes(t))
+        : (tipoIndice === 'MTO' ? 'MTO' : tipoIndice === 'GTIA' ? 'GTIA' : 'INSTALACION');
+    if (p?.es_extensivo && !['RETIRO', 'CIMENTACION'].includes(tipo)) tipo = 'EXTENSIVO';
+    return tipo;
 };
 
 /**
@@ -326,14 +343,27 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico(), {
         if (cita && (soloCalendario || !indice || cita <= indice || cita.slice(0, 7) <= mesEnCurso)) {
             // conHora (D8 · PLA-22): ese día tiene una cita con hora, no solo la fecha límite. Nadie más lo lee.
             const conHora = (nombresDeProyecto.get(p.id) || []).some(n => (mapa[n] || []).some(c => c.fecha === cita && !c.retiro && c.conHora));
-            res.set(p.id, { fecha: cita, fuente: 'calendario', conHora, retiroPrevio: huboRetiro(p.id, cita) });
+            const tipos = (nombresDeProyecto.get(p.id) || []).flatMap(n => (mapa[n] || []).filter(c => c.fecha === cita && !c.retiro).flatMap(c => [...c.tipos]));
+            res.set(p.id, { fecha: cita, fuente: 'calendario', conHora, retiroPrevio: huboRetiro(p.id, cita), tipoCita: tipoDeObra(p, tipos), nombres: nombresDeProyecto.get(p.id) || [] });
         } else {
             const cimentacion = indice ? ultimaCimentacion(p) : null;
-            if (cimentacion && cimentacion >= indice) res.set(p.id, { fecha: null, fuente: 'cimentacion', cimentacion });
-            else res.set(p.id, { fecha: indice, fuente: 'indice' });
+            if (cimentacion && cimentacion >= indice) res.set(p.id, { fecha: null, fuente: 'cimentacion', cimentacion, tipoCita: 'CIMENTACION', nombres: nombresDeProyecto.get(p.id) || [] });
+            else res.set(p.id, { fecha: indice, fuente: 'indice', tipoCita: tipoDeObra(p, []), nombres: nombresDeProyecto.get(p.id) || [] });
         }
     }
     return res;
+};
+
+/**
+ * ¿La obra de esta cita es EXTENSIVO en el Índice? Con el mismo cruce de nombres de la agenda (resolverFechasInstalacion):
+ * la cita se liga a la obra que reclamó su nombre. Para el campo `es_extensivo` de GET /produccion/citas (6-nov-2026).
+ * @returns {(cita) => boolean}
+ */
+export const extensivoDeCita = (proyectos, citas, hoy = hoyMexico()) => {
+    const fechas = resolverFechasInstalacion(proyectos, citas, hoy);
+    const nombres = new Set();
+    for (const p of proyectos) if (p.es_extensivo) for (const n of fechas.get(p.id)?.nombres || []) nombres.add(n);
+    return (cita) => nombres.has(normalizarNombre(cita?.nombre));
 };
 
 /**
@@ -525,6 +555,35 @@ const guardarFoto = async (mapa) => {
 };
 
 /**
+ * Revisión del 6-nov-2026 (punto 9). En cada pasada de 5 minutos, ya con el calendario leído, se guarda en `configuracion`:
+ *  · produccion_fechas_detalle: { id: [tipoCita, fechaDeCimentación|null] } de cada obra abierta. Es lo que la puerta de
+ *    producción no puede saber sin leer Sheets (routes/sistemas/produccion.js): el tipo de cita y si la obra quedó sin
+ *    fecha por una cimentación.
+ *  · calendario_celdas_no_entendidas: { dia, celdas: [{ fecha, celda, motivos }] } de hoy en adelante (100 como máximo).
+ *    La leen la puerta «pendientes de Planta» y el aviso diario (services/seguimientoPlanta.service.js).
+ * Solo escribe si cambió. Nunca lanza: esto no puede tumbar los avisos de cambio de fecha.
+ */
+export const CLAVE_DETALLE_FECHAS = 'produccion_fechas_detalle';
+export const CLAVE_CELDAS = 'calendario_celdas_no_entendidas';
+const MAX_CELDAS = 100;
+const guardarSeguimientoCalendario = async ({ proyectos, fechas, citas, hoy }) => {
+    try {
+        const detalle = {};
+        for (const p of proyectos) {
+            const f = fechas.get(p.id);
+            if (f) detalle[p.id] = [f.tipoCita || null, f.fuente === 'cimentacion' ? f.cimentacion || null : null];
+        }
+        await guardarClave(CLAVE_DETALLE_FECHAS, JSON.stringify(detalle),
+            'Tipo de cita y cimentación de cada obra abierta (puerta de producción; revisión 6-nov-2026)');
+        const celdas = celdasNoEntendidas((citas || []).filter(c => c.fecha && c.fecha >= hoy)).slice(0, MAX_CELDAS);
+        await guardarClave(CLAVE_CELDAS, JSON.stringify({ dia: hoy, celdas }),
+            'Celdas del calendario que Planta no entiende, de hoy en adelante (revisión 6-nov-2026)');
+    } catch (e) {
+        console.error('⚠️ No se pudo guardar el detalle del calendario (tipo de cita y celdas no entendidas):', e.message);
+    }
+};
+
+/**
  * Compara la fecha de instalación de cada proyecto contra la pasada anterior y avisa al grupo
  * de PRODUCCIÓN los dos cambios que le mueven el trabajo:
  *  · Se ADELANTÓ a hoy o a mañana. Los recordatorios de siempre (7:00, 14:00, 16:00) ya
@@ -626,6 +685,7 @@ const revisarCambiosUnaVez = async () => {
         console.log(`📅 Cambio de instalación avisado (${tipo}): "${p.nombre}" ${anterior} → ${nueva || 'sin fecha'}`);
         avisados++;
     }
+    await guardarSeguimientoCalendario({ proyectos, fechas, citas, hoy });
     // La foto se queda solo con los proyectos abiertos: los cerrados salen solos.
     ultimaFecha = vistos;
     try { await guardarFoto(vistos); } catch (e) { console.error('⚠️ No se pudo guardar la foto de fechas de instalación:', e.message); }

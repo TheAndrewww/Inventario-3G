@@ -40,7 +40,9 @@
  *     cerradaEn (ISO de México o null), cerradaConSesion (la cerró alguien con sesión, no la terminal ni el Índice),
  *     areas: { manufactura: { aplica, lista, listaEn }, herreria: { aplica, lista, listaEn, soldadura, pintura },
  *              pendientes: ['manufactura'|'herreria'|'herreria_armado'|'herreria_pintado'], sinPlanos, produccionCerrada },
- *     fechaInstalacion: { fecha: AAAA-MM-DD|null, fuente: 'calendario'|'indice'|null }, fechaIndice, pausado,
+ *     fechaInstalacion: { fecha: AAAA-MM-DD|null, fuente: 'calendario'|'indice'|'cimentacion'|null,
+ *       tipoCita (6-nov: RETIRO|CIMENTACION|EXTENSIVO|MTO|GTIA|INSTALACION|null), cimentacion (AAAA-MM-DD|null) },
+ *     fechaIndice, pausado,
  *     pronostico: el sí o el no de Producción por WhatsApp (PLA-17, sin el autor) o null,
  *     calidad (28-oct, SOLO con PANEL_CALIDAD; apagada el campo no va): { estado, avaladaEn, avaladaPor, faltanAtributos,
  *       pendientes: [{ punto, texto }], defectos: [{ punto, texto, nota, saleAsi }], observacionesInstalacion } o null si
@@ -103,6 +105,7 @@ import { mismosProyectos } from '../../services/pedidosCleanup.service.js';
 import { pronosticoParaTablero } from './pronostico.js';
 import { panelCalidad } from '../../utils/banderasCalidad.js';
 import { calidadDeObras } from '../../services/calidad.service.js';
+import { vocabularioUnico } from '../../utils/vocabularioCalendario.js';
 
 export const ALCANCE_PRODUCCION = 'produccion.leer';
 export const MAX_LISTA = 50;
@@ -115,6 +118,7 @@ const MAX_MATERIAL = 10;
 const MAX_TICKETS_LEIDOS = 2000;
 const MAX_SOLICITUDES_LEIDAS = 1000;
 const CLAVE_FOTO = 'produccion_fechas_instalacion'; // la de fechaInstalacion.service.js (revisarAdelantos)
+const CLAVE_DETALLE = 'produccion_fechas_detalle'; // la misma pasada: [tipoCita, cimentación] por obra (6-nov-2026)
 const ETAPAS_CERRADAS = ['instalacion', 'completado'];
 const ETAPAS_EN_CURSO = ['pendiente', 'diseno', 'compras', 'produccion'];
 const TICKETS_ABIERTOS = ['pendiente', 'aprobado']; // los del aviso de las 16:00 (tickets-abiertos)
@@ -280,12 +284,37 @@ export const leerFoto = (valor) => {
     return foto;
 };
 
-/** La fecha de instalación sin leer Sheets: la de la foto (ya cruzada con el calendario) o la del Índice. */
-export const fechaDeObra = (p, foto) => {
+/** Mapa id → { tipoCita, cimentacion } de la misma pasada de 5 min (fechaInstalacion.service › guardarSeguimientoCalendario). */
+export const leerDetalle = (valor) => {
+    const detalle = new Map();
+    try {
+        const obj = valor ? JSON.parse(valor) : {};
+        for (const [id, par] of Object.entries(obj)) {
+            const [tipoCita, cimentacion] = Array.isArray(par) ? par : [];
+            detalle.set(Number(id), {
+                tipoCita: typeof tipoCita === 'string' && /^[A-Z]{3,12}$/.test(tipoCita) ? tipoCita : null,
+                cimentacion: typeof cimentacion === 'string' && RE_DIA.test(cimentacion) ? cimentacion : null
+            });
+        }
+    } catch { /* ilegible: sin tipo de cita */ }
+    return detalle;
+};
+
+/**
+ * La fecha de instalación sin leer Sheets: la de la foto (ya cruzada con el calendario) o la del Índice.
+ * Con `detalle` (6-nov-2026) suma dos campos nuevos: `tipoCita` (RETIRO, CIMENTACION, EXTENSIVO, MTO, GTIA o
+ * INSTALACION, el vocabulario único) y `cimentacion` (AAAA-MM-DD si la obra tiene cimentación el día de su fecha del
+ * Índice o después). Con CALENDARIO_VOCABULARIO_UNICO esa obra sale sin fecha (`fuente: 'cimentacion'`), igual que en la
+ * agenda; apagada, con la del Índice como hasta hoy.
+ */
+export const fechaDeObra = (p, foto, detalle = null) => {
     const indice = p.fecha_limite || null;
     const deFoto = foto?.get(p.id) || null;
-    if (deFoto) return { fecha: deFoto, fuente: deFoto === indice ? 'indice' : 'calendario' };
-    return { fecha: indice, fuente: indice ? 'indice' : null };
+    const d = detalle ? detalle.get(p.id) || null : null;
+    const extra = detalle ? { tipoCita: d?.tipoCita ?? null, cimentacion: d?.cimentacion ?? null } : {};
+    if (deFoto) return { fecha: deFoto, fuente: deFoto === indice ? 'indice' : 'calendario', ...extra };
+    if (d?.cimentacion && vocabularioUnico()) return { fecha: null, fuente: 'cimentacion', ...extra };
+    return { fecha: indice, fuente: indice ? 'indice' : null, ...extra };
 };
 
 /**
@@ -303,7 +332,7 @@ const pronosticoLimpio = (p) => ({
  * Lo que Operación ve de cada obra. Pura. `calidad` (28-oct, solo con PANEL_CALIDAD): la hoja de calidad de la obra
  * (calidad.service › calidadDeObras) o null si no se pudo leer; sin la bandera el campo no va y la obra sale como hoy.
  */
-export const armarObra = (p, { obraId = null, foto = null, pronostico = null, ahora = new Date(), calidad } = {}) => {
+export const armarObra = (p, { obraId = null, foto = null, detalle = null, pronostico = null, ahora = new Date(), calidad } = {}) => {
     const tipo = p.tipo_proyecto ? String(p.tipo_proyecto).trim().toUpperCase() : null;
     const r = resumenProduccion(p);
     return {
@@ -333,7 +362,7 @@ export const armarObra = (p, { obraId = null, foto = null, pronostico = null, ah
             sinPlanos: r.sin_planos,
             produccionCerrada: r.produccion_cerrada
         },
-        fechaInstalacion: fechaDeObra(p, foto),
+        fechaInstalacion: fechaDeObra(p, foto, detalle),
         fechaIndice: p.fecha_limite || null,
         pausado: !!p.pausado,
         pronostico: pronostico ? pronosticoLimpio(pronosticoParaTablero(pronostico, ahora)) : null,
@@ -519,6 +548,17 @@ export const leerFotoDeBase = async () => {
     }
 };
 
+/** El tipo de cita y la cimentación de cada obra (6-nov-2026). Si no se puede leer: mapa vacío y `tipoCita: null`. */
+export const leerDetalleDeBase = async () => {
+    try {
+        const fila = await Configuracion.findOne({ where: { clave: CLAVE_DETALLE }, attributes: ['valor'] });
+        return leerDetalle(fila?.valor);
+    } catch (e) {
+        console.error('[puerta] produccion: no se pudo leer el tipo de cita (sale null):', e.message);
+        return new Map();
+    }
+};
+
 /**
  * La hoja de calidad de cada obra de la página (solo con PANEL_CALIDAD; si no, null y la obra sale como hoy). Si no se
  * puede leer, cada obra lleva `calidad: null` y la respuesta sale igual (lo principal es la obra).
@@ -536,16 +576,17 @@ const leerCalidad = async (filas, obraIds) => {
 /** ID 3G, foto de fechas y pronósticos de una página de obras, en paralelo (y, con PANEL_CALIDAD, su hoja de calidad). */
 const complementos = async (filas) => {
     const ids = filas.map((p) => p.id);
-    const [obraIds, foto, pronosticos] = await Promise.all([
+    const [obraIds, foto, pronosticos, detalle] = await Promise.all([
         obraIdsDeProyectos(ids),
         leerFotoDeBase(),
-        ProduccionProyecto.pronosticosVigentes(ids)
+        ProduccionProyecto.pronosticosVigentes(ids),
+        leerDetalleDeBase()
     ]);
-    return { obraIds, foto, pronosticos, calidad: await leerCalidad(filas, obraIds) };
+    return { obraIds, foto, detalle, pronosticos, calidad: await leerCalidad(filas, obraIds) };
 };
 
-const armarPagina = (filas, { obraIds, foto, pronosticos, calidad }, ahora) => filas.map((p) => armarObra(p, {
-    obraId: obraIds.get(p.id), foto, pronostico: pronosticos.get(p.id), ahora,
+const armarPagina = (filas, { obraIds, foto, detalle, pronosticos, calidad }, ahora) => filas.map((p) => armarObra(p, {
+    obraId: obraIds.get(p.id), foto, detalle, pronostico: pronosticos.get(p.id), ahora,
     ...(calidad ? { calidad: calidad.get(p.id) ?? null } : {})
 }));
 
