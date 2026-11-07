@@ -1,44 +1,18 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-    Search,
-    Plus,
-    Package,
-    Wrench,
-    ChevronDown,
-    ChevronUp,
-    UserCheck,
-    RotateCcw,
-    AlertCircle,
-    CheckCircle,
-    Clock,
-    Settings,
-    Users,
-    Printer
-} from 'lucide-react';
 import herramientasRentaService from '../services/herramientasRenta.service';
 import usuariosService from '../services/usuarios.service';
 import camionetasService from '../services/camionetas.service';
 import categoriasService from '../services/categorias.service';
 import ubicacionesService from '../services/ubicaciones.service';
 import proveedoresService from '../services/proveedores.service';
-import { Loader, Modal, Button } from '../components/common';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
-import { getImageUrl } from '../utils/imageUtils';
-import { useDiseno3G } from '../diseno-3g/useDiseno3G';
-import CabG3 from '../diseno-3g/CabG3';
-// Rediseño 2 · vista encendida (apagado no la usa): mismo estado, mismas peticiones y los mismos diálogos
-import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
 import VistaRenta from '../rediseno2/gestion/VistaRenta';
 import { CajonAsignar, CajonDevolver, CajonNuevoTipo, CajonCondicion } from '../rediseno2/gestion/CajonesRenta';
 
 const RentaHerramientasPage = () => {
     const navigate = useNavigate();
-    const g3 = useDiseno3G(); // Diseño 3G: encabezado y estados con texto, sin emojis (apagado, lo de siempre)
     const [tipos, setTipos] = useState([]);
     const [tiposExpandidos, setTiposExpandidos] = useState({});
     const [unidadesPorTipo, setUnidadesPorTipo] = useState({});
@@ -50,7 +24,6 @@ const RentaHerramientasPage = () => {
     const [unidadSeleccionada, setUnidadSeleccionada] = useState(null);
     const [modalNuevoTipo, setModalNuevoTipo] = useState(false);
     const { user } = useAuth();
-    const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes de los return de siempre)
     const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
     // Solo administradores, almacenistas y encargados pueden gestionar
@@ -144,55 +117,6 @@ const RentaHerramientasPage = () => {
         }, { totalUnidades: 0, disponibles: 0, asignadas: 0 });
     }, [tipos]);
 
-    // Mostrar badge de condición física
-    const getCondicionBadge = (unidad) => {
-        // Usar nuevo campo condicion si existe, o mapear desde estado
-        const condicion = unidad.condicion || mapearEstadoACondicion(unidad.estado);
-        const badges = {
-            bueno: { color: 'bg-green-100 text-green-800 border-green-200', texto: '🟢 Bueno', icon: CheckCircle },
-            regular: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', texto: '🟡 Regular', icon: AlertCircle },
-            malo: { color: 'bg-red-100 text-red-800 border-red-200', texto: '🔴 Malo', icon: AlertCircle },
-            perdido: { color: 'bg-gray-100 text-gray-800 border-gray-200', texto: '⚫ Perdido', icon: AlertCircle },
-            baja: { color: 'bg-gray-100 text-gray-800 border-gray-200', texto: '⚫ Baja', icon: AlertCircle }
-        };
-        const badge = badges[condicion] || badges.bueno;
-        const Icon = badge.icon;
-        // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
-        if (g3) {
-            const g3c = { bueno: ['ok', 'Bueno'], regular: ['aviso', 'Regular'], malo: ['mal', 'Malo'], perdido: ['neutro', 'Perdido'], baja: ['neutro', 'Baja'] }[condicion] || ['ok', 'Bueno'];
-            return <span className={`g3-estado g3-estado--${g3c[0]}`}>{g3c[1]}</span>;
-        }
-        return (
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${badge.color}`}>
-                <Icon size={10} />
-                {badge.texto}
-            </span>
-        );
-    };
-
-    // Mostrar badge de estatus de disponibilidad
-    const getEstatusBadge = (unidad) => {
-        // Usar nuevo campo estatus si existe, o mapear desde estado
-        const estatus = unidad.estatus || (unidad.estado === 'asignada' ? 'asignado' : 'disponible');
-        const badges = {
-            disponible: { color: 'bg-blue-50 text-blue-700 border-blue-200', texto: 'Disponible' },
-            asignado: { color: 'bg-purple-100 text-purple-800 border-purple-200', texto: 'Asignada' },
-            en_reparacion: { color: 'bg-orange-100 text-orange-800 border-orange-200', texto: 'En reparación' },
-            en_transito: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', texto: 'En tránsito' }
-        };
-        const badge = badges[estatus] || badges.disponible;
-        // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
-        if (g3) {
-            const tono = { disponible: 'ok', asignado: 'info', en_reparacion: 'aviso', en_transito: 'info' }[estatus] || 'ok';
-            return <span className={`g3-estado g3-estado--${tono}`}>{badge.texto}</span>;
-        }
-        return (
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${badge.color}`}>
-                {badge.texto}
-            </span>
-        );
-    };
-
     // Mapear estado antiguo a condicion nueva (para compatibilidad)
     const mapearEstadoACondicion = (estado) => {
         const mapeo = {
@@ -212,476 +136,66 @@ const RentaHerramientasPage = () => {
         return unidad.estatus === 'asignado' || unidad.estado === 'asignada';
     };
 
-    // Rediseño 2 · vista ENCENDIDA: los mismos datos, los mismos manejadores y los mismos diálogos (el JSX de hoy sigue intacto
-    // debajo). Los diálogos son los de siempre: cada uno pinta su cajón nuevo encendido.
-    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-    if (d3) {
-        return (
-            <VistaRenta
-                puedeGestionar={puedeGestionar} tipos={tipos} tiposFiltrados={tiposFiltrados} tiposExpandidos={tiposExpandidos}
-                unidadesPorTipo={unidadesPorTipo} loading={loading} errorCarga={errorCargaR2} recargar={fetchTipos} searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm} stats={stats} puedeCrear={user?.rol === 'administrador' || user?.rol === 'almacenista'}
-                toggleTipo={toggleTipo} handleAsignar={handleAsignar} handleDevolver={handleDevolver} handleCambiarEstado={handleCambiarEstado}
-                handleImprimirCodigos={handleImprimirCodigos} setModalNuevoTipo={setModalNuevoTipo} mapearEstadoACondicion={mapearEstadoACondicion}
-                estaAsignada={estaAsignada}
-                dialogos={(
-                    <>
-                        {modalAsignar && unidadSeleccionada && (
-                            <ModalAsignar
-                                isOpen={modalAsignar}
-                                unidad={unidadSeleccionada}
-                                onClose={() => { setModalAsignar(false); setUnidadSeleccionada(null); }}
-                                onSuccess={() => {
-                                    setModalAsignar(false);
-                                    setUnidadSeleccionada(null);
-                                    fetchTipos();
-                                    if (unidadSeleccionada.tipo?.id) fetchUnidadesTipo(unidadSeleccionada.tipo.id);
-                                }}
-                            />
-                        )}
-                        {modalDevolver && unidadSeleccionada && (
-                            <ModalDevolver
-                                isOpen={modalDevolver}
-                                unidad={unidadSeleccionada}
-                                onClose={() => { setModalDevolver(false); setUnidadSeleccionada(null); }}
-                                onSuccess={() => {
-                                    setModalDevolver(false);
-                                    setUnidadSeleccionada(null);
-                                    fetchTipos();
-                                    if (unidadSeleccionada.tipo?.id) fetchUnidadesTipo(unidadSeleccionada.tipo.id);
-                                }}
-                            />
-                        )}
-                        {modalNuevoTipo && (
-                            <ModalNuevoTipo
-                                isOpen={modalNuevoTipo}
-                                onClose={() => setModalNuevoTipo(false)}
-                                onSuccess={() => { setModalNuevoTipo(false); fetchTipos(); }}
-                            />
-                        )}
-                        {modalCambiarEstado && unidadSeleccionada && (
-                            <ModalCambiarEstado
-                                isOpen={modalCambiarEstado}
-                                unidad={unidadSeleccionada}
-                                onClose={() => { setModalCambiarEstado(false); setUnidadSeleccionada(null); }}
-                                onSuccess={() => {
-                                    setModalCambiarEstado(false);
-                                    setUnidadSeleccionada(null);
-                                    // Refrescar unidades del tipo
-                                    if (unidadSeleccionada?.tipo_herramienta_id) fetchUnidadesTipo(unidadSeleccionada.tipo_herramienta_id);
-                                    fetchTipos();
-                                }}
-                            />
-                        )}
-                    </>
-                )}
-            />
-        );
-    }
-
-    if (!puedeGestionar) {
-        return (
-            <div className="p-6">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="text-red-800">No tienes permisos para acceder a esta sección.</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (loading) {
-        return <Loader fullScreen />;
-    }
-
     return (
-        <div className="p-6">
-            {/* Header */}
-            {g3 ? (
-                <CabG3 titulo="Herramientas de renta" descripcion="Gestiona las herramientas de renta con seguimiento individual de cada unidad." />
-            ) : (
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Herramientas de Renta</h1>
-                <p className="text-gray-600">
-                    Gestiona las herramientas de renta con seguimiento individual de cada unidad
-                </p>
-            </div>
-            )}
-
-            {/* Barra de acciones */}
-            <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre, prefijo o categoría..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                    />
-                </div>
-
-                {(user?.rol === 'administrador' || user?.rol === 'almacenista') && (
-                    <Button
-                        onClick={() => setModalNuevoTipo(true)}
-                        className="bg-red-700 hover:bg-red-800 text-white"
-                    >
-                        <Plus size={20} />
-                        {g3 ? 'Nuevo tipo de herramienta' : 'Nuevo Tipo de Herramienta'}
-                    </Button>
-                )}
-            </div>
-
-            {/* Estadísticas globales */}
-            {g3 ? (
-                <div className="g3-rejilla g3-rejilla--4 g3p-cab">
-                    <div className="g3-kpi"><span className="g3-kpi-valor">{tipos.length}</span><span className="g3-kpi-texto">Tipos de herramienta</span></div>
-                    <div className="g3-kpi"><span className="g3-kpi-valor">{stats.totalUnidades}</span><span className="g3-kpi-texto">Total de unidades</span></div>
-                    <div className="g3-kpi"><span className="g3-kpi-valor">{stats.disponibles}</span><span className="g3-kpi-texto">Disponibles</span></div>
-                    <div className="g3-kpi"><span className="g3-kpi-valor">{stats.asignadas}</span><span className="g3-kpi-texto">Asignadas</span></div>
-                </div>
-            ) : (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-600">Tipos de Herramienta</p>
-                            <p className="text-2xl font-bold text-gray-900">{tipos.length}</p>
-                        </div>
-                        <Package className="text-purple-500" size={32} />
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-600">Total de Unidades</p>
-                            <p className="text-2xl font-bold text-gray-900">{stats.totalUnidades}</p>
-                        </div>
-                        <Wrench className="text-blue-500" size={32} />
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-600">Disponibles</p>
-                            <p className="text-2xl font-bold text-gray-900">{stats.disponibles}</p>
-                        </div>
-                        <CheckCircle className="text-green-500" size={32} />
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow p-4 border-l-4 border-orange-500">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-600">Asignadas</p>
-                            <p className="text-2xl font-bold text-gray-900">{stats.asignadas}</p>
-                        </div>
-                        <UserCheck className="text-orange-500" size={32} />
-                    </div>
-                </div>
-            </div>
-            )}
-
-            {/* Lista de tipos */}
-            {tiposFiltrados.length === 0 ? (
-                <div className="bg-white rounded-lg shadow p-12 text-center">
-                    <Wrench size={64} className="mx-auto mb-4 text-gray-300" />
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        No hay tipos de herramienta registrados
-                    </h3>
-                    <p className="text-gray-600 mb-6">
-                        Comienza creando un nuevo tipo de herramienta
-                    </p>
-                    {(user?.rol === 'administrador' || user?.rol === 'almacenista') && (
-                        <Button
-                            onClick={() => setModalNuevoTipo(true)}
-                            className="bg-red-700 hover:bg-red-800"
-                        >
-                            <Plus size={20} />
-                            Crear Primer Tipo
-                        </Button>
+        <VistaRenta
+            puedeGestionar={puedeGestionar} tipos={tipos} tiposFiltrados={tiposFiltrados} tiposExpandidos={tiposExpandidos}
+            unidadesPorTipo={unidadesPorTipo} loading={loading} errorCarga={errorCargaR2} recargar={fetchTipos} searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm} stats={stats} puedeCrear={user?.rol === 'administrador' || user?.rol === 'almacenista'}
+            toggleTipo={toggleTipo} handleAsignar={handleAsignar} handleDevolver={handleDevolver} handleCambiarEstado={handleCambiarEstado}
+            handleImprimirCodigos={handleImprimirCodigos} setModalNuevoTipo={setModalNuevoTipo} mapearEstadoACondicion={mapearEstadoACondicion}
+            estaAsignada={estaAsignada}
+            dialogos={(
+                <>
+                    {modalAsignar && unidadSeleccionada && (
+                        <ModalAsignar
+                            isOpen={modalAsignar}
+                            unidad={unidadSeleccionada}
+                            onClose={() => { setModalAsignar(false); setUnidadSeleccionada(null); }}
+                            onSuccess={() => {
+                                setModalAsignar(false);
+                                setUnidadSeleccionada(null);
+                                fetchTipos();
+                                if (unidadSeleccionada.tipo?.id) fetchUnidadesTipo(unidadSeleccionada.tipo.id);
+                            }}
+                        />
                     )}
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {tiposFiltrados.map((tipo) => {
-                        const estaExpandido = tiposExpandidos[tipo.id];
-                        const unidades = unidadesPorTipo[tipo.id] || [];
-
-                        return (
-                            <div key={tipo.id} className="bg-white rounded-lg shadow overflow-hidden">
-                                {/* Header del tipo */}
-                                <div
-                                    className="bg-gray-50 px-6 py-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
-                                    onClick={() => toggleTipo(tipo.id)}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-4 flex-1">
-                                            {(() => {
-                                                // Usar imagen del tipo, o si no existe, la del artículo origen
-                                                const imagenUrl = tipo.imagen_url
-                                                    ? getImageUrl(tipo.imagen_url)
-                                                    : tipo.articuloOrigen?.imagen_url
-                                                        ? getImageUrl(tipo.articuloOrigen.imagen_url)
-                                                        : null;
-                                                return (
-                                                    <div className="w-14 h-14 rounded-lg bg-red-100 flex items-center justify-center overflow-hidden">
-                                                        {imagenUrl ? (
-                                                            <img
-                                                                src={imagenUrl}
-                                                                alt={tipo.nombre}
-                                                                className="w-full h-full object-cover"
-                                                                onError={(e) => {
-                                                                    e.target.style.display = 'none';
-                                                                    e.target.nextElementSibling.style.display = 'flex';
-                                                                }}
-                                                            />
-                                                        ) : null}
-                                                        <Wrench
-                                                            className="text-red-700"
-                                                            size={28}
-                                                            style={{ display: imagenUrl ? 'none' : 'block' }}
-                                                        />
-                                                    </div>
-                                                );
-                                            })()}
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-3 mb-1">
-                                                    <h3 className="font-bold text-lg text-gray-900">{tipo.nombre}</h3>
-                                                    <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs font-mono rounded">
-                                                        {tipo.prefijo_codigo}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-4 text-sm text-gray-600">
-                                                    <span>
-                                                        {tipo.categoria?.nombre || 'Sin categoría'}
-                                                    </span>
-                                                    <span>•</span>
-                                                    <span>
-                                                        {tipo.total_unidades} {tipo.total_unidades === 1 ? 'unidad' : 'unidades'}
-                                                    </span>
-                                                    <span>•</span>
-                                                    <span className="text-green-600 font-medium">
-                                                        {tipo.unidades_disponibles} disponibles
-                                                    </span>
-                                                    {tipo.unidades_asignadas > 0 && (
-                                                        <>
-                                                            <span>•</span>
-                                                            <span className="text-blue-600 font-medium">
-                                                                {tipo.unidades_asignadas} asignadas
-                                                            </span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <button className="p-2 hover:bg-gray-200 rounded-lg transition-colors">
-                                            {estaExpandido ? (
-                                                <ChevronUp className="text-gray-600" size={24} />
-                                            ) : (
-                                                <ChevronDown className="text-gray-600" size={24} />
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Unidades (colapsable) */}
-                                {estaExpandido && (
-                                    <div className="p-6">
-                                        {/* Botón de imprimir códigos */}
-                                        {unidades.length > 0 && (user?.rol === 'administrador' || user?.rol === 'almacenista') && (
-                                            <div className="mb-4 flex justify-end">
-                                                <Button
-                                                    onClick={() => handleImprimirCodigos(tipo)}
-                                                    className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
-                                                >
-                                                    <Printer size={18} />
-                                                    Imprimir Códigos de Barras
-                                                </Button>
-                                            </div>
-                                        )}
-
-                                        {unidades.length === 0 ? (
-                                            <p className="text-center text-gray-500 py-4">No hay unidades registradas</p>
-                                        ) : (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                {unidades.map((unidad) => (
-                                                    <div
-                                                        key={unidad.id}
-                                                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                                                    >
-                                                        <div className="flex items-start justify-between mb-3">
-                                                            <div>
-                                                                <p className="font-mono font-bold text-gray-900">
-                                                                    {unidad.codigo_unico}
-                                                                </p>
-                                                                {unidad.numero_serie && (
-                                                                    <p className="text-xs text-gray-500 mt-1">
-                                                                        S/N: {unidad.numero_serie}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                {getCondicionBadge(unidad)}
-                                                                {getEstatusBadge(unidad)}
-                                                            </div>
-                                                        </div>
-
-                                                        {estaAsignada(unidad) && (
-                                                            <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-100">
-                                                                <div className="flex items-center gap-2 text-sm">
-                                                                    {unidad.usuarioAsignado ? (
-                                                                        <>
-                                                                            <UserCheck size={14} className="text-blue-600" />
-                                                                            <span className="text-blue-900 font-medium">
-                                                                                {unidad.usuarioAsignado.nombre}
-                                                                            </span>
-                                                                        </>
-                                                                    ) : unidad.camioneta ? (
-                                                                        <>
-                                                                            <Package size={14} className="text-blue-600" />
-                                                                            <span className="text-blue-900 font-medium">
-                                                                                Camioneta: {unidad.camioneta.nombre}
-                                                                            </span>
-                                                                        </>
-                                                                    ) : null}
-                                                                </div>
-                                                                <div className="flex items-center gap-3 mt-1">
-                                                                    {unidad.fecha_asignacion && (
-                                                                        <p className="text-xs text-blue-700 flex items-center gap-1">
-                                                                            <Clock size={12} />
-                                                                            Asignada: {new Date(unidad.fecha_asignacion).toLocaleDateString('es-MX')}
-                                                                        </p>
-                                                                    )}
-                                                                    {unidad.fecha_vencimiento_asignacion && (
-                                                                        <p className="text-xs text-orange-700 flex items-center gap-1 font-medium">
-                                                                            <AlertCircle size={12} />
-                                                                            Vence: {new Date(unidad.fecha_vencimiento_asignacion).toLocaleDateString('es-MX')}
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                        {unidad.observaciones && (
-                                                            <p className="text-xs text-gray-600 mb-3 italic">
-                                                                {unidad.observaciones}
-                                                            </p>
-                                                        )}
-
-                                                        <div className="flex gap-2">
-                                                            {!estaAsignada(unidad) && (
-                                                                <Button
-                                                                    onClick={() => handleAsignar(unidad, tipo)}
-                                                                    variant="secondary"
-                                                                    className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm py-2"
-                                                                >
-                                                                    <UserCheck size={14} />
-                                                                    Asignar
-                                                                </Button>
-                                                            )}
-                                                            {estaAsignada(unidad) && (
-                                                                <Button
-                                                                    onClick={() => handleDevolver(unidad, tipo)}
-                                                                    variant="secondary"
-                                                                    className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 text-sm py-2"
-                                                                >
-                                                                    <RotateCcw size={14} />
-                                                                    Devolver
-                                                                </Button>
-                                                            )}
-                                                            <Button
-                                                                onClick={() => handleCambiarEstado(unidad, tipo)}
-                                                                variant="secondary"
-                                                                className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 text-sm py-2"
-                                                            >
-                                                                <Settings size={14} />
-                                                                Estado
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
+                    {modalDevolver && unidadSeleccionada && (
+                        <ModalDevolver
+                            isOpen={modalDevolver}
+                            unidad={unidadSeleccionada}
+                            onClose={() => { setModalDevolver(false); setUnidadSeleccionada(null); }}
+                            onSuccess={() => {
+                                setModalDevolver(false);
+                                setUnidadSeleccionada(null);
+                                fetchTipos();
+                                if (unidadSeleccionada.tipo?.id) fetchUnidadesTipo(unidadSeleccionada.tipo.id);
+                            }}
+                        />
+                    )}
+                    {modalNuevoTipo && (
+                        <ModalNuevoTipo
+                            isOpen={modalNuevoTipo}
+                            onClose={() => setModalNuevoTipo(false)}
+                            onSuccess={() => { setModalNuevoTipo(false); fetchTipos(); }}
+                        />
+                    )}
+                    {modalCambiarEstado && unidadSeleccionada && (
+                        <ModalCambiarEstado
+                            isOpen={modalCambiarEstado}
+                            unidad={unidadSeleccionada}
+                            onClose={() => { setModalCambiarEstado(false); setUnidadSeleccionada(null); }}
+                            onSuccess={() => {
+                                setModalCambiarEstado(false);
+                                setUnidadSeleccionada(null);
+                                // Refrescar unidades del tipo
+                                if (unidadSeleccionada?.tipo_herramienta_id) fetchUnidadesTipo(unidadSeleccionada.tipo_herramienta_id);
+                                fetchTipos();
+                            }}
+                        />
+                    )}
+                </>
             )}
-
-            {/* Modales */}
-            {modalAsignar && unidadSeleccionada && (
-                <ModalAsignar
-                    isOpen={modalAsignar}
-                    unidad={unidadSeleccionada}
-                    onClose={() => {
-                        setModalAsignar(false);
-                        setUnidadSeleccionada(null);
-                    }}
-                    onSuccess={() => {
-                        setModalAsignar(false);
-                        setUnidadSeleccionada(null);
-                        fetchTipos();
-                        if (unidadSeleccionada.tipo?.id) {
-                            fetchUnidadesTipo(unidadSeleccionada.tipo.id);
-                        }
-                    }}
-                />
-            )}
-
-            {modalDevolver && unidadSeleccionada && (
-                <ModalDevolver
-                    isOpen={modalDevolver}
-                    unidad={unidadSeleccionada}
-                    onClose={() => {
-                        setModalDevolver(false);
-                        setUnidadSeleccionada(null);
-                    }}
-                    onSuccess={() => {
-                        setModalDevolver(false);
-                        setUnidadSeleccionada(null);
-                        fetchTipos();
-                        if (unidadSeleccionada.tipo?.id) {
-                            fetchUnidadesTipo(unidadSeleccionada.tipo.id);
-                        }
-                    }}
-                />
-            )}
-
-            {modalNuevoTipo && (
-                <ModalNuevoTipo
-                    isOpen={modalNuevoTipo}
-                    onClose={() => setModalNuevoTipo(false)}
-                    onSuccess={() => {
-                        setModalNuevoTipo(false);
-                        fetchTipos();
-                    }}
-                />
-            )}
-
-            {modalCambiarEstado && unidadSeleccionada && (
-                <ModalCambiarEstado
-                    isOpen={modalCambiarEstado}
-                    unidad={unidadSeleccionada}
-                    onClose={() => {
-                        setModalCambiarEstado(false);
-                        setUnidadSeleccionada(null);
-                    }}
-                    onSuccess={() => {
-                        setModalCambiarEstado(false);
-                        setUnidadSeleccionada(null);
-                        // Refrescar unidades del tipo
-                        if (unidadSeleccionada?.tipo_herramienta_id) {
-                            fetchUnidadesTipo(unidadSeleccionada.tipo_herramienta_id);
-                        }
-                        fetchTipos();
-                    }}
-                />
-            )}
-        </div>
+        />
     );
 };
 
@@ -695,7 +209,6 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
     const [camionetas, setCamionetas] = useState([]);
     const [camionetaSeleccionada, setCamionetaSeleccionada] = useState('');
     const [loading, setLoading] = useState(false);
-    const d3 = useDiseno3GR2(); // Rediseño 2: el mismo formulario en un cajón
 
     useEffect(() => {
         fetchDatos();
@@ -752,138 +265,12 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
         }
     };
 
-    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-    if (d3) {
-        return (
-            <CajonAsignar unidad={unidad} onClose={onClose} tipoAsignacion={tipoAsignacion} setTipoAsignacion={setTipoAsignacion}
-                usuarioSeleccionado={usuarioSeleccionado} setUsuarioSeleccionado={setUsuarioSeleccionado} camionetaSeleccionada={camionetaSeleccionada}
-                setCamionetaSeleccionada={setCamionetaSeleccionada} observaciones={observaciones} setObservaciones={setObservaciones}
-                fechaVencimiento={fechaVencimiento} setFechaVencimiento={setFechaVencimiento} usuarios={usuarios} camionetas={camionetas}
-                loading={loading} handleSubmit={handleSubmit} />
-        );
-    }
-
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Asignar Herramienta">
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm text-blue-800 mb-1">
-                        <strong>Herramienta:</strong> {unidad.tipo?.nombre}
-                    </p>
-                    <p className="text-sm text-blue-800">
-                        <strong>Código:</strong> {unidad.codigo_unico}
-                    </p>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Asignar a:
-                    </label>
-                    <div className="flex gap-4">
-                        <label className="flex items-center">
-                            <input
-                                type="radio"
-                                value="usuario"
-                                checked={tipoAsignacion === 'usuario'}
-                                onChange={(e) => setTipoAsignacion(e.target.value)}
-                                className="mr-2"
-                            />
-                            Usuario
-                        </label>
-                        <label className="flex items-center">
-                            <input
-                                type="radio"
-                                value="camioneta"
-                                checked={tipoAsignacion === 'camioneta'}
-                                onChange={(e) => setTipoAsignacion(e.target.value)}
-                                className="mr-2"
-                            />
-                            Camioneta
-                        </label>
-                    </div>
-                </div>
-
-                {tipoAsignacion === 'usuario' && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Usuario *
-                        </label>
-                        <select
-                            value={usuarioSeleccionado}
-                            onChange={(e) => setUsuarioSeleccionado(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                            required
-                        >
-                            <option value="">Seleccionar usuario...</option>
-                            {usuarios.filter(u => u.activo).map(usuario => (
-                                <option key={usuario.id} value={usuario.id}>
-                                    {usuario.nombre} - {usuario.puesto || usuario.rol}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-
-                {tipoAsignacion === 'camioneta' && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Camioneta *
-                        </label>
-                        <select
-                            value={camionetaSeleccionada}
-                            onChange={(e) => setCamionetaSeleccionada(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                            required
-                        >
-                            <option value="">Seleccionar camioneta...</option>
-                            {camionetas.filter(c => c.activo).map(camioneta => (
-                                <option key={camioneta.id} value={camioneta.id}>
-                                    {camioneta.nombre} {camioneta.matricula ? `(${camioneta.matricula})` : ''} - {camioneta.encargado?.nombre || 'Sin encargado'}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Observaciones
-                    </label>
-                    <textarea
-                        value={observaciones}
-                        onChange={(e) => setObservaciones(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                        rows="3"
-                        placeholder="Notas adicionales sobre la asignación..."
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Fecha de Vencimiento (opcional)
-                    </label>
-                    <input
-                        type="date"
-                        value={fechaVencimiento}
-                        onChange={(e) => setFechaVencimiento(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                        min={new Date().toISOString().split('T')[0]}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                        Fecha límite para devolver la herramienta
-                    </p>
-                </div>
-
-                <div className="flex gap-3 justify-end mt-6">
-                    <Button type="button" onClick={onClose} variant="secondary" disabled={loading}>
-                        Cancelar
-                    </Button>
-                    <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700">
-                        {loading ? 'Asignando...' : 'Asignar Herramienta'}
-                    </Button>
-                </div>
-            </form>
-        </Modal>
+        <CajonAsignar unidad={unidad} onClose={onClose} tipoAsignacion={tipoAsignacion} setTipoAsignacion={setTipoAsignacion}
+            usuarioSeleccionado={usuarioSeleccionado} setUsuarioSeleccionado={setUsuarioSeleccionado} camionetaSeleccionada={camionetaSeleccionada}
+            setCamionetaSeleccionada={setCamionetaSeleccionada} observaciones={observaciones} setObservaciones={setObservaciones}
+            fechaVencimiento={fechaVencimiento} setFechaVencimiento={setFechaVencimiento} usuarios={usuarios} camionetas={camionetas}
+            loading={loading} handleSubmit={handleSubmit} />
     );
 };
 
@@ -891,7 +278,6 @@ const ModalAsignar = ({ isOpen, unidad, onClose, onSuccess }) => {
 const ModalDevolver = ({ isOpen, unidad, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
     const [observaciones, setObservaciones] = useState('');
-    const d3 = useDiseno3GR2(); // Rediseño 2: el mismo formulario en un cajón
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -914,63 +300,12 @@ const ModalDevolver = ({ isOpen, unidad, onClose, onSuccess }) => {
         }
     };
 
-    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-    if (d3) {
-        return <CajonDevolver unidad={unidad} onClose={onClose} observaciones={observaciones} setObservaciones={setObservaciones} loading={loading} handleSubmit={handleSubmit} />;
-    }
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Devolver Herramienta">
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="text-sm text-green-800 mb-1">
-                        <strong>Herramienta:</strong> {unidad.tipo?.nombre}
-                    </p>
-                    <p className="text-sm text-green-800 mb-1">
-                        <strong>Código:</strong> {unidad.codigo_unico}
-                    </p>
-                    {unidad.usuarioAsignado && (
-                        <p className="text-sm text-green-800">
-                            <strong>Asignado a:</strong> {unidad.usuarioAsignado.nombre}
-                        </p>
-                    )}
-                    {unidad.camioneta && (
-                        <p className="text-sm text-green-800">
-                            <strong>Camioneta:</strong> {unidad.camioneta.nombre}
-                        </p>
-                    )}
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Estado de la herramienta
-                    </label>
-                    <textarea
-                        value={observaciones}
-                        onChange={(e) => setObservaciones(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                        rows="3"
-                        placeholder="Ej: En buen estado, con desgaste normal, requiere mantenimiento, etc."
-                    />
-                </div>
-
-                <div className="flex gap-3 justify-end mt-6">
-                    <Button type="button" onClick={onClose} variant="secondary" disabled={loading}>
-                        Cancelar
-                    </Button>
-                    <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700">
-                        {loading ? 'Devolviendo...' : 'Confirmar Devolución'}
-                    </Button>
-                </div>
-            </form>
-        </Modal>
-    );
+    return <CajonDevolver unidad={unidad} onClose={onClose} observaciones={observaciones} setObservaciones={setObservaciones} loading={loading} handleSubmit={handleSubmit} />;
 };
 
 // Modal para crear nuevo tipo de herramienta
 const ModalNuevoTipo = ({ isOpen, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
-    const d3 = useDiseno3GR2(); // Rediseño 2: el mismo formulario en un cajón
     const [categorias, setCategorias] = useState([]);
     const [ubicaciones, setUbicaciones] = useState([]);
     const [proveedores, setProveedores] = useState([]);
@@ -1073,210 +408,15 @@ const ModalNuevoTipo = ({ isOpen, onClose, onSuccess }) => {
         }
     };
 
-    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-    if (d3) {
-        return (
-            <CajonNuevoTipo onClose={onClose} formData={formData} handleChange={handleChange} categorias={categorias} ubicaciones={ubicaciones}
-                proveedores={proveedores} loading={loading} handleSubmit={handleSubmit} />
-        );
-    }
-
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Nuevo Tipo de Herramienta" maxWidth="max-w-2xl">
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                {/* Nombre */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nombre <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                        type="text"
-                        name="nombre"
-                        value={formData.nombre}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                        placeholder="Ej: Pistola de Pintar"
-                        required
-                    />
-                </div>
-
-                {/* Descripción */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Descripción
-                    </label>
-                    <textarea
-                        name="descripcion"
-                        value={formData.descripcion}
-                        onChange={handleChange}
-                        rows="2"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                        placeholder="Descripción opcional del tipo de herramienta"
-                    />
-                </div>
-
-                {/* Grid de 2 columnas para campos principales */}
-                <div className="grid grid-cols-2 gap-4">
-                    {/* Categoría */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Categoría <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                            name="categoria_id"
-                            value={formData.categoria_id}
-                            onChange={handleChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                            required
-                        >
-                            <option value="">Seleccionar categoría</option>
-                            {categorias.map(cat => (
-                                <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Ubicación */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Ubicación <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                            name="ubicacion_id"
-                            value={formData.ubicacion_id}
-                            onChange={handleChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                            required
-                        >
-                            <option value="">Seleccionar ubicación</option>
-                            {ubicaciones.map(ubi => (
-                                <option key={ubi.id} value={ubi.id}>{ubi.nombre}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-
-                {/* Proveedor */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Proveedor (opcional)
-                    </label>
-                    <select
-                        name="proveedor_id"
-                        value={formData.proveedor_id}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    >
-                        <option value="">Sin proveedor</option>
-                        {proveedores.filter(p => p.activo).map(prov => (
-                            <option key={prov.id} value={prov.id}>{prov.nombre}</option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Grid de 2 columnas para precio y cantidad */}
-                <div className="grid grid-cols-2 gap-4">
-                    {/* Precio Unitario */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Precio Unitario <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            type="number"
-                            name="precio_unitario"
-                            value={formData.precio_unitario}
-                            onChange={handleChange}
-                            step="0.01"
-                            min="0"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                            placeholder="0.00"
-                            required
-                        />
-                    </div>
-
-                    {/* Cantidad de Unidades */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Cantidad de Unidades <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            type="number"
-                            name="cantidad_unidades"
-                            value={formData.cantidad_unidades}
-                            onChange={handleChange}
-                            min="1"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                            placeholder="1"
-                            required
-                        />
-                    </div>
-                </div>
-
-                {/* Grid de 2 columnas para imagen y prefijo */}
-                <div className="grid grid-cols-2 gap-4">
-                    {/* URL Imagen */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            URL de Imagen (opcional)
-                        </label>
-                        <input
-                            type="url"
-                            name="imagen_url"
-                            value={formData.imagen_url}
-                            onChange={handleChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                            placeholder="https://..."
-                        />
-                    </div>
-
-                    {/* Prefijo Código */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Prefijo Código (opcional)
-                        </label>
-                        <input
-                            type="text"
-                            name="prefijo_codigo"
-                            value={formData.prefijo_codigo}
-                            onChange={handleChange}
-                            maxLength="3"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                            placeholder="Ej: PP, CP"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                            Si no se especifica, se generará automáticamente
-                        </p>
-                    </div>
-                </div>
-
-                {/* Botones */}
-                <div className="flex justify-end gap-3 pt-4 border-t">
-                    <Button
-                        type="button"
-                        onClick={onClose}
-                        variant="secondary"
-                        disabled={loading}
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        type="submit"
-                        disabled={loading}
-                        className="bg-red-700 hover:bg-red-800"
-                    >
-                        {loading ? 'Creando...' : 'Crear Tipo'}
-                    </Button>
-                </div>
-            </form>
-        </Modal>
+        <CajonNuevoTipo onClose={onClose} formData={formData} handleChange={handleChange} categorias={categorias} ubicaciones={ubicaciones}
+            proveedores={proveedores} loading={loading} handleSubmit={handleSubmit} />
     );
 };
 
 // Modal para cambiar estado de una unidad
 const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
-    const g3 = useDiseno3G(); // Diseño 3G: opciones sin emojis
-    const d3 = useDiseno3GR2(); // Rediseño 2: el mismo formulario en un cajón
     const [nuevaCondicion, setNuevaCondicion] = useState('');
     const [motivo, setMotivo] = useState('');
 
@@ -1331,9 +471,7 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
                 condicion: nuevaCondicion,
                 motivo: motivo.trim()
             });
-            toast.success(g3
-                ? `Condición cambiada a «${(condicionesDisponibles.find(c => c.value === nuevaCondicion)?.label || '').replace(/^[^\p{L}\p{N}]+/u, '')}»`
-                : `Condición cambiada a "${condicionesDisponibles.find(c => c.value === nuevaCondicion)?.label}"`);
+            toast.success(`Condición cambiada a «${(condicionesDisponibles.find(c => c.value === nuevaCondicion)?.label || '').replace(/^[^\p{L}\p{N}]+/u, '')}»`);
             onSuccess();
         } catch (error) {
             console.error('Error al cambiar condición:', error);
@@ -1346,120 +484,10 @@ const ModalCambiarEstado = ({ isOpen, unidad, onClose, onSuccess }) => {
     const condicionActual = unidad.condicion || mapearEstadoACondicion(unidad.estado);
     const estatusActual = unidad.estatus || (unidad.estado === 'asignada' ? 'asignado' : 'disponible');
 
-    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-    if (d3) {
-        return (
-            <CajonCondicion unidad={unidad} onClose={onClose} condicionesDisponibles={condicionesDisponibles} nuevaCondicion={nuevaCondicion}
-                setNuevaCondicion={setNuevaCondicion} motivo={motivo} setMotivo={setMotivo} condicionActual={condicionActual}
-                estatusActual={estatusActual} loading={loading} handleSubmit={handleSubmit} />
-        );
-    }
-
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Cambiar Condición de Herramienta">
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                {/* Información de la unidad */}
-                <div className="bg-gray-50 p-4 rounded-lg border">
-                    <h3 className="font-semibold text-gray-900 mb-2">
-                        {unidad.tipo?.nombre || 'Herramienta'}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                        Código: <span className="font-mono font-bold">{unidad.codigo_unico}</span>
-                    </p>
-                    <div className="flex gap-4 mt-2">
-                        <p className="text-sm text-gray-600">
-                            Condición: <span className="font-medium capitalize">{condicionActual}</span>
-                        </p>
-                        <p className="text-sm text-gray-600">
-                            Estatus: <span className={`font-medium capitalize ${estatusActual === 'asignado' ? 'text-blue-600' : 'text-green-600'}`}>
-                                {estatusActual}
-                            </span>
-                        </p>
-                    </div>
-                </div>
-
-                {/* Selector de nueva condición */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Nueva Condición <span className="text-red-500">*</span>
-                    </label>
-                    <p className="text-xs text-gray-500 mb-3">
-                        Indica el estado físico de la herramienta. El estatus de asignación no cambia aquí.
-                    </p>
-                    <div className="grid grid-cols-1 gap-2">
-                        {condicionesDisponibles.map((condicion) => (
-                            <button
-                                key={condicion.value}
-                                type="button"
-                                onClick={() => setNuevaCondicion(condicion.value)}
-                                className={`
-                                    px-4 py-3 rounded-lg border-2 text-left transition-all
-                                    ${nuevaCondicion === condicion.value
-                                        ? 'border-red-600 bg-red-50 g3:!border-g3-primario g3:!bg-g3-primario-tinte'
-                                        : 'border-gray-200 bg-white hover:border-gray-300'
-                                    }
-                                    ${condicionActual === condicion.value ? 'opacity-50' : ''}
-                                `}
-                                disabled={condicionActual === condicion.value}
-                            >
-                                <span className={`text-sm font-medium ${condicion.color}`}>
-                                    {g3 ? condicion.label.replace(/^[^\p{L}\p{N}]+/u, '') : condicion.label}
-                                </span>
-                                <span className="block text-xs text-gray-500 mt-1">
-                                    {condicion.desc}
-                                </span>
-                                {condicionActual === condicion.value && (
-                                    <span className="text-xs text-gray-400 ml-2">(actual)</span>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Motivo */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Motivo / Observaciones
-                    </label>
-                    <textarea
-                        value={motivo}
-                        onChange={(e) => setMotivo(e.target.value)}
-                        rows="2"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                        placeholder="Describe el motivo del cambio de condición..."
-                    />
-                </div>
-
-                {/* Advertencia si está asignada */}
-                {estatusActual === 'asignado' && (
-                    <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-                        <p className="text-sm text-blue-800">
-                            <AlertCircle size={14} className="inline mr-1" />
-                            Esta herramienta está asignada. El cambio de condición no afecta la asignación.
-                        </p>
-                    </div>
-                )}
-
-                {/* Botones */}
-                <div className="flex justify-end gap-3 pt-4 border-t">
-                    <Button
-                        type="button"
-                        onClick={onClose}
-                        variant="secondary"
-                        disabled={loading}
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        type="submit"
-                        disabled={loading || !nuevaCondicion || nuevaCondicion === condicionActual}
-                        className="bg-red-700 hover:bg-red-800"
-                    >
-                        {loading ? 'Cambiando...' : 'Cambiar Condición'}
-                    </Button>
-                </div>
-            </form>
-        </Modal>
+        <CajonCondicion unidad={unidad} onClose={onClose} condicionesDisponibles={condicionesDisponibles} nuevaCondicion={nuevaCondicion}
+            setNuevaCondicion={setNuevaCondicion} motivo={motivo} setMotivo={setMotivo} condicionActual={condicionActual}
+            estatusActual={estatusActual} loading={loading} handleSubmit={handleSubmit} />
     );
 };
 

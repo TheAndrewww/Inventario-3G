@@ -1,10 +1,4 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
-import { Download, Printer, Loader2 } from 'lucide-react';
-// Rediseño 2: encendido se pinta con rediseno2/inventario/CodigoBarrasR2 (la misma imagen, la misma petición)
-import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
 import CodigoBarrasR2 from '../../rediseno2/inventario/CodigoBarrasR2';
 
 const BarcodeDisplay = ({ articuloId, codigoEAN13, className = '' }) => {
@@ -12,7 +6,6 @@ const BarcodeDisplay = ({ articuloId, codigoEAN13, className = '' }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [loading, setLoading] = useState(true);
-  const d3 = useDiseno3GR2();
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
   const barcodeUrl = `${API_URL}/articulos/${articuloId}/barcode`;
@@ -138,67 +131,9 @@ const BarcodeDisplay = ({ articuloId, codigoEAN13, className = '' }) => {
     printWindow.document.close();
   };
 
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    return (
-      <CodigoBarrasR2 imagen={imageUrl} cargando={loading} error={imageError} codigo={codigoEAN13}
-        alCargar={() => { setImageLoaded(true); setLoading(false); }} alDescargar={handleDownload} alImprimir={handlePrint} />
-    );
-  }
-
   return (
-    <div className={`flex flex-col items-center gap-3 ${className}`}>
-      {/* Imagen del código de barras */}
-      <div className="relative bg-white p-4 rounded-lg border border-gray-200 min-w-[250px] min-h-[120px]">
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Loader2 className="animate-spin text-gray-400" size={24} />
-          </div>
-        )}
-
-        {imageError ? (
-          <div className="p-8 text-center text-red-600">
-            <p className="text-sm">Error al cargar el código de barras</p>
-            <p className="text-xs mt-1">{codigoEAN13}</p>
-          </div>
-        ) : imageUrl && (
-          <img
-            src={imageUrl}
-            alt={`Código de barras ${codigoEAN13}`}
-            className={`max-w-full h-auto ${!imageLoaded ? 'opacity-0' : 'opacity-100'} transition-opacity`}
-            onLoad={() => {
-              setImageLoaded(true);
-              setLoading(false);
-            }}
-          />
-        )}
-      </div>
-
-      {/* Código EAN-13 */}
-      <div className="font-mono text-sm text-gray-700 font-semibold">
-        {codigoEAN13}
-      </div>
-
-      {/* Botones de acción */}
-      <div className="flex gap-2">
-        <button
-          onClick={handleDownload}
-          className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-          title="Descargar PNG"
-        >
-          <Download size={16} />
-          Descargar
-        </button>
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-          title="Imprimir"
-        >
-          <Printer size={16} />
-          Imprimir
-        </button>
-      </div>
-    </div>
+    <CodigoBarrasR2 imagen={imageUrl} cargando={loading} error={imageError} codigo={codigoEAN13}
+      alCargar={() => { setImageLoaded(true); setLoading(false); }} alDescargar={handleDownload} alImprimir={handlePrint} />
   );
 };
 

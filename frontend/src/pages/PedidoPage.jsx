@@ -1,10 +1,5 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Minus, Trash2, Package, Users, Truck, Search, Barcode, PlusCircle } from 'lucide-react';
 import { usePedido } from '../context/PedidoContext';
-import { Button } from '../components/common';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import pedidosService from '../services/pedidos.service';
@@ -17,22 +12,16 @@ import { flattenProyectos } from '../utils/produccion';
 import EAN13Scanner from '../components/scanner/EAN13Scanner';
 import ArticuloFormModal from '../components/articulos/ArticuloFormModal';
 import toast from 'react-hot-toast';
-import { getImageUrl } from '../utils/imageUtils';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
-import BarcodeScannerIndicator from '../components/scanner/BarcodeScannerIndicator';
 import ScanSuccessNotification from '../components/scanner/ScanSuccessNotification';
 import { generateTicketPDF } from '../utils/pdfGenerator';
 import { ModalCrearOrdenDesdeSolicitudes } from './OrdenesCompraPage';
-import { useDiseno3G } from '../diseno-3g/useDiseno3G';
-import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
-import { useDiseno3G as useRediseno2 } from '../rediseno2/fundacion/useDiseno3G';
+import { confirmarG3 } from '../diseno-3g/dialogosG3';
 import VistaOrdenSalida from '../rediseno2/tickets/VistaOrdenSalida';
 
 const PedidoPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const g3 = useDiseno3G(); // Diseño 3G: solo textos e íconos (apagado, el DOM de siempre)
-  const d3 = useRediseno2(); // Rediseño 2: encendido se pinta VistaOrdenSalida con este mismo estado y manejadores
   const {
     items,
     incrementar,
@@ -189,30 +178,17 @@ const PedidoPage = () => {
       return;
     }
 
-    // Diseño 3G encendido: vista previa del paquete (no manda nada al servidor); apagado, el confirm() de siempre.
-    if (g3Activo()) {
-      const totalPiezas = getTotalPiezas();
-      confirmarG3({
-        titulo: '¿Vaciar el carrito?',
-        datos: [['Artículos', String(items.length)], ['Piezas', String(totalPiezas)]],
-        pasa: [`Se eliminarán ${items.length} artículo${items.length !== 1 ? 's' : ''} del carrito con un total de ${totalPiezas} pieza${totalPiezas !== 1 ? 's' : ''}.`],
-        confirmar: 'Vaciar carrito', cancelar: 'No vaciar', peligro: true,
-      }).then((si) => {
-        if (!si) return;
-        limpiarPedido();
-        toast.success('Carrito vaciado exitosamente');
-      });
-      return;
-    }
-
-    const confirmar = window.confirm(
-      `¿Estás seguro que deseas vaciar el carrito?\n\nSe eliminarán ${items.length} artículo(s) con un total de ${getTotalPiezas()} pieza(s).`
-    );
-
-    if (confirmar) {
+    const totalPiezas = getTotalPiezas();
+    confirmarG3({
+      titulo: '¿Vaciar el carrito?',
+      datos: [['Artículos', String(items.length)], ['Piezas', String(totalPiezas)]],
+      pasa: [`Se eliminarán ${items.length} artículo${items.length !== 1 ? 's' : ''} del carrito con un total de ${totalPiezas} pieza${totalPiezas !== 1 ? 's' : ''}.`],
+      confirmar: 'Vaciar carrito', cancelar: 'No vaciar', peligro: true,
+    }).then((si) => {
+      if (!si) return;
       limpiarPedido();
       toast.success('Carrito vaciado exitosamente');
-    }
+    });
   };
 
   const handleFinalizarPedido = async () => {
@@ -380,7 +356,7 @@ const PedidoPage = () => {
       const response = await articulosService.getByEAN13(codigo);
       if (response && response.id) {
         agregarArticulo(response);
-        toast.success(g3Activo() ? `${response.nombre} agregado` : `✓ ${response.nombre} agregado`);
+        toast.success(`${response.nombre} agregado`);
         setBusqueda('');
         setResultadosBusqueda([]);
         setShowScanner(false);
@@ -429,17 +405,17 @@ const PedidoPage = () => {
         setShowScanSuccess(true);
 
         // También mostrar toast para confirmación
-        toast.success(g3Activo() ? `${articuloEncontrado.nombre} agregado` : `✓ ${articuloEncontrado.nombre} agregado`, {
-          icon: g3Activo() ? undefined : '📦',
+        toast.success(`${articuloEncontrado.nombre} agregado`, {
+          icon: undefined,
           duration: 2000,
         });
       } else {
-        toast.error(g3Activo() ? `Artículo no encontrado: ${codigo}` : `❌ Artículo no encontrado: ${codigo}`, {
+        toast.error(`Artículo no encontrado: ${codigo}`, {
           duration: 4000,
         });
       }
     } catch (error) {
-      toast.error(g3Activo() ? 'Error al buscar el artículo' : `❌ Error al buscar artículo`, {
+      toast.error('Error al buscar el artículo', {
         duration: 3000,
       });
     }
@@ -455,14 +431,14 @@ const PedidoPage = () => {
   // Agregar artículo desde búsqueda
   const handleAgregarArticulo = (articulo) => {
     agregarArticulo(articulo);
-    toast.success(g3Activo() ? `${articulo.nombre} agregado` : `✓ ${articulo.nombre} agregado`);
+    toast.success(`${articulo.nombre} agregado`);
     setBusqueda('');
     setResultadosBusqueda([]);
   };
 
   // Handler para cuando se crea un nuevo artículo exitosamente
   const handleNuevoArticuloCreado = (nuevoArticulo) => {
-    toast.success(g3Activo() ? `Artículo «${nuevoArticulo.nombre}» creado` : `✓ Artículo "${nuevoArticulo.nombre}" creado exitosamente`);
+    toast.success(`Artículo «${nuevoArticulo.nombre}» creado`);
     // Agregar el nuevo artículo al pedido
     agregarArticulo(nuevoArticulo);
     // Limpiar búsqueda
@@ -473,77 +449,23 @@ const PedidoPage = () => {
     setNombreNuevoArticulo(null);
   };
 
-  // Rediseño 2 encendido: misma página, otra vista. Los manejadores son los de arriba; lo que hoy va escrito dentro del
-  // JSX (buscar en mayúsculas, «Crear nuevo artículo», «Ver inventario», cerrar el aviso de lectura) se repite igual aquí.
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    return (
-      <VistaOrdenSalida e={{
-        user, items, incrementar, decrementar, eliminarArticulo, getTotalPiezas, getCostoTotal,
-        proyecto, setProyecto, observaciones, setObservaciones,
-        equipos, equipoSeleccionado, setEquipoSeleccionado, cargandoEquipos,
-        camionetas, camionetaSeleccionada, setCamionetaSeleccionada, cargandoCamionetas,
-        proyectosProduccion, cargandoProyectos, encargados, encargadoSeleccionado, setEncargadoSeleccionado, cargandoEncargados,
-        busqueda, cambiarBusqueda: (texto) => setBusqueda(texto.toUpperCase()), resultadosBusqueda, buscando,
-        showScanner, setShowScanner, isScanning,
-        handleCantidadChange, handleCantidadBlur, handleVaciarCarrito, handleFinalizarPedido, handleAgregarArticulo,
-        abrirNuevoArticulo: () => {
-          setNombreNuevoArticulo(busqueda);
-          setModalNuevoArticulo(true);
-        },
-        irAInventario: () => navigate('/inventario'),
-        escaner: showScanner ? <EAN13Scanner onScan={buscarPorCodigo} onClose={() => setShowScanner(false)} /> : null,
-        avisoLectura: showScanSuccess && lastScannedArticle ? (
-          <ScanSuccessNotification
-            articulo={lastScannedArticle}
-            onClose={() => {
-              setShowScanSuccess(false);
-              setLastScannedArticle(null);
-            }}
-          />
-        ) : null,
-        modales: (
-          <>
-            <ArticuloFormModal
-              isOpen={modalNuevoArticulo}
-              onClose={() => {
-                setModalNuevoArticulo(false);
-                setNombreNuevoArticulo(null);
-              }}
-              onSuccess={handleNuevoArticuloCreado}
-              articulo={null}
-              nombreInicial={nombreNuevoArticulo}
-            />
-            {mostrarModalOrden && (
-              <ModalCrearOrdenDesdeSolicitudes
-                isOpen={mostrarModalOrden}
-                solicitudes={solicitudesOrden}
-                generarPDFOrden={undefined}
-                onClose={() => {
-                  setMostrarModalOrden(false);
-                  setSolicitudesOrden([]);
-                  navigate('/historial');
-                }}
-                onSuccess={() => {
-                  setMostrarModalOrden(false);
-                  setSolicitudesOrden([]);
-                  navigate('/historial');
-                }}
-              />
-            )}
-          </>
-        ),
-      }} />
-    );
-  }
-
   return (
-    <div className="p-4 md:p-6">
-      {/* Indicador de escaneo activo */}
-      <BarcodeScannerIndicator isScanning={isScanning} />
-
-      {/* Notificación de artículo escaneado exitosamente */}
-      {showScanSuccess && lastScannedArticle && (
+    <VistaOrdenSalida e={{
+      user, items, incrementar, decrementar, eliminarArticulo, getTotalPiezas, getCostoTotal,
+      proyecto, setProyecto, observaciones, setObservaciones,
+      equipos, equipoSeleccionado, setEquipoSeleccionado, cargandoEquipos,
+      camionetas, camionetaSeleccionada, setCamionetaSeleccionada, cargandoCamionetas,
+      proyectosProduccion, cargandoProyectos, encargados, encargadoSeleccionado, setEncargadoSeleccionado, cargandoEncargados,
+      busqueda, cambiarBusqueda: (texto) => setBusqueda(texto.toUpperCase()), resultadosBusqueda, buscando,
+      showScanner, setShowScanner, isScanning,
+      handleCantidadChange, handleCantidadBlur, handleVaciarCarrito, handleFinalizarPedido, handleAgregarArticulo,
+      abrirNuevoArticulo: () => {
+        setNombreNuevoArticulo(busqueda);
+        setModalNuevoArticulo(true);
+      },
+      irAInventario: () => navigate('/inventario'),
+      escaner: showScanner ? <EAN13Scanner onScan={buscarPorCodigo} onClose={() => setShowScanner(false)} /> : null,
+      avisoLectura: showScanSuccess && lastScannedArticle ? (
         <ScanSuccessNotification
           articulo={lastScannedArticle}
           onClose={() => {
@@ -551,455 +473,39 @@ const PedidoPage = () => {
             setLastScannedArticle(null);
           }}
         />
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        {/* Lista de artículos */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Panel de Búsqueda Rápida */}
-          <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-            <h3 className="text-base md:text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Search size={20} />
-              Buscar y Agregar Artículos
-            </h3>
-
-            {/* Barra de búsqueda con scanner */}
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                  <input
-                    type="text"
-                    value={busqueda}
-                    onChange={(e) => setBusqueda(e.target.value.toUpperCase())}
-                    placeholder="BUSCAR POR NOMBRE O CÓDIGO..."
-                    className="w-full pl-10 pr-3 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm md:text-base"
-                    style={{ textTransform: 'uppercase' }}
-                  />
-                </div>
-                <button
-                  onClick={() => setShowScanner(!showScanner)}
-                  className={`px-4 py-3 rounded-lg border-2 transition-colors ${showScanner
-                    ? 'bg-red-700 text-white border-red-700'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
-                  title="Escanear código de barras"
-                >
-                  <Barcode size={20} />
-                </button>
-              </div>
-
-              {/* Scanner */}
-              {showScanner && (
-                <div className="border-2 border-red-700 rounded-lg p-3 bg-gray-50">
-                  <EAN13Scanner
-                    onScan={buscarPorCodigo}
-                    onClose={() => setShowScanner(false)}
-                  />
-                </div>
-              )}
-
-              {/* Resultados de búsqueda */}
-              {busqueda.length >= 2 && (
-                <div className="border border-gray-200 rounded-lg max-h-80 overflow-y-auto">
-                  {buscando ? (
-                    <div className="p-4 text-center text-gray-500">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-700 mx-auto"></div>
-                      <p className="mt-2 text-sm">Buscando...</p>
-                    </div>
-                  ) : resultadosBusqueda.length > 0 ? (
-                    <div className="divide-y divide-gray-200">
-                      {resultadosBusqueda.map((articulo) => {
-                        const imagenUrl = articulo.imagen_url
-                          ? getImageUrl(articulo.imagen_url)
-                          : null;
-                        const desactivado = articulo.activo === false;
-
-                        return (
-                          <div
-                            key={articulo.id}
-                            className={`p-3 hover:bg-gray-50 cursor-pointer transition-colors ${desactivado ? 'bg-gray-100 opacity-75' : ''}`}
-                            onClick={() => handleAgregarArticulo(articulo)}
-                          >
-                            <div className="flex items-center gap-3">
-                              {imagenUrl ? (
-                                <img
-                                  src={imagenUrl}
-                                  alt={articulo.nombre}
-                                  className={`w-12 h-12 object-cover rounded-lg flex-shrink-0 ${desactivado ? 'grayscale' : ''}`}
-                                />
-                              ) : (
-                                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
-                                  {g3 ? <Package size={18} className="text-gray-500" aria-hidden="true" /> : '📦'}
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <h4 className={`font-medium text-sm truncate ${desactivado ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
-                                  {articulo.nombre}
-                                  {desactivado && <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-gray-300 text-gray-700 no-underline">DESACTIVADO</span>}
-                                </h4>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {articulo.codigo_ean13} • Stock: {articulo.stock_actual}
-                                </p>
-                              </div>
-                              <button
-                                className="px-3 py-1.5 bg-red-700 text-white rounded-lg hover:bg-red-800 text-sm flex items-center gap-1"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAgregarArticulo(articulo);
-                                }}
-                              >
-                                <Plus size={14} />
-                                Agregar
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center">
-                      <p className="text-gray-600 mb-3 text-sm">
-                        No se encontraron artículos con "{busqueda}"
-                      </p>
-                      <button
-                        onClick={() => {
-                          setNombreNuevoArticulo(busqueda);
-                          setModalNuevoArticulo(true);
-                        }}
-                        className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors mx-auto text-sm"
-                      >
-                        <PlusCircle size={18} />
-                        Crear nuevo artículo
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {!busqueda && !showScanner && (
-                <p className="text-xs text-gray-500 text-center">
-                  Escribe el nombre o código del artículo, o escanea su código de barras
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Lista de artículos en el pedido */}
-          <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-            <h3 className="text-base md:text-lg font-bold text-gray-900 mb-4">Artículos en el Pedido</h3>
-
-            {items.length === 0 ? (
-              <div className="text-center py-8 md:py-12 text-gray-500">
-                <ShoppingCart size={48} className="mx-auto mb-4 opacity-20 md:w-16 md:h-16" />
-                <p className="text-base md:text-lg mb-2">No hay artículos en el pedido</p>
-                <p className="text-sm">Agrega artículos desde el inventario</p>
-                <button
-                  onClick={() => navigate('/inventario')}
-                  className="mt-4 px-6 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 text-sm md:text-base"
-                >
-                  Ver Inventario
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {items.map((item) => {
-                  const imagenUrl = item.imagen_url
-                    ? getImageUrl(item.imagen_url)
-                    : null;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 md:p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
-                    >
-                      <div className="flex items-center gap-3 flex-1">
-                        {imagenUrl ? (
-                          <img
-                            src={imagenUrl}
-                            alt={item.nombre}
-                            className="w-14 h-14 md:w-16 md:h-16 object-cover rounded-lg flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-14 h-14 md:w-16 md:h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl md:text-3xl flex-shrink-0">
-                            {g3 ? <Package size={22} className="text-gray-500" aria-hidden="true" /> : '📦'}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-gray-900 text-sm md:text-base truncate">{item.nombre}</h4>
-                          <p className="text-xs md:text-sm text-gray-500 truncate">
-                            {item.codigo_ean13}
-                          </p>
-                          <p className="text-xs md:text-sm text-gray-500">
-                            ${(parseFloat(item.costo_unitario) || 0).toFixed(2)} c/u
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between sm:justify-end gap-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => decrementar(item.id)}
-                            className="w-8 h-8 border-2 border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 transition-colors"
-                          >
-                            <Minus size={14} />
-                          </button>
-                          <input
-                            type="number"
-                            value={item.cantidad}
-                            onChange={(e) => handleCantidadChange(item.id, e.target.value)}
-                            onBlur={(e) => handleCantidadBlur(item.id, e.target.value)}
-                            min="1"
-                            className="text-base md:text-lg font-bold w-14 md:w-16 text-center border-2 border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-transparent"
-                          />
-                          <button
-                            onClick={() => incrementar(item.id)}
-                            className="w-8 h-8 border-2 border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 transition-colors"
-                          >
-                            <Plus size={14} />
-                          </button>
-                        </div>
-
-                        <div className="text-right min-w-[80px] md:min-w-[100px]">
-                          <p className="font-bold text-gray-900 text-sm md:text-base">
-                            ${(item.cantidad * (item.costo_unitario || 0)).toFixed(2)}
-                          </p>
-                        </div>
-
-                        <button
-                          onClick={() => eliminarArticulo(item.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Resumen del pedido */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 lg:sticky lg:top-6">
-            <h3 className="text-base md:text-lg font-bold text-gray-900 mb-4">Resumen del Pedido</h3>
-
-            {/* Formulario de proyecto/equipo y observaciones */}
-            <div className="space-y-3 md:space-y-4 mb-4 md:mb-6 pb-4 md:pb-6 border-b border-gray-200">
-              {user?.rol === 'almacen' ? (
-                // Almacenista selecciona equipo
-                <>
-                  <div>
-                    <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
-                      <div className="flex items-center gap-2">
-                        <Users size={14} />
-                        <span>Equipo *</span>
-                      </div>
-                    </label>
-                    <select
-                      value={equipoSeleccionado}
-                      onChange={(e) => setEquipoSeleccionado(e.target.value)}
-                      className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                      disabled={cargandoEquipos}
-                      required
-                    >
-                      <option value="">Selecciona un equipo...</option>
-                      {equipos.map((equipo) => (
-                        <option key={equipo.id} value={equipo.id}>
-                          {equipo.nombre}
-                        </option>
-                      ))}
-                    </select>
-                    {equipoSeleccionado && equipos.find(e => e.id === parseInt(equipoSeleccionado)) && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Encargado: {equipos.find(e => e.id === parseInt(equipoSeleccionado))?.encargado?.nombre || 'N/A'}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Selector de Equipo */}
-                  <div className="pt-2 border-t border-gray-100">
-                    <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
-                      <div className="flex items-center gap-2">
-                        <Truck size={14} />
-                        <span>Equipo (Opcional)</span>
-                      </div>
-                    </label>
-                    <select
-                      value={camionetaSeleccionada}
-                      onChange={(e) => setCamionetaSeleccionada(e.target.value)}
-                      className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                      disabled={cargandoCamionetas}
-                    >
-                      <option value="">Selecciona un equipo...</option>
-                      {camionetas.map((camioneta) => (
-                        <option key={camioneta.id} value={camioneta.id}>
-                          {camioneta.nombre}
-                        </option>
-                      ))}
-                    </select>
-                    {camionetaSeleccionada && camionetas.find(c => c.id === parseInt(camionetaSeleccionada)) && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Encargado: {camionetas.find(c => c.id === parseInt(camionetaSeleccionada))?.encargado?.nombre || 'N/A'}
-                      </p>
-                    )}
-                  </div>
-                </>
-              ) : (
-                // Diseñador/Admin: proyecto + encargado
-                <>
-                  <div>
-                    <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
-                      <div className="flex items-center gap-2">
-                        <Package size={14} />
-                        <span>Proyecto *</span>
-                      </div>
-                    </label>
-                    <select
-                      value={proyecto}
-                      onChange={(e) => setProyecto(e.target.value)}
-                      className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                      disabled={cargandoProyectos}
-                      required
-                    >
-                      <option value="">Selecciona un proyecto...</option>
-                      <optgroup label="Áreas fijas">
-                        <option value="MANUFACTURA">{g3 ? 'Manufactura' : '🏭 MANUFACTURA'}</option>
-                        <option value="HERRERÍA">{g3 ? 'Herrería' : '⚒️ HERRERÍA'}</option>
-                      </optgroup>
-                      {proyectosProduccion.length > 0 && (
-                        <optgroup label="Proyectos en producción">
-                          {proyectosProduccion.map(p => (
-                            <option key={p.id} value={p.nombre}>
-                              {p.nombre}{p.cliente ? ` — ${p.cliente}` : ''}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
-                    {proyectosProduccion.length === 0 && !cargandoProyectos && (
-                      <p className="text-xs text-amber-600 mt-1">
-                        No hay proyectos activos en producción
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
-                      <div className="flex items-center gap-2">
-                        <Users size={14} />
-                        <span>Encargado (Opcional)</span>
-                      </div>
-                    </label>
-                    <select
-                      value={encargadoSeleccionado}
-                      onChange={(e) => setEncargadoSeleccionado(e.target.value)}
-                      className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                      disabled={cargandoEncargados}
-                    >
-                      <option value="">Sin encargado</option>
-                      {encargados.map(e => (
-                        <option key={e.id} value={e.id}>{e.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-
-              <div>
-                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
-                  Observaciones (opcional)
-                </label>
-                <textarea
-                  value={observaciones}
-                  onChange={(e) => setObservaciones(e.target.value)}
-                  placeholder="Notas adicionales..."
-                  rows={3}
-                  className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
-              <div className="flex justify-between text-gray-600 text-sm md:text-base">
-                <span>Total de artículos:</span>
-                <span className="font-medium">{items.length}</span>
-              </div>
-              <div className="flex justify-between text-gray-600 text-sm md:text-base">
-                <span>Total de piezas:</span>
-                <span className="font-medium">{getTotalPiezas()}</span>
-              </div>
-              <div className="border-t border-gray-200 pt-2 md:pt-3 flex justify-between">
-                <span className="font-bold text-gray-900 text-sm md:text-base">Costo Total:</span>
-                <span className="font-bold text-lg md:text-xl text-red-700 g3:!text-g3-tinta">${getCostoTotal().toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="space-y-2 md:space-y-3">
-              <Button
-                variant="primary"
-                fullWidth
-                disabled={items.length === 0}
-                onClick={handleFinalizarPedido}
-              >
-                <span className="text-sm md:text-base">Finalizar Pedido</span>
-              </Button>
-              <Button
-                variant="secondary"
-                fullWidth
-                disabled={items.length === 0}
-                onClick={handleVaciarCarrito}
-              >
-                <span className="text-sm md:text-base">Vaciar Carrito</span>
-              </Button>
-            </div>
-
-            <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-gray-200">
-              <h4 className="font-medium text-gray-900 mb-2 text-sm md:text-base">Información</h4>
-              <p className="text-xs md:text-sm text-gray-600">
-                Usuario: <span className="font-medium">{user?.nombre || 'N/A'}</span>
-              </p>
-              <p className="text-xs md:text-sm text-gray-600">
-                Fecha: <span className="font-medium">{new Date().toLocaleDateString('es-MX')}</span>
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Modal para crear nuevo artículo */}
-      <ArticuloFormModal
-        isOpen={modalNuevoArticulo}
-        onClose={() => {
-          setModalNuevoArticulo(false);
-          setNombreNuevoArticulo(null);
-        }}
-        onSuccess={handleNuevoArticuloCreado}
-        articulo={null}
-        nombreInicial={nombreNuevoArticulo}
-      />
-
-      {/* Paso 2 — Crear Orden de Compra desde los faltantes de la Orden de Salida */}
-      {mostrarModalOrden && (
-        <ModalCrearOrdenDesdeSolicitudes
-          isOpen={mostrarModalOrden}
-          solicitudes={solicitudesOrden}
-          generarPDFOrden={undefined}
-          onClose={() => {
-            setMostrarModalOrden(false);
-            setSolicitudesOrden([]);
-            navigate('/historial');
-          }}
-          onSuccess={() => {
-            setMostrarModalOrden(false);
-            setSolicitudesOrden([]);
-            navigate('/historial');
-          }}
-        />
-      )}
-    </div>
+      ) : null,
+      modales: (
+        <>
+          <ArticuloFormModal
+            isOpen={modalNuevoArticulo}
+            onClose={() => {
+              setModalNuevoArticulo(false);
+              setNombreNuevoArticulo(null);
+            }}
+            onSuccess={handleNuevoArticuloCreado}
+            articulo={null}
+            nombreInicial={nombreNuevoArticulo}
+          />
+          {mostrarModalOrden && (
+            <ModalCrearOrdenDesdeSolicitudes
+              isOpen={mostrarModalOrden}
+              solicitudes={solicitudesOrden}
+              generarPDFOrden={undefined}
+              onClose={() => {
+                setMostrarModalOrden(false);
+                setSolicitudesOrden([]);
+                navigate('/historial');
+              }}
+              onSuccess={() => {
+                setMostrarModalOrden(false);
+                setSolicitudesOrden([]);
+                navigate('/historial');
+              }}
+            />
+          )}
+        </>
+      ),
+    }} />
   );
 };
 

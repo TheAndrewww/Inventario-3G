@@ -1,19 +1,6 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve. Las ramas con tv
-// (useTvG3) en true son el diseño de TV de la ola 3, que tampoco se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Snowflake, CheckCircle2 } from 'lucide-react';
-import { Loader } from '../components/common';
-import { Toaster } from 'react-hot-toast';
-import ProyectoTimeline from '../components/produccion/ProyectoTimeline';
-import EstadisticasHeader from '../components/produccion/EstadisticasHeader';
 import { useProduccionData } from '../hooks/useProduccionData';
 import { sortProyectosPorUrgencia } from '../utils/produccion';
-import { px } from '../utils/produccion';
-import { useTvG3 } from '../diseno-3g/tvG3';
-import { BarraTv, VivoTv, ControlesTv, CargandoTv } from '../diseno-3g/PiezasTv';
-import { useDiseno3G } from '../rediseno2/fundacion/useDiseno3G';
 import VistaTvProduccion from '../rediseno2/piso/VistaTvProduccion';
 
 const DashboardProduccionTVPage = () => {
@@ -23,10 +10,6 @@ const DashboardProduccionTVPage = () => {
         refreshInterval: 60 * 1000,
         isPublic: true
     });
-    // Diseño 3G para TV: solo si la liga de esta pantalla trae ?diseno=3g (ver diseno-3g/tvG3.js). Mismos datos y misma frecuencia.
-    const tv = useTvG3();
-    // Rediseño 2: encendido, la vista nueva (abajo, antes del return de siempre). Mismos datos, manejadores y claves.
-    const d3 = useDiseno3G();
 
     // Zoom y Orientación (persistidos en localStorage)
     const [zoomLevel, setZoomLevel] = useState(() => {
@@ -68,18 +51,6 @@ const DashboardProduccionTVPage = () => {
     const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
     const rotar = () => setRotacion(prev => (prev + 90) % 360);
 
-    const getRotationStyle = () => {
-        const isVertical = rotacion === 90 || rotacion === 270;
-        return {
-            transform: rotacion === 0 ? 'none' : `rotate(${rotacion}deg)`,
-            width: isVertical ? '100vh' : '100vw',
-            height: isVertical ? '100vw' : '100vh',
-            position: 'absolute',
-            top: isVertical ? 'calc(50% - 50vw)' : 0,
-            left: isVertical ? 'calc(50% - 50vh)' : 0,
-        };
-    };
-
     // Helper: MTO o GTIA que NO son EXTENSIVO van directo a Preparados
     const usaTimelineSimplificado = (p) => {
         const tipo = p.tipo_proyecto?.toUpperCase();
@@ -106,164 +77,12 @@ const DashboardProduccionTVPage = () => {
         [proyectos]
     );
 
-    // Rediseño 2 (encendido): tablero de renglones con páginas automáticas; la carga, el orden y los filtros son los de arriba
-    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-    if (d3) {
-        return (
-            <VistaTvProduccion
-                proyectos={proyectos} activos={proyectosActivos} pausadas={proyectosCongelados} estadisticas={estadisticas}
-                cargando={loading && proyectos.length === 0} zoom={zoomLevel} rotacion={rotacion} controlesVisibles={controlsVisible}
-                alReducir={handleZoomOut} alAumentar={handleZoomIn} alRotar={rotar}
-            />
-        );
-    }
-
-    if (loading && proyectos.length === 0) {
-        if (tv) return <CargandoTv>Cargando proyectos…</CargandoTv>;
-        return <div className="flex items-center justify-center h-screen"><Loader size="lg" /></div>;
-    }
-
-    if (tv) {
-        return (
-            <div className="g3tv-fijo" style={{ '--escala': zoomLevel }}>
-                <Toaster position="top-right" />
-                <div className="w-full h-full transition-all duration-300 origin-center" style={getRotationStyle()}>
-                    <div className="g3tv-desplaza">
-                        <div className="g3tv-pila">
-                            <BarraTv
-                                titulo="Panel de producción"
-                                subtitulo={<><b>{proyectosActivos.length}</b> proyecto{proyectosActivos.length !== 1 ? 's' : ''} en producción</>}
-                                derecha={<VivoTv>En vivo · se actualiza cada minuto</VivoTv>}
-                            />
-                            <div className="g3tv-resumen">
-                                <EstadisticasHeader estadisticas={estadisticas} />
-                                {proyectosCongelados.length > 0 && (
-                                    <section className="g3tv-panel" aria-label="Proyectos pausados">
-                                        <div className="g3tv-panel-cab"><Snowflake aria-hidden="true" />Proyectos pausados ({proyectosCongelados.length})</div>
-                                        <div className="g3tv-chips">
-                                            {proyectosCongelados.map(p => <span key={p.id} title={p.nombre}>{p.nombre}</span>)}
-                                        </div>
-                                    </section>
-                                )}
-                            </div>
-                            {proyectosActivos.length > 0 ? (
-                                <div className="g3tv-mapa g3tv-lista">
-                                    {proyectosActivos.map(proyecto => (
-                                        <ProyectoTimeline key={proyecto.id} proyecto={proyecto} />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="g3tv-vacio"><CheckCircle2 aria-hidden="true" /><b>No hay proyectos activos en producción</b></div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-                <ControlesTv visibles={controlsVisible} rotacion={rotacion} zoom={zoomLevel} onReducir={handleZoomOut} onAumentar={handleZoomIn} onRotar={rotar} />
-            </div>
-        );
-    }
-
     return (
-        <div className="fixed inset-0 overflow-hidden bg-gray-50" style={{ '--escala': zoomLevel }}>
-            <Toaster position="top-right" />
-
-            {/* Main Content Container with Rotation */}
-            <div
-                className="w-full h-full transition-all duration-300 origin-center"
-                style={getRotationStyle()}
-            >
-                {/* Scrollable Area */}
-                <div className="h-full w-full overflow-auto" style={{ padding: px(16) }}>
-                    {/* Header */}
-                    <div className="mb-5 bg-slate-600 rounded-2xl shadow-xl border border-slate-500 p-5">
-                        <div className="flex items-center gap-5">
-                            <div className="h-16 px-3 flex items-center justify-center shrink-0">
-                                <img
-                                    src="https://res.cloudinary.com/dd93jrilg/image/upload/v1763171532/logo_web_blanco_j8xeyh.png"
-                                    alt="3G"
-                                    className="h-full w-auto object-contain"
-                                />
-                            </div>
-                            <div className="flex-1">
-                                <h1 className="text-4xl font-bold text-white mb-1">Panel de Producción</h1>
-                                <p className="text-gray-300 text-lg font-medium">
-                                    <span className="font-bold text-emerald-400">{proyectosActivos.length}</span> proyecto{proyectosActivos.length !== 1 ? 's' : ''} en producción
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex gap-4 mb-6">
-                        <div className="flex-1">
-                            <EstadisticasHeader estadisticas={estadisticas} />
-                        </div>
-                        {proyectosCongelados.length > 0 && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm flex flex-col min-w-[300px] max-w-[400px]">
-                                <div className="flex items-center gap-2 mb-2 text-blue-700 font-bold border-b border-blue-100 pb-2">
-                                    <Snowflake size={20} />
-                                    <span>Proyectos Pausados ({proyectosCongelados.length})</span>
-                                </div>
-                                <div className="flex-1 overflow-y-auto pr-2 space-y-1" style={{ maxHeight: px(220) }}>
-                                    {proyectosCongelados.map(p => (
-                                        <div key={p.id} className="text-sm text-blue-800 bg-white/50 px-2 py-1 rounded border border-blue-100 truncate">
-                                            {p.nombre}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="pb-20" style={{ gap: px(16), display: 'flex', flexDirection: 'column' }}>
-                        {proyectosActivos.map(proyecto => (
-                            <ProyectoTimeline key={proyecto.id} proyecto={proyecto} />
-                        ))}
-                        {proyectosActivos.length === 0 && (
-                            <div className="text-center text-gray-500 font-bold" style={{ padding: px(80), fontSize: `calc(1.5rem * var(--escala, 1))` }}>
-                                No hay proyectos activos en producción
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* En vivo indicator */}
-            <div
-                className={`fixed z-40 bg-white/80 backdrop-blur-sm rounded-full font-medium text-gray-500 shadow-sm border border-gray-100 flex items-center bottom-4 left-4`}
-                style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem', gap: '0.5rem' }}
-            >
-                <span>En vivo</span>
-            </div>
-
-            {/* Controls */}
-            <div className={`fixed z-50 flex gap-2 transition-opacity duration-300 bottom-4 right-4 ${controlsVisible ? 'opacity-100' : 'opacity-0'}`}>
-                {/* Rotation indicator */}
-                <div className="flex bg-gray-900 text-white rounded-lg shadow-xl overflow-hidden border border-gray-700">
-                    <div className="px-3 py-1 text-xs font-medium flex items-center justify-center bg-gray-800">
-                        {rotacion}°
-                    </div>
-                </div>
-                {/* Scale Controls */}
-                <div className="flex bg-gray-900 text-white rounded-lg shadow-xl overflow-hidden border border-gray-700">
-                    <button onClick={handleZoomOut} className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors" title="Reducir Escala">
-                        <ZoomOut size={20} />
-                    </button>
-                    <div className="px-3 py-1 text-sm font-bold flex items-center justify-center min-w-[50px] border-x border-gray-700 bg-gray-800">
-                        {Math.round(zoomLevel * 100)}%
-                    </div>
-                    <button onClick={handleZoomIn} className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors" title="Aumentar Escala">
-                        <ZoomIn size={20} />
-                    </button>
-                </div>
-
-                {/* Rotation Toggle */}
-                <div className="flex bg-gray-900 text-white rounded-lg shadow-xl overflow-hidden border border-gray-700">
-                    <button onClick={rotar} className="p-3 hover:bg-gray-800 active:bg-gray-700 transition-colors" title="Rotar 90°">
-                        <RotateCw size={20} />
-                    </button>
-                </div>
-            </div>
-        </div>
+        <VistaTvProduccion
+            proyectos={proyectos} activos={proyectosActivos} pausadas={proyectosCongelados} estadisticas={estadisticas}
+            cargando={loading && proyectos.length === 0} zoom={zoomLevel} rotacion={rotacion} controlesVisibles={controlsVisible}
+            alReducir={handleZoomOut} alAumentar={handleZoomIn} alRotar={rotar}
+        />
     );
 };
 

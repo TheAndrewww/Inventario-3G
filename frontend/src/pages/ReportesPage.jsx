@@ -1,134 +1,9 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Package, AlertCircle, AlertTriangle, CheckCircle, TrendingUp, RefreshCw, Check, X, Sparkles, DollarSign } from 'lucide-react';
 import reportesService from '../services/reportes.service';
-import { Loader } from '../components/common';
 import toast from 'react-hot-toast';
-import { useDiseno3G } from '../diseno-3g/useDiseno3G';
-import CabG3 from '../diseno-3g/CabG3';
-import { g3Activo, confirmarG3, cx, etq } from '../diseno-3g/dialogosG3';
-// Rediseño 2 · vista encendida (apagado no la usa): mismo reporte, misma selección y la misma petición de aplicar
-import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import { confirmarG3 } from '../diseno-3g/dialogosG3';
 import VistaReportes from '../rediseno2/gestion/VistaReportes';
-
-const formatCurrency = (n) => `$${(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatNumber = (n) => (n || 0).toLocaleString('es-MX');
-
-const ESTADO_LABEL = {
-    critico: { texto: 'Crítico', color: 'bg-red-100 text-red-800 border-red-200', dot: 'bg-red-500' },
-    bajoMinimo: { texto: 'Bajo mínimo', color: 'bg-orange-100 text-orange-800 border-orange-200', dot: 'bg-orange-500' },
-    ok: { texto: 'OK', color: 'bg-green-100 text-green-800 border-green-200', dot: 'bg-green-500' },
-    sobreMaximo: { texto: 'Sobre máximo', color: 'bg-purple-100 text-purple-800 border-purple-200', dot: 'bg-purple-500' },
-    sinMovimiento: { texto: 'Sin movimiento', color: 'bg-gray-100 text-gray-700 border-gray-200', dot: 'bg-gray-400' }
-};
-
-const ACCION_LABEL = {
-    aumentar_min: { texto: 'Aumentar mínimo', color: 'bg-red-50 text-red-700 border-red-200' },
-    reducir_min: { texto: 'Reducir mínimo', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-    reducir_max: { texto: 'Reducir máximo', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-    definir_max: { texto: 'Definir máximo', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-    sin_movimiento: { texto: 'Sin movimiento', color: 'bg-gray-50 text-gray-700 border-gray-200' },
-    ok: { texto: 'OK', color: 'bg-green-50 text-green-700 border-green-200' }
-};
-
-// Dona SVG simple a partir de distribución
-const DonutChart = ({ data, total }) => {
-    const segments = [
-        { key: 'critico', value: data.critico, color: '#ef4444' },
-        { key: 'bajoMinimo', value: data.bajoMinimo, color: '#f97316' },
-        { key: 'ok', value: data.ok, color: '#22c55e' },
-        { key: 'sobreMaximo', value: data.sobreMaximo, color: '#a855f7' },
-        { key: 'sinMovimiento', value: data.sinMovimiento, color: '#9ca3af' }
-    ].filter(s => s.value > 0);
-
-    const radius = 70;
-    const cx = 90, cy = 90;
-    const circumference = 2 * Math.PI * radius;
-    let offset = 0;
-
-    if (total === 0) {
-        return (
-            <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
-                Sin datos para mostrar
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex items-center justify-center gap-6 flex-wrap">
-            <svg width="180" height="180" viewBox="0 0 180 180">
-                <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#f3f4f6" strokeWidth="22" />
-                {segments.map((seg) => {
-                    const len = (seg.value / total) * circumference;
-                    const dasharray = `${len} ${circumference - len}`;
-                    const dashoffset = -offset;
-                    offset += len;
-                    return (
-                        <circle
-                            key={seg.key}
-                            cx={cx}
-                            cy={cy}
-                            r={radius}
-                            fill="none"
-                            stroke={seg.color}
-                            strokeWidth="22"
-                            strokeDasharray={dasharray}
-                            strokeDashoffset={dashoffset}
-                            transform={`rotate(-90 ${cx} ${cy})`}
-                        />
-                    );
-                })}
-                <text x={cx} y={cy - 4} textAnchor="middle" className="fill-gray-900 text-2xl font-bold">{total}</text>
-                <text x={cx} y={cy + 16} textAnchor="middle" className="fill-gray-500 text-xs">consumibles</text>
-            </svg>
-            <div className="space-y-1.5 text-sm">
-                {Object.entries(data).map(([k, v]) => {
-                    if (v === 0) return null;
-                    const label = ESTADO_LABEL[k];
-                    if (!label) return null;
-                    return (
-                        <div key={k} className="flex items-center gap-2">
-                            <span className={`w-3 h-3 rounded-full ${label.dot}`}></span>
-                            <span className="text-gray-700">{label.texto}</span>
-                            <span className="text-gray-500 ml-auto">{v}</span>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-};
-
-// Gráfica de barras horizontal simple
-const BarChart = ({ items, valueKey, labelKey, unitKey, color = 'bg-blue-500' }) => {
-    if (items.length === 0) return <div className="text-gray-400 text-sm py-8 text-center">Sin datos</div>;
-    const max = Math.max(...items.map(i => parseFloat(i[valueKey]) || 0));
-    return (
-        <div className="space-y-2">
-            {items.map((item, idx) => {
-                const value = parseFloat(item[valueKey]) || 0;
-                const pct = max > 0 ? (value / max) * 100 : 0;
-                return (
-                    <div key={idx} className="text-sm">
-                        <div className="flex items-center justify-between mb-0.5">
-                            <span className="text-gray-700 truncate max-w-[60%]" title={item[labelKey]}>
-                                {item[labelKey]}
-                            </span>
-                            <span className="font-medium text-gray-900">
-                                {formatNumber(Math.round(value))} {item[unitKey] || ''}
-                            </span>
-                        </div>
-                        <div className="w-full bg-gray-100 rounded-full h-2">
-                            <div className={`h-2 rounded-full ${color}`} style={{ width: `${pct}%` }}></div>
-                        </div>
-                    </div>
-                );
-            })}
-        </div>
-    );
-};
 
 const ReportesPage = () => {
     const [data, setData] = useState(null);
@@ -136,11 +11,9 @@ const ReportesPage = () => {
     const [dias, setDias] = useState(90);
     const [seleccion, setSeleccion] = useState(new Set());
     const [aplicando, setAplicando] = useState(false);
-    const g3 = useDiseno3G(); // Diseño 3G: encabezado, números, tabla en tarjetas y vista previa del paquete (apagado, lo de siempre)
     const [filtroAccion, setFiltroAccion] = useState('todos');
     // Mín/máx escritos a mano en la tabla: id → { min, max } (texto del input)
     const [valores, setValores] = useState({});
-    const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
     const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
 
     const cargar = async () => {
@@ -232,25 +105,22 @@ const ReportesPage = () => {
             return;
         }
         const aCero = ajustes.filter(a => a.stock_minimo === 0).length;
-        const avisoCero = aCero > 0 ? `\n\n${aCero} quedará(n) con mínimo 0 y se desactivarán.` : '';
-        if (g3Activo()) {
-            // Vista previa antes → después armada con los mismos ajustes que se van a mandar (ya calculados arriba)
-            const nombre = (id) => sugerenciasFiltradas.find(x => x.id === id);
-            const cambios = ajustes.slice(0, 8).map(a => {
-                const s = nombre(a.id) || {};
-                const antes = `mín ${formatNumber(s.stock_minimo)} · máx ${s.stock_maximo !== null && s.stock_maximo !== undefined ? formatNumber(s.stock_maximo) : '-'}`;
-                const despues = `mín ${formatNumber(a.stock_minimo !== undefined ? a.stock_minimo : s.stock_minimo)} · máx ${a.stock_maximo !== undefined ? formatNumber(a.stock_maximo) : (s.stock_maximo !== null && s.stock_maximo !== undefined ? formatNumber(s.stock_maximo) : '-')}`;
-                return { campo: s.nombre || `Artículo ${a.id}`, antes, despues };
-            });
-            if (!(await confirmarG3({
-                titulo: `¿Aplicar ${ajustes.length} ${ajustes.length === 1 ? 'ajuste' : 'ajustes'} de stock?`,
-                aviso: 'Esta acción modifica los artículos.',
-                cambios,
-                datos: ajustes.length > 8 ? [['Además', `${ajustes.length - 8} artículo(s) más`]] : [],
-                pasa: aCero > 0 ? [`${aCero} quedará(n) con mínimo 0 y se desactivarán.`] : [],
-                confirmar: 'Aplicar ajustes', cancelar: 'Regresar', ancho: true,
-            }))) return;
-        } else if (!window.confirm(`¿Aplicar ${ajustes.length} ajuste(s) de stock? Esta acción modifica los artículos.${avisoCero}`)) return;
+        // Vista previa antes → después armada con los mismos ajustes que se van a mandar (ya calculados arriba)
+        const nombre = (id) => sugerenciasFiltradas.find(x => x.id === id);
+        const cambios = ajustes.slice(0, 8).map(a => {
+            const s = nombre(a.id) || {};
+            const antes = `mín ${formatNumber(s.stock_minimo)} · máx ${s.stock_maximo !== null && s.stock_maximo !== undefined ? formatNumber(s.stock_maximo) : '-'}`;
+            const despues = `mín ${formatNumber(a.stock_minimo !== undefined ? a.stock_minimo : s.stock_minimo)} · máx ${a.stock_maximo !== undefined ? formatNumber(a.stock_maximo) : (s.stock_maximo !== null && s.stock_maximo !== undefined ? formatNumber(s.stock_maximo) : '-')}`;
+            return { campo: s.nombre || `Artículo ${a.id}`, antes, despues };
+        });
+        if (!(await confirmarG3({
+            titulo: `¿Aplicar ${ajustes.length} ${ajustes.length === 1 ? 'ajuste' : 'ajustes'} de stock?`,
+            aviso: 'Esta acción modifica los artículos.',
+            cambios,
+            datos: ajustes.length > 8 ? [['Además', `${ajustes.length - 8} artículo(s) más`]] : [],
+            pasa: aCero > 0 ? [`${aCero} quedará(n) con mínimo 0 y se desactivarán.`] : [],
+            confirmar: 'Aplicar ajustes', cancelar: 'Regresar', ancho: true,
+        }))) return;
         try {
             setAplicando(true);
             const res = await reportesService.aplicarSugerencias(ajustes);
@@ -264,286 +134,11 @@ const ReportesPage = () => {
         }
     };
 
-    // Rediseño 2 · vista ENCENDIDA: los mismos datos y los mismos manejadores (el JSX de hoy sigue intacto debajo)
-    // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-    if (d3) {
-        return (
-            <VistaReportes data={data} loading={loading} errorCarga={errorCargaR2} dias={dias} setDias={setDias} cargar={cargar}
-                filtroAccion={filtroAccion} setFiltroAccion={setFiltroAccion} seleccion={seleccion} setSeleccion={setSeleccion}
-                aplicando={aplicando} aplicar={aplicar} sugerenciasFiltradas={sugerenciasFiltradas} propuesta={propuesta}
-                editarValor={editarValor} valores={valores} toggleSeleccion={toggleSeleccion} seleccionarTodos={seleccionarTodos} />
-        );
-    }
-
-    if (loading && !data) return <Loader fullScreen />;
-
-    const { kpis, distribucion, top_consumidos, resumen_categorias, parametros } = data || {};
-
     return (
-        <div className="p-6 max-w-7xl mx-auto">
-            {/* Header */}
-            {g3 ? (
-                <CabG3 titulo="Reportes de inventario" descripcion={`Análisis de materiales consumibles y sugerencias de ajuste · ${parametros?.dias_analizados ?? dias} días`}>
-                    <select value={dias} onChange={(e) => setDias(parseInt(e.target.value, 10))} className="g3-selector g3p-selector-cab" aria-label="Período del análisis">
-                        <option value={30}>Últimos 30 días</option>
-                        <option value={60}>Últimos 60 días</option>
-                        <option value={90}>Últimos 90 días</option>
-                        <option value={180}>Últimos 180 días</option>
-                        <option value={365}>Últimos 365 días</option>
-                    </select>
-                    <button onClick={cargar} disabled={loading} className="g3-btn g3-btn--ch">
-                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Actualizar
-                    </button>
-                </CabG3>
-            ) : (
-            <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                        <BarChart3 className="text-red-700" size={32} />
-                        Reportes de Inventario
-                    </h1>
-                    <p className="text-gray-600 mt-1">
-                        Análisis de materiales consumibles y sugerencias de ajuste · {parametros?.dias_analizados ?? dias} días
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <select
-                        value={dias}
-                        onChange={(e) => setDias(parseInt(e.target.value, 10))}
-                        className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
-                    >
-                        <option value={30}>Últimos 30 días</option>
-                        <option value={60}>Últimos 60 días</option>
-                        <option value={90}>Últimos 90 días</option>
-                        <option value={180}>Últimos 180 días</option>
-                        <option value={365}>Últimos 365 días</option>
-                    </select>
-                    <button
-                        onClick={cargar}
-                        disabled={loading}
-                        className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50"
-                    >
-                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                        Actualizar
-                    </button>
-                </div>
-            </div>
-            )}
-
-            {/* KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <KpiCard
-                    icon={<Package size={24} className="text-blue-600" />}
-                    bg="bg-blue-100"
-                    label="Consumibles"
-                    value={formatNumber(kpis.total_consumibles)}
-                />
-                <KpiCard
-                    icon={<DollarSign size={24} className="text-green-600" />}
-                    bg="bg-green-100"
-                    label="Valoración total"
-                    value={formatCurrency(kpis.valoracion_total)}
-                    dinero
-                />
-                <KpiCard
-                    icon={<AlertTriangle size={24} className="text-orange-600" />}
-                    bg="bg-orange-100"
-                    label="Bajo mínimo"
-                    value={formatNumber(kpis.articulos_bajo_minimo + kpis.articulos_criticos)}
-                    sub={`${kpis.articulos_criticos} crítico${kpis.articulos_criticos !== 1 ? 's' : ''}`}
-                />
-                <KpiCard
-                    icon={<Sparkles size={24} className="text-purple-600" />}
-                    bg="bg-purple-100"
-                    label="Sugerencias"
-                    value={formatNumber(kpis.sugerencias_pendientes)}
-                    sub="ajustes propuestos"
-                />
-            </div>
-
-            {/* Gráficas */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Estado del stock</h2>
-                    <DonutChart data={distribucion} total={kpis.total_consumibles} />
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <TrendingUp size={20} className="text-blue-600" />
-                        Top consumidos (período)
-                    </h2>
-                    <BarChart
-                        items={top_consumidos.map(t => ({ ...t, label: t.nombre }))}
-                        valueKey="consumo_total"
-                        labelKey="label"
-                        unitKey="unidad"
-                        color="bg-blue-500"
-                    />
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 lg:col-span-2">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Valoración por categoría</h2>
-                    <BarChart
-                        items={resumen_categorias.slice(0, 10).map(c => ({ label: c.categoria, valor: c.valor, articulos: c.articulos, bajo_minimo: c.bajo_minimo }))}
-                        valueKey="valor"
-                        labelKey="label"
-                        color="bg-green-500"
-                    />
-                </div>
-            </div>
-
-            {/* Sugerencias */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-                <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between gap-3 flex-wrap">
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                            <Sparkles size={20} className="text-purple-600" />
-                            Sugerencias de ajuste
-                        </h2>
-                        <p className="text-sm text-gray-500 mt-0.5">
-                            Mínimo sugerido = consumo diario × {parametros?.lead_time_dias} días · Máximo = consumo × {parametros?.cobertura_dias} días · Puedes corregir cualquier valor antes de aplicar
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <select
-                            value={filtroAccion}
-                            onChange={(e) => { setFiltroAccion(e.target.value); setSeleccion(new Set()); }}
-                            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
-                        >
-                            <option value="todos">Todas las acciones</option>
-                            <option value="aumentar_min">Aumentar mínimo</option>
-                            <option value="reducir_min">Reducir mínimo</option>
-                            <option value="reducir_max">Reducir máximo</option>
-                            <option value="definir_max">Definir máximo</option>
-                            <option value="sin_movimiento">Sin movimiento</option>
-                        </select>
-                        <button
-                            onClick={aplicar}
-                            disabled={aplicando || seleccion.size === 0}
-                            className={g3 ? 'g3-btn g3-btn--primario g3-btn--ch' : 'flex items-center gap-2 px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50'}
-                        >
-                            <Check size={16} />
-                            Aplicar {seleccion.size > 0 ? `(${seleccion.size})` : ''}
-                        </button>
-                    </div>
-                </div>
-
-                {sugerenciasFiltradas.length === 0 ? (
-                    <div className="p-10 text-center text-gray-500">
-                        <CheckCircle size={48} className="mx-auto mb-3 text-green-300" />
-                        <p>No hay sugerencias pendientes con este filtro.</p>
-                    </div>
-                ) : (
-                    <div className={cx('overflow-x-auto', g3 && 'g3-tabla g3-tabla--tarjetas g3p-tabla-en-tarjeta')}>
-                        <table className="min-w-full text-sm">
-                            <thead className="bg-gray-50 text-xs uppercase text-gray-600">
-                                <tr>
-                                    <th className="px-3 py-3 text-left">
-                                        <input
-                                            type="checkbox"
-                                            checked={seleccion.size > 0 && seleccion.size === sugerenciasFiltradas.length}
-                                            onChange={seleccionarTodos}
-                                        />
-                                    </th>
-                                    <th className="px-3 py-3 text-left">Artículo</th>
-                                    <th className="px-3 py-3 text-left">Estado</th>
-                                    <th className="px-3 py-3 text-right">Stock actual</th>
-                                    <th className="px-3 py-3 text-right">Consumo/mes</th>
-                                    <th className="px-3 py-3 text-right">{g3 ? 'Mínimo: actual → sugerido' : 'Mín actual → sugerido'}</th>
-                                    <th className="px-3 py-3 text-right">{g3 ? 'Máximo: actual → sugerido' : 'Máx actual → sugerido'}</th>
-                                    <th className="px-3 py-3 text-left">Acción</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {sugerenciasFiltradas.map(s => {
-                                    const est = ESTADO_LABEL[s.estado] || ESTADO_LABEL.ok;
-                                    const acc = ACCION_LABEL[s.sugerencia.accion] || ACCION_LABEL.ok;
-                                    const sel = seleccion.has(s.id);
-                                    const p = propuesta(s);
-                                    const editadoMin = valores[s.id]?.min !== undefined;
-                                    const editadoMax = valores[s.id]?.max !== undefined;
-                                    return (
-                                        <tr key={s.id} className={sel ? 'bg-blue-50' : 'hover:bg-gray-50'}>
-                                            <td className={cx('px-3 py-3', g3 && 'g3p-celda-casilla')}>
-                                                <input type="checkbox" checked={sel} onChange={() => toggleSeleccion(s.id)} aria-label={g3 ? `Seleccionar ${s.nombre}` : undefined} />
-                                            </td>
-                                            <td className={cx('px-3 py-3', g3 && 'g3-celda-titulo')}>
-                                                <div className="font-medium text-gray-900">{s.nombre}</div>
-                                                <div className="text-xs text-gray-500">{s.categoria || 'Sin categoría'} · {s.unidad}</div>
-                                            </td>
-                                            <td className={cx('px-3 py-3', g3 && 'g3-celda-estado')}>
-                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border ${est.color}`}>
-                                                    <span className={`w-2 h-2 rounded-full ${est.dot}`}></span>
-                                                    {est.texto}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 py-3 text-right text-gray-900" {...etq(g3, 'Stock actual')}>{formatNumber(s.stock_actual)}</td>
-                                            <td className="px-3 py-3 text-right text-gray-700" {...etq(g3, 'Consumo al mes')}>{s.consumo_mensual.toFixed(1)}</td>
-                                            <td className="px-3 py-3 text-right whitespace-nowrap" {...etq(g3, 'Mínimo: actual → sugerido')}>
-                                                <span className="text-gray-500">{formatNumber(s.stock_minimo)}</span>
-                                                {' → '}
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    step="1"
-                                                    value={p.min}
-                                                    onChange={(e) => editarValor(s.id, 'min', e.target.value)}
-                                                    className={`w-20 px-2 py-1 text-right border rounded ${editadoMin ? 'border-blue-500 bg-blue-50 font-semibold' : 'border-gray-300'}`}
-                                                    title={`Sugerido: ${formatNumber(s.sugerencia.stock_min_sugerido)}`}
-                                                />
-                                            </td>
-                                            <td className="px-3 py-3 text-right whitespace-nowrap" {...etq(g3, 'Máximo: actual → sugerido')}>
-                                                <span className="text-gray-500">{s.stock_maximo !== null ? formatNumber(s.stock_maximo) : '-'}</span>
-                                                {' → '}
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    step="1"
-                                                    value={p.max}
-                                                    placeholder="-"
-                                                    onChange={(e) => editarValor(s.id, 'max', e.target.value)}
-                                                    className={`w-20 px-2 py-1 text-right border rounded ${editadoMax ? 'border-blue-500 bg-blue-50 font-semibold' : 'border-gray-300'}`}
-                                                    title={`Sugerido: ${formatNumber(s.sugerencia.stock_max_sugerido)}`}
-                                                />
-                                            </td>
-                                            <td className="px-3 py-3" {...etq(g3, 'Acción')}>
-                                                <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded border ${acc.color}`} title={s.sugerencia.razon}>
-                                                    {acc.texto}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-const KpiCard = ({ icon, bg, label, value, sub, dinero }) => {
-    const g3 = useDiseno3G(); // Diseño 3G: número con el componente del paquete
-    // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
-    if (g3) {
-        return (
-            <div className={dinero ? 'g3-kpi g3p-kpi-dinero' : 'g3-kpi'}>
-                <span className="g3-kpi-valor">{value}</span>
-                <span className="g3-kpi-texto">{label}{sub ? ` · ${sub}` : ''}</span>
-            </div>
-        );
-    }
-    return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-gray-500">{label}</p>
-            <div className={`p-2 rounded-lg ${bg}`}>{icon}</div>
-        </div>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-        {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
-    </div>
+        <VistaReportes data={data} loading={loading} errorCarga={errorCargaR2} dias={dias} setDias={setDias} cargar={cargar}
+            filtroAccion={filtroAccion} setFiltroAccion={setFiltroAccion} seleccion={seleccion} setSeleccion={setSeleccion}
+            aplicando={aplicando} aplicar={aplicar} sugerenciasFiltradas={sugerenciasFiltradas} propuesta={propuesta}
+            editarValor={editarValor} valores={valores} toggleSeleccion={toggleSeleccion} seleccionarTodos={seleccionarTodos} />
     );
 };
 

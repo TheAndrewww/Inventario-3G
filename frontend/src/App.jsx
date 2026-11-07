@@ -1,8 +1,4 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3, g3 en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { PedidoProvider } from './context/PedidoContext';
 import { NotificacionesProvider } from './context/NotificacionesContext';
@@ -51,8 +47,6 @@ import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAuth } from './context/AuthContext';
 import { rolPuedeVer, rutaInicialPorRol } from './components/layout/Sidebar';
 import { rolPuedeVerG3 } from './diseno-3g/menuPlanta';
-import { useDiseno3G } from './diseno-3g/useDiseno3G';
-import { useDiseno3G as useDiseno3GR2 } from './rediseno2/fundacion/useDiseno3G';
 import { AvisosFlotantes } from './rediseno2/fundacion/armazon/AvisosFlotantes';
 import VistaTabletasCalidad from './rediseno2/calidad/VistaTabletasCalidad';
 import { usePanelCalidad } from './rediseno2/calidad/usePanelCalidad';
@@ -74,8 +68,7 @@ const SoloConVista = ({ path, children }) => {
 // Pantallas nuevas que solo existen con Diseño 3G (B1 · PLA-12): con el diseño de siempre, o sin el rol, a su inicio
 const SoloConDiseno3G = ({ path, children }) => {
   const { user } = useAuth();
-  const g3 = useDiseno3G();
-  if (!g3 || !rolPuedeVerG3(user?.rol, path)) {
+  if (!rolPuedeVerG3(user?.rol, path)) {
     return <Navigate to={rutaInicialPorRol(user?.rol)} replace />;
   }
   return children;
@@ -104,8 +97,6 @@ const OrdenesCompraRuta = () => {
 function App() {
   // Auto-reload cuando se detecta nueva versión en producción
   useVersionCheck();
-  // Rediseño 2: encendido, los avisos flotantes de siempre (react-hot-toast) abajo a la izquierda y con el diseño nuevo
-  const d3 = useDiseno3GR2();
   return (
     <Router>
       <RutaDiseno3G />
@@ -129,28 +120,7 @@ function App() {
             <NotificacionesProvider>
               <CalendarioProvider>
                 <PedidoProvider>
-                  {d3 ? <AvisosFlotantes /> : <Toaster
-                    position="top-right"
-                    toastOptions={{
-                      duration: 3000,
-                      style: {
-                        background: '#363636',
-                        color: '#fff',
-                      },
-                      success: {
-                        iconTheme: {
-                          primary: '#10b981',
-                          secondary: '#fff',
-                        },
-                      },
-                      error: {
-                        iconTheme: {
-                          primary: '#ef4444',
-                          secondary: '#fff',
-                        },
-                      },
-                    }}
-                  />}
+                  <AvisosFlotantes />
 
                   <Routes>
                     {/* Ruta de login */}

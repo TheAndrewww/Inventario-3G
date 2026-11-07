@@ -1,16 +1,7 @@
-// Rediseño 2 · el diseño nuevo en React.
-// Solo el diseño nuevo (decisión del dueño, 16-oct-2026): useDiseno3G() y leerDiseno3G() devuelven SIEMPRE true (ya no hay
-// interruptor; index.html pone <html data-diseno="3g"> fijo y forzarDiseno3G.js lo mantiene). Así no parpadea lo viejo.
-// VIEJO: se borra a partir del 24-oct-2026 — en cada página, lo que corre con d3 en false (ver src/diseno-3g/LEEME.md).
+// Rediseño 2 · el tema y el ancho de pantalla en React.
+// Solo el diseño nuevo (16-oct-2026): index.html pone <html data-diseno="3g"> fijo y forzarDiseno3G.js lo mantiene. Los
+// ganchos useDiseno3G()/leerDiseno3G() (siempre true) y la vista vieja de cada página se borraron el 7-nov-2026.
 // El tema (useTemaR2) se sigue leyendo del atributo y se entera de los cambios con un MutationObserver.
-//
-// Uso en una página (junto a los demás hooks, NUNCA dentro de un if):
-//   const d3 = useDiseno3G();
-//   …estado, efectos y manejadores de siempre…
-//   if (d3) return <VistaNueva {...estadoYManejadores} />;
-//   return (…el JSX de siempre, intacto…);
-//
-// La exportación vieja (src/diseno-3g/useDiseno3G.js) sigue funcionando igual; las piezas nuevas importan esta.
 import { useSyncExternalStore } from 'react';
 
 const raiz = () => document.documentElement;
@@ -22,12 +13,9 @@ function suscribir(avisar) {
   return () => { observador.disconnect(); if (dejar) dejar(); };
 }
 
-/** true: el diseño nuevo siempre está encendido (para usar fuera de React). */
-export const leerDiseno3G = () => true;
 /** Tema guardado del diseño nuevo: 'claro' | 'oscuro' | 'auto'. Sin nada guardado: 'claro'. */
 export const leerTemaR2 = () => raiz().getAttribute('data-g3-tema') || 'claro';
 
-export const useDiseno3G = () => true;
 export const useTemaR2 = () => useSyncExternalStore(suscribir, leerTemaR2, () => 'claro');
 
 // Ancho de la pantalla por puntos de quiebre del rediseño (DISENO-v2 §3.1):

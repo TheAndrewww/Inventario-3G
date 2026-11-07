@@ -189,12 +189,16 @@ describe('forzarDiseno3G: vuelve a poner el atributo sin cambiar lo guardado', (
 });
 
 describe('React: el diseño nuevo siempre está encendido', () => {
-  it('useDiseno3G() da true (el de siempre y el del rediseño 2), y leerDiseno3G() también', async () => {
-    const viejo = await import(pathToFileURL(join(RAIZ, 'src/diseno-3g/useDiseno3G.js')).href);
-    const r2 = await import(pathToFileURL(join(RAIZ, 'src/rediseno2/fundacion/useDiseno3G.js')).href);
-    assert.equal(viejo.useDiseno3G(), true);
-    assert.equal(r2.useDiseno3G(), true);
-    assert.equal(r2.leerDiseno3G(), true);
+  it('lo viejo ya no está (7-nov-2026): ni el gancho del interruptor, ni ramas apagadas, ni marcado g3-no, ni la TV de la ola 3', () => {
+    const quedan = archivosSrc()
+      .filter((p) => !p.includes(join('src', 'tv-clasico')))
+      .filter((p) => {
+        // solo código: los comentarios pueden contar la historia
+        const codigo = readFileSync(p, 'utf8').split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+        return /useDiseno3G\(|useTvG3\(|g3Activo|leerDiseno3G|['" ]g3-no['" ]|g3:hidden|data-g3-tv|VIEJO: se borra a partir del 24-oct/.test(codigo);
+      })
+      .map((p) => p.slice(RAIZ.length + 1));
+    assert.deepEqual(quedan, []);
   });
 
   it('RutaDiseno3G ya no llama G3.aplicar() (que apagaba con «actual» guardado): llama forzarDiseno3G()', () => {

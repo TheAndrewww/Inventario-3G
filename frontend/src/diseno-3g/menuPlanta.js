@@ -113,7 +113,6 @@ export const marcarPanelCalidad = (activo) => {
   window.dispatchEvent(new Event(EVENTO_PANEL_CALIDAD));
 };
 export const panelCalidadEncendido = () => panelCalidadActivo;
-export const tituloDeRuta = (ruta) => TITULOS[ruta] || 'Planta';
 
 // Secciones con pestañas: varias pantallas (rutas de siempre) bajo un solo renglón del riel.
 export const SECCIONES = {

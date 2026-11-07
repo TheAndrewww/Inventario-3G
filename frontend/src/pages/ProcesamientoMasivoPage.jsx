@@ -1,30 +1,7 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Wand2,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  RefreshCw,
-  Trash2,
-  Image as ImageIcon,
-  Loader2,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  X,
-  ZoomIn
-} from 'lucide-react';
 import articulosService from '../services/articulos.service';
-import { Loader, Button } from '../components/common';
 import toast from 'react-hot-toast';
-import { useDiseno3G } from '../diseno-3g/useDiseno3G';
-import CabG3 from '../diseno-3g/CabG3';
-import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
-// Rediseño 2: encendido, rediseno2/inventario/VistaFotosIA (mismo estado, mismas peticiones y el mismo sondeo)
-import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import { confirmarG3 } from '../diseno-3g/dialogosG3';
 import VistaFotosIA from '../rediseno2/inventario/VistaFotosIA';
 
 const ProcesamientoMasivoPage = () => {
@@ -37,9 +14,6 @@ const ProcesamientoMasivoPage = () => {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [imagenModal, setImagenModal] = useState(null); // Para ver imagen grande
-  const g3 = useDiseno3G(); // Diseño 3G: encabezado, columnas apiladas en celular y confirmación del paquete (apagado, lo de siempre)
-  const d3 = useDiseno3GR2(); // Rediseño 2 encendido
   const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de carga para la vista nueva (el aviso de siempre no cambia)
 
   // Cargar artículos, estado de cola e historial al iniciar
@@ -177,15 +151,11 @@ const ProcesamientoMasivoPage = () => {
   };
 
   const handleLimpiarCola = async () => {
-    if (g3Activo()) {
-      if (!(await confirmarG3({
-        titulo: '¿Limpiar la cola?',
-        aviso: 'Se eliminan de la cola los artículos completados y fallidos de más de 7 días.',
-        confirmar: 'Limpiar cola', cancelar: 'No limpiar', peligro: true,
-      }))) return;
-    } else if (!window.confirm('¿Eliminar artículos completados y fallidos de más de 7 días?')) {
-      return;
-    }
+    if (!(await confirmarG3({
+      titulo: '¿Limpiar la cola?',
+      aviso: 'Se eliminan de la cola los artículos completados y fallidos de más de 7 días.',
+      confirmar: 'Limpiar cola', cancelar: 'No limpiar', peligro: true,
+    }))) return;
 
     try {
       await articulosService.cleanProcessingQueue(7);
@@ -204,21 +174,6 @@ const ProcesamientoMasivoPage = () => {
     }
   };
 
-  const getEstadoColor = (estado) => {
-    switch (estado) {
-      case 'completed':
-        return 'text-green-600 bg-green-50 border-green-200';
-      case 'processing':
-        return 'text-blue-600 bg-blue-50 border-blue-200';
-      case 'pending':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'failed':
-        return 'text-red-600 bg-red-50 border-red-200';
-      default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
-    }
-  };
-
   const getEstadoTexto = (estado) => {
     switch (estado) {
       case 'completed':
@@ -234,338 +189,12 @@ const ProcesamientoMasivoPage = () => {
     }
   };
 
-  // Rediseño 2 encendido: la cola en una tira, la tabla con casillas y el historial en un cajón
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    return (
-      <VistaFotosIA f={{
-        articulos, selectedArticulos, setSelectedArticulos, loading, processing, queueStatus, historial, loadingHistory, autoRefresh,
-        handleSelectArticulo, handleSelectAll, handleProcesarSeleccionados, handleRetryItem, handleLimpiarCola, fetchQueueStatus, fetchHistorial,
-        errorCargaR2, fetchArticulos,
-      }} />
-    );
-  }
-
-  if (loading) {
-    return <Loader />;
-  }
-
-  // Acciones de la cabecera: las mismas en los dos diseños (solo cambia dónde se acomodan)
-  const accionesCabecera = (
-    <>
-          {selectedArticulos.length > 0 && (
-            <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
-              {selectedArticulos.length} seleccionados
-            </span>
-          )}
-          <Button
-            onClick={handleSelectAll}
-            size="sm"
-            variant="outline"
-          >
-            {selectedArticulos.length === articulos.length ? 'Deseleccionar' : (g3 ? 'Seleccionar todos' : 'Seleccionar Todos')}
-          </Button>
-          <Button
-            onClick={handleProcesarSeleccionados}
-            disabled={selectedArticulos.length === 0 || processing}
-            size="sm"
-          >
-            {processing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Procesando...
-              </>
-            ) : (
-              <>
-                <Wand2 className="w-4 h-4 mr-2" />
-                Procesar ({selectedArticulos.length})
-              </>
-            )}
-          </Button>
-    </>
-  );
-
   return (
-    <div className="h-full flex flex-col">
-      {/* Header Compacto */}
-      {g3 ? (
-        <div className="px-4 pt-4 md:px-6 md:pt-6">
-          <CabG3 titulo="Fotos de artículos con IA" descripcion="Selecciona artículos para procesar sus fotos con IA. Se atienden en una cola; el historial muestra cómo va cada uno.">
-            {accionesCabecera}
-          </CabG3>
-        </div>
-      ) : (
-      <div className="px-4 py-3 border-b bg-white flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Wand2 className="w-6 h-6 text-purple-600" />
-          <h1 className="text-xl font-bold text-gray-900">Procesamiento Masivo con IA</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {accionesCabecera}
-        </div>
-      </div>
-      )}
-
-      {/* Layout Horizontal de 3 Columnas */}
-      <div className="flex-1 flex gap-4 p-4 overflow-hidden g3:max-[860px]:flex-col g3:max-[860px]:overflow-visible g3:md:px-6">
-
-        {/* Columna 1: Estado de la Cola */}
-        <div className="w-64 flex-shrink-0 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden g3:max-[860px]:w-auto">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-purple-600" />
-              Estado
-            </h2>
-            <Button onClick={fetchQueueStatus} size="sm" variant="outline">
-              <RefreshCw className="w-3 h-3" />
-            </Button>
-          </div>
-
-          {queueStatus ? (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-yellow-50 p-2 rounded border border-yellow-200 text-center">
-                  <div className="text-xl font-bold text-yellow-700">{queueStatus.stats.pendientes}</div>
-                  <div className="text-xs text-yellow-600">Pendientes</div>
-                </div>
-                <div className="bg-blue-50 p-2 rounded border border-blue-200 text-center">
-                  <div className="text-xl font-bold text-blue-700">{queueStatus.stats.procesando}</div>
-                  <div className="text-xs text-blue-600">Procesando</div>
-                </div>
-                <div className="bg-green-50 p-2 rounded border border-green-200 text-center">
-                  <div className="text-xl font-bold text-green-700">{queueStatus.stats.completados}</div>
-                  <div className="text-xs text-green-600">Completados</div>
-                </div>
-                <div className="bg-red-50 p-2 rounded border border-red-200 text-center">
-                  <div className="text-xl font-bold text-red-700">{queueStatus.stats.fallidos}</div>
-                  <div className="text-xs text-red-600">Fallidos</div>
-                </div>
-              </div>
-
-              {queueStatus.articuloActual && (
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                    <span className="text-xs text-blue-600 font-medium">Procesando ahora</span>
-                  </div>
-                  <div className="text-sm font-semibold text-blue-900 truncate">
-                    {queueStatus.articuloActual.articulo_nombre}
-                  </div>
-                  <div className="text-xs text-blue-600">
-                    {Math.round(queueStatus.articuloActual.segundos_procesando)}s - Intento {queueStatus.articuloActual.intentos}
-                  </div>
-                </div>
-              )}
-
-              {autoRefresh && (
-                <div className="text-xs text-gray-500 flex items-center gap-1">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Auto-refresh activo
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-sm text-gray-500 text-center py-4">
-              Sin datos de cola
-            </div>
-          )}
-        </div>
-
-        {/* Columna 2: Selección de Artículos (Principal - Más Grande) */}
-        <div className="flex-1 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden min-w-0 g3:max-[860px]:overflow-visible">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-purple-600" />
-              Artículos ({articulos.length})
-            </h2>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {articulos.map(articulo => (
-                <div
-                  key={articulo.id}
-                  onClick={() => handleSelectArticulo(articulo.id)}
-                  className={`
-                    rounded-lg border-2 cursor-pointer transition-all overflow-hidden
-                    ${selectedArticulos.includes(articulo.id)
-                      ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-300 g3:!border-g3-primario g3:!bg-g3-primario-tinte g3:!ring-0'
-                      : 'border-gray-200 hover:border-purple-300 bg-white g3:hover:!border-g3-linea-fuerte'
-                    }
-                  `}
-                >
-                  {/* Imagen Grande */}
-                  <div className="relative aspect-square bg-gray-100 group">
-                    {articulo.imagen_url ? (
-                      <>
-                        <img
-                          src={articulo.imagen_url}
-                          alt={articulo.nombre}
-                          className="w-full h-full object-cover"
-                        />
-                        {/* Botón de zoom */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setImagenModal({ url: articulo.imagen_url, nombre: articulo.nombre });
-                          }}
-                          className="absolute bottom-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Ver imagen completa"
-                        >
-                          <ZoomIn className="w-4 h-4" />
-                        </button>
-                      </>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ImageIcon className="w-8 h-8 text-gray-300" />
-                      </div>
-                    )}
-                    {/* Checkbox en esquina */}
-                    <div className="absolute top-2 left-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedArticulos.includes(articulo.id)}
-                        onChange={() => handleSelectArticulo(articulo.id)}
-                        className="w-5 h-5 text-purple-600 rounded border-2 border-white shadow"
-                      />
-                    </div>
-                    {/* Badge de seleccionado */}
-                    {selectedArticulos.includes(articulo.id) && (
-                      <div className="absolute top-2 right-2">
-                        <CheckCircle2 className="w-5 h-5 text-purple-600 bg-white rounded-full g3:!text-g3-primario" />
-                      </div>
-                    )}
-                  </div>
-                  {/* Info del artículo */}
-                  <div className="p-2">
-                    <div className="text-sm font-medium text-gray-900 truncate" title={articulo.nombre}>
-                      {articulo.nombre}
-                    </div>
-                    <div className="text-xs text-gray-500">ID: {articulo.id}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Columna 3: Historial */}
-        <div className="w-80 flex-shrink-0 bg-white rounded-lg shadow-md p-4 flex flex-col overflow-hidden g3:max-[860px]:w-auto">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-purple-600" />
-              Historial
-            </h2>
-            <div className="flex items-center gap-1">
-              <Button
-                onClick={handleLimpiarCola}
-                size="sm"
-                variant="outline"
-                title="Limpiar cola antigua"
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
-              <Button
-                onClick={fetchHistorial}
-                size="sm"
-                variant="outline"
-              >
-                <RefreshCw className="w-3 h-3" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {loadingHistory ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
-              </div>
-            ) : historial.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 text-sm">
-                <Clock className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                Sin historial
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {historial.map(item => (
-                  <div
-                    key={item.id}
-                    className={`p-3 rounded-lg border text-sm ${getEstadoColor(item.estado)}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 truncate" title={item.articulo_nombre}>
-                          {item.articulo_nombre}
-                        </div>
-                        <div className="text-xs text-gray-600 mt-0.5">
-                          ID: {item.articulo_id} | Intentos: {item.intentos}/{item.max_intentos}
-                        </div>
-                        {item.duracion_segundos && (
-                          <div className="text-xs text-gray-500">
-                            {Math.round(item.duracion_segundos)}s
-                          </div>
-                        )}
-                        {item.error_message && (
-                          <div className="text-xs text-red-600 mt-1 flex items-start gap-1">
-                            <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                            <span className="truncate" title={item.error_message}>{item.error_message}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-shrink-0 flex items-center gap-1">
-                        {item.estado === 'completed' && <CheckCircle2 className="w-4 h-4 text-green-600" />}
-                        {item.estado === 'processing' && <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />}
-                        {item.estado === 'pending' && <Clock className="w-4 h-4 text-yellow-600" />}
-                        {item.estado === 'failed' && (
-                          <>
-                            <XCircle className="w-4 h-4 text-red-600" />
-                            <button
-                              onClick={() => handleRetryItem(item.id)}
-                              className="text-xs text-red-600 hover:text-red-800 underline"
-                            >
-                              Reintentar
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Modal para ver imagen grande */}
-      {imagenModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-          onClick={() => setImagenModal(null)}
-        >
-          <div className="relative max-w-4xl max-h-[90vh] m-4">
-            {/* Botón cerrar */}
-            <button
-              onClick={() => setImagenModal(null)}
-              className="absolute -top-10 right-0 p-2 text-white hover:text-gray-300 transition-colors"
-            >
-              <X className="w-8 h-8" />
-            </button>
-            {/* Nombre del artículo */}
-            <div className="absolute -top-10 left-0 text-white font-medium truncate max-w-md">
-              {imagenModal.nombre}
-            </div>
-            {/* Imagen */}
-            <img
-              src={imagenModal.url}
-              alt={imagenModal.nombre}
-              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        </div>
-      )}
-    </div>
+    <VistaFotosIA f={{
+      articulos, selectedArticulos, setSelectedArticulos, loading, processing, queueStatus, historial, loadingHistory, autoRefresh,
+      handleSelectArticulo, handleSelectAll, handleProcesarSeleccionados, handleRetryItem, handleLimpiarCola, fetchQueueStatus, fetchHistorial,
+      errorCargaR2, fetchArticulos,
+    }} />
   );
 };
 

@@ -9,7 +9,6 @@ const UNIDADES = [
   ['cajas', 'Cajas'], ['rollos', 'Rollos'], ['bolsas', 'Bolsas'], ['unidades', 'Unidades'],
 ];
 
-
 export default function CajonNuevoArticulo({ onClose, formData, handleChange, categorias, ubicaciones, proveedoresList, modoNuevoProveedor,
   nuevoProveedorNombre, setNuevoProveedorNombre, handleCrearProveedorRapido, handleCancelarNuevoProveedor, loading, handleSubmit }) {
   return (

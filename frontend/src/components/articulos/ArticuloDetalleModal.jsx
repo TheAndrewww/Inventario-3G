@@ -1,18 +1,10 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
-import { X, Package, MapPin, DollarSign, Hash, Box, Edit, Sparkles, Eye, PackagePlus, PackageMinus, Clock, Wrench, User, Users } from 'lucide-react';
-import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
-import { Modal } from '../common';
 import BarcodeDisplay from './BarcodeDisplay';
 import UnidadHerramientaDetalleModal from './UnidadHerramientaDetalleModal';
 import { getImageUrl } from '../../utils/imageUtils';
 import articulosService from '../../services/articulos.service';
 import herramientasRentaService from '../../services/herramientasRenta.service';
-import { g3Activo, confirmarG3, avisoG3 } from '../../diseno-3g/dialogosG3';
-// Rediseño 2: el detalle encendido es un cajón lateral (mismas peticiones; ver rediseno2/inventario/CajonDetalleArticulo)
-import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
+import { confirmarG3, avisoG3 } from '../../diseno-3g/dialogosG3';
 import CajonDetalleArticulo from '../../rediseno2/inventario/CajonDetalleArticulo';
 
 const ArticuloDetalleModal = ({
@@ -28,8 +20,6 @@ const ArticuloDetalleModal = ({
   puedeRegistrarSalida = false,
   r2 // Rediseño 2: datos y manejadores extra que solo usa el cajón encendido (Inventario los pasa; apagado no se usan)
 }) => {
-  const g3 = useDiseno3G(); // Diseño 3G: íconos en vez de emojis (apagado, el DOM de siempre)
-  const d3 = useDiseno3GR2(); // Rediseño 2 encendido: cajón lateral
   const [imagenExpandida, setImagenExpandida] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
 
@@ -119,7 +109,6 @@ const ArticuloDetalleModal = ({
 
   if (!articulo) return null;
 
-  const stockBajo = parseFloat(articulo.stock_actual) <= parseFloat(articulo.stock_minimo);
 
   const imagenUrl = getImageUrl(articulo.imagen_url);
 
@@ -127,23 +116,17 @@ const ArticuloDetalleModal = ({
   const handleReprocessImage = async () => {
     if (!articulo.imagen_url) return;
 
-    // Diseño 3G encendido: vista previa y avisos del paquete; apagado, el confirm()/alert() de siempre.
-    if (g3Activo()) {
-      if (!(await confirmarG3({
-        titulo: '¿Reprocesar esta imagen con IA?',
-        texto: 'Mejora la calidad de la foto. Esto puede tardar unos segundos.',
-        datos: [['Artículo', articulo.nombre]],
-        confirmar: 'Reprocesar imagen', cancelar: 'No reprocesar',
-      }))) return;
-    } else if (!confirm('¿Reprocesar esta imagen con IA para mejorar su calidad? Esto puede tardar unos segundos.')) {
-      return;
-    }
+    if (!(await confirmarG3({
+      titulo: '¿Reprocesar esta imagen con IA?',
+      texto: 'Mejora la calidad de la foto. Esto puede tardar unos segundos.',
+      datos: [['Artículo', articulo.nombre]],
+      confirmar: 'Reprocesar imagen', cancelar: 'No reprocesar',
+    }))) return;
 
     setReprocessing(true);
     try {
       const result = await articulosService.reprocessImagen(articulo.id);
-      if (g3Activo()) avisoG3('Imagen reprocesada con IA.', 'ok');
-      else alert('✅ Imagen reprocesada exitosamente con IA');
+      avisoG3('Imagen reprocesada con IA.', 'ok');
 
       // Notificar al componente padre para actualizar la lista
       if (onImageReprocessed) {
@@ -151,407 +134,23 @@ const ArticuloDetalleModal = ({
       }
     } catch (error) {
       console.error('Error al reprocesar imagen:', error);
-      if (g3Activo()) avisoG3(error.message || 'Error al reprocesar imagen. Verifica que Nano Banana esté configurado.', 'mal');
-      else alert('❌ ' + (error.message || 'Error al reprocesar imagen. Verifica que Nano Banana esté configurado.'));
+      avisoG3(error.message || 'Error al reprocesar imagen. Verifica que Nano Banana esté configurado.', 'mal');
     } finally {
       setReprocessing(false);
     }
   };
 
-  // Rediseño 2 encendido: el detalle en un cajón lateral, con el mismo estado y las mismas peticiones de arriba
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    return (
-      <CajonDetalleArticulo articulo={articulo} abierto={isOpen} alCerrar={onClose} imagenUrl={imagenUrl} canEdit={canEdit} onEdit={onEdit}
-        onEntrada={onEntrada} onSalida={onSalida} puedeGestionarInventario={puedeGestionarInventario} puedeRegistrarSalida={puedeRegistrarSalida}
-        reprocessing={reprocessing} alMejorarFoto={handleReprocessImage} ultimoMovimiento={ultimoMovimiento} cargandoMovimiento={loadingUltimoMov}
-        unidadesLista={unidadesHerramienta} cargandoUnidades={loadingUnidades} alVerUnidad={handleVerUnidad}
-        codigoBarras={!articulo.es_herramienta ? <BarcodeDisplay articuloId={articulo.id} codigoEAN13={articulo.codigo_ean13} /> : null}
-        detalleUnidad={modalUnidadOpen && unidadSeleccionada ? (
-          <UnidadHerramientaDetalleModal unidad={unidadSeleccionada} tipoHerramienta={tipoHerramienta} isOpen={modalUnidadOpen}
-            onClose={() => { setModalUnidadOpen(false); setUnidadSeleccionada(null); }} />
-        ) : null}
-        r2={r2} />
-    );
-  }
-
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Detalles del Artículo">
-      <div className="space-y-6">
-        {/* Header con imagen y nombre */}
-        <div className="border-b pb-4">
-          <div className="flex items-start gap-4">
-            {/* Imagen del artículo */}
-            <div className="flex-shrink-0">
-              {imagenUrl ? (
-                <div className="space-y-2">
-                  <img
-                    src={imagenUrl}
-                    alt={articulo.nombre}
-                    className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => setImagenExpandida(true)}
-                    title="Haz clic para ver la imagen en tamaño completo"
-                  />
-                  {canEdit && (
-                    <button
-                      onClick={handleReprocessImage}
-                      disabled={reprocessing}
-                      className="w-24 px-2 py-1 text-xs bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                      title="Reprocesar con IA para mejorar calidad"
-                    >
-                      {reprocessing ? (
-                        <>
-                          <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full"></div>
-                          <span>IA...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={12} />
-                          <span>Mejorar IA</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="w-24 h-24 bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center text-4xl">
-                  {g3 ? <Package size={40} className="text-gray-400" aria-hidden="true" /> : '📦'}
-                </div>
-              )}
-            </div>
-
-            {/* Información del artículo */}
-            <div className="flex-1 min-w-0">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                {articulo.nombre}
-              </h2>
-              {articulo.descripcion && (
-                <p className="text-gray-600">{articulo.descripcion}</p>
-              )}
-              <div className="mt-3">
-                <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">
-                  {articulo.categoria?.nombre || 'Sin categoría'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Código de barras - Solo para consumibles, NO para herramientas */}
-        {!articulo.es_herramienta && (
-          <div className="bg-gray-50 p-6 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-700 mb-4 text-center">
-              Código de Barras EAN-13
-            </h3>
-            <BarcodeDisplay
-              articuloId={articulo.id}
-              codigoEAN13={articulo.codigo_ean13}
-            />
-          </div>
-        )}
-
-        {/* Lista de unidades para herramientas */}
-        {articulo.es_herramienta && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg overflow-hidden">
-            <div className="flex items-center gap-2 p-4 border-b border-orange-200 bg-orange-100">
-              {g3 ? <Wrench size={24} className="text-orange-700 shrink-0" aria-hidden="true" /> : <span className="text-2xl">🔧</span>}
-              <div>
-                <p className="text-sm font-medium text-orange-900">
-                  Herramienta de Renta - Unidades Individuales
-                </p>
-                <p className="text-xs text-orange-700">
-                  Cada unidad tiene su propio código de barras. Haz clic en una unidad para ver sus detalles.
-                </p>
-              </div>
-            </div>
-
-            {/* Loading */}
-            {loadingUnidades && (
-              <div className="p-6 text-center">
-                <div className="animate-spin h-8 w-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto"></div>
-                <p className="text-sm text-orange-700 mt-2">Cargando unidades...</p>
-              </div>
-            )}
-
-            {/* Lista de unidades */}
-            {!loadingUnidades && unidadesHerramienta.length > 0 && (
-              <div className="p-4 max-h-80 overflow-y-auto">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {unidadesHerramienta.map((unidad) => {
-                    const estadoBadges = {
-                      disponible: { bg: 'bg-green-100', text: 'text-green-800', label: 'Disponible', icon: '✓' },
-                      asignada: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Asignada', icon: '👤' },
-                      en_reparacion: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'En Reparación', icon: '🔧' },
-                      perdida: { bg: 'bg-red-100', text: 'text-red-800', label: 'Perdida', icon: '❌' },
-                      baja: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Baja', icon: '🗑️' }
-                    };
-                    const badge = estadoBadges[unidad.estado] || estadoBadges.disponible;
-
-                    return (
-                      <button
-                        key={unidad.id}
-                        onClick={() => handleVerUnidad(unidad)}
-                        className="bg-white border-2 border-orange-200 hover:border-orange-400 rounded-lg p-3 text-left transition-all hover:shadow-md group"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono font-bold text-red-600 text-sm">
-                            {unidad.codigo_unico}
-                          </span>
-                          <Eye size={16} className="text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.bg} ${badge.text}`}>
-                            {g3 ? badge.label : <>{badge.icon} {badge.label}</>}
-                          </span>
-                        </div>
-                        {unidad.usuarioAsignado && (
-                          <p className="text-xs text-gray-600 mt-1 truncate">
-                            {g3 ? <User size={12} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '👤 '}{unidad.usuarioAsignado.nombre}
-                          </p>
-                        )}
-                        {unidad.equipoAsignado && (
-                          <p className="text-xs text-gray-600 mt-1 truncate">
-                            {g3 ? <Users size={12} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '👥 '}{unidad.equipoAsignado.nombre}
-                          </p>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-orange-700 mt-3 text-center">
-                  Total: {unidadesHerramienta.length} {unidadesHerramienta.length === 1 ? 'unidad' : 'unidades'}
-                </p>
-              </div>
-            )}
-
-            {/* Sin unidades */}
-            {!loadingUnidades && unidadesHerramienta.length === 0 && (
-              <div className="p-6 text-center text-orange-700">
-                <p className="text-sm">No hay unidades registradas para esta herramienta</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Información del artículo */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* Stock */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Box size={18} className="text-gray-400" />
-              <span className="text-sm font-medium text-gray-600">Stock Actual</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className={`text-2xl font-bold ${stockBajo ? 'text-red-600' : 'text-gray-900'}`}>
-                {parseFloat(articulo.stock_actual).toFixed(0)}
-              </span>
-              <span className="text-sm text-gray-500">{articulo.unidad}</span>
-            </div>
-            {stockBajo && (
-              <span className="inline-block mt-2 px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
-                Stock bajo (mín: {parseFloat(articulo.stock_minimo).toFixed(0)})
-              </span>
-            )}
-          </div>
-
-          {/* Costo */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign size={18} className="text-gray-400" />
-              <span className="text-sm font-medium text-gray-600">Costo Unitario</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900">
-              ${parseFloat(articulo.costo_unitario || 0).toFixed(2)}
-            </div>
-          </div>
-
-          {/* Ubicación */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <MapPin size={18} className="text-gray-400" />
-              <span className="text-sm font-medium text-gray-600">Ubicación</span>
-            </div>
-            <div className="text-sm text-gray-900">
-              {articulo.ubicacion?.codigo || 'N/A'}
-            </div>
-            {articulo.ubicacion?.descripcion && (
-              <div className="text-xs text-gray-500 mt-1">
-                {articulo.ubicacion.descripcion}
-              </div>
-            )}
-          </div>
-
-          {/* Stock Mínimo */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Package size={18} className="text-gray-400" />
-              <span className="text-sm font-medium text-gray-600">Stock Mínimo</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-gray-900">
-                {parseFloat(articulo.stock_minimo).toFixed(0)}
-              </span>
-              <span className="text-sm text-gray-500">{articulo.unidad}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Última actualización */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Clock size={18} className="text-gray-500" />
-            <h3 className="text-sm font-semibold text-gray-700">Última Actualización</h3>
-          </div>
-          {loadingUltimoMov ? (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
-              Cargando...
-            </div>
-          ) : ultimoMovimiento ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Tipo:</span>
-                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${ultimoMovimiento.tipo === 'ajuste_entrada' || ultimoMovimiento.tipo === 'entrada_orden_compra' || ultimoMovimiento.tipo === 'devolucion'
-                  ? 'bg-green-100 text-green-800'
-                  : ultimoMovimiento.tipo === 'retiro' || ultimoMovimiento.tipo === 'ajuste_salida'
-                    ? 'bg-orange-100 text-orange-800'
-                    : 'bg-blue-100 text-blue-800'
-                  }`}>
-                  {ultimoMovimiento.tipo_legible}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Cantidad:</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {parseFloat(ultimoMovimiento.cantidad).toFixed(0)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Fecha:</span>
-                <span className="text-sm text-gray-900">
-                  {new Date(ultimoMovimiento.fecha).toLocaleDateString('es-MX', {
-                    year: 'numeric', month: 'short', day: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
-                  })}
-                </span>
-              </div>
-              {ultimoMovimiento.usuario && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">Realizado por:</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {g3 ? <User size={14} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '👤 '}{ultimoMovimiento.usuario.nombre}
-                  </span>
-                  <span className="text-xs text-gray-400">({ultimoMovimiento.usuario.rol})</span>
-                </div>
-              )}
-              {ultimoMovimiento.ticket_id && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">Ticket:</span>
-                  <span className="text-xs font-mono text-gray-600">{ultimoMovimiento.ticket_id}</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400 italic">Sin movimientos registrados</p>
-          )}
-        </div>
-
-        {/* Botones de acción */}
-        <div className="space-y-3 pt-4 border-t">
-          {/* Botones de Entrada y Salida - Solo para almacenistas */}
-          {(puedeGestionarInventario || puedeRegistrarSalida) && (
-            <div className="grid grid-cols-2 gap-3">
-              {puedeGestionarInventario && onEntrada && (
-                <button
-                  onClick={() => {
-                    onEntrada(articulo);
-                    onClose();
-                  }}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
-                >
-                  <PackagePlus size={20} />
-                  Entrada
-                </button>
-              )}
-              {puedeRegistrarSalida && onSalida && (
-                <button
-                  onClick={() => {
-                    onSalida(articulo);
-                    onClose();
-                  }}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors font-medium"
-                >
-                  <PackageMinus size={20} />
-                  Salida
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Botones de cerrar y editar */}
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-            >
-              Cerrar
-            </button>
-            {canEdit && onEdit && (
-              <button
-                onClick={() => {
-                  onEdit(articulo);
-                  onClose();
-                }}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors"
-              >
-                <Edit size={18} />
-                Editar
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Modal de imagen expandida */}
-      {imagenExpandida && imagenUrl && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-90 z-[9999] flex items-center justify-center p-4"
-          onClick={() => setImagenExpandida(false)}
-        >
-          <div className="relative max-w-7xl max-h-full">
-            <button
-              onClick={() => setImagenExpandida(false)}
-              className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors"
-              title="Cerrar (Esc)"
-            >
-              <X size={32} />
-            </button>
-            <img
-              src={imagenUrl}
-              alt={articulo.nombre}
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <p className="text-white text-center mt-4 text-sm">
-              {articulo.nombre}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de detalle de unidad de herramienta */}
-      {modalUnidadOpen && unidadSeleccionada && (
-        <UnidadHerramientaDetalleModal
-          unidad={unidadSeleccionada}
-          tipoHerramienta={tipoHerramienta}
-          isOpen={modalUnidadOpen}
-          onClose={() => {
-            setModalUnidadOpen(false);
-            setUnidadSeleccionada(null);
-          }}
-        />
-      )}
-    </Modal>
+    <CajonDetalleArticulo articulo={articulo} abierto={isOpen} alCerrar={onClose} imagenUrl={imagenUrl} canEdit={canEdit} onEdit={onEdit}
+      onEntrada={onEntrada} onSalida={onSalida} puedeGestionarInventario={puedeGestionarInventario} puedeRegistrarSalida={puedeRegistrarSalida}
+      reprocessing={reprocessing} alMejorarFoto={handleReprocessImage} ultimoMovimiento={ultimoMovimiento} cargandoMovimiento={loadingUltimoMov}
+      unidadesLista={unidadesHerramienta} cargandoUnidades={loadingUnidades} alVerUnidad={handleVerUnidad}
+      codigoBarras={!articulo.es_herramienta ? <BarcodeDisplay articuloId={articulo.id} codigoEAN13={articulo.codigo_ean13} /> : null}
+      detalleUnidad={modalUnidadOpen && unidadSeleccionada ? (
+        <UnidadHerramientaDetalleModal unidad={unidadSeleccionada} tipoHerramienta={tipoHerramienta} isOpen={modalUnidadOpen}
+          onClose={() => { setModalUnidadOpen(false); setUnidadSeleccionada(null); }} />
+      ) : null}
+      r2={r2} />
   );
 };
 
