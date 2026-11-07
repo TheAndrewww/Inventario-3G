@@ -56,6 +56,8 @@ import { useDiseno3G as useDiseno3GR2 } from './rediseno2/fundacion/useDiseno3G'
 import { AvisosFlotantes } from './rediseno2/fundacion/armazon/AvisosFlotantes';
 import VistaTabletasCalidad from './rediseno2/calidad/VistaTabletasCalidad';
 import { usePanelCalidad } from './rediseno2/calidad/usePanelCalidad';
+// Sofía (7-nov-2026): su ventana flotante, solo en pantallas internas y solo con VITE_SOFIA_FLOTANTE_URL (ver src/sofia)
+import SofiaFlotante from './sofia/SofiaFlotante.jsx';
 
 const IndexRedirect = () => {
   const { user } = useAuth();
@@ -161,6 +163,7 @@ function App() {
                       path="/"
                       element={
                         <PrivateRoute>
+                          <SofiaFlotante />
                           <DashboardLayout />
                         </PrivateRoute>
                       }
