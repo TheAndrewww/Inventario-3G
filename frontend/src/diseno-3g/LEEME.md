@@ -50,7 +50,7 @@ Desde el 16-oct-2026 ya no aplica: ver «Solo el diseño nuevo».
 
 | Archivo | Origen | Qué es |
 |---|---|---|
-| `diseno-3g.css`, `diseno-3g.js`, `sistemas.json`, `puentes/tailwind-preset.cjs` | Copia sin cambios del paquete **Diseño 3G v1.1.0** (`Plataforma-3G/diseno-3g/`, 12-oct-2026; `puentes/` sigue igual que en v1.0.0). SHA-256 abajo. | Tokens, componentes `.g3-*`, interruptor, selector de apps, variante `g3:` de Tailwind. |
+| `diseno-3g.css`, `diseno-3g.js`, `sistemas.json`, `puentes/tailwind-preset.cjs` | Copia sin cambios del paquete **Diseño 3G v1.1.0** (`Plataforma-3G/diseno-3g/`, 12-oct-2026; `puentes/` sigue igual que en v1.0.0). `diseno-3g.css` lleva además la marca de **v1.2.0 (marca original) 7-nov-2026** (ver abajo). SHA-256 abajo. | Tokens, componentes `.g3-*`, interruptor, selector de apps, variante `g3:` de Tailwind. |
 | `planta-mapa-tailwind.css` | **Generado** por `generar-mapa-tailwind.mjs` | Re-pinta con tokens las ~390 clases de color de Tailwind que usa Planta (gris → neutros, rojo de marca → azul acero, estados…). Si se agregan colores nuevos: `node src/diseno-3g/generar-mapa-tailwind.mjs` desde `frontend/`. |
 | `planta-3g.css` | Propio de Planta | Armazón (riel, barra, pestañas, barra inferior), radios, sombras, tablas, formularios y modales de siempre bajo el interruptor. |
 | `menuPlanta.js` | Propio | Grupos del riel (Almacén, Compras, Producción, Calendario, Herramientas y cuadrillas, Administración), títulos claros de cada pantalla y secciones con pestañas (Tickets de material, Compras). **Permisos y rutas salen de `ALL_MENU_ITEMS`** (`components/layout/Sidebar.jsx`); si se agrega una pantalla allí y no aquí, aparece en «Otros». |
@@ -62,11 +62,21 @@ Desde el 16-oct-2026 ya no aplica: ver «Solo el diseño nuevo».
 SHA-256 de los archivos del paquete (para saber si ya hay versión nueva):
 
 ```
-c28ef2683a9f835318addbf9b3c0419f6d898fb876383bed5fe2a2d4825270ef  diseno-3g.css
+26426b801fc4db13bf2fd38d95c7138bef45be96a4a036120a25a2a00dc13e21  diseno-3g.css
 27b767ac4806205c27c5a84c390bad0c5248fbef6a820448c444fd67fd3d8e2f  diseno-3g.js
 f4bac54ef921c330e501e35d6e5065c226f44586a896f84f0d22924fac9b8e54  sistemas.json
 3030e48847509347cb1d99eed54e067c263a54fe4d0b4d5073278277e929469c  puentes/tailwind-preset.cjs
 ```
+
+### Marca: v1.2.0 (marca original) 7-nov-2026
+
+- En `diseno-3g.css` cambiaron solo dos cosas, copiadas del paquete: la regla `.g3-logo-marca` ahora dibuja el **isologo
+  original** de 3G (letras blancas y el cuadro rojo #BE202E) incrustado sobre un cuadro oscuro #111614, con el texto «3G» del
+  HTML solo para lectores de pantalla; y el token claro `--g3-rojo-3g` pasa de #c4122f a **#be202e** (el oscuro #d9203d no
+  cambia). Todas las marcas «3G» del rediseño 2 (riel, barra, entrada, TV, terminal, anuncios) ya usaban `.g3-logo-marca`.
+- Icono de pestaña: `public/icono-oscuro.svg` (isologo en cuadro oscuro). `apple-touch-icon` → `public/apple-touch-icon.png`
+  y los íconos de `public/manifest.json` → `public/icono-192.png` y `public/icono-512.png` (todos de `Plataforma-3G/diseno-3g/marca/`).
+  `public/Logo3G.svg` (ícono de las notificaciones) no se tocó.
 
 ## Reglas para seguir trabajando
 
