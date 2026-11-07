@@ -42,6 +42,9 @@ const allowedOrigins = [
     'http://localhost:5175',
     'http://192.168.100.26:5173', // Acceso desde red local (móviles)
     'https://inventario-3-g.vercel.app', // Producción Vercel (explícito)
+    // Dominio propio de Planta (el mismo proyecto de Vercel). Va aquí y no en FRONTEND_URL,
+    // porque FRONTEND_URL arma los enlaces de los correos y avisos.
+    'https://planta.3gvelarias.com',
 ];
 
 // Agregar URL de producción si existe en env
