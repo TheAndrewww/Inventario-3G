@@ -126,7 +126,8 @@ describe('dónde se monta', () => {
     const c = leer('src/sofia/SofiaFlotante.jsx');
     assert.match(c, /const DIRECCION = import\.meta\.env\.VITE_SOFIA_FLOTANTE_URL;\s*const SOFIA = DIRECCION \? origenSofia\(DIRECCION\) : null;/);
     assert.match(c, /if \(SOFIA && typeof window !== 'undefined'\) aparatoDeIsa\(/);
-    assert.match(c, /if \(!SOFIA \|\| rutaSinSofia\(window\.location\.pathname\)\) return;/);
+    assert.match(c, /if \(!SOFIA \|\| rutaSinSofia\(window\.location\.pathname\)\) return undefined;/);
+    assert.match(c, /window\.addEventListener\('hashchange', intentar\);\s*return \(\) => window\.removeEventListener\('hashchange', intentar\);/);
   });
   it('repositorio público: ninguna dirección de Sofía escrita en el código ni en los ejemplos', () => {
     const textos = [...readdirSync(join(RAIZ, 'src/sofia')).map((n) => leer(`src/sofia/${n}`)), leer('.env.example')];

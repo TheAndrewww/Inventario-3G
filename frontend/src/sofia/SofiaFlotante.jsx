@@ -20,8 +20,14 @@ if (SOFIA && typeof window !== 'undefined') aparatoDeIsa(window.location, almace
 
 export default function SofiaFlotante() {
   useEffect(() => {
-    if (!SOFIA || rutaSinSofia(window.location.pathname)) return;
-    if (aparatoDeIsa(window.location, almacen() || sinAlmacen)) ponerSofia(document, SOFIA, 'planta');
+    if (!SOFIA || rutaSinSofia(window.location.pathname)) return undefined;
+    const intentar = () => {
+      if (aparatoDeIsa(window.location, almacen() || sinAlmacen)) ponerSofia(document, SOFIA, 'planta');
+    };
+    intentar();
+    // #sofia agregado a una página ya abierta (el navegador no recarga): se marca y se pide el guion en ese momento.
+    window.addEventListener('hashchange', intentar);
+    return () => window.removeEventListener('hashchange', intentar);
   }, []);
   return null;
 }
