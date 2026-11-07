@@ -414,7 +414,7 @@ test('cerradas: últimos 7 días por omisión, en orden, sin canceladas, inactiv
         assert.equal(lona.entregada, false);
         assert.equal(lona.cerradaConSesion, true);
         assert.match(lona.cerradaEn, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}-0[56]:00$/);
-        assert.deepEqual(lona.fechaInstalacion, { fecha: '2026-11-03', fuente: 'calendario' });
+        assert.deepEqual(lona.fechaInstalacion, { fecha: '2026-11-03', fuente: 'calendario', tipoCita: null, cimentacion: null });
         assert.equal(lona.fechaIndice, '2026-11-05');
         assert.deepEqual(lona.areas.pendientes, []);
         assert.equal(lona.areas.produccionCerrada, true);
@@ -423,12 +423,12 @@ test('cerradas: últimos 7 días por omisión, en orden, sin canceladas, inactiv
         assert.equal(velaria.obraId, null);
         assert.equal(velaria.entregada, true);
         assert.equal(velaria.cerradaConSesion, false);
-        assert.deepEqual(velaria.fechaInstalacion, { fecha: '2026-10-30', fuente: 'indice' });
+        assert.deepEqual(velaria.fechaInstalacion, { fecha: '2026-10-30', fuente: 'indice', tipoCita: null, cimentacion: null });
 
         assert.equal(mto.tipo, 'MTO');
         assert.equal(mto.sinProduccion, true);
         assert.equal(mto.areas.sinPlanos, true);
-        assert.deepEqual(mto.fechaInstalacion, { fecha: null, fuente: null });
+        assert.deepEqual(mto.fechaInstalacion, { fecha: null, fuente: null, tipoCita: null, cimentacion: null });
     });
 });
 
@@ -596,7 +596,7 @@ test('en-curso: el taller (producción o planos sin terminar) con sus áreas, ob
         assert.equal(toldo.observaciones.produccion, 'Falta costura; llamar al •••, anticipo $•••');
         assert.equal(toldo.observaciones.compras, 'Pagaron ••• al proveedor');
         assert.equal(toldo.observaciones.diseno, 'Dueña: ••• tel •••; instalar en •••');
-        assert.deepEqual(toldo.fechaInstalacion, { fecha: '2026-11-10', fuente: 'calendario' });
+        assert.deepEqual(toldo.fechaInstalacion, { fecha: '2026-11-10', fuente: 'calendario', tipoCita: null, cimentacion: null });
         assert.equal(toldo.pronostico.respuesta, 'no');
         assert.equal(toldo.pronostico.motivo, 'falta tela; llamar al ••• o a ••• anticipo •••');
         assert.equal(toldo.pronostico.fechaPropuesta, 'cuando paguen el saldo ••• en •••');

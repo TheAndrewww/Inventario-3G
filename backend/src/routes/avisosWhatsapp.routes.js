@@ -7,7 +7,9 @@
 
 import express from 'express';
 import { Op } from 'sequelize';
-import { proyectosAbiertos, resolverFechasInstalacion, leerCitasCercanas, leerCitasMesAnterior, resumenProduccion } from '../services/fechaInstalacion.service.js';
+import { proyectosAbiertos, resolverFechasInstalacion, leerCitasCercanas, leerCitasMesAnterior, resumenProduccion, tipoDeObra, extensivoDeCitaConTope } from '../services/fechaInstalacion.service.js';
+// 6-nov-2026 (revisión, punto 9 b): el tipo de cita del vocabulario único viaja en campos nuevos (tipo_cita, es_extensivo).
+import { tiposDeCitaDelDia, vocabularioUnico } from '../utils/vocabularioCalendario.js';
 import { obtenerDistribucionEquipos } from '../services/googleSheets.service.js';
 import { AvisoWhatsApp, OrdenCompra, Usuario, Proveedor, DetalleOrdenCompra, Articulo, ArticuloProveedor, ProduccionProyecto, SolicitudCompra, Movimiento, DetalleMovimiento, Equipo } from '../models/index.js';
 import { urlSolicitudes } from '../services/barridoCompras.service.js';
@@ -618,6 +620,10 @@ router.get('/produccion/agenda', async (req, res) => {
                 // MTO: a Charly solo se le pregunta si ya hubo un retiro antes (ver huboRetiro).
                 es_mto: String(p.tipo_proyecto || '').toUpperCase() === 'MTO' || /\bMTO\b/i.test(p.nombre || ''),
                 retiro_previo: fechas?.get(p.id)?.retiroPrevio === true,
+                // Campos nuevos (6-nov-2026): el tipo de la cita de ese día con el vocabulario único (RETIRO, CIMENTACION,
+                // EXTENSIVO, MTO, GTIA o INSTALACION) y si la obra es EXTENSIVO en el Índice (columna J).
+                tipo_cita: fechas?.get(p.id)?.tipoCita || tipoDeObra(p),
+                es_extensivo: !!p.es_extensivo,
                 ...resumenProduccion(p),
                 produccion_completado_en: p.produccion_completado_en
             }));
@@ -670,7 +676,13 @@ router.get('/produccion/citas', async (req, res) => {
             }
         }
 
-        const citas = (await leerCitasCercanas())
+        const cercanas = await leerCitasCercanas();
+        // ¿La obra de cada cita es EXTENSIVO en el Índice? Si la base da error o no contesta en 3 s, solo cuenta la palabra
+        // de la celda (vuelta 1: Julia corta a los 20 s, y antes esta ruta no tocaba la base).
+        const { esExtensivoDe, motivo: sinObras } = await extensivoDeCitaConTope(cercanas);
+        if (sinObras) console.error('Citas del día: no se pudo cruzar con las obras (es_extensivo solo por la celda):', sinObras);
+        const unico = vocabularioUnico();
+        const citas = cercanas
             // Sin horario no es una cita: son las notas del calendario (ASUETO, "27 CUMPLE
             // VICENTE", "CONTROL - C1"). Confirmar eso con el cliente no tiene sentido.
             .filter(c => c.fecha === fecha && c.nombre && c.hora)
@@ -690,9 +702,10 @@ router.get('/produccion/citas', async (req, res) => {
                     // sabe quién va, y entonces no hay a quién nombrar.
                     equipo: equipo || null,
                     responsable: (equipo && responsables.get(equipo)) || null,
-                    tipo: /retiro/i.test(completo) ? 'RETIRO'
-                        : /gtia|garant/i.test(completo) ? 'GTIA'
-                            : /\bmto\b|mantenim/i.test(completo) ? 'MTO' : 'INSTALACION',
+                    // `tipo` SIEMPRE es RETIRO, GTIA, MTO o INSTALACION, con la bandera apagada o encendida, y sin el producto
+                    // de la obra (tipoAnteriorDeCita). `tipo_cita` y `es_extensivo` son nuevos (6-nov-2026): el contrato «tipo
+                    // de cita v1», con el producto de la obra. Julia reparte con `tipo_cita` si viene; si no, con `tipo`.
+                    ...tiposDeCitaDelDia(c, { esExtensivo: esExtensivoDe(c), unico }),
                     falla: c.equipoHora === 'FALLA'
                 };
             });

@@ -28,6 +28,7 @@ const ESTADO = {
   surtida: ['ok', 'Surtido'],
   parcial: ['aviso', 'Surtido en parte'],
   rechazada: ['mal', 'No se pudo'],
+  cancelada: ['neutro', 'Cancelado'],
 };
 
 const motivo = (e) => e?.response?.data?.message || e?.message || 'Error de conexión';
@@ -71,8 +72,12 @@ export default function PedidosEncargadosPage() {
     }
     setProcesando(s.id);
     try {
-      await pedidosEncargadosService.responder(s.id, estado, nota);
+      const r = await pedidosEncargadosService.responder(s.id, estado, nota);
       toast.success(estado === 'surtida' ? 'Marcado como surtido' : 'Respuesta guardada');
+      // 6-nov-2026: con el aviso al encargado encendido (PLANTA_SEGUIMIENTO), si el WhatsApp no salió se dice al momento.
+      if (r?.avisoEncargado === false) {
+        toast.error('El aviso por WhatsApp al encargado no salió. Lo ve en su tableta; si urge, avísale por otro medio.', { duration: 8000 });
+      }
       await cargar();
     } catch (e) {
       toast.error(motivo(e));
@@ -87,7 +92,9 @@ export default function PedidosEncargadosPage() {
       titulo: '¿Borrar este pedido?',
       aviso: 'No se puede deshacer.',
       datos: [['Encargado', titulo(s.encargado)], ['Pide', s.texto]],
-      pasa: ['Desaparece de esta lista y de la tableta del encargado.'],
+      // 6-nov-2026: ya no se borra el renglón; queda «cancelado» para que la tableta se entere (antes seguía «por atender»).
+      // La tableta no conoce «cancelado»: lo recibe como «No se puede» con la nota de abajo (routes/sistemas/almacen.js).
+      pasa: ['Desaparece de esta lista.', 'En la tableta del encargado sale como «No se puede», con la nota «Lo quitó el administrador en Planta».'],
       confirmar: 'Borrar pedido', cancelar: 'No borrar', peligro: true,
     }))) return;
     setProcesando(s.id);

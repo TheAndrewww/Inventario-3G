@@ -61,6 +61,23 @@ export const ENVIOS = [
         soloCon: 'PANEL_CALIDAD'
     },
     {
+        // 6-nov-2026 (revisión, punto 9) · PLANTA_SEGUIMIENTO: solo aparecen con la bandera (y su pieza) encendida
+        id: 'pla-seguimiento-resumen', nombre: 'Pendientes de Planta: celdas del calendario sin entender, pedidos vencidos y tickets sin subir',
+        cron: '0 8-18 * * 1-6', texto: '8:00, lunes a sábado (si no sale, se reintenta cada hora hasta las 18:00)', linea: 'campana', firma: 'Planta', destino: 'Administrador (campana y push)',
+        interruptor: 'PLANTA_SEGUIMIENTO', silencio: 'Domingo no; de 9:00 a 18:00 solo si el de las 8:00 no salió', soloCon: 'PLANTA_SEGUIMIENTO:resumen'
+    },
+    {
+        id: 'pla-seguimiento-pedidos', nombre: 'Recordatorio a Almacén de los pedidos de encargados sin atender',
+        cron: '0 9-18 * * 1-6', texto: 'Cada hora de 9:00 a 18:00, lunes a sábado (una vez al día por pedido, dos días como máximo)',
+        linea: 'contable', firma: 'Avisos de Planta', destino: 'Grupo Requisiciones y campana de Almacén',
+        interruptor: 'PLANTA_SEGUIMIENTO', silencio: 'Solo si hay pedidos con más de PEDIDOS_RECORDAR_HORAS por atender', soloCon: 'PLANTA_SEGUIMIENTO:pedidos'
+    },
+    {
+        id: 'pla-seguimiento-tickets', nombre: 'Aviso de órdenes de salida que no llegan a Drive en una hora',
+        cron: '*/10 * * * *', texto: 'Cada 10 minutos (una vez por ticket)', linea: 'campana', firma: 'Planta', destino: 'Administrador (campana y push)',
+        interruptor: 'PLANTA_SEGUIMIENTO', silencio: 'Solo si hay tickets atorados', soloCon: 'PLANTA_SEGUIMIENTO:tickets'
+    },
+    {
         id: 'pla-correo-orden', nombre: 'Correo de cada orden por autorizar («Aprobar» y «Rechazar»)',
         cron: null, texto: 'Al pedir la autorización de una orden', linea: 'correo', firma: '3G Inventario', destino: 'Dirección (correo)',
         interruptor: 'OC_CORREO_MODO_APROBAR', silencio: null
@@ -119,6 +136,8 @@ export const agendaPlanta = async ({ ahora = new Date() } = {}) => {
     const { cancelacionProgramadaEncendida } = await import('../controllers/ordenesCompra.controller.js');
     const { ticketDriveDesdeServidor } = await import('../services/ticketDrive.service.js');
     const { panelCalidad } = await import('./banderasCalidad.js');
+    const { piezasSeguimiento } = await import('../services/seguimientoPlanta.service.js');
+    const piezas = piezasSeguimiento();
     const ventana = ventanaAvisos();
     const modo = modoCorreoOrdenes();
     // Último aviso que Julia publicó de la cola (dato real de la base); si falla, «no se sabe».
@@ -136,6 +155,7 @@ export const agendaPlanta = async ({ ahora = new Date() } = {}) => {
         if (nombre === 'CANCELACION_PROGRAMADA') return { variable: 'CANCELACION_PROGRAMADA', encendido: cancelacionProgramadaEncendida() };
         if (nombre === 'TICKET_DRIVE_DESDE_SERVIDOR') return { variable: 'TICKET_DRIVE_DESDE_SERVIDOR', encendido: ticketDriveDesdeServidor() };
         if (nombre === 'PANEL_CALIDAD') return { variable: 'PANEL_CALIDAD', encendido: panelCalidad() };
+        if (nombre === 'PLANTA_SEGUIMIENTO') return { variable: 'PLANTA_SEGUIMIENTO', encendido: piezas.size > 0 };
         return null;
     };
     const silencioCola = ventana
@@ -143,7 +163,11 @@ export const agendaPlanta = async ({ ahora = new Date() } = {}) => {
         : 'Hoy ninguna: sale también de noche y en domingo';
 
     // Lo que solo existe con una bandera (soloCon) no aparece con ella apagada: la agenda queda igual que antes
-    const encendida = (nombre) => (nombre === 'PANEL_CALIDAD' ? panelCalidad() : true);
+    const encendida = (nombre) => {
+        if (nombre === 'PANEL_CALIDAD') return panelCalidad();
+        if (nombre.startsWith('PLANTA_SEGUIMIENTO:')) return piezas.has(nombre.split(':')[1]);
+        return true;
+    };
     const envios = ENVIOS.filter((e) => !e.soloCon || encendida(e.soloCon)).map((e) => {
         const ultima = e.id === 'pla-avisos-cola' ? ultimoDeLaCola : (corridas.get(e.id) || null);
         let proxima = e.cron ? siguienteEjecucion(e.cron, ahora) : null;

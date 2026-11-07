@@ -154,6 +154,7 @@ import rollosMembrana from './src/routes/rollosMembrana.routes.js';
 import checklistRoutes from './src/routes/checklist.routes.js';
 import solicitudesCambioRoutes from './src/routes/solicitudesCambio.routes.js';
 import pedidosEncargadosRoutes from './src/routes/pedidosEncargados.routes.js';
+import seguimientoRoutes from './src/routes/seguimiento.routes.js'; // 6-nov-2026: pendientes de Planta y tickets por día
 import configuracionRoutes from './src/routes/configuracion.routes.js';
 import reportesRoutes from './src/routes/reportes.routes.js';
 import avisosWhatsappRoutes from './src/routes/avisosWhatsapp.routes.js';
@@ -314,6 +315,7 @@ app.use('/api/rollos-membrana', rollosMembrana);
 app.use('/api/checklist', checklistRoutes);
 app.use('/api/solicitudes-cambio', solicitudesCambioRoutes);
 app.use('/api/pedidos-encargados', pedidosEncargadosRoutes); // 23-oct: pedidos de los encargados a Almacén
+app.use('/api/seguimiento', seguimientoRoutes); // 6-nov-2026: pendientes de Planta y tickets de salida por día (administrador)
 app.use('/api/configuracion', configuracionRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/avisos-whatsapp', avisosWhatsappRoutes);

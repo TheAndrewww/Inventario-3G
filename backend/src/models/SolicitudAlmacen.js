@@ -13,6 +13,12 @@ import { sequelize } from '../config/database.js';
 // 30-oct (jefe): MATERIAL para una obra (pintura, soldadura…).
 export const TIPOS_SOLICITUD_ALMACEN = ['MATERIAL', 'REPOSICION', 'HERRAMIENTA_ESPECIAL'];
 export const ESTADOS_SOLICITUD_ALMACEN = ['pendiente', 'surtida', 'parcial', 'rechazada'];
+// 6-nov-2026: «borrar» en Planta ya no quita el renglón; lo deja «cancelada» para que la tableta se entere. No es una
+// respuesta de Almacén (no está en la lista de arriba): solo la pone el administrador.
+export const ESTADO_CANCELADA = 'cancelada';
+// La tableta solo conoce surtida, parcial y rechazada (lo demás lo pinta «Esperando a Charly»): por la puerta, un pedido
+// cancelado sale como «rechazada» con esta nota (routes/sistemas/almacen.js › estadoParaTableta).
+export const NOTA_CANCELADA = 'Lo quitó el administrador en Planta';
 
 const SolicitudAlmacen = sequelize.define('SolicitudAlmacen', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -23,7 +29,7 @@ const SolicitudAlmacen = sequelize.define('SolicitudAlmacen', {
     proyecto: { type: DataTypes.STRING(200), allowNull: true },
     obra_id: { type: DataTypes.STRING(12), allowNull: true, comment: 'ID 3G «3G-AA-NNNN»' },
     referencia: { type: DataTypes.STRING(100), allowNull: false, unique: true, comment: 'Id del pedido en Operación' },
-    estado: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'pendiente', comment: 'pendiente | surtida | parcial | rechazada' },
+    estado: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'pendiente', comment: 'pendiente | surtida | parcial | rechazada | cancelada' },
     nota_almacen: { type: DataTypes.TEXT, allowNull: true, comment: 'Lo que contestó Almacén' },
     atendida_por: { type: DataTypes.STRING(100), allowNull: true, comment: 'Nombre de quien lo atendió' },
     atendida_en: { type: DataTypes.DATE, allowNull: true }

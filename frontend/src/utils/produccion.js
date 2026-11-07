@@ -426,8 +426,11 @@ const construirCitasPorNombre = (calendarioProyectos, anio, mes) => {
         // CIMENTACIÓN y RETIRO casi siempre van en el 2o renglón de la celda (`cliente`):
         // se miran los dos renglones, igual que en backend/src/services/fechaInstalacion.service.js.
         const completo = normalizarNombre(`${cp.nombre} ${cp.cliente || ''}`);
+        // Desde el 6-nov-2026 el backend manda en cada cita `esRetiro` y `esCimentacion` con la MISMA regla de la agenda
+        // (backend/src/utils/vocabularioCalendario.js); si no vienen (un backend de antes), la regla de siempre.
+        const esCimentacion = typeof cp.esCimentacion === 'boolean' ? cp.esCimentacion : completo.includes('cimentacion');
         // Cimentación = producción en la obra; la instalación es cuando termina
-        if (completo.includes('cimentacion')) return;
+        if (esCimentacion) return;
         let fecha = cp.fecha;
         if (!fecha && cp.dia) {
             fecha = `${anio}-${String(mes).padStart(2, '0')}-${String(cp.dia).padStart(2, '0')}`;
@@ -437,7 +440,7 @@ const construirCitasPorNombre = (calendarioProyectos, anio, mes) => {
         if (lista.some(c => c.fecha === fecha)) return; // misma fecha repetida
         lista.push({
             fecha,
-            retiro: esCitaRetiro(completo),
+            retiro: typeof cp.esRetiro === 'boolean' ? cp.esRetiro : esCitaRetiro(completo),
             // La hora en rojo oscuro = FALLA en la instalación (hay que reprogramar)
             falla: cp.equipoHora === 'FALLA',
             nota: cp.nota || null
@@ -667,8 +670,25 @@ export const getEstadoCierrePreparado = (proyecto) => {
  *        proyecto instalado el mes pasado y nunca cerrado se siga detectando.
  * @returns {Array} Proyectos con fecha_limite actualizada donde corresponde
  */
+/**
+ * Citas de CIMENTACIÓN por nombre, solo cuando el backend dice `unaFecha` (bandera CALENDARIO_VOCABULARIO_UNICO): con
+ * cimentación el día de su fecha del Índice (o después), la obra queda sin fecha hasta que aparezca la instalación, como
+ * en la agenda (backend/src/services/fechaInstalacion.service.js, regla del usuario del 5-nov-2026).
+ */
+const construirCimentaciones = (citas) => {
+    const mapa = {};
+    for (const cp of citas || []) {
+        if (cp?.unaFecha !== true || cp.esCimentacion !== true || !cp.nombre || !cp.fecha) continue;
+        const key = normalizarNombre(cp.nombre);
+        if (key) (mapa[key] = mapa[key] || []).push({ fecha: cp.fecha, retiro: false });
+    }
+    return mapa;
+};
+
 export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, mes, calendarioFuturos = [], calendarioPasados = []) => {
     if (!proyectos?.length) return proyectos;
+    const cimentaciones = construirCimentaciones([...(calendarioProyectos || []), ...(calendarioFuturos || [])]);
+    const nombresCimentacion = Object.keys(cimentaciones);
 
     const fechasPorNombre = construirCitasPorNombre(calendarioProyectos, anio, mes);
     const nombresCalendario = Object.keys(fechasPorNombre);
@@ -684,7 +704,7 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
     );
     const nombresCierre = Object.keys(citasCierre);
 
-    if (nombresCalendario.length === 0 && nombresFuturos.length === 0 && nombresCierre.length === 0) return proyectos;
+    if (nombresCalendario.length === 0 && nombresFuturos.length === 0 && nombresCierre.length === 0 && nombresCimentacion.length === 0) return proyectos;
 
     const porNumeroActual = ligarPorNumero(proyectos, nombresCalendario);
     const porNumeroFuturo = ligarPorNumero(proyectos, nombresFuturos);
@@ -736,6 +756,15 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
                 const nuevaFechaLimite = fechaLimiteDesdeInstalacion(fechaInstalacionStr);
                 console.log(`   ✅ CALENDARIO FUTURO MANDA (índice sin fecha): prod="${nombreProd}" ↔ cal="${nombreCal}" → instalación=${fechaInstalacionStr} → fecha_limite=${nuevaFechaLimite}`);
                 return { ...p, ...metaCierre, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
+            }
+        }
+
+        // 3) Con la bandera de un solo vocabulario: cimentación el día de su fecha del Índice o después → sin fecha.
+        if (fechaIndice && nombresCimentacion.length) {
+            const nombres = elegirNombres(nombreProd, nombresCimentacion);
+            const ultima = nombres.flatMap(n => cimentaciones[n].map(c => c.fecha)).sort().pop();
+            if (ultima && ultima >= String(fechaIndice).slice(0, 10)) {
+                return { ...p, ...metaCierre, fecha_limite: null, diasRestantes: null, _sinFechaPorCimentacion: ultima };
             }
         }
 
