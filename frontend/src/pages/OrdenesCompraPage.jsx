@@ -1,26 +1,17 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Plus, Package, ShoppingCart, Eye, Send, CheckCircle, XCircle, AlertCircle, AlertTriangle, Camera, Download, FileText, PlusCircle, RotateCcw, Trash2, X, Edit, Clock, User, Check } from 'lucide-react';
 import ordenesCompraService from '../services/ordenesCompra.service';
 import articulosService from '../services/articulos.service';
 import proveedoresService from '../services/proveedores.service';
 import categoriasService from '../services/categorias.service';
 import ubicacionesService from '../services/ubicaciones.service';
-import { Loader, Modal, Button, TimelineHistorial } from '../components/common';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import EAN13ScannerOrdenesCompra from '../components/scanner/EAN13ScannerOrdenesCompra';
 import { jsPDF } from 'jspdf';
 import AnularOrdenCompraModal from '../components/ordenes-compra/AnularOrdenCompraModal';
 import EditarOrdenModal from '../components/ordenes/EditarOrdenModal';
-import { useDiseno3G } from '../diseno-3g/useDiseno3G';
-import CabG3 from '../diseno-3g/CabG3';
-import { cx, etq, g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
-// Rediseño 2 · vistas encendidas (apagado no las usa)
-import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
+import { confirmarG3 } from '../diseno-3g/dialogosG3';
 import VistaOrdenesR2 from '../rediseno2/compras/VistaOrdenes';
 import VistaSolicitudesR2 from '../rediseno2/compras/VistaSolicitudes';
 import CajonNuevaOrdenR2 from '../rediseno2/compras/CajonNuevaOrden';
@@ -45,8 +36,6 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
   const [filterEstado, setFilterEstado] = useState('');
   const [vistaOrdenes, setVistaOrdenes] = useState('activas'); // 'activas', 'completadas', 'canceladas'
   const vistaActual = vista; // 'solicitudes' o 'ordenes' (la decide la ruta)
-  const g3 = useDiseno3G(); // Diseño 3G: encabezado, números, estados y tablas en tarjetas (apagado, lo de siempre)
-  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
   const [errorCargaR2, setErrorCargaR2] = useState(null); // Rediseño 2: el error de la carga, para pintarlo con «Reintentar»
   const [modalNuevaOrden, setModalNuevaOrden] = useState(false);
   const [modalDetalle, setModalDetalle] = useState(false);
@@ -250,43 +239,6 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     }
   };
 
-  const handleEnviarOrden = async (ordenId) => {
-    if (g3Activo()) {
-      const o = ordenes.find(x => x.id === ordenId) || (ordenSeleccionada?.id === ordenId ? ordenSeleccionada : null);
-      if (!(await confirmarG3({
-        titulo: '¿Enviar esta orden al proveedor?',
-        datos: o ? [['Orden', o.ticket_id], ['Proveedor', o.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', totalOrden(o)]] : [],
-        confirmar: 'Enviar orden', cancelar: 'Regresar',
-      }))) return;
-    } else if (!window.confirm('¿Está seguro de enviar esta orden al proveedor?')) return;
-
-    try {
-      await ordenesCompraService.enviarOrden(ordenId);
-      toast.success('Orden enviada al proveedor');
-
-      // Recargar la lista de órdenes
-      await fetchData();
-
-      // Si hay una orden seleccionada en el modal, actualizarla
-      if (ordenSeleccionada && ordenSeleccionada.id === ordenId) {
-        const data = await ordenesCompraService.obtenerOrden(ordenId);
-        setOrdenSeleccionada(data.data?.orden);
-      }
-    } catch (error) {
-      toast.error('Error al enviar la orden');
-    }
-  };
-
-  const handleActualizarEstado = async (ordenId, nuevoEstado) => {
-    try {
-      await ordenesCompraService.actualizarEstado(ordenId, nuevoEstado);
-      toast.success('Estado actualizado');
-      fetchData();
-    } catch (error) {
-      toast.error('Error al actualizar el estado');
-    }
-  };
-
   const handleAbrirModalAnular = (orden) => {
     setOrdenAAnular(orden);
     setModalAnular(true);
@@ -303,7 +255,6 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     setOrdenSeleccionada(null);
     return response;
   };
-
 
   const handleAbrirModalEditar = (orden) => {
     setOrdenAEditar(orden);
@@ -327,7 +278,6 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
       setModalDetalle(true);
     }
   };
-
 
   const handleAbrirModalCancelarSolicitud = (solicitud, e) => {
     e.stopPropagation(); // Evitar que se abra el modal de crear orden
@@ -412,11 +362,11 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
 
       if (articulosBajoStock.length === 0) {
         setModalArticulosEncontrados(false);
-        toast.success(g3Activo() ? 'Todos los artículos tienen stock suficiente' : '✅ Todos los artículos tienen stock suficiente');
+        toast.success('Todos los artículos tienen stock suficiente');
       } else {
         setModalArticulosEncontrados(true);
         toast(`${articulosBajoStock.length} artículo${articulosBajoStock.length !== 1 ? 's' : ''} bajo stock mínimo`, {
-          icon: g3Activo() ? undefined : '⚠️',
+          icon: undefined,
           duration: 2000
         });
       }
@@ -472,7 +422,7 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
         toast.loading('Actualizando lista...', { id: 'updating-list' });
         await handleMostrarBajoStockMinimo();
         toast.dismiss('updating-list');
-        toast.success(g3Activo() ? 'Artículo quitado de la lista' : '✅ Artículo removido de la lista', { duration: 2000 });
+        toast.success('Artículo quitado de la lista', { duration: 2000 });
       }
     } catch (error) {
       console.error('Error al crear solicitud:', error);
@@ -799,9 +749,6 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     return matchesSearch && matchesEstado && matchesVista;
   });
 
-  // Mostrar todas las solicitudes sin filtros
-  const filteredSolicitudes = solicitudes;
-
   // Extraer categorías únicas de las solicitudes (ya no se usa pero se mantiene por compatibilidad)
   const categoriasUnicas = React.useMemo(() => {
     const categoriasMap = new Map();
@@ -815,13 +762,11 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
   }, [solicitudes]);
 
   const handleAprobarOrden = async (orden) => {
-    if (g3Activo()) {
-      if (!(await confirmarG3({
-        titulo: `¿Aprobar la orden ${orden.ticket_id}?`,
-        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', totalOrden(orden)]],
-        confirmar: 'Aprobar orden', cancelar: 'Regresar',
-      }))) return;
-    } else if (!confirm(`¿Aprobar la orden ${orden.ticket_id}?`)) return;
+    if (!(await confirmarG3({
+      titulo: `¿Aprobar la orden ${orden.ticket_id}?`,
+      datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', totalOrden(orden)]],
+      confirmar: 'Aprobar orden', cancelar: 'Regresar',
+    }))) return;
     setLoadingAprobacion(true);
     try {
       await ordenesCompraService.aprobarOrden(orden.id);
@@ -863,16 +808,13 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     }
   };
 
-
   const handleEliminarOrden = async (orden) => {
-    if (g3Activo()) {
-      if (!(await confirmarG3({
-        titulo: `¿Eliminar permanentemente la orden ${orden.ticket_id}?`,
-        aviso: 'Esta acción no se puede deshacer.',
-        datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', totalOrden(orden)]],
-        confirmar: 'Eliminar orden', cancelar: 'No eliminar', peligro: true,
-      }))) return;
-    } else if (!confirm(`¿Eliminar permanentemente la orden ${orden.ticket_id}? Esta acción no se puede deshacer.`)) return;
+    if (!(await confirmarG3({
+      titulo: `¿Eliminar permanentemente la orden ${orden.ticket_id}?`,
+      aviso: 'Esta acción no se puede deshacer.',
+      datos: [['Proveedor', orden.proveedor?.nombre || 'Sin proveedor'], ['Total estimado', totalOrden(orden)]],
+      confirmar: 'Eliminar orden', cancelar: 'No eliminar', peligro: true,
+    }))) return;
     setLoadingAprobacion(true);
     try {
       await ordenesCompraService.eliminarOrden(orden.id);
@@ -887,771 +829,8 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
     }
   };
 
-  const getEstadoBadge = (estado) => {
-    const estados = {
-      pendiente_aprobacion: { label: 'Pendiente Aprobación', color: 'bg-amber-100 text-amber-800', icon: AlertCircle },
-      enviada: { label: 'Enviada', color: 'bg-blue-100 text-blue-800', icon: Send },
-      parcial: { label: 'Parcial', color: 'bg-yellow-100 text-yellow-800', icon: Package },
-      recibida: { label: 'Recibida', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-      cancelada: { label: 'Cancelada', color: 'bg-red-100 text-red-800', icon: XCircle },
-      rechazada: { label: 'Rechazada', color: 'bg-red-200 text-red-900', icon: XCircle }
-    };
-
-    const config = estados[estado] || estados.pendiente_aprobacion;
-    const IconComponent = config.icon;
-
-    // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
-    if (g3) {
-      const g3e = {
-        pendiente_aprobacion: ['aviso', 'Pendiente de aprobación'], enviada: ['info', 'Enviada'], parcial: ['aviso', 'Recibida en parte'],
-        recibida: ['ok', 'Recibida'], cancelada: ['mal', 'Cancelada'], rechazada: ['mal', 'Rechazada'],
-      }[estado] || ['aviso', 'Pendiente de aprobación'];
-      return <span className={`g3-estado g3-estado--${g3e[0]}`}>{g3e[1]}</span>;
-    }
-
-    return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
-        <IconComponent size={12} />
-        {config.label}
-      </span>
-    );
-  };
-
-  const getPrioridadBadge = (prioridad) => {
-    const prioridades = {
-      baja: 'bg-gray-100 text-gray-800',
-      media: 'bg-blue-100 text-blue-800',
-      alta: 'bg-orange-100 text-orange-800',
-      urgente: 'bg-red-100 text-red-800'
-    };
-
-    // VIEJO: se borra a partir del 24-oct-2026 — g3 siempre es true; lo que corre con g3 en false (después de este if o en su else) es lo viejo.
-    if (g3) {
-      // Mismo texto que hoy (la prioridad tal cual; sin prioridad, nada)
-      if (!prioridad) return null;
-      const g3p = { baja: ['neutro', 'Baja'], media: ['info', 'Media'], alta: ['aviso', 'Alta'], urgente: ['mal', 'Urgente'] }[prioridad] || ['info', prioridad];
-      return <span className={`g3-estado g3-estado--${g3p[0]}`}>{g3p[1]}</span>;
-    }
-
-    return (
-      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${prioridades[prioridad] || prioridades.media}`}>
-        {prioridad?.toUpperCase()}
-      </span>
-    );
-  };
-
-  // Rediseño 2 · vista ENCENDIDA. Mismo estado, mismas peticiones y mismos manejadores; los diálogos se montan con las
-  // mismas props de abajo (cada uno pinta su versión nueva encendido). El JSX de hoy sigue intacto debajo.
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    const modalesR2 = (
-      <>
-        {modalNuevaOrden && (
-          <ModalNuevaOrden
-            isOpen={modalNuevaOrden}
-            onClose={() => setModalNuevaOrden(false)}
-            onSuccess={() => {
-              setModalNuevaOrden(false);
-              fetchData();
-            }}
-            esDiseñador={esDiseñador}
-          />
-        )}
-        {modalCrearDesdeSeleccion && (
-          <ModalCrearOrdenDesdeSolicitudes
-            isOpen={modalCrearDesdeSeleccion}
-            solicitudes={solicitudes.filter(s => solicitudesSeleccionadas.includes(s.id))}
-            cantidadesIniciales={cantidadesSolicitudesEditadas}
-            generarPDFOrden={generarPDFOrden}
-            onClose={() => setModalCrearDesdeSeleccion(false)}
-            onSuccess={() => {
-              setModalCrearDesdeSeleccion(false);
-              setSolicitudesSeleccionadas([]);
-              fetchData();
-            }}
-          />
-        )}
-        {modalAnular && ordenAAnular && (
-          <AnularOrdenCompraModal
-            isOpen={modalAnular}
-            onClose={() => {
-              setModalAnular(false);
-              setOrdenAAnular(null);
-            }}
-            orden={ordenAAnular}
-            onAnular={handleAnularOrden}
-          />
-        )}
-        {modalCancelarSolicitud && solicitudACancelar && (
-          <CancelarSolicitudModal
-            isOpen={modalCancelarSolicitud}
-            onClose={() => {
-              setModalCancelarSolicitud(false);
-              setSolicitudACancelar(null);
-            }}
-            solicitud={solicitudACancelar}
-            onCancelar={handleCancelarSolicitud}
-          />
-        )}
-        {modalEditarOrden && ordenAEditar && (
-          <EditarOrdenModal
-            isOpen={modalEditarOrden}
-            onClose={() => {
-              setModalEditarOrden(false);
-              setOrdenAEditar(null);
-            }}
-            orden={ordenAEditar}
-            onSuccess={handleEdicionExitosa}
-          />
-        )}
-        <ModalArticulosEncontrados
-          isOpen={modalArticulosEncontrados}
-          onClose={() => {
-            setModalArticulosEncontrados(false);
-            setArticulosBuscados([]);
-            setMostrandoBajoStock(false);
-          }}
-          articulos={articulosBuscados}
-          articulosConSolicitudIds={articulosConSolicitudIds}
-          onCrearSolicitud={async (articulo) => {
-            const stockFaltante = Math.max(0, parseFloat(articulo.stock_maximo || articulo.stock_minimo * 2) - parseFloat(articulo.stock_actual));
-            const cantidad = Math.ceil(stockFaltante) || 1;
-            const prioridad = parseFloat(articulo.stock_actual) < parseFloat(articulo.stock_minimo) ? 'alta' : 'media';
-            const motivo = `Reposición de stock. Stock actual: ${articulo.stock_actual} ${articulo.unidad}, Stock mínimo: ${articulo.stock_minimo} ${articulo.unidad}`;
-            await ordenesCompraService.crearSolicitudManual(articulo.id, cantidad, prioridad, motivo);
-            setArticulosConSolicitudIds(prev => [...prev, articulo.id]);
-            // Quitar el artículo de la lista para reflejar que ya se agregó,
-            // SIN cerrar la ventana: así se pueden agregar varios seguidos.
-            setArticulosBuscados(prev => prev.filter(a => a.id !== articulo.id));
-            // Refrescar solicitudes en segundo plano (no cierra el modal de bajo stock)
-            fetchData();
-          }}
-          titulo={mostrandoBajoStock ? 'Artículos bajo stock mínimo' : 'Resultados de búsqueda'}
-        />
-      </>
-    );
-    const comunesR2 = { loading, errorCarga: errorCargaR2, recargar: fetchData, estadisticas, esAdmin, esDiseñador, children: modalesR2 };
-    if (vistaActual === 'solicitudes') {
-      return (
-        <VistaSolicitudesR2
-          {...comunesR2}
-          solicitudes={solicitudes}
-          cantidadesSolicitudesEditadas={cantidadesSolicitudesEditadas}
-          cambiarCantidad={handleCantidadSolicitudChange}
-          obtenerProveedorSolicitud={obtenerProveedorSolicitud}
-          armarOrden={handleClickSolicitud}
-          abrirCancelar={handleAbrirModalCancelarSolicitud}
-          categoriasUnicas={categoriasUnicas}
-          abrirBajoStock={handleMostrarBajoStockMinimo}
-          buscandoArticulos={buscandoArticulos}
-          busquedaArticulo={busquedaArticulo}
-          setBusquedaArticulo={setBusquedaArticulo}
-          articulosBuscados={articulosBuscados}
-          elegirArticulo={(articulo) => {
-            handleAbrirModalCrearSolicitudArticulo(articulo);
-            setBusquedaArticulo('');
-            setArticulosBuscados([]);
-          }}
-          crear={{
-            abierto: modalCrearSolicitud,
-            articulo: articuloSeleccionado,
-            cantidad: cantidadSolicitud,
-            setCantidad: setCantidadSolicitud,
-            prioridad: prioridadSolicitud,
-            setPrioridad: setPrioridadSolicitud,
-            motivo: motivoSolicitud,
-            setMotivo: setMotivoSolicitud,
-            enviar: handleCrearSolicitudManual,
-            cargando: loading,
-            cerrar: () => {
-              setModalCrearSolicitud(false);
-              setArticuloSeleccionado(null);
-              setCantidadSolicitud('');
-              setPrioridadSolicitud('media');
-              setMotivoSolicitud('');
-            },
-          }}
-        />
-      );
-    }
-    return (
-      <VistaOrdenesR2
-        {...comunesR2}
-        ordenes={ordenes}
-        filteredOrdenes={filteredOrdenes}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        filterEstado={filterEstado}
-        setFilterEstado={setFilterEstado}
-        vistaOrdenes={vistaOrdenes}
-        setVistaOrdenes={setVistaOrdenes}
-        puedeCrearOrdenes={puedeCrearOrdenes}
-        puedeAnularOrdenes={puedeAnularOrdenes}
-        puedeReabrirOrdenes={puedeReabrirOrdenes}
-        abrirNueva={() => setModalNuevaOrden(true)}
-        verDetalle={handleVerDetalle}
-        generarPDFOrden={generarPDFOrden}
-        aprobar={handleAprobarOrden}
-        abrirRechazo={handleAbrirRechazo}
-        eliminar={handleEliminarOrden}
-        abrirAnular={handleAbrirModalAnular}
-        abrirEditar={handleAbrirModalEditar}
-        loadingAprobacion={loadingAprobacion}
-        ordenSeleccionada={ordenSeleccionada}
-        detalleAbierto={modalDetalle}
-        cerrarDetalle={() => {
-          setModalDetalle(false);
-          setOrdenSeleccionada(null);
-        }}
-        franjaPago={modalDetalle && ordenSeleccionada ? <FranjaPagoPedido ordenId={ordenSeleccionada.id} /> : null}
-        rechazo={{
-          abierto: modalRechazo,
-          orden: ordenParaRechazo,
-          motivo: motivoRechazo,
-          setMotivo: setMotivoRechazo,
-          confirmar: handleConfirmarRechazo,
-          cerrar: () => setModalRechazo(false),
-          cargando: loadingAprobacion,
-        }}
-      />
-    );
-  }
-
-  if (loading) {
-    return <Loader fullScreen />;
-  }
-
-  return (
-    <div className="p-6">
-      {/* Header */}
-      {g3 ? (
-        <CabG3
-          titulo={vista === 'solicitudes' ? 'Solicitudes de compra' : 'Órdenes de compra'}
-          descripcion={esDiseñador
-            ? 'Puedes crear órdenes aunque no haya stock. Se generarán solicitudes automáticas para artículos faltantes.'
-            : vista === 'solicitudes'
-              ? 'Toca una solicitud para armar su orden de compra; si tiene proveedor, se juntan todas las de ese proveedor.'
-              : 'Gestiona las órdenes de compra y solicitudes pendientes.'}
-        />
-      ) : (
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Órdenes de Compra</h1>
-        <p className="text-gray-600">
-          {esDiseñador
-            ? 'Puedes crear órdenes aunque no haya stock. Se generarán solicitudes automáticas para artículos faltantes.'
-            : 'Gestiona las órdenes de compra y solicitudes pendientes.'}
-        </p>
-      </div>
-      )}
-
-      {/* Dashboard de Métricas */}
-      {g3 && estadisticas && (
-        <div className="g3-rejilla g3-rejilla--4 g3p-cab">
-          <div className="g3-kpi">
-            <span className="g3-kpi-valor" style={{ color: estadisticas.resumen.solicitudesPendientes > 10 ? 'var(--g3-mal)' : 'var(--g3-aviso)' }}>{estadisticas.resumen.solicitudesPendientes}</span>
-            <span className="g3-kpi-texto">Solicitudes pendientes{estadisticas.resumen.solicitudesPendientes > 10 ? ' · requiere atención' : ''}</span>
-          </div>
-          <div className="g3-kpi">
-            <span className="g3-kpi-valor">{estadisticas.resumen.ordenesBorrador}</span>
-            <span className="g3-kpi-texto">Órdenes en borrador</span>
-          </div>
-          <div className="g3-kpi">
-            <span className="g3-kpi-valor">{estadisticas.resumen.ordenesEnviadas}</span>
-            <span className="g3-kpi-texto">Esperando entrega</span>
-          </div>
-          <div className="g3-kpi g3p-kpi-dinero">
-            <span className="g3-kpi-valor">{estadisticas.importesOcultos ? SIN_IMPORTE : `$${parseFloat(estadisticas.resumen.totalEstimadoMes).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
-            <span className="g3-kpi-texto">Total del mes · {new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })}</span>
-          </div>
-        </div>
-      )}
-      {!g3 && estadisticas && (
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Solicitudes Pendientes */}
-          <div className={`bg-white rounded-lg shadow p-5 border-l-4 ${estadisticas.resumen.solicitudesPendientes > 10
-            ? 'border-red-500'
-            : 'border-orange-500'
-            }`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Solicitudes Pendientes</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {estadisticas.resumen.solicitudesPendientes}
-                </p>
-                {estadisticas.resumen.solicitudesPendientes > 10 && (
-                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                    <AlertCircle size={12} />
-                    Requiere atención
-                  </p>
-                )}
-              </div>
-              <AlertCircle
-                size={40}
-                className={estadisticas.resumen.solicitudesPendientes > 10 ? 'text-red-500' : 'text-orange-500'}
-              />
-            </div>
-          </div>
-
-          {/* Órdenes en Borrador */}
-          <div className="bg-white rounded-lg shadow p-5 border-l-4 border-gray-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Órdenes en Borrador</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {estadisticas.resumen.ordenesBorrador}
-                </p>
-              </div>
-              <Package size={40} className="text-gray-500" />
-            </div>
-          </div>
-
-          {/* Órdenes Enviadas */}
-          <div className="bg-white rounded-lg shadow p-5 border-l-4 border-blue-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Esperando Entrega</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {estadisticas.resumen.ordenesEnviadas}
-                </p>
-              </div>
-              <Send size={40} className="text-blue-500" />
-            </div>
-          </div>
-
-          {/* Total Estimado del Mes */}
-          <div className="bg-white rounded-lg shadow p-5 border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Total del Mes</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {estadisticas.importesOcultos ? SIN_IMPORTE : `$${parseFloat(estadisticas.resumen.totalEstimadoMes).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })}
-                </p>
-              </div>
-              <ShoppingCart size={40} className="text-green-500" />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Vista de Órdenes */}
-      {vistaActual === 'ordenes' && (
-        <>
-          {/* Barra de búsqueda y filtros */}
-          <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Buscar por ticket, proveedor u observaciones..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              />
-            </div>
-
-            <select
-              value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            >
-              <option value="">Todos los estados</option>
-              <option value="pendiente_aprobacion">Pendiente Aprobación</option>
-              <option value="enviada">Enviada</option>
-              <option value="parcial">Parcial</option>
-              <option value="recibida">Recibida</option>
-              <option value="rechazada">Rechazada</option>
-              <option value="cancelada">Cancelada</option>
-            </select>
-
-            {/* Botones de vista */}
-            <div className="flex items-center gap-2 border border-gray-300 rounded-lg p-1 bg-gray-50">
-              <button
-                onClick={() => setVistaOrdenes('activas')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${vistaOrdenes === 'activas'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-700 hover:bg-gray-200'
-                  }`}
-              >
-                Activas
-              </button>
-              <button
-                onClick={() => setVistaOrdenes('completadas')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${vistaOrdenes === 'completadas'
-                  ? 'bg-green-600 text-white shadow-sm'
-                  : 'text-gray-700 hover:bg-gray-200'
-                  }`}
-              >
-                Completadas
-              </button>
-              <button
-                onClick={() => setVistaOrdenes('canceladas')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${vistaOrdenes === 'canceladas'
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-gray-700 hover:bg-gray-200'
-                  }`}
-              >
-                Canceladas
-              </button>
-            </div>
-
-            {puedeCrearOrdenes && (
-              <Button
-                onClick={() => setModalNuevaOrden(true)}
-                className="bg-red-700 hover:bg-red-800 text-white"
-              >
-                <Plus size={20} />
-                {g3 ? 'Nueva orden' : 'Nueva Orden'}
-              </Button>
-            )}
-          </div>
-
-          {/* Lista de órdenes */}
-          <div className={g3 ? undefined : 'bg-white rounded-lg shadow overflow-hidden'}>
-            <div className={cx('overflow-x-auto', g3 && 'g3-tabla g3-tabla--tarjetas')}>
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ticket
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Proveedor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Creado por
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Estimado
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Estado
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Fecha
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredOrdenes.length === 0 ? (
-                    <tr>
-                      <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
-                        <Package size={48} className="mx-auto mb-2 text-gray-300" />
-                        <p>No hay órdenes de compra</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredOrdenes.map((orden) => (
-                      <tr key={orden.id} className={`cursor-pointer transition-colors ${orden.estado === 'rechazada' ? 'bg-red-50 hover:bg-red-100' :
-                        orden.estado === 'pendiente_aprobacion' ? 'bg-amber-50 hover:bg-amber-100' :
-                          'hover:bg-gray-50'
-                        }`} onClick={() => handleVerDetalle(orden)}>
-                        <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-titulo')}>
-                          <div className="font-medium text-gray-900">{orden.ticket_id}</div>
-                        </td>
-                        <td className="px-6 py-4" {...etq(g3, 'Proveedor')}>
-                          <div className="text-sm text-gray-900">
-                            {orden.proveedor?.nombre || 'Sin proveedor'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4" {...etq(g3, 'Creada por')}>
-                          <div className="text-sm text-gray-900">{orden.creador?.nombre}</div>
-                          <div className="text-xs text-gray-500">{orden.creador?.rol}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Total estimado')}>
-                          <div className="text-sm font-semibold text-gray-900">
-                            {totalOrden(orden)}
-                          </div>
-                        </td>
-                        <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-estado')}>
-                          {getEstadoBadge(orden.estado)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" {...etq(g3, 'Fecha')}>
-                          {new Date(orden.created_at).toLocaleDateString('es-MX', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </td>
-                        <td className={cx('px-6 py-4 whitespace-nowrap text-right text-sm font-medium', g3 && 'g3-celda-acciones')} onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => generarPDFOrden(orden)}
-                            disabled={!['enviada', 'parcial', 'recibida'].includes(orden.estado)}
-                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors text-sm ${
-                              ['enviada', 'parcial', 'recibida'].includes(orden.estado)
-                                ? 'bg-red-700 hover:bg-red-800 text-white'
-                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            }`}
-                            title={['enviada', 'parcial', 'recibida'].includes(orden.estado) ? 'Descargar PDF' : 'Solo disponible para órdenes aprobadas y enviadas'}
-                          >
-                            <Download size={16} />
-                            PDF
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Vista de Solicitudes */}
-      {vistaActual === 'solicitudes' && (
-        <>
-          {/* Barra de búsqueda de artículos para crear solicitudes */}
-          <div className="mb-6 bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">{g3 ? 'Crear una solicitud de compra' : 'Crear Nueva Solicitud de Compra:'}</h3>
-
-            <div className="flex flex-col gap-2">
-              <div className="flex gap-2 g3:max-sm:flex-col">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                  <input
-                    type="text"
-                    placeholder="Buscar artículo por nombre, código o categoría..."
-                    value={busquedaArticulo}
-                    onChange={(e) => setBusquedaArticulo(e.target.value.toUpperCase())}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 text-sm"
-                    style={{ textTransform: 'uppercase' }}
-                  />
-                </div>
-
-                <button
-                  onClick={handleMostrarBajoStockMinimo}
-                  disabled={buscandoArticulos}
-                  className={g3 ? 'g3-btn g3-btn--ch' : 'px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm disabled:opacity-50 flex items-center gap-2 whitespace-nowrap'}
-                  title="Ver artículos que necesitan reposición"
-                >
-                  <AlertCircle size={18} />
-                  {g3 ? 'Bajo stock mínimo' : 'Bajo Stock Mínimo'}
-                </button>
-              </div>
-
-              {/* Dropdown de resultados en tiempo real */}
-              {busquedaArticulo.length >= 2 && (
-                <div className="border border-gray-200 rounded-lg max-h-80 overflow-y-auto bg-white">
-                  {buscandoArticulos ? (
-                    <div className="p-3 text-center text-gray-500">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-700 mx-auto"></div>
-                      <p className="mt-2 text-xs">Buscando...</p>
-                    </div>
-                  ) : articulosBuscados.length > 0 ? (
-                    <div className="divide-y divide-gray-200">
-                      {articulosBuscados.slice(0, 10).map((articulo) => {
-                        const stockPorcentaje = (parseFloat(articulo.stock_actual) / parseFloat(articulo.stock_minimo || 1)) * 100;
-                        const stockBajo = stockPorcentaje < 100;
-                        const stockCritico = stockPorcentaje < 50;
-                        const desactivado = articulo.activo === false;
-
-                        return (
-                          <div
-                            key={articulo.id}
-                            className={`p-2 hover:bg-gray-50 cursor-pointer transition-colors ${desactivado ? 'bg-gray-100 opacity-75' : stockCritico ? 'bg-red-50' : stockBajo ? 'bg-orange-50' : ''
-                              }`}
-                            onClick={() => {
-                              handleAbrirModalCrearSolicitudArticulo(articulo);
-                              setBusquedaArticulo('');
-                              setArticulosBuscados([]);
-                            }}
-                          >
-                            <div className="flex items-center gap-2">
-                              {articulo.imagen_url ? (
-                                <img
-                                  src={articulo.imagen_url}
-                                  alt={articulo.nombre}
-                                  className={`w-10 h-10 object-cover rounded-lg flex-shrink-0 ${desactivado ? 'grayscale' : ''}`}
-                                  onError={(e) => { e.target.style.display = 'none'; }}
-                                />
-                              ) : (
-                                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg flex-shrink-0">
-                                  {g3 ? <Package size={18} className="text-gray-500" aria-hidden="true" /> : '📦'}
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <h4 className={`font-medium text-sm truncate ${desactivado ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
-                                  {articulo.nombre}
-                                  {desactivado && <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-gray-300 text-gray-700 no-underline">{g3 ? 'Desactivado' : 'DESACTIVADO'}</span>}
-                                </h4>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {articulo.codigo_ean13 && `${articulo.codigo_ean13} • `}
-                                  Stock: {articulo.stock_actual} {articulo.unidad}
-                                  {articulo.categoria && ` • ${articulo.categoria.nombre}`}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  className="px-2 py-1 bg-red-700 text-white rounded-lg hover:bg-red-800 text-xs flex items-center gap-1"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAbrirModalCrearSolicitudArticulo(articulo);
-                                    setBusquedaArticulo('');
-                                    setArticulosBuscados([]);
-                                  }}
-                                >
-                                  <Plus size={12} />
-                                  Agregar
-                                </button>
-                                {stockBajo && (g3 ? (
-                                  <span className={`g3-estado ${stockCritico ? 'g3-estado--mal' : 'g3-estado--aviso'}`}>{stockCritico ? 'Crítico' : 'Bajo'}</span>
-                                ) : (
-                                  <span className={`px-1.5 py-0.5 text-xs font-semibold rounded ${stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
-                                    }`}>
-                                    {stockCritico ? '⚠️' : '⚡'}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {articulosBuscados.length > 10 && (
-                        <div className="p-2 text-center text-xs text-gray-500 bg-gray-50">
-                          Mostrando 10 de {articulosBuscados.length} resultados
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-3 text-center">
-                      <p className="text-gray-500 text-xs">
-                        No se encontraron artículos con "{busquedaArticulo}"
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className={g3 ? undefined : 'bg-white rounded-lg shadow overflow-hidden'}>
-            <div className={cx('overflow-x-auto', g3 && 'g3-tabla g3-tabla--tarjetas')}>
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Artículo
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {g3 ? 'Cantidad solicitada' : 'Cant. Solicitada'}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {g3 ? 'Stock actual' : 'Stock Actual'}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Prioridad
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Solicitante
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Motivo
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredSolicitudes.length === 0 ? (
-                    <tr>
-                      <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
-                        {solicitudes.length === 0 ? (
-                          <>
-                            <CheckCircle size={48} className="mx-auto mb-2 text-green-300" />
-                            <p>No hay solicitudes pendientes</p>
-                          </>
-                        ) : (
-                          <>
-                            <Search size={48} className="mx-auto mb-2 text-gray-300" />
-                            <p>No se encontraron solicitudes con los filtros aplicados</p>
-                            <button
-                              onClick={() => {
-                                setSearchSolicitudes('');
-                                setFilterPrioridad('');
-                                setFilterCategoria('');
-                              }}
-                              className="mt-2 text-red-700 hover:text-red-900 text-sm underline"
-                            >
-                              Limpiar filtros
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredSolicitudes.map((solicitud) => (
-                      <tr
-                        key={solicitud.id}
-                        onClick={() => handleClickSolicitud(solicitud)}
-                        className="hover:bg-red-50 cursor-pointer transition-colors g3:hover:!bg-g3-hover"
-                      >
-                        <td className={cx('px-6 py-4', g3 && 'g3-celda-titulo')}>
-                          <div className="text-sm font-medium text-gray-900">
-                            {solicitud.articulo?.nombre}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {solicitud.articulo?.categoria?.nombre}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Cantidad solicitada')}>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={cantidadesSolicitudesEditadas[solicitud.id] ?? parseFloat(solicitud.cantidad_solicitada)}
-                              onChange={(e) => handleCantidadSolicitudChange(solicitud.id, e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-center"
-                            />
-                            <span className="text-sm text-gray-600">{solicitud.articulo?.unidad}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap" {...etq(g3, 'Stock actual')}>
-                          <div className="text-sm font-semibold text-gray-900">
-                            {parseFloat(solicitud.articulo?.stock_actual || 0).toFixed(0)} {solicitud.articulo?.unidad}
-                          </div>
-                        </td>
-                        <td className={cx('px-6 py-4 whitespace-nowrap', g3 && 'g3-celda-estado')}>
-                          {getPrioridadBadge(solicitud.prioridad)}
-                        </td>
-                        <td className="px-6 py-4" {...etq(g3, 'Solicitante')}>
-                          <div className="text-sm text-gray-900">{solicitud.solicitante?.nombre}</div>
-                          <div className="text-xs text-gray-500">{solicitud.solicitante?.rol}</div>
-                        </td>
-                        <td className="px-6 py-4" {...etq(g3, 'Motivo')}>
-                          <div className="text-sm text-gray-600 max-w-md">
-                            {solicitud.motivo}
-                          </div>
-                        </td>
-                        <td className={cx('px-6 py-4 whitespace-nowrap text-right text-sm font-medium', g3 && 'g3-celda-acciones')}>
-                          <button
-                            onClick={(e) => handleAbrirModalCancelarSolicitud(solicitud, e)}
-                            className={g3 ? 'g3-btn g3-btn--ch g3-btn--peligro' : 'text-red-600 hover:text-red-900'}
-                            title="Cancelar solicitud"
-                          >
-                            <XCircle size={18} />
-                            {g3 && 'Cancelar solicitud'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Modal Nueva Orden */}
+  const modalesR2 = (
+    <>
       {modalNuevaOrden && (
         <ModalNuevaOrden
           isOpen={modalNuevaOrden}
@@ -1663,70 +842,6 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
           esDiseñador={esDiseñador}
         />
       )}
-
-      {/* Modal Detalle */}
-      {modalDetalle && ordenSeleccionada && (
-        <ModalDetalleOrden
-          isOpen={modalDetalle}
-          orden={ordenSeleccionada}
-          onClose={() => {
-            setModalDetalle(false);
-            setOrdenSeleccionada(null);
-          }}
-          onActualizarEstado={handleActualizarEstado}
-          puedeAnularOrdenes={puedeAnularOrdenes}
-          puedeReabrirOrdenes={puedeReabrirOrdenes}
-          onAbrirModalAnular={handleAbrirModalAnular}
-          onEnviarOrden={handleEnviarOrden}
-          onEditarOrden={handleAbrirModalEditar}
-          esAdmin={esAdmin}
-          onAprobar={handleAprobarOrden}
-          onRechazar={handleAbrirRechazo}
-          onEliminar={handleEliminarOrden}
-          loadingAprobacion={loadingAprobacion}
-        />
-      )}
-
-      {/* Modal de Rechazo */}
-      {modalRechazo && ordenParaRechazo && (
-        <Modal isOpen={modalRechazo} onClose={() => setModalRechazo(false)} title="Rechazar Orden de Compra" size="md">
-          <div className="space-y-4">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-800">
-                Estás rechazando la orden <strong>{ordenParaRechazo.ticket_id}</strong>
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Motivo del rechazo *
-              </label>
-              <textarea
-                value={motivoRechazo}
-                onChange={(e) => setMotivoRechazo(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 resize-none"
-                rows={4}
-                placeholder="Explica por qué se rechaza esta orden..."
-                autoFocus
-              />
-            </div>
-            <div className="flex gap-3 justify-end">
-              <Button onClick={() => setModalRechazo(false)} variant="secondary">
-                Cancelar
-              </Button>
-              <button
-                onClick={handleConfirmarRechazo}
-                disabled={loadingAprobacion || !motivoRechazo.trim()}
-                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-              >
-                <XCircle size={16} />
-                {loadingAprobacion ? 'Procesando...' : 'Confirmar Rechazo'}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Modal Crear Orden desde Solicitudes Seleccionadas */}
       {modalCrearDesdeSeleccion && (
         <ModalCrearOrdenDesdeSolicitudes
           isOpen={modalCrearDesdeSeleccion}
@@ -1741,8 +856,6 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
           }}
         />
       )}
-
-      {/* Modal Anular Orden de Compra */}
       {modalAnular && ordenAAnular && (
         <AnularOrdenCompraModal
           isOpen={modalAnular}
@@ -1754,8 +867,6 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
           onAnular={handleAnularOrden}
         />
       )}
-
-      {/* Modal Cancelar Solicitud de Compra */}
       {modalCancelarSolicitud && solicitudACancelar && (
         <CancelarSolicitudModal
           isOpen={modalCancelarSolicitud}
@@ -1767,8 +878,6 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
           onCancelar={handleCancelarSolicitud}
         />
       )}
-
-      {/* Modal Editar Orden */}
       {modalEditarOrden && ordenAEditar && (
         <EditarOrdenModal
           isOpen={modalEditarOrden}
@@ -1780,8 +889,6 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
           onSuccess={handleEdicionExitosa}
         />
       )}
-
-      {/* Modal Artículos Encontrados */}
       <ModalArticulosEncontrados
         isOpen={modalArticulosEncontrados}
         onClose={() => {
@@ -1804,37 +911,99 @@ const OrdenesCompraPage = ({ vista = 'ordenes' }) => {
           // Refrescar solicitudes en segundo plano (no cierra el modal de bajo stock)
           fetchData();
         }}
-        titulo={mostrandoBajoStock ? (g3 ? 'Artículos bajo stock mínimo' : '⚠️ Artículos Bajo Stock Mínimo') : (g3 ? 'Resultados de búsqueda' : '🔍 Resultados de Búsqueda')}
+        titulo={mostrandoBajoStock ? 'Artículos bajo stock mínimo' : 'Resultados de búsqueda'}
       />
-
-      {/* Modal Crear Solicitud */}
-      <ModalCrearSolicitud
-        isOpen={modalCrearSolicitud}
-        onClose={() => {
-          setModalCrearSolicitud(false);
-          setArticuloSeleccionado(null);
-          setCantidadSolicitud('');
-          setPrioridadSolicitud('media');
-          setMotivoSolicitud('');
+    </>
+  );
+  const comunesR2 = { loading, errorCarga: errorCargaR2, recargar: fetchData, estadisticas, esAdmin, esDiseñador, children: modalesR2 };
+  if (vistaActual === 'solicitudes') {
+    return (
+      <VistaSolicitudesR2
+        {...comunesR2}
+        solicitudes={solicitudes}
+        cantidadesSolicitudesEditadas={cantidadesSolicitudesEditadas}
+        cambiarCantidad={handleCantidadSolicitudChange}
+        obtenerProveedorSolicitud={obtenerProveedorSolicitud}
+        armarOrden={handleClickSolicitud}
+        abrirCancelar={handleAbrirModalCancelarSolicitud}
+        categoriasUnicas={categoriasUnicas}
+        abrirBajoStock={handleMostrarBajoStockMinimo}
+        buscandoArticulos={buscandoArticulos}
+        busquedaArticulo={busquedaArticulo}
+        setBusquedaArticulo={setBusquedaArticulo}
+        articulosBuscados={articulosBuscados}
+        elegirArticulo={(articulo) => {
+          handleAbrirModalCrearSolicitudArticulo(articulo);
+          setBusquedaArticulo('');
+          setArticulosBuscados([]);
         }}
-        articulo={articuloSeleccionado}
-        cantidad={cantidadSolicitud}
-        setCantidad={setCantidadSolicitud}
-        prioridad={prioridadSolicitud}
-        setPrioridad={setPrioridadSolicitud}
-        motivo={motivoSolicitud}
-        setMotivo={setMotivoSolicitud}
-        onSubmit={handleCrearSolicitudManual}
-        loading={loading}
+        crear={{
+          abierto: modalCrearSolicitud,
+          articulo: articuloSeleccionado,
+          cantidad: cantidadSolicitud,
+          setCantidad: setCantidadSolicitud,
+          prioridad: prioridadSolicitud,
+          setPrioridad: setPrioridadSolicitud,
+          motivo: motivoSolicitud,
+          setMotivo: setMotivoSolicitud,
+          enviar: handleCrearSolicitudManual,
+          cargando: loading,
+          cerrar: () => {
+            setModalCrearSolicitud(false);
+            setArticuloSeleccionado(null);
+            setCantidadSolicitud('');
+            setPrioridadSolicitud('media');
+            setMotivoSolicitud('');
+          },
+        }}
       />
-    </div>
+    );
+  }
+  return (
+    <VistaOrdenesR2
+      {...comunesR2}
+      ordenes={ordenes}
+      filteredOrdenes={filteredOrdenes}
+      searchTerm={searchTerm}
+      setSearchTerm={setSearchTerm}
+      filterEstado={filterEstado}
+      setFilterEstado={setFilterEstado}
+      vistaOrdenes={vistaOrdenes}
+      setVistaOrdenes={setVistaOrdenes}
+      puedeCrearOrdenes={puedeCrearOrdenes}
+      puedeAnularOrdenes={puedeAnularOrdenes}
+      puedeReabrirOrdenes={puedeReabrirOrdenes}
+      abrirNueva={() => setModalNuevaOrden(true)}
+      verDetalle={handleVerDetalle}
+      generarPDFOrden={generarPDFOrden}
+      aprobar={handleAprobarOrden}
+      abrirRechazo={handleAbrirRechazo}
+      eliminar={handleEliminarOrden}
+      abrirAnular={handleAbrirModalAnular}
+      abrirEditar={handleAbrirModalEditar}
+      loadingAprobacion={loadingAprobacion}
+      ordenSeleccionada={ordenSeleccionada}
+      detalleAbierto={modalDetalle}
+      cerrarDetalle={() => {
+        setModalDetalle(false);
+        setOrdenSeleccionada(null);
+      }}
+      franjaPago={modalDetalle && ordenSeleccionada ? <FranjaPagoPedido ordenId={ordenSeleccionada.id} /> : null}
+      rechazo={{
+        abierto: modalRechazo,
+        orden: ordenParaRechazo,
+        motivo: motivoRechazo,
+        setMotivo: setMotivoRechazo,
+        confirmar: handleConfirmarRechazo,
+        cerrar: () => setModalRechazo(false),
+        cargando: loadingAprobacion,
+      }}
+    />
   );
 };
 
 // Modal para crear nueva orden
 const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
-  const g3 = useDiseno3G(); // Diseño 3G: textos sin emojis (apagado, los de siempre)
-  const d3 = useDiseno3GR2(); // Rediseño 2: cajón extra encendido
   const { user } = useAuth();
   const esAdmin = user?.rol === 'administrador';
 
@@ -2140,592 +1309,43 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
     }, 0);
   };
 
-  // Rediseño 2 · encendido: el mismo estado y el mismo envío en un cajón de dos zonas (el JSX de hoy sigue abajo)
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    if (!isOpen) return null;
-    return (
-      <CajonNuevaOrdenR2
-        onClose={onClose}
-        esDiseñador={esDiseñador}
-        esAdmin={esAdmin}
-        proveedores={proveedores}
-        proveedorId={proveedorId}
-        setProveedorId={setProveedorId}
-        articulos={articulos}
-        articulosFiltrados={articulosFiltrados}
-        articulosPorCategoria={articulosPorCategoria}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        mostrarCatalogo={mostrarCatalogo}
-        setMostrarCatalogo={setMostrarCatalogo}
-        articulosSeleccionados={articulosSeleccionados}
-        handleSeleccionarArticulo={handleSeleccionarArticulo}
-        handleRemoverArticulo={handleRemoverArticulo}
-        handleCantidadChange={handleCantidadChange}
-        handleCostoChange={handleCostoChange}
-        articulosOrdenes={articulosOrdenes}
-        articulosSolicitudes={articulosSolicitudes}
-        articulosBajoStock={articulosBajoStock}
-        ordenesSeleccionadas={ordenesSeleccionadas}
-        setOrdenesSeleccionadas={setOrdenesSeleccionadas}
-        loadingPendientes={loadingPendientes}
-        handleAgregarDesdeSugerencias={handleAgregarDesdeSugerencias}
-        fechaLlegadaEstimada={fechaLlegadaEstimada}
-        setFechaLlegadaEstimada={setFechaLlegadaEstimada}
-        observaciones={observaciones}
-        setObservaciones={setObservaciones}
-        loading={loading}
-        handleSubmit={handleSubmit}
-        calcularTotal={calcularTotal}
-        abrirNuevoArticulo={() => setMostrarModalNuevoArticulo(true)}
-        nuevoArticulo={mostrarModalNuevoArticulo && (
-          <ModalNuevoArticulo
-            isOpen={mostrarModalNuevoArticulo}
-            onClose={() => setMostrarModalNuevoArticulo(false)}
-            categorias={categorias}
-            ubicaciones={ubicaciones}
-            proveedores={proveedores}
-            nombreInicial={searchTerm}
-            proveedorInicial={proveedorId}
-            onSuccess={(nuevoArticulo) => {
-              setArticulos([...articulos, nuevoArticulo]);
-              setMostrarModalNuevoArticulo(false);
-              // Agregar automáticamente el nuevo artículo a la orden
-              handleSeleccionarArticulo(nuevoArticulo);
-              toast.success('Artículo creado y agregado a la orden');
-            }}
-          />
-        )}
-      />
-    );
-  }
-
+  if (!isOpen) return null;
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Nueva Orden de Compra">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {esDiseñador && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-            <p className="text-sm text-blue-800">
-              {g3 ? null : '💡 '}<strong>Modo Diseñador:</strong> Puedes crear órdenes aunque no haya stock suficiente.
-              Se generarán solicitudes de compra automáticas para los artículos faltantes.
-            </p>
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Proveedor (Opcional)
-          </label>
-          <select
-            value={proveedorId}
-            onChange={(e) => setProveedorId(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-          >
-            <option value="">Seleccionar proveedor...</option>
-            {proveedores.map(proveedor => (
-              <option key={proveedor.id} value={proveedor.id}>
-                {proveedor.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Sección de consolidación de órdenes (solo para admin) */}
-        {esAdmin && proveedorId && (articulosOrdenes.length > 0 || articulosSolicitudes.length > 0 || articulosBajoStock.length > 0) && (
-          <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <AlertTriangle className="text-yellow-600" size={18} />
-                  Artículos disponibles para incluir
-                </h4>
-                <p className="text-sm text-gray-600 mt-1">
-                  Este proveedor tiene artículos en órdenes pendientes, solicitudes y/o bajo stock mínimo.
-                </p>
-              </div>
-              {loadingPendientes && (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-600"></div>
-              )}
-            </div>
-
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {/* 1. Artículos en órdenes pendientes/rechazadas */}
-              {articulosOrdenes.length > 0 && (
-                <div className="space-y-2">
-                  <h5 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <ShoppingCart size={16} />
-                    En órdenes pendientes/rechazadas ({articulosOrdenes.length})
-                  </h5>
-                  {articulosOrdenes.map((item) => (
-                    <div key={`orden-${item.articulo_id}`} className="bg-white rounded-lg p-3 border border-gray-200">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">{item.articulo?.nombre}</p>
-                          <p className="text-sm text-gray-500 mt-1">
-                            En {item.ordenes_count} orden{item.ordenes_count !== 1 ? 'es' : ''} •
-                            Total: {item.cantidad_total} {item.articulo?.unidad || 'uds'}
-                          </p>
-                          <div className="mt-2 space-y-1">
-                            {item.ordenes.map((orden) => (
-                              <label
-                                key={orden.orden_id}
-                                className="flex items-center gap-2 text-xs text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={ordenesSeleccionadas.has(orden.orden_id)}
-                                  onChange={(e) => {
-                                    const newSet = new Set(ordenesSeleccionadas);
-                                    if (e.target.checked) {
-                                      newSet.add(orden.orden_id);
-                                    } else {
-                                      newSet.delete(orden.orden_id);
-                                    }
-                                    setOrdenesSeleccionadas(newSet);
-                                  }}
-                                  className="rounded border-gray-300"
-                                />
-                                <span className="font-mono">{orden.orden_ticket}</span>
-                                <span className="text-gray-400">•</span>
-                                <span>{orden.cantidad_solicitada} {item.articulo?.unidad}</span>
-                                <span className="text-gray-400">•</span>
-                                <span className={`px-1.5 py-0.5 rounded text-xs ${
-                                  orden.orden_estado === 'pendiente_aprobacion'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {orden.orden_estado === 'pendiente_aprobacion' ? 'Pendiente' : 'Rechazada'}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleAgregarDesdeSugerencias(item, item.cantidad_total, 'orden')}
-                          className="px-3 py-1.5 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center gap-1 whitespace-nowrap"
-                        >
-                          <Plus size={16} />
-                          Agregar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* 2. Artículos con solicitudes pendientes */}
-              {articulosSolicitudes.length > 0 && (
-                <div className="space-y-2">
-                  <h5 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <FileText size={16} />
-                    Con solicitudes pendientes ({articulosSolicitudes.length})
-                  </h5>
-                  {articulosSolicitudes.map((item) => (
-                    <div key={`solicitud-${item.articulo_id}`} className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">{item.articulo?.nombre}</p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {item.solicitudes_count} solicitud{item.solicitudes_count !== 1 ? 'es' : ''} •
-                            Total: {item.cantidad_total} {item.articulo?.unidad || 'uds'}
-                          </p>
-                          <div className="mt-2 space-y-1">
-                            {item.solicitudes.map((solicitud) => (
-                              <div
-                                key={solicitud.solicitud_id}
-                                className="flex items-center gap-2 text-xs text-gray-600 p-1"
-                              >
-                                <span className="font-mono text-blue-700">{solicitud.solicitud_ticket}</span>
-                                <span className="text-gray-400">•</span>
-                                <span>{solicitud.cantidad_solicitada} {item.articulo?.unidad}</span>
-                                <span className="text-gray-400">•</span>
-                                <span className={`px-1.5 py-0.5 rounded text-xs ${
-                                  solicitud.prioridad === 'urgente' ? 'bg-red-100 text-red-800' :
-                                  solicitud.prioridad === 'alta' ? 'bg-orange-100 text-orange-800' :
-                                  solicitud.prioridad === 'media' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {solicitud.prioridad}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleAgregarDesdeSugerencias(item, item.cantidad_total, 'solicitud')}
-                          className="px-3 py-1.5 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center gap-1 whitespace-nowrap"
-                        >
-                          <Plus size={16} />
-                          Agregar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* 3. Artículos bajo stock mínimo */}
-              {articulosBajoStock.length > 0 && (
-                <div className="space-y-2">
-                  <h5 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <AlertCircle size={16} />
-                    Bajo stock mínimo ({articulosBajoStock.length})
-                  </h5>
-                  {articulosBajoStock.map((item) => (
-                    <div key={`stock-${item.articulo_id}`} className="bg-red-50 rounded-lg p-3 border border-red-200">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">{item.articulo?.nombre}</p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            Stock actual: {item.stock_actual} {item.articulo?.unidad} •
-                            Mínimo: {item.stock_minimo} {item.articulo?.unidad} •
-                            Faltante: <span className="text-red-600 font-semibold">{item.faltante}</span>
-                          </p>
-                          <p className="text-xs text-red-700 mt-1">
-                            Cantidad sugerida: {item.cantidad_sugerida} {item.articulo?.unidad}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleAgregarDesdeSugerencias(item, item.cantidad_sugerida, 'bajo_stock')}
-                          className="px-3 py-1.5 bg-red-700 text-white text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center gap-1 whitespace-nowrap"
-                        >
-                          <Plus size={16} />
-                          Agregar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {ordenesSeleccionadas.size > 0 && (
-              <div className="mt-3 p-2 bg-yellow-100 rounded-lg">
-                <p className="text-sm font-medium text-yellow-900">
-                  {g3 ? <Check size={14} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '✓ '}{ordenesSeleccionadas.size} orden{ordenesSeleccionadas.size !== 1 ? 'es' : ''} seleccionada{ordenesSeleccionadas.size !== 1 ? 's' : ''} para consolidar
-                </p>
-                <p className="text-xs text-yellow-700 mt-1">
-                  Los artículos duplicados se eliminarán de estas órdenes al crear la nueva orden.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Buscar y agregar artículos
-          </label>
-
-          {/* Buscador de artículos */}
-          <div className="relative mb-4">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Buscar por nombre, código EAN-13 o categoría..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setMostrarCatalogo(e.target.value.length > 0);
-                  }}
-                  onFocus={() => setMostrarCatalogo(searchTerm.length > 0)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm('');
-                  setMostrarCatalogo(!mostrarCatalogo);
-                }}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-2"
-              >
-                <Package size={18} />
-                {mostrarCatalogo && !searchTerm ? 'Ocultar' : 'Ver todos'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMostrarModalNuevoArticulo(true)}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                title="Crear nuevo artículo"
-              >
-                <PlusCircle size={18} />
-                Nuevo
-              </button>
-            </div>
-
-            {/* Catálogo desplegable */}
-            {mostrarCatalogo && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
-                {/* Contador de resultados */}
-                {articulosFiltrados.length > 0 && (
-                  <div className="sticky top-0 bg-gray-50 px-4 py-2 border-b border-gray-200 text-sm text-gray-600">
-                    {searchTerm
-                      ? `${articulosFiltrados.length} resultado${articulosFiltrados.length !== 1 ? 's' : ''} encontrado${articulosFiltrados.length !== 1 ? 's' : ''}`
-                      : `${articulos.length} artículo${articulos.length !== 1 ? 's' : ''} disponible${articulos.length !== 1 ? 's' : ''}`
-                    }
-                  </div>
-                )}
-
-                {articulosFiltrados.length > 0 ? (
-                  searchTerm ? (
-                    // Vista de búsqueda: lista plana
-                    articulosFiltrados.map((articulo) => {
-                      const yaSeleccionado = articulosSeleccionados.find(item => item.articulo_id === articulo.id);
-
-                      return (
-                        <button
-                          key={articulo.id}
-                          type="button"
-                          onClick={() => handleSeleccionarArticulo(articulo)}
-                          disabled={yaSeleccionado}
-                          className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors ${yaSeleccionado ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''
-                            }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900">{articulo.nombre}</p>
-                              <div className="flex items-center gap-3 mt-1">
-                                <span className="text-xs text-gray-500">
-                                  {articulo.codigo_ean13 || 'Sin código'}
-                                </span>
-                                <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded">
-                                  {articulo.categoria?.nombre || 'Sin categoría'}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="text-right ml-4">
-                              <p className="text-sm font-semibold text-gray-900">
-                                ${parseFloat(articulo.costo_unitario || 0).toFixed(2)}
-                              </p>
-                              <p className={`text-xs ${parseFloat(articulo.stock_actual) > parseFloat(articulo.stock_minimo)
-                                ? 'text-green-600'
-                                : 'text-orange-600'
-                                }`}>
-                                Stock: {articulo.stock_actual} {articulo.unidad}
-                              </p>
-                            </div>
-                          </div>
-                          {yaSeleccionado && (
-                            <p className="text-xs text-gray-500 mt-1">{g3 ? 'Ya agregado' : '✓ Ya agregado'}</p>
-                          )}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    // Vista "Ver todos": agrupado por categorías
-                    Object.entries(articulosPorCategoria).map(([categoria, articulosCategoria]) => (
-                      <div key={categoria}>
-                        <div className="sticky top-10 bg-gray-100 px-4 py-2 border-b border-gray-200">
-                          <h4 className="font-semibold text-gray-700 text-sm flex items-center gap-2">
-                            <Package size={14} />
-                            {categoria} ({articulosCategoria.length})
-                          </h4>
-                        </div>
-                        {articulosCategoria.map((articulo) => {
-                          const yaSeleccionado = articulosSeleccionados.find(item => item.articulo_id === articulo.id);
-
-                          return (
-                            <button
-                              key={articulo.id}
-                              type="button"
-                              onClick={() => handleSeleccionarArticulo(articulo)}
-                              disabled={yaSeleccionado}
-                              className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors ${yaSeleccionado ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''
-                                }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <p className="font-medium text-gray-900">{articulo.nombre}</p>
-                                  <div className="flex items-center gap-3 mt-1">
-                                    <span className="text-xs text-gray-500">
-                                      {articulo.codigo_ean13 || 'Sin código'}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="text-right ml-4">
-                                  <p className="text-sm font-semibold text-gray-900">
-                                    ${parseFloat(articulo.costo_unitario || 0).toFixed(2)}
-                                  </p>
-                                  <p className={`text-xs ${parseFloat(articulo.stock_actual) > parseFloat(articulo.stock_minimo)
-                                    ? 'text-green-600'
-                                    : 'text-orange-600'
-                                    }`}>
-                                    Stock: {articulo.stock_actual} {articulo.unidad}
-                                  </p>
-                                </div>
-                              </div>
-                              {yaSeleccionado && (
-                                <p className="text-xs text-gray-500 mt-1">{g3 ? 'Ya agregado' : '✓ Ya agregado'}</p>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ))
-                  )
-                ) : (
-                  <div className="p-4 text-center text-gray-500">
-                    <p className="text-sm">No se encontraron artículos</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Lista de artículos seleccionados */}
-          {articulosSeleccionados.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">
-                Artículos en la orden ({articulosSeleccionados.length})
-              </h4>
-              {articulosSeleccionados.map((item, index) => {
-                const stockInsuficiente = parseFloat(item.cantidad) > parseFloat(item.articulo.stock_actual);
-                const subtotal = parseFloat(item.cantidad) * parseFloat(item.costo_unitario || 0);
-
-                return (
-                  <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <p className="font-medium text-gray-900">{item.articulo.nombre}</p>
-                            <p className="text-xs text-gray-500">
-                              {item.articulo.codigo_ean13 || 'Sin código'} • Stock: {item.articulo.stock_actual} {item.articulo.unidad}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoverArticulo(index)}
-                            className="text-red-600 hover:text-red-800 p-1"
-                            title="Eliminar"
-                          >
-                            <XCircle size={18} />
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">Cantidad</label>
-                            <input
-                              type="number"
-                              value={item.cantidad}
-                              onChange={(e) => handleCantidadChange(index, e.target.value)}
-                              className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-red-700 ${stockInsuficiente ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
-                                }`}
-                              min="0.01"
-                              step="0.01"
-                              required
-                            />
-                            {stockInsuficiente && (
-                              <p className="text-xs text-blue-600 mt-1">
-                                {g3 ? 'Cantidad mayor al stock actual' : 'ℹ️ Cantidad mayor al stock actual'}
-                              </p>
-                            )}
-                          </div>
-
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">Costo Unitario</label>
-                            <input
-                              type="number"
-                              value={item.costo_unitario}
-                              onChange={(e) => handleCostoChange(index, e.target.value)}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-700"
-                              min="0"
-                              step="0.01"
-                              required
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">Subtotal</label>
-                            <div className="w-full px-2 py-1 text-sm bg-gray-100 border border-gray-300 rounded font-semibold">
-                              ${subtotal.toFixed(2)}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Total */}
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-gray-900">Total Estimado:</span>
-                  <span className="text-xl font-bold text-red-700">
-                    ${calcularTotal().toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {articulosSeleccionados.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <Package size={48} className="mx-auto mb-2 text-gray-300" />
-              <p className="text-sm">Busca y selecciona artículos para agregar a la orden</p>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Fecha de Llegada Estimada
-          </label>
-          <input
-            type="date"
-            value={fechaLlegadaEstimada}
-            onChange={(e) => setFechaLlegadaEstimada(e.target.value)}
-            min={new Date().toISOString().split('T')[0]}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            placeholder="Seleccionar fecha..."
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Se enviarán notificaciones cuando la fecha se cumpla sin haber recibido la orden
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Observaciones
-          </label>
-          <textarea
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            rows="3"
-            placeholder="Notas adicionales sobre esta orden..."
-          />
-        </div>
-
-        <div className="flex gap-3 justify-end mt-6">
-          <Button
-            type="button"
-            onClick={onClose}
-            variant="secondary"
-            disabled={loading}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            disabled={loading || articulosSeleccionados.length === 0}
-          >
-            {loading ? 'Creando...' : 'Crear Orden'}
-          </Button>
-        </div>
-      </form>
-
-      {/* Modal para crear nuevo artículo */}
-      {mostrarModalNuevoArticulo && (
+    <CajonNuevaOrdenR2
+      onClose={onClose}
+      esDiseñador={esDiseñador}
+      esAdmin={esAdmin}
+      proveedores={proveedores}
+      proveedorId={proveedorId}
+      setProveedorId={setProveedorId}
+      articulos={articulos}
+      articulosFiltrados={articulosFiltrados}
+      articulosPorCategoria={articulosPorCategoria}
+      searchTerm={searchTerm}
+      setSearchTerm={setSearchTerm}
+      mostrarCatalogo={mostrarCatalogo}
+      setMostrarCatalogo={setMostrarCatalogo}
+      articulosSeleccionados={articulosSeleccionados}
+      handleSeleccionarArticulo={handleSeleccionarArticulo}
+      handleRemoverArticulo={handleRemoverArticulo}
+      handleCantidadChange={handleCantidadChange}
+      handleCostoChange={handleCostoChange}
+      articulosOrdenes={articulosOrdenes}
+      articulosSolicitudes={articulosSolicitudes}
+      articulosBajoStock={articulosBajoStock}
+      ordenesSeleccionadas={ordenesSeleccionadas}
+      setOrdenesSeleccionadas={setOrdenesSeleccionadas}
+      loadingPendientes={loadingPendientes}
+      handleAgregarDesdeSugerencias={handleAgregarDesdeSugerencias}
+      fechaLlegadaEstimada={fechaLlegadaEstimada}
+      setFechaLlegadaEstimada={setFechaLlegadaEstimada}
+      observaciones={observaciones}
+      setObservaciones={setObservaciones}
+      loading={loading}
+      handleSubmit={handleSubmit}
+      calcularTotal={calcularTotal}
+      abrirNuevoArticulo={() => setMostrarModalNuevoArticulo(true)}
+      nuevoArticulo={mostrarModalNuevoArticulo && (
         <ModalNuevoArticulo
           isOpen={mostrarModalNuevoArticulo}
           onClose={() => setMostrarModalNuevoArticulo(false)}
@@ -2743,7 +1363,7 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
           }}
         />
       )}
-    </Modal>
+    />
   );
 };
 
@@ -2751,13 +1371,8 @@ const ModalNuevaOrden = ({ isOpen, onClose, onSuccess, esDiseñador }) => {
 // C4 · PLA-16: franja «Pago y pedido (Julia)» del detalle (solo con Diseño 3G). La historia la manda Finanzas por la
 // puerta /api/sistemas/v1/ordenes/:folio/seguimiento (FIN-10) y, con LLEGADA_CON_DATOS, la recepción de Planta. Sin
 // historia no se muestra nada.
-const HORA_MX = new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
-const DIA_CORTO = new Intl.DateTimeFormat('es-MX', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' });
-const diaDe = (aaaammdd) => DIA_CORTO.format(new Date(`${aaaammdd}T12:00:00Z`)).replace(/\./g, '');
-const horaDe = (iso) => HORA_MX.format(new Date(iso)).replace(/\./g, '');
 const FranjaPagoPedido = ({ ordenId }) => {
   const [datos, setDatos] = useState(null);
-  const d3 = useDiseno3GR2(); // Rediseño 2: sección del cajón encendido (la misma petición)
   useEffect(() => {
     let vigente = true;
     ordenesCompraService.obtenerSeguimiento(ordenId)
@@ -2766,362 +1381,7 @@ const FranjaPagoPedido = ({ ordenId }) => {
     return () => { vigente = false; };
   }, [ordenId]);
   if (!datos?.seguimiento?.length) return null;
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) return <PagoPedidoR2 datos={datos} />;
-  const actual = datos.actual;
-  return (
-    <section className="g3-tarjeta" aria-label="Pago y pedido (Julia)" style={{ borderLeft: `4px solid var(--g3-${actual?.tono || 'linea-fuerte'})` }}>
-      <div className="g3-tarjeta-cab">
-        <h3>Pago y pedido (Julia)</h3>
-        {actual ? <span className={`g3-estado g3-estado--${actual.tono}`}>{actual.texto}</span> : null}
-      </div>
-      {actual?.fechaEstimada ? (
-        <p className="g3-chico" style={{ margin: '6px 0 0' }}>Llegada estimada según Julia: <b>{diaDe(actual.fechaEstimada)}</b></p>
-      ) : null}
-      <ol className="g3-linea-tiempo" style={{ marginTop: 12 }}>
-        {datos.seguimiento.map((s) => (
-          <li key={s.id} className="g3-evento">
-            <div>
-              <span>{s.texto}</span>
-              <small>
-                {horaDe(s.fecha)}
-                {s.fechaEstimada ? ` · llega aprox. ${diaDe(s.fechaEstimada)}` : ''}
-                {s.folioFactura ? ` · factura ${s.folioFactura}` : ''}
-              </small>
-              {s.nota ? <small>{s.nota}</small> : null}
-              {s.fotos?.length ? (
-                <small>
-                  {s.fotos.map((u, i) => (
-                    <a key={u} href={u} target="_blank" rel="noopener noreferrer" style={{ marginRight: 12, textDecoration: 'underline' }}>
-                      {s.fotos.length > 1 ? `Ver foto ${i + 1} de la factura` : 'Ver la foto de la factura'}
-                    </a>
-                  ))}
-                </small>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-};
-
-const ModalDetalleOrden = ({ isOpen, orden, onClose, onActualizarEstado, puedeAnularOrdenes, puedeReabrirOrdenes, onAbrirModalAnular, onEnviarOrden, onEditarOrden, esAdmin, onAprobar, onRechazar, onEliminar, loadingAprobacion }) => {
-  const [tabActual, setTabActual] = React.useState('detalle'); // 'detalle' o 'historial'
-  const esPendienteAprobacion = orden && orden.estado === 'pendiente_aprobacion';
-  const esRechazada = orden && orden.estado === 'rechazada';
-  const g3 = useDiseno3G(); // Diseño 3G: estado sin emojis (apagado, el de siempre)
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Orden ${orden.ticket_id}`} size="xl">
-      {/* Tabs */}
-      <div className="border-b border-gray-200 mb-4">
-        <div className="flex gap-4">
-          <button
-            onClick={() => setTabActual('detalle')}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${tabActual === 'detalle'
-              ? 'border-red-700 text-red-700'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            Detalle de la Orden
-          </button>
-          <button
-            onClick={() => setTabActual('historial')}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${tabActual === 'historial'
-              ? 'border-red-700 text-red-700'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            Historial de Trazabilidad
-          </button>
-        </div>
-      </div>
-
-      {/* Contenido de tabs */}
-      {tabActual === 'detalle' ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-500">Estado</p>
-              <p className="font-medium">
-                {orden.estado === 'pendiente_aprobacion' && (g3 ? 'Pendiente de aprobación' : '⏳ Pendiente de Aprobación')}
-                {orden.estado === 'enviada' && (g3 ? 'Enviada' : '✅ Enviada')}
-                {orden.estado === 'parcial' && 'Parcial'}
-                {orden.estado === 'recibida' && (orden.cierre_incompleto?.faltantes?.length > 0 ? 'Recibida (cerrada incompleta)' : 'Recibida')}
-                {orden.estado === 'cancelada' && 'Cancelada'}
-                {orden.estado === 'rechazada' && (g3 ? 'Rechazada' : '❌ Rechazada')}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Total Estimado</p>
-              <p className="font-medium">{totalOrden(orden)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Proveedor</p>
-              <p className="font-medium">{orden.proveedor?.nombre || 'Sin proveedor'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Creado por</p>
-              <p className="font-medium">{orden.creador?.nombre}</p>
-            </div>
-          </div>
-
-          {g3 && <FranjaPagoPedido ordenId={orden.id} />}
-
-          {orden.observaciones && (
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Observaciones</p>
-              <p className="text-sm text-gray-700">{orden.observaciones}</p>
-            </div>
-          )}
-
-          {/* Reporte de cierre incompleto (para reclamarle al proveedor) */}
-          {orden.cierre_incompleto?.faltantes?.length > 0 && (
-            <div className="bg-orange-50 border border-orange-300 rounded-lg p-4">
-              <h4 className="font-semibold text-orange-900 mb-2 text-sm flex items-center gap-2">
-                <AlertTriangle size={16} />
-                Cerrada incompleta · {orden.cierre_incompleto.cerrado_por} · {new Date(orden.cierre_incompleto.fecha).toLocaleString('es-MX')}
-              </h4>
-              <ul className="space-y-1 text-sm text-orange-900">
-                {orden.cierre_incompleto.faltantes.map((f, i) => (
-                  <li key={i}>
-                    <span className="font-medium">{f.nombre}</span>: llegaron {f.recibido} de {f.solicitado} {f.unidad}
-                    {' '}(faltaron {f.faltante}) — <span className="italic">{f.motivo_texto}</span>
-                  </li>
-                ))}
-              </ul>
-              {orden.cierre_incompleto.comentario && (
-                <p className="text-sm text-orange-800 mt-2">Comentario: {orden.cierre_incompleto.comentario}</p>
-              )}
-            </div>
-          )}
-
-          {/* Motivo de rechazo */}
-          {esRechazada && orden.motivo_rechazo && (
-            <div className="bg-red-50 border border-red-300 rounded-lg p-4">
-              <h4 className="font-semibold text-red-900 mb-1 text-sm flex items-center gap-2">
-                <XCircle size={16} />
-                Motivo de Rechazo
-              </h4>
-              <p className="text-sm text-red-800">{orden.motivo_rechazo}</p>
-            </div>
-          )}
-
-          {/* Alerta pendiente de aprobación */}
-          {esPendienteAprobacion && (
-            <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
-              <h4 className="font-semibold text-amber-900 text-sm flex items-center gap-2">
-                <AlertCircle size={16} />
-                Esta orden está pendiente de aprobación por un administrador
-              </h4>
-            </div>
-          )}
-
-          <div className="mt-4">
-            <h3 className="font-semibold mb-3">Artículos</h3>
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Artículo</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Cantidad</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Costo Unit.</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {orden.detalles?.map((detalle) => (
-                    <tr key={detalle.id}>
-                      <td className="px-4 py-2 text-sm">{detalle.articulo?.nombre}</td>
-                      <td className="px-4 py-2 text-sm">
-                        {parseFloat(detalle.cantidad_solicitada).toFixed(2)} {detalle.articulo?.unidad}
-                      </td>
-                      <td className="px-4 py-2 text-sm">
-                        {orden.importesOcultos ? SIN_IMPORTE : `$${parseFloat(detalle.costo_unitario || 0).toFixed(2)}`}
-                      </td>
-                      <td className="px-4 py-2 text-sm font-medium">
-                        {orden.importesOcultos ? SIN_IMPORTE : `$${parseFloat(detalle.subtotal || 0).toFixed(2)}`}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {orden.solicitudes_origen && orden.solicitudes_origen.length > 0 && (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-              <h4 className="font-semibold text-orange-900 mb-2 text-sm">
-                {g3 ? 'Solicitudes generadas automáticamente' : '⚠️ Solicitudes generadas automáticamente'}
-              </h4>
-              <ul className="text-sm text-orange-800 space-y-1">
-                {orden.solicitudes_origen.map((sol) => (
-                  <li key={sol.id}>
-                    • {sol.ticket_id}: {sol.articulo?.nombre} - {parseFloat(sol.cantidad_solicitada).toFixed(0)} {sol.articulo?.unidad}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="flex gap-3 justify-between mt-6">
-            <div className="flex gap-3">
-              {esAdmin && esPendienteAprobacion && onEditarOrden && (
-                <Button
-                  onClick={() => onEditarOrden(orden)}
-                  variant="secondary"
-                  className="bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
-                >
-                  <Edit size={16} />
-                  Editar
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-3">
-              {/* Botones de aprobación (solo admin, solo pendiente) */}
-              {esAdmin && esPendienteAprobacion && (
-                <>
-                  <button
-                    onClick={() => onAprobar(orden)}
-                    disabled={loadingAprobacion}
-                    className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <CheckCircle size={16} />
-                    {loadingAprobacion ? 'Procesando...' : 'Aprobar'}
-                  </button>
-                  <button
-                    onClick={() => onRechazar(orden)}
-                    disabled={loadingAprobacion}
-                    className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <XCircle size={16} />
-                    Rechazar
-                  </button>
-                </>
-              )}
-              {esAdmin && puedeAnularOrdenes && orden.estado !== 'cancelada' && orden.estado !== 'rechazada' && orden.estado !== 'pendiente_aprobacion' && (
-                <Button
-                  onClick={() => onAbrirModalAnular(orden)}
-                  variant="danger"
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
-                  <RotateCcw size={16} />
-                  Anular Orden
-                </Button>
-              )}
-              {/* Botones para órdenes rechazadas */}
-              {esRechazada && (
-                <>
-                  {puedeReabrirOrdenes && onEditarOrden && (
-                    <button
-                      onClick={() => onEditarOrden(orden)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <Edit size={16} />
-                      Editar Orden
-                    </button>
-                  )}
-                  {puedeAnularOrdenes && onEliminar && (
-                    <button
-                      onClick={() => onEliminar(orden)}
-                      disabled={loadingAprobacion}
-                      className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <Trash2 size={16} />
-                      {loadingAprobacion ? 'Eliminando...' : 'Eliminar'}
-                    </button>
-                  )}
-                </>
-              )}
-              <Button onClick={onClose} variant="secondary">
-                Cerrar
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div>
-          <TimelineHistorial ordenId={orden.id} />
-
-          <div className="flex gap-3 justify-between mt-6">
-            <div className="flex gap-3">
-              {esAdmin && esPendienteAprobacion && onEditarOrden && (
-                <Button
-                  onClick={() => onEditarOrden(orden)}
-                  variant="secondary"
-                  className="bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
-                >
-                  <Edit size={16} />
-                  Editar
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-3">
-              {/* Botones de aprobación (solo admin, solo pendiente) */}
-              {esAdmin && esPendienteAprobacion && (
-                <>
-                  <button
-                    onClick={() => onAprobar(orden)}
-                    disabled={loadingAprobacion}
-                    className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <CheckCircle size={16} />
-                    {loadingAprobacion ? 'Procesando...' : 'Aprobar'}
-                  </button>
-                  <button
-                    onClick={() => onRechazar(orden)}
-                    disabled={loadingAprobacion}
-                    className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <XCircle size={16} />
-                    Rechazar
-                  </button>
-                </>
-              )}
-              {esAdmin && puedeAnularOrdenes && orden.estado !== 'cancelada' && orden.estado !== 'rechazada' && orden.estado !== 'pendiente_aprobacion' && (
-                <Button
-                  onClick={() => onAbrirModalAnular(orden)}
-                  variant="danger"
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
-                  <RotateCcw size={16} />
-                  Anular Orden
-                </Button>
-              )}
-              {/* Botones para órdenes rechazadas */}
-              {esRechazada && (
-                <>
-                  {puedeReabrirOrdenes && onEditarOrden && (
-                    <button
-                      onClick={() => onEditarOrden(orden)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <Edit size={16} />
-                      Editar Orden
-                    </button>
-                  )}
-                  {puedeAnularOrdenes && onEliminar && (
-                    <button
-                      onClick={() => onEliminar(orden)}
-                      disabled={loadingAprobacion}
-                      className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <Trash2 size={16} />
-                      {loadingAprobacion ? 'Eliminando...' : 'Eliminar'}
-                    </button>
-                  )}
-                </>
-              )}
-              <Button onClick={onClose} variant="secondary">
-                Cerrar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </Modal>
-  );
+  return <PagoPedidoR2 datos={datos} />;
 };
 
 // Modal para crear orden desde solicitudes seleccionadas
@@ -3145,8 +1405,6 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
   const [busqueda, setBusqueda] = useState('');
   // Artículos que se darán de alta como herramienta al crear la orden
   const [marcadosHerramienta, setMarcadosHerramienta] = useState(new Set());
-  const g3 = useDiseno3G(); // Diseño 3G: textos sin emojis (apagado, los de siempre)
-  const d3 = useDiseno3GR2(); // Rediseño 2: cajón ancho encendido
 
   // Helper: Obtener el proveedor correcto (de artículo o herramienta)
   const obtenerProveedorSolicitud = (solicitud) => {
@@ -3199,7 +1457,7 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
     setArticulosExtra(prev => {
       const siguen = prev.filter(e => esDelProveedor(e.articulo, proveedorId));
       if (siguen.length !== prev.length) {
-        toast(`Se quitaron ${prev.length - siguen.length} producto(s) agregado(s) que no son de este proveedor`, g3Activo() ? undefined : { icon: '⚠️' });
+        toast(`Se quitaron ${prev.length - siguen.length} producto(s) agregado(s) que no son de este proveedor`, undefined);
       }
       return siguen;
     });
@@ -3434,338 +1692,48 @@ export const ModalCrearOrdenDesdeSolicitudes = ({ isOpen, solicitudes, cantidade
       .slice(0, 30);
   }, [busqueda, catalogo, proveedorId, articulosAgrupados, articulosExtra]);
 
-  // Casilla "Herramienta": ya marcada (y fija) si el artículo ya es herramienta
-  const celdaHerramienta = (articulo) => {
-    const yaEs = !!articulo?.es_herramienta;
-    return (
-      <td className="px-4 py-2 text-sm text-center">
-        <input
-          type="checkbox"
-          checked={yaEs || marcadosHerramienta.has(articulo?.id)}
-          disabled={yaEs}
-          onChange={() => toggleHerramienta(articulo?.id)}
-          className="h-4 w-4 accent-red-700 cursor-pointer disabled:cursor-not-allowed"
-          title={yaEs ? 'Ya está dado de alta como herramienta' : 'Marcar este artículo como herramienta en el inventario'}
-        />
-      </td>
-    );
-  };
-
-  // Rediseño 2 · encendido: mismo estado y mismo envío en un cajón ancho (el JSX de hoy sigue abajo)
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    if (!isOpen) return null;
-    const preferidosR2 = solicitudes
-      .map(s => obtenerProveedorSolicitud(s)?.id)
-      .filter(id => id !== null && id !== undefined);
-    const mismoR2 = preferidosR2.length > 0 && preferidosR2.every(id => id === preferidosR2[0]);
-    const preferidoR2 = proveedorId && mismoR2 && preferidosR2[0].toString() === proveedorId
-      ? proveedores.find(p => p.id.toString() === proveedorId)?.nombre
-      : null;
-    return (
-      <CajonArmarOrdenR2
-        onClose={onClose}
-        solicitudes={solicitudes}
-        proveedores={proveedores}
-        proveedorId={proveedorId}
-        setProveedorId={setProveedorId}
-        preferido={preferidoR2}
-        fechaLlegadaEstimada={fechaLlegadaEstimada}
-        setFechaLlegadaEstimada={setFechaLlegadaEstimada}
-        observaciones={observaciones}
-        setObservaciones={setObservaciones}
-        loading={loading}
-        articulosAgrupados={articulosAgrupados}
-        cantidadesEditadas={cantidadesEditadas}
-        handleCantidadChange={handleCantidadChange}
-        handleEliminarArticulo={handleEliminarArticulo}
-        articulosExtra={articulosExtra}
-        handleCantidadExtraChange={handleCantidadExtraChange}
-        handleQuitarExtra={handleQuitarExtra}
-        marcadosHerramienta={marcadosHerramienta}
-        toggleHerramienta={toggleHerramienta}
-        busqueda={busqueda}
-        setBusqueda={setBusqueda}
-        resultadosBusqueda={resultadosBusqueda}
-        handleAgregarArticulo={handleAgregarArticulo}
-        calcularTotal={calcularTotal}
-        handleSubmit={handleSubmit}
-      />
-    );
-  }
-
+  if (!isOpen) return null;
+  const preferidosR2 = solicitudes
+    .map(s => obtenerProveedorSolicitud(s)?.id)
+    .filter(id => id !== null && id !== undefined);
+  const mismoR2 = preferidosR2.length > 0 && preferidosR2.every(id => id === preferidosR2[0]);
+  const preferidoR2 = proveedorId && mismoR2 && preferidosR2[0].toString() === proveedorId
+    ? proveedores.find(p => p.id.toString() === proveedorId)?.nombre
+    : null;
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Crear Orden desde Solicitudes" size="xl">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Información de solicitudes */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-900 mb-2">
-            {g3 ? 'Resumen de las solicitudes seleccionadas' : '📋 Resumen de Solicitudes Seleccionadas'}
-          </h3>
-          <p className="text-sm text-blue-800">
-            {solicitudes.length} solicitud{solicitudes.length !== 1 ? 'es' : ''} • {articulosAgrupados.length} artículo{articulosAgrupados.length !== 1 ? 's' : ''} único{articulosAgrupados.length !== 1 ? 's' : ''}
-            {articulosExtra.length > 0 && ` • ${articulosExtra.length} agregado${articulosExtra.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-
-        {/* Selección de proveedor */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Proveedor (Opcional)
-          </label>
-          <select
-            value={proveedorId}
-            onChange={(e) => setProveedorId(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-          >
-            <option value="">Seleccionar proveedor...</option>
-            {proveedores.map(proveedor => (
-              <option key={proveedor.id} value={proveedor.id}>
-                {proveedor.nombre}
-              </option>
-            ))}
-          </select>
-
-          {/* Mensaje informativo si hay proveedor seleccionado automáticamente */}
-          {proveedorId && (() => {
-            const proveedoresPreferidos = solicitudes
-              .map(s => obtenerProveedorSolicitud(s)?.id)
-              .filter(id => id !== null && id !== undefined);
-
-            const todosTienenMismoProveedor = proveedoresPreferidos.length > 0 &&
-              proveedoresPreferidos.every(id => id === proveedoresPreferidos[0]);
-
-            if (todosTienenMismoProveedor && proveedoresPreferidos[0].toString() === proveedorId) {
-              const nombreProveedor = proveedores.find(p => p.id.toString() === proveedorId)?.nombre;
-              return (
-                <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
-                  <CheckCircle size={12} />
-                  Proveedor preferido de {solicitudes.length === 1 ? 'este artículo' : 'estos artículos'}: {nombreProveedor}
-                </p>
-              );
-            }
-            return null;
-          })()}
-        </div>
-
-        {/* Fecha de llegada estimada */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Fecha de Llegada Estimada (Opcional)
-          </label>
-          <input
-            type="date"
-            value={fechaLlegadaEstimada}
-            onChange={(e) => setFechaLlegadaEstimada(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-          />
-        </div>
-
-        {/* Buscador para agregar productos del mismo proveedor */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Agregar productos
-          </label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input
-              type="text"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              disabled={!proveedorId}
-              placeholder={proveedorId ? 'Buscar por nombre, código o categoría...' : 'Primero selecciona el proveedor'}
-              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 disabled:bg-gray-100"
-            />
-          </div>
-          {proveedorId && busqueda.trim().length >= 2 && (
-            <div className="mt-1 max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-              {resultadosBusqueda.length === 0 ? (
-                <p className="p-3 text-sm text-gray-500">No hay productos de este proveedor con esa búsqueda</p>
-              ) : resultadosBusqueda.map(art => (
-                <button
-                  key={art.id}
-                  type="button"
-                  onClick={() => handleAgregarArticulo(art)}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-red-50"
-                >
-                  <span>
-                    <span className="font-medium text-gray-900">{art.nombre}</span>
-                    <span className="ml-2 text-xs text-gray-500">Stock: {parseFloat(art.stock_actual || 0)} {art.unidad}</span>
-                  </span>
-                  <Plus size={16} className="text-red-700 shrink-0" />
-                </button>
-              ))}
-            </div>
-          )}
-          <p className="mt-1 text-xs text-gray-500">Solo aparecen productos que surte el proveedor seleccionado.</p>
-        </div>
-
-        {/* Lista de artículos */}
-        <div>
-          <h4 className="text-sm font-medium text-gray-700 mb-2">
-            Artículos en la orden:
-          </h4>
-          {articulosAgrupados.length === 0 ? (
-            <div className="border border-gray-200 rounded-lg p-8 text-center">
-              <Package className="mx-auto text-gray-400 mb-2" size={48} />
-              <p className="text-gray-600 font-medium">No hay artículos en esta orden</p>
-              <p className="text-sm text-gray-500 mt-1">
-                Todos los artículos han sido eliminados
-              </p>
-            </div>
-          ) : (
-            <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Artículo</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Cantidad</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Costo Unit.</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Subtotal</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">Herramienta</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {articulosAgrupados.map((item, index) => {
-                    const costo = parseFloat(item.articulo?.costo_unitario || 0);
-                    const cantidadActual = item.articulo?.id in cantidadesEditadas ? cantidadesEditadas[item.articulo?.id] : item.cantidad_total;
-                    const subtotal = cantidadActual * costo;
-
-                    return (
-                      <tr key={index}>
-                        <td className="px-4 py-2 text-sm">
-                          <div className="font-medium text-gray-900">{item.articulo?.nombre}</div>
-                          <div className="text-xs text-gray-500">
-                            {item.solicitudes.length > 1 && `${item.solicitudes.length} solicitudes`}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={cantidadActual}
-                              onChange={(e) => handleCantidadChange(item.articulo?.id, e.target.value)}
-                              className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-center"
-                            />
-                            <span className="text-gray-600">{item.articulo?.unidad}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-sm">
-                          ${costo.toFixed(2)}
-                        </td>
-                        <td className="px-4 py-2 text-sm font-medium">
-                          ${subtotal.toFixed(2)}
-                        </td>
-                        {celdaHerramienta(item.articulo)}
-                        <td className="px-4 py-2 text-sm">
-                          <button
-                            type="button"
-                            onClick={() => handleEliminarArticulo(item.articulo?.id)}
-                            className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 rounded transition-colors"
-                            title="Eliminar artículo de la orden"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {articulosExtra.map(({ articulo, cantidad }) => {
-                    const costo = parseFloat(articulo?.costo_unitario || 0);
-                    return (
-                      <tr key={`extra-${articulo.id}`} className="bg-green-50/40">
-                        <td className="px-4 py-2 text-sm">
-                          <div className="font-medium text-gray-900">{articulo.nombre}</div>
-                          <div className="text-xs text-green-700">Agregado</div>
-                        </td>
-                        <td className="px-4 py-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={cantidad}
-                              onChange={(e) => handleCantidadExtraChange(articulo.id, e.target.value)}
-                              className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-center"
-                            />
-                            <span className="text-gray-600">{articulo.unidad}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-sm">${costo.toFixed(2)}</td>
-                        <td className="px-4 py-2 text-sm font-medium">${((parseFloat(cantidad) || 0) * costo).toFixed(2)}</td>
-                        {celdaHerramienta(articulo)}
-                        <td className="px-4 py-2 text-sm">
-                          <button
-                            type="button"
-                            onClick={() => handleQuitarExtra(articulo.id)}
-                            className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 rounded transition-colors"
-                            title="Quitar producto de la orden"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Total */}
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <div className="flex justify-between items-center">
-            <span className="font-semibold text-gray-900">Total Estimado:</span>
-            <span className="text-xl font-bold text-red-700">
-              ${calcularTotal().toFixed(2)}
-            </span>
-          </div>
-        </div>
-
-        {/* Observaciones */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Observaciones
-          </label>
-          <textarea
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            rows="3"
-            placeholder="Notas adicionales sobre esta orden..."
-          />
-        </div>
-
-        {/* Botones */}
-        <div className="flex gap-3 justify-end mt-6">
-          <Button
-            type="button"
-            onClick={onClose}
-            variant="secondary"
-            disabled={loading}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            disabled={loading || articulosAgrupados.length === 0}
-          >
-            {loading ? 'Creando Orden...' : 'Crear Orden de Compra'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <CajonArmarOrdenR2
+      onClose={onClose}
+      solicitudes={solicitudes}
+      proveedores={proveedores}
+      proveedorId={proveedorId}
+      setProveedorId={setProveedorId}
+      preferido={preferidoR2}
+      fechaLlegadaEstimada={fechaLlegadaEstimada}
+      setFechaLlegadaEstimada={setFechaLlegadaEstimada}
+      observaciones={observaciones}
+      setObservaciones={setObservaciones}
+      loading={loading}
+      articulosAgrupados={articulosAgrupados}
+      cantidadesEditadas={cantidadesEditadas}
+      handleCantidadChange={handleCantidadChange}
+      handleEliminarArticulo={handleEliminarArticulo}
+      articulosExtra={articulosExtra}
+      handleCantidadExtraChange={handleCantidadExtraChange}
+      handleQuitarExtra={handleQuitarExtra}
+      marcadosHerramienta={marcadosHerramienta}
+      toggleHerramienta={toggleHerramienta}
+      busqueda={busqueda}
+      setBusqueda={setBusqueda}
+      resultadosBusqueda={resultadosBusqueda}
+      handleAgregarArticulo={handleAgregarArticulo}
+      calcularTotal={calcularTotal}
+      handleSubmit={handleSubmit}
+    />
   );
 };
 
 // Modal para crear nuevo artículo desde la orden de compra
 const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedores, onSuccess, nombreInicial = '', proveedorInicial = '' }) => {
-  const g3 = useDiseno3G(); // Diseño 3G: textos sin emojis (apagado, los de siempre)
-  const d3 = useDiseno3GR2(); // Rediseño 2: cajón encendido
   const [formData, setFormData] = useState({
     nombre: nombreInicial || '',
     descripcion: '',
@@ -3892,273 +1860,29 @@ const ModalNuevoArticulo = ({ isOpen, onClose, categorias, ubicaciones, proveedo
     }
   };
 
-  // Rediseño 2 · encendido: mismos campos y mismo envío en un cajón (el JSX de hoy sigue abajo)
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    if (!isOpen) return null;
-    return (
-      <CajonNuevoArticuloR2
-        onClose={onClose}
-        formData={formData}
-        handleChange={handleChange}
-        categorias={categorias}
-        ubicaciones={ubicaciones}
-        proveedoresList={proveedoresList}
-        modoNuevoProveedor={modoNuevoProveedor}
-        nuevoProveedorNombre={nuevoProveedorNombre}
-        setNuevoProveedorNombre={setNuevoProveedorNombre}
-        handleCrearProveedorRapido={handleCrearProveedorRapido}
-        handleCancelarNuevoProveedor={handleCancelarNuevoProveedor}
-        loading={loading}
-        handleSubmit={handleSubmit}
-      />
-    );
-  }
-
+  if (!isOpen) return null;
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Crear Nuevo Artículo">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-          <p className="text-sm text-blue-800">
-            {g3 ? null : '💡 '}<strong>{g3 ? 'Nuevo artículo:' : 'Nuevo Artículo:'}</strong> El artículo se creará con stock en 0 y se agregará automáticamente a la orden de compra.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Nombre - Obligatorio */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nombre del Artículo <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="text"
-              name="nombre"
-              value={formData.nombre}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              placeholder="Ej: Tornillo hexagonal 1/4"
-            />
-          </div>
-
-          {/* Descripción */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Descripción
-            </label>
-            <textarea
-              name="descripcion"
-              value={formData.descripcion}
-              onChange={handleChange}
-              rows="2"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              placeholder="Descripción del artículo..."
-            />
-          </div>
-
-          {/* Categoría - Obligatorio */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Categoría <span className="text-red-600">*</span>
-            </label>
-            <select
-              name="categoria_id"
-              value={formData.categoria_id}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            >
-              <option value="">Seleccionar categoría...</option>
-              {categorias.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Ubicación - Obligatorio */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ubicación <span className="text-red-600">*</span>
-            </label>
-            <select
-              name="ubicacion_id"
-              value={formData.ubicacion_id}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            >
-              <option value="">Seleccionar ubicación...</option>
-              {ubicaciones.map(ub => (
-                <option key={ub.id} value={ub.id}>
-                  {ub.codigo} - {ub.almacen}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Proveedor */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Proveedor
-            </label>
-            {!modoNuevoProveedor ? (
-              <select
-                name="proveedor_id"
-                value={formData.proveedor_id}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              >
-                <option value="">Sin proveedor</option>
-                <option value="nuevo" className="font-semibold text-green-600">
-                  {g3 ? 'Crear nuevo proveedor…' : '➕ Crear nuevo proveedor...'}
-                </option>
-                {proveedoresList.map(prov => (
-                  <option key={prov.id} value={prov.id}>{prov.nombre}</option>
-                ))}
-              </select>
-            ) : (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={nuevoProveedorNombre}
-                  onChange={(e) => setNuevoProveedorNombre(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleCrearProveedorRapido();
-                    }
-                  }}
-                  placeholder="Nombre del proveedor..."
-                  className="flex-1 px-3 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={handleCrearProveedorRapido}
-                  className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                  title="Crear proveedor"
-                  {...(g3 ? { 'aria-label': 'Crear proveedor' } : {})}
-                >
-                  {g3 ? <Check size={18} aria-hidden="true" /> : '✓'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelarNuevoProveedor}
-                  className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors"
-                  title="Cancelar"
-                  {...(g3 ? { 'aria-label': 'Cancelar el proveedor nuevo' } : {})}
-                >
-                  {g3 ? <X size={18} aria-hidden="true" /> : '✕'}
-                </button>
-              </div>
-            )}
-            {modoNuevoProveedor && (
-              <p className="text-xs text-gray-500 mt-1">
-                {g3 ? 'Presiona Enter o el botón de la palomita para crear.' : '💡 Presiona Enter o click en ✓ para crear'}
-              </p>
-            )}
-          </div>
-
-          {/* Unidad */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Unidad de Medida
-            </label>
-            <select
-              name="unidad"
-              value={formData.unidad}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            >
-              <option value="piezas">Piezas</option>
-              <option value="metros">Metros</option>
-              <option value="litros">Litros</option>
-              <option value="kilogramos">Kilogramos</option>
-              <option value="cajas">Cajas</option>
-              <option value="rollos">Rollos</option>
-              <option value="bolsas">Bolsas</option>
-              <option value="unidades">Unidades</option>
-            </select>
-          </div>
-
-          {/* Stock Mínimo */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Stock Mínimo
-            </label>
-            <input
-              type="number"
-              name="stock_minimo"
-              value={formData.stock_minimo}
-              onChange={handleChange}
-              min="0"
-              step="1"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-            />
-          </div>
-
-          {/* Stock Máximo */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Stock Máximo
-            </label>
-            <input
-              type="number"
-              name="stock_maximo"
-              value={formData.stock_maximo}
-              onChange={handleChange}
-              min="1"
-              step="1"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              placeholder="Opcional"
-            />
-          </div>
-
-          {/* Costo Unitario */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Costo Unitario
-            </label>
-            <input
-              type="number"
-              name="costo_unitario"
-              value={formData.costo_unitario}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700"
-              placeholder="0.00"
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-gray-200">
-          <Button
-            type="button"
-            onClick={onClose}
-            variant="secondary"
-            disabled={loading}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            disabled={loading}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            {loading ? 'Creando...' : 'Crear y Agregar'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <CajonNuevoArticuloR2
+      onClose={onClose}
+      formData={formData}
+      handleChange={handleChange}
+      categorias={categorias}
+      ubicaciones={ubicaciones}
+      proveedoresList={proveedoresList}
+      modoNuevoProveedor={modoNuevoProveedor}
+      nuevoProveedorNombre={nuevoProveedorNombre}
+      setNuevoProveedorNombre={setNuevoProveedorNombre}
+      handleCrearProveedorRapido={handleCrearProveedorRapido}
+      handleCancelarNuevoProveedor={handleCancelarNuevoProveedor}
+      loading={loading}
+      handleSubmit={handleSubmit}
+    />
   );
 };
 
 // Modal para cancelar solicitud de compra
 const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
   const [motivo, setMotivo] = useState('');
-  const g3 = useDiseno3G(); // Diseño 3G: aviso sin emoji
-  const d3 = useDiseno3GR2(); // Rediseño 2: diálogo de confirmación encendido
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -4180,84 +1904,10 @@ const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
     }
   };
 
-  // Rediseño 2 · encendido: el mismo motivo y el mismo envío en un diálogo corto (el JSX de hoy sigue abajo)
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    if (!isOpen) return null;
-    return (
-      <DialogoCancelarSolicitudR2 onClose={onClose} solicitud={solicitud} motivo={motivo} setMotivo={setMotivo}
-        loading={loading} handleSubmit={handleSubmit} />
-    );
-  }
-
+  if (!isOpen) return null;
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Cancelar Solicitud de Compra" size="md">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Información de la solicitud */}
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={24} />
-            <div>
-              <h4 className="text-sm font-semibold text-red-900 mb-2">
-                ¿Está seguro de cancelar esta solicitud?
-              </h4>
-              <div className="text-sm text-red-800 space-y-1">
-                <p><strong>Ticket:</strong> {solicitud.ticket_id}</p>
-                <p><strong>Artículo:</strong> {solicitud.articulo?.nombre}</p>
-                <p><strong>Cantidad:</strong> {solicitud.cantidad_solicitada} {solicitud.articulo?.unidad}</p>
-                <p><strong>Solicitante:</strong> {solicitud.solicitante?.nombre}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Campo de motivo */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Motivo de cancelación *
-          </label>
-          <textarea
-            value={motivo}
-            onChange={(e) => setMotivo(e.target.value)}
-            placeholder="Explique por qué se está cancelando esta solicitud (mínimo 10 caracteres)..."
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 resize-none"
-            required
-            minLength={10}
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            {motivo.length}/10 caracteres mínimo
-          </p>
-        </div>
-
-        {/* Advertencia */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <p className="text-xs text-yellow-800">
-            {g3 ? 'Esta acción cambiará el estado de la solicitud a «cancelada».' : '⚠️ Esta acción cambiará el estado de la solicitud a "cancelada".'}{' '}
-            La solicitud ya no aparecerá en la lista de pendientes.
-          </p>
-        </div>
-
-        {/* Botones */}
-        <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
-          <Button
-            type="button"
-            onClick={onClose}
-            variant="secondary"
-            disabled={loading}
-          >
-            No, mantener
-          </Button>
-          <Button
-            type="submit"
-            disabled={loading || motivo.trim().length < 10}
-            className="bg-red-600 hover:bg-red-700"
-          >
-            {loading ? 'Cancelando...' : 'Sí, cancelar solicitud'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <DialogoCancelarSolicitudR2 onClose={onClose} solicitud={solicitud} motivo={motivo} setMotivo={setMotivo}
+      loading={loading} handleSubmit={handleSubmit} />
   );
 };
 
@@ -4265,71 +1915,24 @@ const CancelarSolicitudModal = ({ isOpen, onClose, solicitud, onCancelar }) => {
 const ArticuloSolicitudBtn = ({ articulo, onCrearSolicitud, tieneSolicitud, corto }) => {
   const [loading, setLoading] = useState(false);
   const [creada, setCreada] = useState(false);
-  const d3 = useDiseno3GR2(); // Rediseño 2: botón tonal encendido
-
-  // Rediseño 2 · encendido: el mismo clic de abajo (crear la solicitud y avisar), con el botón de la vista nueva
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    const crearR2 = async () => {
-      setLoading(true);
-      try {
-        await onCrearSolicitud(articulo);
-        setCreada(true);
-        toast.success(g3Activo() ? `Solicitud creada: ${articulo.nombre}` : `✅ Solicitud creada: ${articulo.nombre}`);
-      } catch (error) {
-        toast.error(error.response?.data?.message || error.message || 'Error al crear solicitud');
-      } finally {
-        setLoading(false);
-      }
-    };
-    return <BotonSolicitudR2 loading={loading} creada={creada} tieneSolicitud={tieneSolicitud} alCrear={crearR2} nombre={articulo.nombre} corto={corto} />;
-  }
-
-  if (tieneSolicitud || creada) {
-    return (
-      <span className="px-4 py-2 bg-green-100 text-green-700 rounded-lg font-medium flex items-center gap-2 whitespace-nowrap text-sm">
-        <CheckCircle size={18} />
-        {creada ? 'Creada' : 'Solicitud existente'}
-      </span>
-    );
-  }
-  return (
-    <button
-      onClick={async () => {
-        setLoading(true);
-        try {
-          await onCrearSolicitud(articulo);
-          setCreada(true);
-          toast.success(g3Activo() ? `Solicitud creada: ${articulo.nombre}` : `✅ Solicitud creada: ${articulo.nombre}`);
-        } catch (error) {
-          toast.error(error.response?.data?.message || error.message || 'Error al crear solicitud');
-        } finally {
-          setLoading(false);
-        }
-      }}
-      disabled={loading}
-      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      {loading ? (
-        <>
-          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-          Creando...
-        </>
-      ) : (
-        <>
-          <Plus size={18} />
-          Crear Solicitud
-        </>
-      )}
-    </button>
-  );
+  const crearR2 = async () => {
+    setLoading(true);
+    try {
+      await onCrearSolicitud(articulo);
+      setCreada(true);
+      toast.success(`Solicitud creada: ${articulo.nombre}`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message || 'Error al crear solicitud');
+    } finally {
+      setLoading(false);
+    }
+  };
+  return <BotonSolicitudR2 loading={loading} creada={creada} tieneSolicitud={tieneSolicitud} alCrear={crearR2} nombre={articulo.nombre} corto={corto} />;
 };
 
 // Modal de Artículos Encontrados
 // Sub-componente para mostrar último movimiento de un artículo
 const UltimoMovimientoInfo = ({ articuloId, soloFecha }) => {
-  const g3 = useDiseno3G(); // Diseño 3G: sin emoji
-  const d3 = useDiseno3GR2(); // Rediseño 2: fecha legible encendido (la misma petición)
   const [mov, setMov] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -4347,31 +1950,10 @@ const UltimoMovimientoInfo = ({ articuloId, soloFecha }) => {
     fetchMov();
   }, [articuloId]);
 
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) return <UltimoMovimientoR2 loading={loading} mov={mov} soloFecha={soloFecha} />;
-  if (loading) return <span className="text-xs text-gray-400">Cargando...</span>;
-  if (!mov) return <span className="text-xs text-gray-400 italic">Sin movimientos</span>;
-
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
-      <span className="flex items-center gap-1">
-        <Clock size={12} className="text-gray-400" />
-        {new Date(mov.fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-      </span>
-      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${mov.tipo === 'ajuste_entrada' || mov.tipo === 'entrada_orden_compra' || mov.tipo === 'devolucion'
-        ? 'bg-green-100 text-green-700'
-        : mov.tipo === 'retiro' || mov.tipo === 'ajuste_salida'
-          ? 'bg-orange-100 text-orange-700'
-          : 'bg-blue-100 text-blue-700'
-        }`}>{mov.tipo_legible}</span>
-      {mov.usuario && <span>{g3 ? <User size={12} className="g3:inline g3:align-[-2px] g3:mr-1" aria-hidden="true" /> : '👤 '}{mov.usuario.nombre}</span>}
-    </div>
-  );
+  return <UltimoMovimientoR2 loading={loading} mov={mov} soloFecha={soloFecha} />;
 };
 
 const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitud, titulo, articulosConSolicitudIds = [] }) => {
-  const g3 = useDiseno3G(); // Diseño 3G: estado del stock con texto, sin emoji
-  const d3 = useDiseno3GR2(); // Rediseño 2: cajón con tabla encendido
   // Filtros por Almacén y Sección (default Principal / Stock).
   const [filtroAlmacen, setFiltroAlmacen] = useState('Principal');
   const [filtroSeccion, setFiltroSeccion] = useState('Stock');
@@ -4582,348 +2164,24 @@ const ModalArticulosEncontrados = ({ isOpen, onClose, articulos, onCrearSolicitu
     }
   };
 
-  // Rediseño 2 · encendido: los mismos filtros, el mismo PDF y los mismos renglones (con su «última actualización») en tabla
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    return (
-      <CajonBajoStockR2
-        onClose={onClose}
-        titulo={titulo}
-        articulos={articulos}
-        articulosFiltrados={articulosFiltrados}
-        filtroAlmacen={filtroAlmacen}
-        setFiltroAlmacen={setFiltroAlmacen}
-        filtroSeccion={filtroSeccion}
-        setFiltroSeccion={setFiltroSeccion}
-        almacenesUnicos={almacenesUnicos}
-        seccionesUnicas={seccionesUnicas}
-        generarPDFBajoStock={generarPDFBajoStock}
-        BotonSolicitud={ArticuloSolicitudBtn}
-        UltimoMovimiento={UltimoMovimientoInfo}
-        onCrearSolicitud={onCrearSolicitud}
-        articulosConSolicitudIds={articulosConSolicitudIds}
-      />
-    );
-  }
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">{titulo}</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                {articulosFiltrados.length} de {articulos.length} artículo{articulos.length !== 1 ? 's' : ''}
-                {(filtroAlmacen !== 'todos' || filtroSeccion !== 'todos') && (
-                  <span className="ml-1 text-gray-500">
-                    · {filtroAlmacen === 'todos' ? 'Todos los almacenes' : filtroAlmacen}
-                    {' / '}
-                    {filtroSeccion === 'todos' ? 'Todas las secciones' : filtroSeccion}
-                  </span>
-                )}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {articulosFiltrados.length > 0 && (
-                <button
-                  onClick={generarPDFBajoStock}
-                  className="flex items-center gap-2 px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors text-sm font-medium"
-                  title="Descargar PDF con artículos bajo stock"
-                >
-                  <Download size={16} />
-                  PDF
-                </button>
-              )}
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X size={24} />
-              </button>
-            </div>
-          </div>
-
-          {/* Filtros Almacén / Sección */}
-          <div className="mt-3 flex flex-wrap gap-3 items-end">
-            <div className="flex flex-col">
-              <label className="text-xs font-medium text-gray-700 mb-1">Almacén</label>
-              <select
-                value={filtroAlmacen}
-                onChange={(e) => setFiltroAlmacen(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              >
-                <option value="todos">Todos los almacenes</option>
-                {almacenesUnicos.map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-xs font-medium text-gray-700 mb-1">Sección</label>
-              <select
-                value={filtroSeccion}
-                onChange={(e) => setFiltroSeccion(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              >
-                <option value="todos">Todas las secciones</option>
-                {seccionesUnicas.map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-            </div>
-            {(filtroAlmacen !== 'Principal' || filtroSeccion !== 'Stock') && (
-              <button
-                onClick={() => { setFiltroAlmacen('Principal'); setFiltroSeccion('Stock'); }}
-                className="px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white border border-gray-300 rounded-lg transition-colors"
-                title="Volver a Principal / Stock"
-              >
-                {g3 ? 'Restablecer filtros' : '↺ Default'}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6">
-          {articulosFiltrados.length === 0 ? (
-            <div className="text-center py-12">
-              <Package size={64} className="mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">
-                {articulos.length === 0
-                  ? 'No se encontraron artículos'
-                  : `No hay artículos en ${filtroAlmacen === 'todos' ? 'la selección' : filtroAlmacen} ${filtroSeccion === 'todos' ? '' : '/ ' + filtroSeccion}`}
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {articulosFiltrados.map((articulo) => {
-                const stockPorcentaje = (parseFloat(articulo.stock_actual) / parseFloat(articulo.stock_minimo || 1)) * 100;
-                const stockBajo = stockPorcentaje < 100;
-                const stockCritico = stockPorcentaje < 50;
-
-                return (
-                  <div
-                    key={articulo.id}
-                    className={`border-2 rounded-lg p-4 hover:shadow-md transition-all ${stockCritico
-                      ? 'border-red-300 bg-red-50'
-                      : stockBajo
-                        ? 'border-orange-300 bg-orange-50'
-                        : 'border-gray-200 bg-white'
-                      }`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-start gap-3">
-                          {articulo.imagen_url && (
-                            <img
-                              src={articulo.imagen_url}
-                              alt={articulo.nombre}
-                              className="w-16 h-16 object-cover rounded-lg border border-gray-200"
-                              onError={(e) => { e.target.style.display = 'none'; }}
-                            />
-                          )}
-                          <div className="flex-1">
-                            <h4 className="font-bold text-gray-900 text-lg">{articulo.nombre}</h4>
-                            {articulo.descripcion && (
-                              <p className="text-sm text-gray-600 mt-1">{articulo.descripcion}</p>
-                            )}
-                            <div className="flex flex-wrap gap-3 mt-2 text-sm">
-                              {articulo.codigo_ean13 && (
-                                <span className="text-gray-600">
-                                  <strong>EAN-13:</strong> {articulo.codigo_ean13}
-                                </span>
-                              )}
-                              {articulo.categoria && (
-                                <span className="px-2 py-1 bg-gray-100 rounded text-gray-700">
-                                  {articulo.categoria.nombre}
-                                </span>
-                              )}
-                              {articulo.proveedor && (
-                                <span className="px-2 py-1 bg-purple-100 rounded text-purple-700">
-                                  {articulo.proveedor.nombre}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-3 gap-3">
-                          <div className={`text-center p-2 rounded ${stockCritico ? 'bg-red-100' : stockBajo ? 'bg-orange-100' : 'bg-green-100'}`}>
-                            <p className="text-xs text-gray-600">Stock Actual</p>
-                            <p className={`font-bold ${stockCritico ? 'text-red-700' : stockBajo ? 'text-orange-700' : 'text-green-700'}`}>
-                              {articulo.stock_actual} {articulo.unidad}
-                            </p>
-                          </div>
-                          <div className="text-center p-2 rounded bg-gray-100">
-                            <p className="text-xs text-gray-600">Stock Mínimo</p>
-                            <p className="font-bold text-gray-900">
-                              {articulo.stock_minimo} {articulo.unidad}
-                            </p>
-                          </div>
-                          <div className="text-center p-2 rounded bg-gray-100">
-                            <p className="text-xs text-gray-600">Stock Máximo</p>
-                            <p className="font-bold text-gray-900">
-                              {articulo.stock_maximo || 'N/A'} {articulo.stock_maximo ? articulo.unidad : ''}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Última actualización */}
-                        <div className="mt-2 pt-2 border-t border-gray-200">
-                          <span className="text-xs font-medium text-gray-500">Última actualización: </span>
-                          <UltimoMovimientoInfo articuloId={articulo.id} />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <ArticuloSolicitudBtn
-                          articulo={articulo}
-                          onCrearSolicitud={onCrearSolicitud}
-                          tieneSolicitud={articulosConSolicitudIds.includes(articulo.id)}
-                        />
-                        {stockBajo && (
-                          <span className={`px-2 py-1 text-xs font-semibold rounded ${stockCritico ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
-                            }`}>
-                            {stockCritico ? (g3 ? 'Stock crítico' : '⚠️ Stock Crítico') : (g3 ? 'Stock bajo' : '⚡ Stock Bajo')}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Modal de Crear Solicitud
-const ModalCrearSolicitud = ({
-  isOpen,
-  onClose,
-  articulo,
-  cantidad,
-  setCantidad,
-  prioridad,
-  setPrioridad,
-  motivo,
-  setMotivo,
-  onSubmit,
-  loading
-}) => {
-  if (!isOpen || !articulo) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">Crear Solicitud de Compra</h3>
-              <p className="text-sm text-gray-600 mt-1">{articulo.nombre}</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X size={24} />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {/* Info del artículo */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div>
-                <p className="text-gray-600">Stock Actual</p>
-                <p className="font-bold text-gray-900">{articulo.stock_actual} {articulo.unidad}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Stock Mínimo</p>
-                <p className="font-bold text-gray-900">{articulo.stock_minimo} {articulo.unidad}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Stock Máximo</p>
-                <p className="font-bold text-gray-900">{articulo.stock_maximo || 'N/A'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Cantidad */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Cantidad a Solicitar *
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={cantidad}
-                onChange={(e) => setCantidad(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                required
-              />
-              <span className="text-gray-600 font-medium">{articulo.unidad}</span>
-            </div>
-          </div>
-
-          {/* Prioridad */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Prioridad *
-            </label>
-            <select
-              value={prioridad}
-              onChange={(e) => setPrioridad(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-            >
-              <option value="baja">Baja</option>
-              <option value="media">Media</option>
-              <option value="alta">Alta</option>
-              <option value="urgente">Urgente</option>
-            </select>
-          </div>
-
-          {/* Motivo */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Motivo (opcional)
-            </label>
-            <textarea
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Explique por qué se necesita este artículo..."
-              rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
-            />
-          </div>
-
-          {/* Botones */}
-          <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={onSubmit}
-              disabled={loading || !cantidad || parseFloat(cantidad) <= 0}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Creando...' : 'Crear Solicitud'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <CajonBajoStockR2
+      onClose={onClose}
+      titulo={titulo}
+      articulos={articulos}
+      articulosFiltrados={articulosFiltrados}
+      filtroAlmacen={filtroAlmacen}
+      setFiltroAlmacen={setFiltroAlmacen}
+      filtroSeccion={filtroSeccion}
+      setFiltroSeccion={setFiltroSeccion}
+      almacenesUnicos={almacenesUnicos}
+      seccionesUnicas={seccionesUnicas}
+      generarPDFBajoStock={generarPDFBajoStock}
+      BotonSolicitud={ArticuloSolicitudBtn}
+      UltimoMovimiento={UltimoMovimientoInfo}
+      onCrearSolicitud={onCrearSolicitud}
+      articulosConSolicitudIds={articulosConSolicitudIds}
+    />
   );
 };
 

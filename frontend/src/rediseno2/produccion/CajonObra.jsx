@@ -1,5 +1,3 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): las ramas con g3Activo() en false
-// (window.prompt / window.confirm de Pausar y Regresar) ya nunca corren. Ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 // Rediseño 2 · Producción · cajón de una obra (se abre al tocar el renglón del tablero).
 // Arriba la decisión (completar la etapa que sigue, pausar o reanudar, ver la carpeta; «Regresar» en «Más acciones»);
 // abajo el paso a paso con los MISMOS interruptores de hoy (un toque, mismo onToggleEtapa), las fechas y los datos.
@@ -9,7 +7,7 @@ import { useState } from 'react';
 import { CheckCircle2, CalendarClock, ChevronLeft, FolderOpen, Pause, Play } from 'lucide-react';
 import {
   Cajon, CajonCabecera, CajonDecision, CajonCuerpo, SeccionCajon, Datos, Estado, Boton, MenuAcciones, Interruptor, Fecha,
-  confirmarG3, pedirTextoG3, g3Activo, plural, fechaCita, tipoTrabajo, estadoDe,
+  confirmarG3, pedirTextoG3, plural, fechaCita, tipoTrabajo, estadoDe,
 } from '../fundacion';
 import {
   atrasoDe, etapaDe, pasosDe, citaDe, fechaMaximaDe, etapasMarcables, textoDias, usaTimelineSimplificado, calcularPorcentaje,
@@ -95,13 +93,11 @@ export function CajonObra({
     if (pausando || !onTogglePausa) return;
     let motivo = '';
     if (!isPaused) {
-      motivo = g3Activo()
-        ? await pedirTextoG3({
+      motivo = await pedirTextoG3({
           titulo: `Pausar «${p.nombre}»`,
           etiqueta: '¿Cuál es el motivo de la pausa? (opcional)',
           confirmar: 'Pausar proyecto', cancelar: 'No pausar',
-        })
-        : window.prompt('¿Cuál es el motivo de la pausa? (opcional)');
+        });
       if (motivo === null) return;
     }
     setPausando(true);
@@ -113,13 +109,11 @@ export function CajonObra({
   };
   const regresar = async () => {
     if (regresando || !onRegresar) return;
-    const confirmado = g3Activo()
-      ? await confirmarG3({
+    const confirmado = await confirmarG3({
         titulo: `¿Regresar «${p.nombre}» a la etapa anterior?`,
         datos: [['Etapa actual', estadoDe('etapa', p.etapa_actual).texto]],
         confirmar: 'Regresar etapa', cancelar: 'No regresar',
-      })
-      : window.confirm(`¿Regresar "${p.nombre}" a la etapa anterior?`);
+      });
     if (!confirmado) return;
     setRegresando(true);
     try {

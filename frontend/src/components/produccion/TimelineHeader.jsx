@@ -1,13 +1,8 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con g3 en false son la vista apagada, que ya nunca se ve. Las ramas con tv
-// (useTvG3) en true son el diseño de TV de la ola 3, que tampoco se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { memo } from 'react';
 import { User, Clock, Calendar, AlertTriangle, CheckCircle2, CalendarClock } from 'lucide-react';
 import { s, px, calcularDiasPorEtapa, esUrgenteMTO } from '../../utils/produccion';
 import { ETAPAS_CONFIG, getColorPorTipo, calcularPorcentaje, usaTimelineSimplificado } from './constants';
-import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
-import { useTvG3, tipoTv } from '../../diseno-3g/tvG3';
+import { tipoTv } from '../../diseno-3g/tvG3';
 
 // Diseño 3G (interruptor o TV): tipo de trabajo con su nombre completo y el color del tipo (tokens del paquete).
 const COLOR_TIPO_G3 = {
@@ -21,10 +16,7 @@ const COLOR_TIPO_G3 = {
  * Muestra: badges, nombre, cliente y círculo de progreso
  */
 const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
-    const g3 = useDiseno3G();
-    const tv = useTvG3();
-    const nuevo = g3 || !!tv; // textos sin siglas ni emojis (apagado, lo de siempre)
-    const conObraId = g3 && !tv && !!proyecto.obra_id; // C1 · PLA-19: el ID 3G solo con Diseño 3G, fuera de las TV
+    const conObraId = !!proyecto.obra_id; // C1 · PLA-19: el ID 3G solo con Diseño 3G, fuera de las TV
     const diasRestantes = proyecto.diasRestantes;
     const esGarantia = proyecto.tipo_proyecto?.toUpperCase() === 'GTIA';
     const esMTO = proyecto.tipo_proyecto?.toUpperCase() === 'MTO';
@@ -78,32 +70,23 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
             <div className="flex-1" style={{ minWidth: 0 }}>
                 {/* Badges (con el ID 3G pueden pasar a dos renglones en el celular) */}
                 <div className="flex items-center mb-1" style={{ gap: px(4), ...(conObraId ? { flexWrap: 'wrap' } : {}) }}>
-                    {colorTipo.label && (nuevo ? (() => {
-                        const t = tipoTv(proyecto.tipo_proyecto);
-                        return (
-                            <span
-                                className="inline-flex items-center font-bold rounded-full"
-                                style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, ...(COLOR_TIPO_G3[t.clase] || { background: 'var(--g3-neutro-suave)', color: 'var(--g3-tinta)' }) }}
-                            >
-                                {t.texto}
-                            </span>
-                        );
-                    })() : (
-                        <span
-                            className={`inline-flex items-center font-bold rounded-full ${colorTipo.labelBg}`}
-                            style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}` }}
-                        >
-                            {colorTipo.label}
-                        </span>
-                    ))}
+                    {colorTipo.label && ((() => {
+                const t = tipoTv(proyecto.tipo_proyecto);
+                return (
+                    <span
+                        className="inline-flex items-center font-bold rounded-full"
+                        style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, ...(COLOR_TIPO_G3[t.clase] || { background: 'var(--g3-neutro-suave)', color: 'var(--g3-tinta)' }) }}
+                    >
+                        {t.texto}
+                    </span>
+                );
+            })())}
                     {enRetraso && (
                         <span
                             className="inline-flex items-center font-bold rounded-full bg-red-600 text-white animate-pulse"
                             style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, gap: px(4) }}
                         >
-                            {nuevo
-                                ? <><AlertTriangle style={{ width: s(0.85), height: s(0.85) }} aria-hidden="true" />{diasRetrasoDisplay} día{diasRetrasoDisplay !== 1 ? 's' : ''} de atraso</>
-                                : <>⚠️ {diasRetrasoDisplay}d atraso</>}
+                            <><AlertTriangle style={{ width: s(0.85), height: s(0.85) }} aria-hidden="true" />{diasRetrasoDisplay} día{diasRetrasoDisplay !== 1 ? 's' : ''} de atraso</>
                         </span>
                     )}
                     {esUrgente && !enRetraso && (
@@ -111,7 +94,7 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
                             className="inline-flex items-center font-bold rounded-full bg-red-500 text-white animate-pulse"
                             style={{ fontSize: s(0.75), padding: `${px(2)} ${px(8)}`, gap: px(4) }}
                         >
-                            {nuevo ? 'Urgente' : '!'}
+                            {'Urgente'}
                         </span>
                     )}
                     {/* Badge etapa actual */}
@@ -126,7 +109,7 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
                         }}
                     >
                         {timelineSimplificado && proyecto.etapa_actual !== 'completado'
-                            ? (nuevo ? ETAPAS_CONFIG.instalacion.nombre : ETAPAS_CONFIG.instalacion.nombre.toUpperCase())
+                            ? (ETAPAS_CONFIG.instalacion.nombre)
                             : ETAPAS_CONFIG[proyecto.etapa_actual]?.nombre}
                     </span>
                     {/* C1 · PLA-19: el ID 3G de la obra (lo genera Operación en el libro de obras). Solo con Diseño 3G y fuera
@@ -181,9 +164,9 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
                     </>
                 )}
 
-                {/* C7 · PLA-17: el sí o el no de Producción por WhatsApp (lo manda Julia). Solo Diseño 3G o TV con ?diseno=3g;
-                    con el diseño de siempre no se monta nada. Solo informa: no cierra ni mueve la etapa. */}
-                {nuevo && proyecto.pronostico_whatsapp?.texto && (() => {
+                {/* C7 · PLA-17: el sí o el no de Producción por WhatsApp (lo manda Julia). Solo informa: no cierra ni mueve la
+                    etapa. */}
+                {proyecto.pronostico_whatsapp?.texto && (() => {
                     const si = proyecto.pronostico_whatsapp.respuesta === 'si';
                     const Icono = si ? CheckCircle2 : CalendarClock;
                     return (
@@ -218,7 +201,7 @@ const TimelineHeader = memo(({ proyecto, onAbrirCarpeta }) => {
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm min-w-[85px]">
-                                <span className="text-gray-400 font-bold uppercase tracking-wider mb-0.5 g3p-texto-min g3:normal-case g3:tracking-normal" style={{ fontSize: s(0.65) }}>{nuevo ? 'Avance' : 'AVANCE'}</span>
+                                <span className="text-gray-400 font-bold uppercase tracking-wider mb-0.5 g3p-texto-min g3:normal-case g3:tracking-normal" style={{ fontSize: s(0.65) }}>{'Avance'}</span>
                                 <span className="font-bold text-gray-700 leading-tight" style={{ fontSize: s(1.15) }}>{porcentaje}%</span>
                             </div>
                         )}

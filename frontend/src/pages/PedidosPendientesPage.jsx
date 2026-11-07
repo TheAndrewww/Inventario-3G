@@ -1,16 +1,9 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3, g3, g3Activo() en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ClipboardList, CheckSquare, Square, Package, User, Calendar, AlertCircle, Edit2, Plus, Minus, Trash2, Save, X, CheckCircle } from 'lucide-react';
 import pedidosService from '../services/pedidos.service';
-import { Loader, Modal } from '../components/common';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { useDiseno3G } from '../diseno-3g/useDiseno3G';
-import { g3Activo, confirmarG3 } from '../diseno-3g/dialogosG3';
-import { useDiseno3G as useRediseno2 } from '../rediseno2/fundacion/useDiseno3G';
+import { confirmarG3 } from '../diseno-3g/dialogosG3';
 import VistaTicketsPendientes from '../rediseno2/tickets/VistaTicketsPendientes';
 
 // Devuelve solo las observaciones originales del ticket (recorta anotaciones
@@ -26,8 +19,6 @@ const obsOriginales = (texto) => {
 
 const PedidosPendientesPage = () => {
   const { user } = useAuth();
-  const g3 = useDiseno3G(); // Diseño 3G: solo textos e íconos (apagado, el DOM de siempre)
-  const d3 = useRediseno2(); // Rediseño 2: encendido se pinta VistaTicketsPendientes con este mismo estado y manejadores
   const esAdmin = user?.rol === 'administrador';
 
   const [pedidos, setPedidos] = useState([]);
@@ -87,16 +78,13 @@ const PedidosPendientesPage = () => {
 
   const handleEliminarTicket = async (pedido, e) => {
     if (e) e.stopPropagation();
-    // Diseño 3G encendido: vista previa del paquete; apagado, el confirm() de siempre. Misma petición después.
-    if (g3Activo()) {
-      if (!(await confirmarG3({
-        titulo: `¿Eliminar el ticket ${pedido.ticket_id}?`,
-        aviso: 'No se puede deshacer.',
-        datos: [['Ticket', pedido.ticket_id], ['Destino', pedido.ubicacionDestino?.almacen || pedido.proyecto || 'Sin especificar'], ['Artículos', String(pedido.detalles?.length || 0)]],
-        pasa: ['Se revertirá el stock de sus artículos.'],
-        confirmar: 'Eliminar ticket', cancelar: 'No eliminar', peligro: true,
-      }))) return;
-    } else if (!window.confirm(`¿Eliminar el ticket ${pedido.ticket_id}? Se revertirá el stock de sus artículos y no se puede deshacer.`)) return;
+    if (!(await confirmarG3({
+      titulo: `¿Eliminar el ticket ${pedido.ticket_id}?`,
+      aviso: 'No se puede deshacer.',
+      datos: [['Ticket', pedido.ticket_id], ['Destino', pedido.ubicacionDestino?.almacen || pedido.proyecto || 'Sin especificar'], ['Artículos', String(pedido.detalles?.length || 0)]],
+      pasa: ['Se revertirá el stock de sus artículos.'],
+      confirmar: 'Eliminar ticket', cancelar: 'No eliminar', peligro: true,
+    }))) return;
     try {
       setEliminandoId(pedido.id);
       const res = await pedidosService.eliminar(pedido.id);
@@ -237,16 +225,12 @@ const PedidosPendientesPage = () => {
   };
 
   const handleEliminarArticulo = async (pedidoId, detalleId) => {
-    if (g3Activo()) {
-      const detalle = pedidoSeleccionado?.detalles?.find((d) => d.id === detalleId);
-      if (!(await confirmarG3({
-        titulo: '¿Quitar este artículo del ticket?',
-        datos: [['Ticket', pedidoSeleccionado?.ticket_id || ''], ['Artículo', detalle?.articulo?.nombre || '']],
-        confirmar: 'Quitar artículo', cancelar: 'No quitar', peligro: true,
-      }))) return;
-    } else if (!confirm('¿Estás seguro de eliminar este artículo del ticket?')) {
-      return;
-    }
+    const detalle = pedidoSeleccionado?.detalles?.find((d) => d.id === detalleId);
+    if (!(await confirmarG3({
+      titulo: '¿Quitar este artículo del ticket?',
+      datos: [['Ticket', pedidoSeleccionado?.ticket_id || ''], ['Artículo', detalle?.articulo?.nombre || '']],
+      confirmar: 'Quitar artículo', cancelar: 'No quitar', peligro: true,
+    }))) return;
 
     try {
       setProcesando(true);
@@ -276,14 +260,12 @@ const PedidosPendientesPage = () => {
       toast.error('Faltan artículos por palomear');
       return;
     }
-    if (g3Activo()) {
-      if (!(await confirmarG3({
-        titulo: `¿Marcar el ticket ${pedidoSeleccionado.ticket_id} como completado?`,
-        datos: [['Ticket', pedidoSeleccionado.ticket_id], ['Destino', pedidoSeleccionado.ubicacionDestino?.almacen || pedidoSeleccionado.proyecto || 'Sin especificar'], ['Artículos', String(pedidoSeleccionado.detalles?.length || 0)]],
-        pasa: ['Pasará a la columna de Completados.'],
-        confirmar: 'Marcar como completado', cancelar: 'Regresar',
-      }))) return;
-    } else if (!confirm('¿Marcar este ticket como COMPLETADO? Pasará a la columna de Completados.')) return;
+    if (!(await confirmarG3({
+      titulo: `¿Marcar el ticket ${pedidoSeleccionado.ticket_id} como completado?`,
+      datos: [['Ticket', pedidoSeleccionado.ticket_id], ['Destino', pedidoSeleccionado.ubicacionDestino?.almacen || pedidoSeleccionado.proyecto || 'Sin especificar'], ['Artículos', String(pedidoSeleccionado.detalles?.length || 0)]],
+      pasa: ['Pasará a la columna de Completados.'],
+      confirmar: 'Marcar como completado', cancelar: 'Regresar',
+    }))) return;
     try {
       setProcesando(true);
       await pedidosService.entregarDirecto(pedidoSeleccionado.id);
@@ -313,580 +295,30 @@ const PedidosPendientesPage = () => {
     }
   };
 
-  const getProgresoColor = (porcentaje) => {
-    if (porcentaje === 0) return 'bg-red-500';
-    if (porcentaje < 50) return 'bg-orange-500';
-    if (porcentaje < 100) return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
-
-  // Rediseño 2 encendido: misma página, otra vista (con su esqueleto de carga en lugar de la rueda). Lo que hoy va escrito
-  // dentro del JSX (− y + de «Editar cantidad», «Cancelar», cerrar la anulación masiva) se repite igual aquí.
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    return (
-      <VistaTicketsPendientes t={{
-        esAdmin, pedidos, pedidosCompletados, loading, listasCargadas, cargarDatos,
-        errorPendientes: errorPendientesR2, errorCompletados: errorCompletadosR2,
-        porRevisar, soloPorRevisar, setSoloPorRevisar, pedidosALaVista,
-        handleVerDetalle, handleEliminarTicket, eliminandoId,
-        abrirAnulacionMasiva, anulandoTodo, anulacionMasiva, confirmarAnulacionMasiva,
-        cerrarAnulacion: () => !anulandoTodo && setAnulacionMasiva(null),
-        showModal, pedidoSeleccionado, handleCloseModal, procesando, obsOriginales,
-        handleMarcarArticulo, handleEditarCantidad, editandoCantidad, handleGuardarCantidad, handleEliminarArticulo, handleCompletarTicket,
-        cantidadMenos: () => setEditandoCantidad({
-          ...editandoCantidad,
-          cantidad: Math.max(1, editandoCantidad.cantidad - 1)
-        }),
-        cantidadMas: () => setEditandoCantidad({
-          ...editandoCantidad,
-          cantidad: editandoCantidad.cantidad + 1
-        }),
-        cantidadEscrita: (valor) => setEditandoCantidad({
-          ...editandoCantidad,
-          cantidad: parseInt(valor) || 1
-        }),
-        cancelarEdicion: () => setEditandoCantidad(null),
-      }} />
-    );
-  }
-
-  if (loading && pedidos.length === 0) {
-    return <Loader fullScreen />;
-  }
-
   return (
-    <div className="p-6">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 g3:hidden">Tickets Pendientes</h1>
-          <p className="text-gray-500 mt-1">Gestiona y prepara los tickets de materiales</p>
-        </div>
-        {esAdmin && (
-          <div className="flex gap-2">
-          <button
-            onClick={() => abrirAnulacionMasiva(true)}
-            disabled={anulandoTodo}
-            className="px-3 py-2 text-sm font-medium text-green-700 border border-green-300 rounded-lg hover:bg-green-50 disabled:opacity-50 g3:!text-g3-tinta g3:!border-g3-linea-fuerte g3:hover:!bg-g3-hover"
-            title="Reabre los tickets anulados de proyectos que siguen abiertos"
-          >
-            Reabrir tickets anulados
-          </button>
-          <button
-            onClick={() => abrirAnulacionMasiva(false)}
-            disabled={anulandoTodo}
-            className="px-3 py-2 text-sm font-medium text-red-700 border border-red-300 rounded-lg hover:bg-red-50 disabled:opacity-50"
-            title="Anula todos los tickets abiertos sin mover el inventario"
-          >
-            Anular tickets anteriores
-          </button>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Columna izquierda: Pendientes */}
-        <section>
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <ClipboardList size={22} className="text-orange-600" />
-            Pendientes
-            <span className="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
-              {pedidos.length}
-            </span>
-          </h2>
-
-          {porRevisar.length > 0 && (
-            <div className={g3 ? 'g3-chips mb-4' : 'mb-4 flex flex-wrap gap-2'} role="group" aria-label="Filtrar tickets pendientes">
-              {[[false, 'Todos', pedidos.length], [true, 'Por revisar · cierre de obra', porRevisar.length]].map(([valor, etiqueta, n]) => (
-                <button
-                  key={etiqueta}
-                  type="button"
-                  aria-pressed={soloPorRevisar === valor}
-                  onClick={() => setSoloPorRevisar(valor)}
-                  className={g3 ? 'g3-chip' : `px-3 py-1.5 text-sm font-medium rounded-full border ${soloPorRevisar === valor ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-                >
-                  {etiqueta}
-                  <span className={g3 ? 'g3-insignia' : 'ml-1.5 font-semibold'}>{n}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {pedidos.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm p-10 text-center">
-              <ClipboardList size={48} className="mx-auto mb-3 text-gray-300" />
-              <h3 className="text-base font-medium text-gray-900 mb-1">No hay tickets pendientes</h3>
-              <p className="text-sm text-gray-500">Todos los tickets han sido completados</p>
-            </div>
-          ) : (
-            <div className="space-y-4 max-h-[calc(100vh-220px)] overflow-y-auto pr-2">
-              {pedidosALaVista.map((pedido) => (
-                <div
-                  key={pedido.id}
-                  className="bg-white rounded-xl shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => handleVerDetalle(pedido)}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <h3 className="text-base font-bold text-gray-900 truncate">
-                          {pedido.ubicacionDestino ? (
-                            <>
-                              {g3 ? null : (pedido.ubicacionDestino.almacen.includes('Camioneta') ? '🚛' : '📦')}{g3 ? null : ' '}{pedido.ubicacionDestino.almacen}
-                            </>
-                          ) : (
-                            pedido.proyecto || 'Sin especificar'
-                          )}
-                        </h3>
-                        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
-                          Pendiente
-                        </span>
-                        {pedido.revision_requerida && (
-                          <span className={g3 ? 'g3-estado g3-estado--aviso' : 'px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800'}>
-                            Por revisar · cierre de obra
-                          </span>
-                        )}
-                      </div>
-                      {pedido.revision_requerida && pedido.revision_motivo && (
-                        <p className="mb-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                          {pedido.revision_motivo}. Decide si se completa o se elimina.
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <ClipboardList size={14} />
-                          <span className="font-mono">{pedido.ticket_id}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <User size={14} />
-                          <span>{pedido.usuario?.nombre || 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Calendar size={14} />
-                          <span>{new Date(pedido.fecha_hora).toLocaleDateString('es-MX')}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between mb-1.5 text-xs">
-                      <span className="text-gray-600">Progreso de preparación</span>
-                      <span className="font-semibold text-gray-900">
-                        {pedido.progreso_dispersion || 0}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full transition-all ${getProgresoColor(pedido.progreso_dispersion || 0)}`}
-                        style={{ width: `${pedido.progreso_dispersion || 0}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-xs text-gray-600">
-                      {pedido.detalles?.length || 0} artículos
-                    </span>
-                    <div className="flex items-center gap-3">
-                      {esAdmin && (
-                        <button
-                          onClick={(e) => handleEliminarTicket(pedido, e)}
-                          disabled={eliminandoId === pedido.id}
-                          className="inline-flex items-center gap-1 text-gray-500 hover:text-red-700 text-sm font-medium disabled:opacity-50 g3:!text-g3-mal"
-                          title="Eliminar ticket (revierte stock)"
-                        >
-                          <Trash2 size={15} />
-                          {eliminandoId === pedido.id ? 'Eliminando…' : 'Eliminar'}
-                        </button>
-                      )}
-                      <button className="text-red-700 hover:text-red-900 text-sm font-medium g3:!text-g3-primario">
-                        {g3 ? 'Ver checklist →' : 'Ver Checklist →'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {obsOriginales(pedido.observaciones) && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <p className="text-xs text-gray-500 font-medium mb-1">Observaciones:</p>
-                      <p className="text-xs text-gray-600 whitespace-pre-line line-clamp-2">{obsOriginales(pedido.observaciones)}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Columna derecha: Completados */}
-        <section>
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <CheckCircle size={22} className="text-green-600" />
-            Completados
-            <span className="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-              {pedidosCompletados.length}
-            </span>
-          </h2>
-
-          {pedidosCompletados.length === 0 ? (
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-10 text-center">
-              <CheckCircle size={48} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-sm text-gray-500 font-medium">No hay tickets completados recientes</p>
-            </div>
-          ) : (
-            <div className="space-y-4 max-h-[calc(100vh-220px)] overflow-y-auto pr-2">
-              {pedidosCompletados.map((pedido) => (
-                <div
-                  key={pedido.id}
-                  className="bg-white border border-gray-200 rounded-xl p-4 hover:border-green-300 transition-colors cursor-pointer"
-                  onClick={() => handleVerDetalle(pedido)}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 flex-shrink-0">
-                        <CheckCircle size={16} />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-gray-900 truncate" title={pedido.ubicacionDestino?.almacen || pedido.proyecto}>
-                          {pedido.ubicacionDestino?.almacen || pedido.proyecto || 'Sin especificar'}
-                        </h4>
-                        <p className="text-xs font-mono text-gray-500">{pedido.ticket_id}</p>
-                      </div>
-                    </div>
-                    <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded-full flex-shrink-0">
-                      Completado
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-600">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <User size={13} className="text-gray-400 flex-shrink-0" />
-                      <span className="truncate">Encargado: {pedido.supervisor?.nombre || pedido.usuario?.nombre || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <CheckSquare size={13} className="text-gray-400 flex-shrink-0" />
-                      <span className="truncate">Preparó: {pedido.detalles?.[0]?.dispersadoPor?.nombre || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Calendar size={13} className="text-gray-400 flex-shrink-0" />
-                      <span>{new Date(pedido.updated_at || pedido.fecha_hora).toLocaleDateString('es-MX')}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Package size={13} className="text-gray-400 flex-shrink-0" />
-                      <span className="font-semibold">{pedido.detalles?.length || 0} artículos</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-
-      <Modal
-        isOpen={showModal}
-        onClose={handleCloseModal}
-        title="Checklist de Preparación"
-        size="xl"
-      >
-        {pedidoSeleccionado && (
-          <div className="space-y-6">
-            {pedidoSeleccionado.revision_requerida && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900" role="note">
-                <p className="font-semibold">Por revisar · cierre de obra</p>
-                {pedidoSeleccionado.revision_motivo && <p className="mt-1">{pedidoSeleccionado.revision_motivo}.</p>}
-                <p className="mt-1">El material ya entregado no regresó solo al almacén. Si ya se entregó todo, complétalo; si no, Dirección lo elimina como siempre (al eliminarlo regresa todo su material).</p>
-              </div>
-            )}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-gray-500">ID Ticket:</span>
-                  <p className="font-mono font-bold text-gray-900">{pedidoSeleccionado.ticket_id}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-500">Destino:</span>
-                  <p className="font-semibold text-gray-900">
-                    {pedidoSeleccionado.ubicacionDestino ? (
-                      <>
-                        {g3 ? null : (pedidoSeleccionado.ubicacionDestino.almacen.includes('Camioneta') ? '🚛' : '📦')}{g3 ? null : ' '}{pedidoSeleccionado.ubicacionDestino.almacen}
-                      </>
-                    ) : (
-                      pedidoSeleccionado.proyecto || 'Sin especificar'
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-500">Encargado:</span>
-                  <p className="text-gray-900">{pedidoSeleccionado.supervisor?.nombre || pedidoSeleccionado.usuario?.nombre || '-'}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-500">Fecha:</span>
-                  <p className="text-gray-900">
-                    {new Date(pedidoSeleccionado.fecha_hora).toLocaleDateString('es-MX')}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <AlertCircle className="text-blue-600" size={20} />
-                <span className="font-semibold text-blue-900">
-                  Progreso: {pedidoSeleccionado.progreso_dispersion || 0}%
-                </span>
-              </div>
-              <div className="w-full bg-blue-200 rounded-full h-3">
-                <div
-                  className="bg-blue-600 h-3 rounded-full transition-all duration-300"
-                  style={{ width: `${pedidoSeleccionado.progreso_dispersion || 0}%` }}
-                ></div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-lg font-semibold text-gray-900 mb-3">Artículos a Preparar</h4>
-              <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                {pedidoSeleccionado.detalles?.map((detalle) => (
-                  <div
-                    key={detalle.id}
-                    className={`border-2 rounded-lg p-4 transition-all ${detalle.dispersado
-                        ? 'border-green-300 bg-green-50'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                  >
-                    <div className="flex items-start gap-4">
-                      <button
-                        onClick={() => handleMarcarArticulo(
-                          pedidoSeleccionado.id,
-                          detalle.id,
-                          !detalle.dispersado
-                        )}
-                        disabled={procesando}
-                        className="mt-1 flex-shrink-0 transition-transform hover:scale-110 disabled:opacity-50"
-                      >
-                        {detalle.dispersado ? (
-                          <CheckSquare size={28} className="text-green-600" />
-                        ) : (
-                          <Square size={28} className="text-gray-400" />
-                        )}
-                      </button>
-
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h5 className={`font-semibold ${detalle.dispersado ? 'text-green-900' : 'text-gray-900'}`}>
-                              {detalle.articulo?.nombre}
-                            </h5>
-                            <p className="text-sm text-gray-600">
-                              EAN-13: {detalle.articulo?.codigo_ean13}
-                            </p>
-                          </div>
-
-                          <div className="text-right">
-                            {editandoCantidad?.detalleId === detalle.id ? (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => setEditandoCantidad({
-                                    ...editandoCantidad,
-                                    cantidad: Math.max(1, editandoCantidad.cantidad - 1)
-                                  })}
-                                  className="w-8 h-8 border-2 border-blue-500 rounded-lg flex items-center justify-center hover:bg-blue-50"
-                                >
-                                  <Minus size={16} className="text-blue-600" />
-                                </button>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={editandoCantidad.cantidad}
-                                  onChange={(e) => setEditandoCantidad({
-                                    ...editandoCantidad,
-                                    cantidad: parseInt(e.target.value) || 1
-                                  })}
-                                  className="w-16 text-center border-2 border-blue-500 rounded-lg font-bold"
-                                />
-                                <button
-                                  onClick={() => setEditandoCantidad({
-                                    ...editandoCantidad,
-                                    cantidad: editandoCantidad.cantidad + 1
-                                  })}
-                                  className="w-8 h-8 border-2 border-blue-500 rounded-lg flex items-center justify-center hover:bg-blue-50"
-                                >
-                                  <Plus size={16} className="text-blue-600" />
-                                </button>
-                                <button
-                                  onClick={handleGuardarCantidad}
-                                  disabled={procesando}
-                                  className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                                >
-                                  <Save size={16} />
-                                </button>
-                                <button
-                                  onClick={() => setEditandoCantidad(null)}
-                                  className="p-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-                                >
-                                  <X size={16} />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <div>
-                                  <p className="text-lg font-bold text-gray-900">
-                                    {detalle.cantidad} {detalle.articulo?.unidad || 'uds'}
-                                  </p>
-                                  {detalle.articulo?.stock_actual !== undefined && (
-                                    <p className={`text-sm ${detalle.articulo.stock_actual >= detalle.cantidad
-                                        ? 'text-green-600'
-                                        : 'text-red-600'
-                                      }`}>
-                                      Stock: {detalle.articulo.stock_actual}
-                                    </p>
-                                  )}
-                                </div>
-                                {!detalle.dispersado && (
-                                  <div className="flex gap-1">
-                                    <button
-                                      onClick={() => handleEditarCantidad(detalle.id, detalle.cantidad)}
-                                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                      title="Editar cantidad"
-                                    >
-                                      <Edit2 size={18} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleEliminarArticulo(pedidoSeleccionado.id, detalle.id)}
-                                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                      title="Eliminar art�culo"
-                                    >
-                                      <Trash2 size={18} />
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {detalle.articulo?.ubicacion && (
-                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                            <Package size={14} />
-                            <span>
-                              {detalle.articulo.ubicacion.codigo} - {detalle.articulo.ubicacion.almacen}
-                              {detalle.articulo.ubicacion.pasillo && ` - Pasillo ${detalle.articulo.ubicacion.pasillo}`}
-                              {detalle.articulo.ubicacion.estante && ` - Estante ${detalle.articulo.ubicacion.estante}`}
-                            </span>
-                          </div>
-                        )}
-
-                        {detalle.observaciones && (
-                          <p className="text-sm text-gray-600 italic mt-2">{detalle.observaciones}</p>
-                        )}
-
-                        {detalle.dispersado && detalle.dispersadoPor && (
-                          <div className="mt-2 text-sm text-green-700">
-                             Preparado por {detalle.dispersadoPor.nombre} el{' '}
-                            {new Date(detalle.fecha_dispersado).toLocaleString('es-MX')}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h5 className="font-medium text-gray-700 mb-2">Observaciones:</h5>
-              {obsOriginales(pedidoSeleccionado.observaciones) ? (
-                <p className="text-gray-900 whitespace-pre-line">{obsOriginales(pedidoSeleccionado.observaciones)}</p>
-              ) : (
-                <p className="text-gray-400 italic text-sm">Sin observaciones.</p>
-              )}
-            </div>
-
-            {/* Botón Completar Ticket — visible solo al 100% y si el ticket aún no está entregado */}
-            {pedidoSeleccionado.progreso_dispersion === 100 && ['pendiente', 'aprobado'].includes(pedidoSeleccionado.estado) && (
-              <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-4 bg-white border-t border-gray-200">
-                <button
-                  onClick={handleCompletarTicket}
-                  disabled={procesando}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition-colors disabled:opacity-50 g3:!bg-g3-primario g3:!text-g3-sobre-primario g3:hover:!bg-g3-primario-hover"
-                >
-                  <CheckCircle size={20} />
-                  {procesando ? 'Completando...' : (g3 ? 'Completar ticket' : 'Completar Ticket')}
-                </button>
-                <p className="text-xs text-gray-500 text-center mt-2">
-                  El ticket pasará a la columna de Completados.
-                </p>
-              </div>
-            )}
-
-          </div>
-        )}
-      </Modal>
-
-      {/* Borrón y cuenta nueva: confirma la lista exacta antes de anular */}
-      <Modal
-        isOpen={!!anulacionMasiva}
-        onClose={() => !anulandoTodo && setAnulacionMasiva(null)}
-        title={anulacionMasiva?.reabrir ? 'Reabrir tickets anulados' : 'Anular tickets anteriores'}
-        size="lg"
-      >
-        {anulacionMasiva && (
-          <div className="space-y-4">
-            {anulacionMasiva.reabrir ? (
-            <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-900">
-              Se reabrirán <strong>{anulacionMasiva.total}</strong> ticket(s) de proyectos que siguen abiertos.
-              Vuelven a Pendientes con lo que ya tenían surtido; el inventario no se mueve.
-              {anulacionMasiva.solicitudes_a_reabrir > 0 && (
-                <> También vuelven <strong>{anulacionMasiva.solicitudes_a_reabrir}</strong> solicitud(es) de compra.</>
-              )}
-              {' '}Los de proyectos cerrados se quedan anulados.
-            </div>
-            ) : (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-900">
-              Se anularán <strong>{anulacionMasiva.total}</strong> ticket(s) abiertos.
-              {' '}<strong>El inventario NO se mueve</strong>: el stock de los SKUs se queda como está.
-              {anulacionMasiva.solicitudes_a_cancelar > 0 && (
-                <> También se cancelan <strong>{anulacionMasiva.solicitudes_a_cancelar}</strong> solicitud(es) de compra de estos tickets que aún no entraban a una orden.</>
-              )}
-              {' '}No se puede deshacer.
-            </div>
-            )}
-            <div className="max-h-80 overflow-y-auto border rounded-lg divide-y">
-              {anulacionMasiva.tickets.map(t => (
-                <div key={t.id} className="px-3 py-2 text-sm flex justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium text-gray-900 truncate">{t.proyecto}</div>
-                    <div className="text-xs text-gray-500">{t.ticket_id}{t.creado_por ? ` · ${t.creado_por}` : ''}</div>
-                  </div>
-                  <div className="text-xs text-gray-500 text-right flex-shrink-0">
-                    {new Date(t.fecha_hora).toLocaleDateString('es-MX')}<br />{t.estado}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setAnulacionMasiva(null)}
-                disabled={anulandoTodo}
-                className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmarAnulacionMasiva}
-                disabled={anulandoTodo}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg text-white disabled:opacity-50 ${anulacionMasiva.reabrir ? 'bg-green-700 hover:bg-green-800' : 'bg-red-700 hover:bg-red-800 g3:!bg-g3-mal g3:!text-g3-sobre-mal g3:hover:!bg-g3-mal-hover'}`}
-              >
-                {anulandoTodo
-                  ? 'Procesando…'
-                  : `${anulacionMasiva.reabrir ? 'Reabrir' : 'Anular'} ${anulacionMasiva.total} ticket(s)`}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-    </div>
+    <VistaTicketsPendientes t={{
+      esAdmin, pedidos, pedidosCompletados, loading, listasCargadas, cargarDatos,
+      errorPendientes: errorPendientesR2, errorCompletados: errorCompletadosR2,
+      porRevisar, soloPorRevisar, setSoloPorRevisar, pedidosALaVista,
+      handleVerDetalle, handleEliminarTicket, eliminandoId,
+      abrirAnulacionMasiva, anulandoTodo, anulacionMasiva, confirmarAnulacionMasiva,
+      cerrarAnulacion: () => !anulandoTodo && setAnulacionMasiva(null),
+      showModal, pedidoSeleccionado, handleCloseModal, procesando, obsOriginales,
+      handleMarcarArticulo, handleEditarCantidad, editandoCantidad, handleGuardarCantidad, handleEliminarArticulo, handleCompletarTicket,
+      cantidadMenos: () => setEditandoCantidad({
+        ...editandoCantidad,
+        cantidad: Math.max(1, editandoCantidad.cantidad - 1)
+      }),
+      cantidadMas: () => setEditandoCantidad({
+        ...editandoCantidad,
+        cantidad: editandoCantidad.cantidad + 1
+      }),
+      cantidadEscrita: (valor) => setEditandoCantidad({
+        ...editandoCantidad,
+        cantidad: parseInt(valor) || 1
+      }),
+      cancelarEdicion: () => setEditandoCantidad(null),
+    }} />
   );
 };
 

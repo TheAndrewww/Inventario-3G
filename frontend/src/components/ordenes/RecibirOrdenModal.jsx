@@ -1,12 +1,6 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect, useRef } from 'react';
-import { X, PackageCheck, AlertCircle, Info, CheckCircle, Check, Pencil, MessageSquarePlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ordenesCompraService from '../../services/ordenesCompra.service';
-// Rediseño 2 · vista encendida (apagado no la usa)
-import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
 import { Cajon as CajonR2, CajonCabecera as CajonCabeceraR2 } from '../../rediseno2/fundacion';
 import RecibirManoR2 from '../../rediseno2/compras/RecibirMano';
 
@@ -25,7 +19,6 @@ const MOTIVOS_FALTANTE = [
 ];
 
 const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess, incrustado = false, alPie = null, alOcupado = null }) => {
-  const d3 = useDiseno3GR2(); // Rediseño 2: «Capturar a mano» dentro del cajón «Recibir» encendido
   const [articulos, setArticulos] = useState([]);
   const [observacionesGenerales, setObservacionesGenerales] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -331,508 +324,51 @@ const RecibirOrdenModal = ({ isOpen, onClose, orden, onSuccess, incrustado = fal
 
   if (!isOpen) return null;
 
-  // Rediseño 2 · encendido: el mismo estado y las mismas peticiones en una tabla (el JSX de hoy sigue abajo)
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    const contenidoR2 = (
-      <RecibirManoR2
-        articulos={articulos}
-        observacionesGenerales={observacionesGenerales}
-        setObservacionesGenerales={setObservacionesGenerales}
-        guardando={guardando}
-        errores={errores}
-        togglePalomear={togglePalomear}
-        marcarCompleto={marcarCompleto}
-        activarOtraCantidad={activarOtraCantidad}
-        handleCantidadChange={handleCantidadChange}
-        handleObservacionChange={handleObservacionChange}
-        actualizarArticulo={actualizarArticulo}
-        togglePalomearTodo={togglePalomearTodo}
-        todoPalomeado={todoPalomeado}
-        palomeados={palomeados}
-        recibiblesIds={recibiblesIds}
-        hayArticulosPendientes={hayArticulosPendientes}
-        progreso={progreso}
-        handleSubmit={handleSubmit}
-        onClose={onClose}
-        abrirCerrarIncompleta={abrirCerrarIncompleta}
-        inputsCantidad={inputsCantidad}
-        alPie={alPie}
-        mostrarModalCompletar={mostrarModalCompletar}
-        cerrarDialogoCompletar={() => {
-          setMostrarModalCompletar(false);
-          setMotivoCompletar('');
-        }}
-        faltantesAlCerrar={faltantesAlCerrar}
-        motivosFaltante={motivosFaltante}
-        setMotivosFaltante={setMotivosFaltante}
-        motivoCompletar={motivoCompletar}
-        setMotivoCompletar={setMotivoCompletar}
-        completando={completando}
-        handleCompletarManualmente={handleCompletarManualmente}
-        motivos={MOTIVOS_FALTANTE}
-      />
-    );
-    if (incrustado) return contenidoR2;
-    return (
-      <CajonR2 abierto alCerrar={guardando ? () => {} : onClose} ancho="ancho" etiqueta={`Recibir ${orden?.ticket_id || ''}`}>
-        <CajonCabeceraR2 titulo={`Recibir ${orden?.ticket_id || ''}`} dato={orden?.proveedor?.nombre} alCerrar={guardando ? undefined : onClose} />
-        {contenidoR2}
-      </CajonR2>
-    );
-  }
-
+  const contenidoR2 = (
+    <RecibirManoR2
+      articulos={articulos}
+      observacionesGenerales={observacionesGenerales}
+      setObservacionesGenerales={setObservacionesGenerales}
+      guardando={guardando}
+      errores={errores}
+      togglePalomear={togglePalomear}
+      marcarCompleto={marcarCompleto}
+      activarOtraCantidad={activarOtraCantidad}
+      handleCantidadChange={handleCantidadChange}
+      handleObservacionChange={handleObservacionChange}
+      actualizarArticulo={actualizarArticulo}
+      togglePalomearTodo={togglePalomearTodo}
+      todoPalomeado={todoPalomeado}
+      palomeados={palomeados}
+      recibiblesIds={recibiblesIds}
+      hayArticulosPendientes={hayArticulosPendientes}
+      progreso={progreso}
+      handleSubmit={handleSubmit}
+      onClose={onClose}
+      abrirCerrarIncompleta={abrirCerrarIncompleta}
+      inputsCantidad={inputsCantidad}
+      alPie={alPie}
+      mostrarModalCompletar={mostrarModalCompletar}
+      cerrarDialogoCompletar={() => {
+        setMostrarModalCompletar(false);
+        setMotivoCompletar('');
+      }}
+      faltantesAlCerrar={faltantesAlCerrar}
+      motivosFaltante={motivosFaltante}
+      setMotivosFaltante={setMotivosFaltante}
+      motivoCompletar={motivoCompletar}
+      setMotivoCompletar={setMotivoCompletar}
+      completando={completando}
+      handleCompletarManualmente={handleCompletarManualmente}
+      motivos={MOTIVOS_FALTANTE}
+    />
+  );
+  if (incrustado) return contenidoR2;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <PackageCheck className="text-blue-600" size={28} />
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Recibir Mercancía
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Orden: {orden?.ticket_id} · Proveedor: {orden?.proveedor?.nombre}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              disabled={guardando}
-              className="p-2 hover:bg-white rounded-lg transition-colors"
-            >
-              <X size={24} className="text-gray-600" />
-            </button>
-          </div>
-        </div>
-
-        {/* Barra de progreso */}
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">
-              Progreso de recepción
-            </span>
-            <span className="text-sm font-bold text-blue-600">
-              {progreso.porcentaje}%
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
-            <div
-              className="bg-blue-600 h-3 rounded-full transition-all duration-300"
-              style={{ width: `${progreso.porcentaje}%` }}
-            />
-          </div>
-          <div className="flex items-center justify-between mt-2 text-xs text-gray-600">
-            <span>Ya recibido: {formatCantidad(progreso.totalYaRecibido)}</span>
-            <span>Ahora: +{formatCantidad(progreso.totalAhoraRecibido)}</span>
-            <span>Total: {formatCantidad(progreso.totalRecibido)} / {formatCantidad(progreso.totalSolicitado)}</span>
-          </div>
-        </div>
-
-        {/* Contenido */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-4">
-            {/* Recepción masiva: palomear toda la orden de un golpe */}
-            {hayArticulosPendientes && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <Info className="text-green-700 flex-shrink-0 mt-0.5" size={20} />
-                  <div className="text-sm text-green-900">
-                    <p className="font-medium">Palomea lo que llegó completo</p>
-                    <p className="text-xs text-green-800 mt-0.5">
-                      Solo escribes a mano cuando llegó una cantidad distinta a la solicitada.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={togglePalomearTodo}
-                  disabled={guardando}
-                  className={`px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 ${
-                    todoPalomeado
-                      ? 'bg-white border border-green-600 text-green-700 hover:bg-green-100'
-                      : 'bg-green-600 text-white hover:bg-green-700'
-                  }`}
-                >
-                  <Check size={18} />
-                  {todoPalomeado ? 'Quitar todas las palomas' : 'Llegó todo completo'}
-                </button>
-              </div>
-            )}
-
-            {/* Lista de artículos */}
-            <div className="space-y-3">
-              {articulos.map((articulo) => {
-                const yaCompleto = articulo.cantidad_pendiente <= 0;
-                const palomeado = articulo.modo === 'completo';
-                const otraCantidad = articulo.modo === 'otra';
-                const cantidadCapturada = parseFloat(articulo.cantidad_recibida) || 0;
-
-                return (
-                  <div
-                    key={articulo.detalle_id}
-                    className={`border rounded-lg p-4 transition-all ${
-                      yaCompleto
-                        ? 'border-gray-200 bg-gray-50 opacity-70'
-                        : palomeado
-                          ? 'border-green-300 bg-green-50'
-                          : otraCantidad
-                            ? 'border-amber-300 bg-amber-50'
-                            : 'border-gray-200 hover:shadow-md'
-                    }`}
-                  >
-                    <div className="flex items-start gap-4">
-                      {/* Paloma: el clic principal de toda la pantalla */}
-                      <button
-                        type="button"
-                        onClick={() => togglePalomear(articulo)}
-                        disabled={guardando || yaCompleto}
-                        title={palomeado ? 'Quitar la paloma' : 'Llegó completo'}
-                        className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-colors disabled:cursor-not-allowed ${
-                          palomeado
-                            ? 'bg-green-600 border-green-600 text-white'
-                            : otraCantidad
-                              ? 'bg-amber-500 border-amber-500 text-white'
-                              : 'bg-white border-gray-300 text-transparent hover:border-green-500 hover:text-green-200'
-                        }`}
-                      >
-                        <Check size={26} strokeWidth={3} />
-                      </button>
-
-                      {/* Imagen del artículo */}
-                      {articulo.imagen_url ? (
-                        <img
-                          src={articulo.imagen_url}
-                          alt={articulo.nombre}
-                          className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Crect x="3" y="3" width="18" height="18" rx="2" ry="2"%3E%3C/rect%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"%3E%3C/circle%3E%3Cpolyline points="21 15 16 10 5 21"%3E%3C/polyline%3E%3C/svg%3E';
-                          }}
-                        />
-                      ) : (
-                        <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center flex-shrink-0">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                            <polyline points="21 15 16 10 5 21"></polyline>
-                          </svg>
-                        </div>
-                      )}
-
-                      {/* Información del artículo */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 text-lg truncate">
-                          {articulo.nombre}
-                        </h3>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-600">
-                          <span>Solicitado: <span className="font-medium">{formatCantidad(articulo.cantidad_solicitada)} {articulo.unidad}</span></span>
-                          {articulo.cantidad_ya_recibida > 0 && (
-                            <span>Ya recibido: <span className="font-medium">{formatCantidad(articulo.cantidad_ya_recibida)} {articulo.unidad}</span></span>
-                          )}
-                          {!yaCompleto && (
-                            <span className="text-blue-600 font-medium">
-                              Falta: {formatCantidad(articulo.cantidad_pendiente)} {articulo.unidad}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Estado del renglón */}
-                        <div className="mt-2 flex flex-wrap items-center gap-3">
-                          {yaCompleto ? (
-                            <span className="text-sm text-gray-500 font-medium">Ya se recibió completo</span>
-                          ) : otraCantidad ? (
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700">
-                                  Llegaron:
-                                </label>
-                                <div className="relative">
-                                  <input
-                                    ref={(el) => { inputsCantidad.current[articulo.detalle_id] = el; }}
-                                    type="number"
-                                    value={articulo.cantidad_recibida}
-                                    onChange={(e) => handleCantidadChange(articulo, e.target.value)}
-                                    step="0.01"
-                                    min="0"
-                                    max={articulo.cantidad_pendiente}
-                                    placeholder="0"
-                                    disabled={guardando}
-                                    className={`w-32 pl-3 pr-12 py-2 border rounded-lg focus:outline-none focus:ring-2 text-lg font-semibold text-center ${
-                                      errores[articulo.detalle_id]
-                                        ? 'border-red-300 focus:ring-red-500 bg-red-50'
-                                        : 'border-gray-300 focus:ring-blue-500'
-                                    }`}
-                                  />
-                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs">
-                                    {articulo.unidad}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => marcarCompleto(articulo)}
-                                  disabled={guardando}
-                                  className="text-sm text-green-700 hover:underline"
-                                >
-                                  Llegó completo
-                                </button>
-                              </div>
-                              {errores[articulo.detalle_id] && (
-                                <div className="mt-1 flex items-center gap-1 text-red-600 text-xs">
-                                  <AlertCircle size={14} />
-                                  <span>{errores[articulo.detalle_id]}</span>
-                                </div>
-                              )}
-                            </div>
-                          ) : palomeado ? (
-                            <>
-                              <span className="text-sm font-semibold text-green-700 flex items-center gap-1">
-                                <CheckCircle size={16} />
-                                Llegó completo: {formatCantidad(cantidadCapturada)} {articulo.unidad}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => activarOtraCantidad(articulo)}
-                                disabled={guardando}
-                                className="text-sm text-gray-600 hover:text-blue-600 flex items-center gap-1"
-                              >
-                                <Pencil size={14} />
-                                Llegó otra cantidad
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-sm text-gray-500">Sin recibir</span>
-                              <button
-                                type="button"
-                                onClick={() => activarOtraCantidad(articulo)}
-                                disabled={guardando}
-                                className="text-sm text-gray-600 hover:text-blue-600 flex items-center gap-1"
-                              >
-                                <Pencil size={14} />
-                                Llegó otra cantidad
-                              </button>
-                            </>
-                          )}
-
-                          {!yaCompleto && !articulo.mostrarNota && (
-                            <button
-                              type="button"
-                              onClick={() => actualizarArticulo(articulo.detalle_id, { mostrarNota: true })}
-                              disabled={guardando}
-                              className="text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1"
-                            >
-                              <MessageSquarePlus size={14} />
-                              Nota
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Observaciones del renglón (solo si se piden) */}
-                        {articulo.mostrarNota && !yaCompleto && (
-                          <textarea
-                            value={articulo.observaciones}
-                            onChange={(e) => handleObservacionChange(articulo.detalle_id, e.target.value)}
-                            placeholder="Ej: Llegó dañado, embalaje deteriorado..."
-                            rows={2}
-                            disabled={guardando}
-                            className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Observaciones generales */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Observaciones Generales
-              </label>
-              <textarea
-                value={observacionesGenerales}
-                onChange={(e) => setObservacionesGenerales(e.target.value)}
-                placeholder="Observaciones sobre toda la recepción (transportista, condiciones de entrega, etc.)"
-                rows={3}
-                disabled={guardando}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
-            </div>
-          </div>
-
-          {/* Footer con botones */}
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between gap-3">
-            {/* Botón de completar orden (solo si hay pendientes) */}
-            <div>
-              {hayArticulosPendientes && (
-                <button
-                  type="button"
-                  onClick={abrirCerrarIncompleta}
-                  disabled={guardando}
-                  title="Registra lo que capturaste y cierra la orden aunque no haya llegado todo"
-                  className="px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 flex items-center gap-2 font-medium text-sm"
-                >
-                  <CheckCircle size={18} />
-                  Cerrar orden incompleta
-                </button>
-              )}
-            </div>
-
-            {/* Botones de acción */}
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-600 hidden sm:inline">
-                {palomeados.length} de {recibiblesIds.length} artículo(s) marcados
-              </span>
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={guardando}
-                className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={guardando || Object.keys(errores).length > 0}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
-              >
-                {guardando ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <PackageCheck size={20} />
-                    Registrar Recepción
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      {/* Modal de confirmación para completar orden */}
-      {mostrarModalCompletar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-orange-50 to-orange-100">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="text-orange-600" size={28} />
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Cerrar orden incompleta
-                  </h2>
-                </div>
-                <button
-                  onClick={() => {
-                    setMostrarModalCompletar(false);
-                    setMotivoCompletar('');
-                  }}
-                  disabled={completando}
-                  className="p-2 hover:bg-white rounded-lg transition-colors"
-                >
-                  <X size={24} className="text-gray-600" />
-                </button>
-              </div>
-            </div>
-
-            {/* Contenido */}
-            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-3">
-                <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
-                <p className="text-sm text-yellow-800">
-                  Se guarda lo que capturaste como recibido y la orden se cierra. Lo que faltó
-                  queda en <strong>Solicitudes</strong> para la siguiente orden de compra, y el
-                  motivo queda registrado para reportarlo al proveedor.
-                </p>
-              </div>
-
-              {faltantesAlCerrar.length === 0 ? (
-                <p className="text-sm text-green-700 font-medium">Con lo capturado ya llegó todo: la orden quedará completa.</p>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-gray-700">¿Por qué no llegó completo?</p>
-                  {faltantesAlCerrar.map(f => (
-                    <div key={f.detalle_id} className="border border-gray-200 rounded-lg p-3">
-                      <p className="font-medium text-gray-900 text-sm">{f.nombre}</p>
-                      <p className="text-xs text-gray-600 mt-0.5">
-                        Llegaron {formatCantidad(f.recibido_total)} de {formatCantidad(f.cantidad_solicitada)} {f.unidad} ·{' '}
-                        <span className="text-red-600 font-medium">faltan {formatCantidad(f.faltante)}</span>
-                      </p>
-                      <select
-                        value={motivosFaltante[f.detalle_id] || 'incompleto'}
-                        onChange={(e) => setMotivosFaltante(prev => ({ ...prev, [f.detalle_id]: e.target.value }))}
-                        disabled={completando}
-                        className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      >
-                        {MOTIVOS_FALTANTE.map(m => (
-                          <option key={m.valor} value={m.valor}>{m.texto}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Comentario para el proveedor {faltantesAlCerrar.some(f => motivosFaltante[f.detalle_id] === 'otro') && <span className="text-red-500">*</span>}
-                </label>
-                <textarea
-                  value={motivoCompletar}
-                  onChange={(e) => setMotivoCompletar(e.target.value)}
-                  placeholder="Ej: Dijo que ya no tiene existencia; 3 piezas venían golpeadas..."
-                  rows={3}
-                  disabled={completando}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-                />
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setMostrarModalCompletar(false);
-                  setMotivoCompletar('');
-                }}
-                disabled={completando}
-                className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleCompletarManualmente}
-                disabled={completando}
-                className="px-6 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
-              >
-                {completando ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Cerrando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle size={20} />
-                    Guardar y cerrar
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <CajonR2 abierto alCerrar={guardando ? () => {} : onClose} ancho="ancho" etiqueta={`Recibir ${orden?.ticket_id || ''}`}>
+      <CajonCabeceraR2 titulo={`Recibir ${orden?.ticket_id || ''}`} dato={orden?.proveedor?.nombre} alCerrar={guardando ? undefined : onClose} />
+      {contenidoR2}
+    </CajonR2>
   );
 };
 

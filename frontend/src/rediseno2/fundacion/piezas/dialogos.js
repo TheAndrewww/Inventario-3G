@@ -7,4 +7,4 @@
 //   avisoG3('Orden aprobada.', 'ok');
 //
 // Si mueve inventario, dinero o avisa a un cliente, la confirmación muestra ANTES → DESPUÉS con datos que ya están en pantalla.
-export { confirmarG3, pedirTextoG3, avisoG3, g3Activo } from '../../../diseno-3g/dialogosG3';
+export { confirmarG3, pedirTextoG3, avisoG3 } from '../../../diseno-3g/dialogosG3';

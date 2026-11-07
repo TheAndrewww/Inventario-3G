@@ -1,9 +1,5 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { useDiseno3G } from '../../rediseno2/fundacion';
 import CarruselAnunciosR2 from '../../rediseno2/publicas/CarruselAnunciosR2';
 
 /**
@@ -12,8 +8,6 @@ import CarruselAnunciosR2 from '../../rediseno2/publicas/CarruselAnunciosR2';
  */
 const CarouselAnuncios = ({ anuncios = [] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  // Rediseño 2: encendido, la misma rotación (16 s) y el mismo índice, pintados por rediseno2/publicas/CarruselAnunciosR2
-  const d3 = useDiseno3G();
 
   // Rotar anuncios cada 8 segundos
   useEffect(() => {
@@ -33,75 +27,7 @@ const CarouselAnuncios = ({ anuncios = [] }) => {
     }
   }, [anuncios.length, currentIndex]);
 
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) return <CarruselAnunciosR2 anuncios={anuncios} actual={currentIndex} />;
-
-  if (anuncios.length === 0) {
-    return (
-      <div className="w-full h-full bg-black flex flex-col items-center justify-center text-white p-8 text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500 mb-4"></div>
-        <h2 className="text-2xl font-bold mb-2">Esperando señal de video...</h2>
-        <p className="text-gray-400">Cargando anuncios de 3G Velarias...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative w-full h-full bg-black overflow-hidden group">
-      {anuncios.map((anuncio, index) => {
-        const isActive = index === currentIndex;
-
-        return (
-          <div
-            key={anuncio.id}
-            className={`absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'
-              }`}
-          >
-            {/* Dynamic Background con efecto Ken Burns */}
-            <div
-              className={`absolute inset-0 bg-cover bg-center transition-transform duration-[16000ms] ease-linear ${isActive ? 'scale-110' : 'scale-100'
-                }`}
-              style={{
-                backgroundImage: `url(${anuncio.imagen_url})`,
-                opacity: 0.4,
-                filter: 'blur(20px)'
-              }}
-            />
-
-            {/* Container de imagen principal */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <img
-                src={anuncio.imagen_url}
-                alt={anuncio.frase}
-                className={`w-full h-full object-cover shadow-2xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-1000 ease-out ${isActive ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'
-                  }`}
-              />
-            </div>
-
-            {/* Overlay de texto removido por solicitud del usuario */}
-          </div>
-        );
-      })}
-
-      {/* Barra de progreso para rotación */}
-      {anuncios.length > 1 && (
-        <div
-          key={currentIndex}
-          className="absolute bottom-0 left-0 h-1.5 bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.8)] z-50 w-full origin-left animate-progress"
-        />
-      )}
-
-      <style>{`
-        @keyframes progress {
-          from { transform: scaleX(0); }
-          to { transform: scaleX(1); }
-        }
-        .animate-progress {
-          animation: progress 16000ms linear forwards;
-        }
-      `}</style>
-    </div>
-  );
+  return <CarruselAnunciosR2 anuncios={anuncios} actual={currentIndex} />;
 };
 
 CarouselAnuncios.propTypes = {

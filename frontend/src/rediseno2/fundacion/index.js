@@ -5,7 +5,7 @@
 // radio/sombra de Tailwind en las vistas nuevas; ninguna pieza pide datos por su cuenta.
 
 // Interruptor y formatos
-export { useDiseno3G, useTemaR2, useAnchoR2, useEsCelular, leerDiseno3G, leerTemaR2 } from './useDiseno3G';
+export { useTemaR2, useAnchoR2, useEsCelular, leerTemaR2 } from './useDiseno3G';
 export * from './formato';
 export { VOCABULARIO, estadoDe, tipoTrabajo, AREAS } from './vocabulario';
 export { useCapa } from './useCapa';
@@ -38,7 +38,7 @@ export { Cantidad } from './piezas/Cantidad';
 export { Datos, LineaTiempo, Mensaje } from './piezas/Datos';
 export { Miniatura, IndicadorPistola, ZonaHeredada } from './piezas/Miniatura';
 export { Pila, Fila, Seccion, Nota } from './piezas/Ayudas';
-export { confirmarG3, pedirTextoG3, avisoG3, g3Activo } from './piezas/dialogos';
+export { confirmarG3, pedirTextoG3, avisoG3 } from './piezas/dialogos';
 
 // Piezas de piso (TV y terminal)
 export { MarcoTv, TablaTv, CeldaTv, ObraTv, PaginasTv, ControlesTv, HoraDeDatos } from './piso/Tv';
