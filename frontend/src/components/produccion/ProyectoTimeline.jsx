@@ -1,15 +1,9 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con g3 en false son la vista apagada, que ya nunca se ve. Las ramas con tv
-// (useTvG3) en true son el diseño de TV de la ola 3, que tampoco se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { memo, useMemo } from 'react';
 import { px, s as escalar, calcularDiasPorEtapa, esProyectoMTO, esUrgenteMTO, getEstadoCierrePreparado } from '../../utils/produccion';
 import { ETAPAS_CONFIG, getColorPorTipo, usaTimelineSimplificado } from './constants';
 import TimelineHeader from './TimelineHeader';
 import TimelineStepper from './TimelineStepper';
 import TimelineFooter from './TimelineFooter';
-import { useDiseno3G } from '../../diseno-3g/useDiseno3G';
-import { useTvG3 } from '../../diseno-3g/tvG3';
 
 // Re-exportar para compatibilidad con imports existentes
 export { ETAPAS_CONFIG } from './constants';
@@ -29,8 +23,6 @@ export { ETAPAS_ORDEN } from './constants';
  *        cerrarlos) y avisa cuando la última cita quedó marcada como FALLA.
  */
 const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, etapasPermitidas = null, onAbrirCarpeta, modoPreparados = false }) => {
-    const g3 = useDiseno3G();
-    const tv = useTvG3();
     // Estado de cierre (solo aplica en la vista de Preparados)
     const estadoCierre = useMemo(
         () => (modoPreparados ? getEstadoCierrePreparado(proyecto) : { debeCerrar: false, falla: false, nota: null, diasDesde: 0 }),
@@ -106,7 +98,7 @@ const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePaus
                     className="bg-amber-100 border-y border-amber-300 text-amber-900 font-semibold"
                     style={{ padding: `${px(4)} ${px(12)}`, fontSize: escalar(0.8) }}
                 >
-                    {g3 || tv ? 'Falla en la instalación · reprogramar' : '⚠️ FALLA EN INSTALACIÓN · reprogramar'}
+                    {'Falla en la instalación · reprogramar'}
                     {estadoCierre.nota && (
                         <span className="font-normal"> — {estadoCierre.nota}</span>
                     )}

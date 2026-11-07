@@ -1,14 +1,7 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3, g3Activo() en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, X, Loader2, Barcode, AlertCircle, SwitchCamera } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import toast from 'react-hot-toast';
-import { g3Activo } from '../../diseno-3g/dialogosG3';
 import { detectBarcodeType, getBarcodeTypeName } from '../../utils/barcodeTypeDetector';
-// Rediseño 2: encendido se pinta con rediseno2/inventario/CampoCodigoR2 (la misma cámara y los mismos manejadores)
-import { useDiseno3G as useDiseno3GR2 } from '../../rediseno2/fundacion/useDiseno3G';
 import CampoCodigoR2 from '../../rediseno2/inventario/CampoCodigoR2';
 
 // `resto` (id y aria-* del <Campo> que lo envuelve) solo lo usa la vista encendida
@@ -20,7 +13,6 @@ const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected, 
   const [selectedCamera, setSelectedCamera] = useState(null);
   const html5QrCodeRef = useRef(null);
   const scannerInitialized = useRef(false);
-  const d3 = useDiseno3GR2();
 
   // Validar que el código tenga contenido válido
   const validateCode = (code) => {
@@ -69,7 +61,7 @@ const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected, 
       }
 
       // Mostrar mensaje de éxito
-      toast.success(g3Activo() ? `${typeName} escaneado correctamente` : `✓ ${typeName} escaneado correctamente`);
+      toast.success(`${typeName} escaneado correctamente`);
 
       // Detener escaneo automáticamente
       stopScanning().catch(err => {
@@ -332,114 +324,9 @@ const EAN13InputScanner = ({ value, onChange, disabled = false, onTypeDetected, 
     };
   }, []);
 
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    return (
-      <CampoCodigoR2 valor={value} alCambiar={handleInputChange} deshabilitado={disabled} escaneando={isScanning} mostrarEscaner={showScanner}
-        camaras={cameras} alIniciar={startScanning} alDetener={stopScanning} alCambiarCamara={switchCamera} valido={validateCode(value)} resto={resto} />
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      {/* Input de código */}
-      <div className="flex gap-2">
-        <div className="flex-1 relative">
-          <input
-            type="text"
-            value={value}
-            onChange={handleInputChange}
-            disabled={disabled || isScanning}
-            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 disabled:bg-gray-100 disabled:cursor-not-allowed font-mono"
-            placeholder="1234567890123"
-            maxLength={13}
-          />
-          <Barcode
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-            size={18}
-          />
-          {value && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <span className={`text-xs ${validateCode(value) ? 'text-green-600' : 'text-orange-600'}`}>
-                {value.length}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Botón de scanner */}
-        {!isScanning ? (
-          <button
-            type="button"
-            onClick={startScanning}
-            disabled={disabled}
-            className="flex items-center gap-2 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Escanear código de barras"
-          >
-            <Camera size={18} />
-            Escanear
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={stopScanning}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-            title="Detener escaneo"
-          >
-            <X size={18} />
-            Detener
-          </button>
-        )}
-      </div>
-
-      {/* Área de escaneo */}
-      {showScanner && (
-        <div className="relative bg-gray-900 rounded-lg overflow-hidden" style={{ width: '100%' }}>
-          <div
-            id="ean13-input-scanner"
-            className="w-full"
-            style={{
-              minHeight: '400px',
-              width: '100%',
-              maxWidth: '100%',
-              display: 'block'
-            }}
-          />
-
-          {/* Botón flotante para cambiar de cámara */}
-          {isScanning && cameras.length > 1 && (
-            <button
-              onClick={switchCamera}
-              className="absolute top-4 left-4 p-3 bg-white/90 hover:bg-white text-gray-900 rounded-full shadow-lg hover:shadow-xl transition-all z-10"
-              title="Cambiar cámara"
-            >
-              <SwitchCamera size={24} />
-            </button>
-          )}
-
-          {isScanning && (
-            <div className="absolute top-2 right-2 z-10">
-              <span className="inline-flex items-center gap-1 px-3 py-2 bg-red-600 text-white text-sm font-medium rounded shadow-lg">
-                <Loader2 size={14} className="animate-spin" />
-                Escaneando...
-              </span>
-            </div>
-          )}
-          {!isScanning && showScanner && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
-              <Loader2 size={32} className="animate-spin text-white" />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Ayuda */}
-      {!isScanning && (
-        <p className="text-xs text-gray-500">
-          Puedes digitar manualmente o escanear cualquier tipo de código de barras o QR. Si lo dejas vacío, se generará uno automáticamente.
-        </p>
-      )}
-    </div>
+    <CampoCodigoR2 valor={value} alCambiar={handleInputChange} deshabilitado={disabled} escaneando={isScanning} mostrarEscaner={showScanner}
+      camaras={cameras} alIniciar={startScanning} alDetener={stopScanning} alCambiarCamara={switchCamera} valido={validateCode(value)} resto={resto} />
   );
 };
 

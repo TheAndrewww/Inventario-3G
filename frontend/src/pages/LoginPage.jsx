@@ -1,16 +1,9 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con d3 en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Mail, Lock, AlertCircle, LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { rutaInicialPorRol } from '../components/layout/Sidebar';
-import { Input, Button } from '../components/common';
 import toast from 'react-hot-toast';
 import { modoCuentas3g, irACuentas3g, estadoServidorCuentas3g } from '../services/cuentas3g';
-// Rediseño 2 · vista encendida (apagado no la usa): el mismo formulario, el mismo envío y los mismos mensajes
-import { useDiseno3G as useDiseno3GR2 } from '../rediseno2/fundacion/useDiseno3G';
 import VistaEntrar from '../rediseno2/gestion/VistaEntrar';
 
 // Entrar con tu cuenta 3G (E1 · PLA-24). VITE_CUENTAS3G_MODO apagado (o sin poner) = esta pantalla exactamente como
@@ -32,7 +25,6 @@ const LoginPage = () => {
   const conC3g = MODO_C3G !== 'apagado';
   const [servidorC3g, setServidorC3g] = useState(null); // { modo, emergencia } · null mientras llega o sin respuesta
   const [yendoC3g, setYendoC3g] = useState(false);
-  const d3 = useDiseno3GR2(); // Rediseño 2: vista nueva encendida (abajo, antes del return de siempre)
 
   // Cuentas 3G: qué modo tiene de verdad el servidor (y si hay emergencia), y el motivo si el regreso falló.
   useEffect(() => {
@@ -107,123 +99,9 @@ const LoginPage = () => {
     }
   };
 
-  // Rediseño 2 · vista ENCENDIDA (el JSX de hoy sigue intacto debajo)
-  // VIEJO: se borra a partir del 24-oct-2026 — d3 siempre es true; lo que corre con d3 en false (después de este if o en su else) es lo viejo.
-  if (d3) {
-    return (
-      <VistaEntrar formData={formData} handleChange={handleChange} handleSubmit={handleSubmit} loading={loading} error={error} conC3g={conC3g}
-        botonC3g={botonC3g} conFormulario={conFormulario} emergenciaC3g={emergenciaC3g} yendoC3g={yendoC3g} entrarConC3g={entrarConC3g} />
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100 flex items-center justify-center p-4 g3-fondo-lanzador">
-      <div className="w-full max-w-md">
-        {/* Logo y Título */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <img
-              src="https://res.cloudinary.com/dd93jrilg/image/upload/v1762292854/logo_completo_web_eknzcb.png"
-              alt="Logo 3G Textil"
-              className="h-32 object-contain"
-            />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">ERP 3G Inventario</h1>
-          <p className="text-gray-600">Ingresa a tu cuenta para continuar</p>
-        </div>
-
-        {/* Formulario */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          {conC3g && (
-            <div className="space-y-4">
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3" role="alert">
-                  <AlertCircle className="text-red-600 shrink-0" size={20} />
-                  <p className="text-red-800 text-sm">{error}</p>
-                </div>
-              )}
-              {botonC3g && (
-                <>
-                  <Button type="button" variant="primary" fullWidth icon={LogIn} onClick={entrarConC3g} disabled={yendoC3g}>
-                    {yendoC3g ? 'Abriendo Cuentas 3G…' : 'Entrar con tu cuenta 3G'}
-                  </Button>
-                  <p className="text-sm text-gray-600 text-center">Con tu cuenta de Google de 3G: una sola cuenta para todos los sistemas.</p>
-                </>
-              )}
-              {!conFormulario && (
-                <p className="text-sm text-gray-600 text-center">
-                  El acceso con correo y contraseña ya no se usa en Planta. ¿No puedes entrar? Pide ayuda a Dirección.
-                </p>
-              )}
-              {conFormulario && botonC3g && (
-                <div className="flex items-center gap-3 pt-2" aria-hidden="true">
-                  <span className="h-px flex-1 bg-gray-200" />
-                  <span className="text-xs font-medium text-gray-600">{emergenciaC3g ? 'Acceso de emergencia · solo Dirección' : 'o usa el acceso de siempre'}</span>
-                  <span className="h-px flex-1 bg-gray-200" />
-                </div>
-              )}
-              {emergenciaC3g && (
-                <p className="text-sm text-gray-600">Úsalo solo si Cuentas 3G no responde. Es solo para Dirección y cada entrada queda en el registro.</p>
-              )}
-            </div>
-          )}
-          {conFormulario && (
-          <form onSubmit={handleSubmit} className={conC3g ? 'space-y-6 mt-4' : 'space-y-6'}>
-            {!conC3g && error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-                <AlertCircle className="text-red-600" size={20} />
-                <p className="text-red-800 text-sm">{error}</p>
-              </div>
-            )}
-
-            <Input
-              label="Correo Electrónico"
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="usuario@3gtextil.com"
-              icon={Mail}
-              required
-            />
-
-            <Input
-              label="Contraseña"
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              icon={Lock}
-              required
-            />
-
-            <Button
-              type="submit"
-              variant={conC3g && botonC3g ? 'secondary' : 'primary'}
-              fullWidth
-              disabled={loading}
-            >
-              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-            </Button>
-          </form>
-          )}
-
-          {conFormulario && (
-          <div className="mt-6 text-center">
-            <a href="#" className="text-sm text-red-700 hover:text-red-800 font-medium g3:!text-g3-primario">
-              ¿Olvidaste tu contraseña?
-            </a>
-          </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="text-center mt-8 text-sm text-gray-600">
-          <p>© 2025 3G Textil. Todos los derechos reservados.</p>
-        </div>
-      </div>
-    </div>
+    <VistaEntrar formData={formData} handleChange={handleChange} handleSubmit={handleSubmit} loading={loading} error={error} conC3g={conC3g}
+      botonC3g={botonC3g} conFormulario={conFormulario} emergenciaC3g={emergenciaC3g} yendoC3g={yendoC3g} entrarConC3g={entrarConC3g} />
   );
 };
 

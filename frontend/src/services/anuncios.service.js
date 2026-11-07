@@ -190,5 +190,3 @@ export default {
   generarAnuncioIndividual
 };
 
-
-

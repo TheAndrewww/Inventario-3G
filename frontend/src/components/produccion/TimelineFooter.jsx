@@ -1,10 +1,7 @@
-// VIEJO: se borra a partir del 24-oct-2026 — solo el diseño nuevo (16-oct-2026): en este archivo, lo que sigue a cada
-// `if (…)` marcado y las ramas con g3Activo() en false son la vista apagada, que ya nunca se ve.
-// Se deja escondido una semana por si hay que regresar; ver src/diseno-3g/LEEME.md («Solo el diseño nuevo»).
 import React, { memo, useState } from 'react';
 import { CheckCircle2, RefreshCw, ChevronRight, ChevronLeft, Pause, Play, Snowflake } from 'lucide-react';
 import { ETAPAS_CONFIG, ETAPAS_ORDEN, usaTimelineSimplificado } from './constants';
-import { g3Activo, confirmarG3, pedirTextoG3 } from '../../diseno-3g/dialogosG3';
+import { confirmarG3, pedirTextoG3 } from '../../diseno-3g/dialogosG3';
 
 /**
  * Footer de la tarjeta de proyecto
@@ -45,13 +42,11 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
         let motivo = '';
         if (!isPaused) {
             // Diseño 3G encendido: cajón con el mismo campo (devuelve lo mismo que prompt(): texto o null).
-            motivo = g3Activo()
-                ? await pedirTextoG3({
+            motivo = await pedirTextoG3({
                     titulo: `Pausar «${proyecto.nombre}»`,
                     etiqueta: '¿Cuál es el motivo de la pausa? (opcional)',
                     confirmar: 'Pausar proyecto', cancelar: 'No pausar',
-                })
-                : window.prompt('¿Cuál es el motivo de la pausa? (opcional)');
+                });
             // Si el usuario cancela el prompt, no hacer nada
             if (motivo === null) return;
         }
@@ -67,13 +62,11 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
     const handleRegresar = async () => {
         if (regresarLoading || !onRegresar) return;
 
-        const confirmado = g3Activo()
-            ? await confirmarG3({
+        const confirmado = await confirmarG3({
                 titulo: `¿Regresar «${proyecto.nombre}» a la etapa anterior?`,
                 datos: [['Etapa actual', ETAPAS_CONFIG[proyecto.etapa_actual]?.nombre || proyecto.etapa_actual]],
                 confirmar: 'Regresar etapa', cancelar: 'No regresar',
-            })
-            : window.confirm(`¿Regresar "${proyecto.nombre}" a la etapa anterior?`);
+            });
         if (!confirmado) return;
 
         setRegresarLoading(true);

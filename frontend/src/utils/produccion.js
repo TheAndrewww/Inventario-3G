@@ -110,7 +110,6 @@ const esDiaAsueto = (date) => {
     return festivosOficiales(y).includes(fecha) || festivosNegocioPlanta.has(fecha) || festivosNegocioPlanta.has(fecha.slice(5));
 };
 
-
 /**
  * Suma días hábiles (Lun-Sab) a una fecha.
  * Excluye domingos (0).

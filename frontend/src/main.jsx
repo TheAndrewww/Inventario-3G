@@ -5,10 +5,6 @@ import './index.css'
 import './diseno-3g/diseno-3g.css'
 import './diseno-3g/planta-mapa-tailwind.css'
 import './diseno-3g/planta-3g.css'
-// VIEJO: se borra a partir del 24-oct-2026 — Diseño 3G para TV de la ola 3 (todo bajo html[data-g3-tv], que ya nunca se pone:
-// las TV y la terminal llevan el rediseño 2). Ver src/diseno-3g/tvG3.js
-import './diseno-3g/planta-tv-mapa.css'
-import './diseno-3g/planta-tv-3g.css'
 // Rediseño 2 (todo bajo :root[data-diseno="3g"]). Ver src/rediseno2/fundacion/index.js
 import './rediseno2/fundacion/r2.css'
 import './rediseno2/fundacion/r2-piso.css'
