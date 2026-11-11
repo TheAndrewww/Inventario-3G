@@ -624,6 +624,10 @@ router.get('/produccion/agenda', async (req, res) => {
                 // EXTENSIVO, MTO, GTIA o INSTALACION) y si la obra es EXTENSIVO en el Índice (columna J).
                 tipo_cita: fechas?.get(p.id)?.tipoCita || tipoDeObra(p),
                 es_extensivo: !!p.es_extensivo,
+                // (10-nov-2026) Para la lista de pendientes de Diseño de Carla: lo pausado (congelado en el tablero) y el
+                // tipo del Índice (GTIA/MTO no llevan diseño) no se le reportan al jefe.
+                pausado: !!p.pausado,
+                tipo_proyecto: p.tipo_proyecto || null,
                 ...resumenProduccion(p),
                 produccion_completado_en: p.produccion_completado_en
             }));
