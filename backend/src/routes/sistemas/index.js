@@ -530,6 +530,22 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
     router.get(`${PREFIJO_SISTEMAS}/produccion/cerradas`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerCerradas(req)));
     router.get(`${PREFIJO_SISTEMAS}/produccion/estado`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerEstado(req)));
     router.get(`${PREFIJO_SISTEMAS}/produccion/en-curso`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerEnCurso(req)));
+    // 11-nov · Carla (junta de cierre): las órdenes de producción de una obra (lista y PDF). Solo lee. Listar Drive y bajar
+    // un PDF tardan más que el tope de 2.8 s: la lista tiene 20 s y el archivo va directo (sin tope).
+    router.get(`${PREFIJO_SISTEMAS}/produccion/documentos`, exigirAlcance(ALCANCE_PRODUCCION), async (req, res) => {
+        try {
+            const { leerDocumentos } = await import('./documentosProduccion.js');
+            const { codigo, cuerpo } = await conTope(leerDocumentos(req), 20000);
+            res.status(codigo).json(cuerpo);
+        } catch (e) {
+            console.error('[puerta] /produccion/documentos:', e.message);
+            error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo listar los documentos; intenta de nuevo.');
+        }
+    });
+    router.get(`${PREFIJO_SISTEMAS}/produccion/documentos/archivo/:archivoId`, exigirAlcance(ALCANCE_PRODUCCION), async (req, res) => {
+        const { mandarDocumento } = await import('./documentosProduccion.js');
+        return mandarDocumento(req, res);
+    });
     // 6-nov-2026 (revisión, punto 9 e): pendientes de Planta para el resumen diario de Operación. Solo lee; sin bandera.
     router.get(`${PREFIJO_SISTEMAS}/pendientes-planta`, exigirAlgunAlcance([ALCANCE_PRODUCCION, 'inicio.leer']), async (req, res) => {
         try {
