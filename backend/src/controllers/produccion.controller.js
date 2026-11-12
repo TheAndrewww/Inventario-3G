@@ -359,6 +359,56 @@ export const regresarEtapa = async (req, res) => {
 };
 
 /**
+ * POST /api/produccion/:id/reabrir-manufactura
+ * Reabre solo la manufactura de una obra en «Preparado» y la regresa a producción (herrería y los demás sellos se
+ * quedan; ver ProduccionProyecto.reabrirManufactura). Cuerpo opcional: { motivo }. No avisa al grupo.
+ */
+export const reabrirManufactura = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const motivo = typeof req.body?.motivo === 'string' ? req.body.motivo.trim().slice(0, 300) || null : null;
+
+        const proyecto = await ProduccionProyecto.findByPk(id);
+        if (!proyecto) {
+            return res.status(404).json({ success: false, message: 'Proyecto no encontrado' });
+        }
+        if (proyecto.etapa_actual !== 'instalacion') {
+            return res.status(409).json({
+                success: false,
+                message: proyecto.etapa_actual === 'completado'
+                    ? 'La obra ya está cerrada en el Índice; no se puede reabrir su manufactura'
+                    : 'Solo se reabre la manufactura de una obra que está en «Preparado»'
+            });
+        }
+
+        await proyecto.reabrirManufactura(req.usuario?.id ?? null, { motivo, quien: req.usuario?.nombre || null });
+
+        console.log(`🔁 Manufactura reabierta para "${proyecto.nombre}": regresa a producción`);
+
+        res.json({
+            success: true,
+            message: 'Manufactura reabierta: la obra regresó a producción',
+            data: {
+                proyecto: {
+                    ...proyecto.toJSON(),
+                    diasRestantes: proyecto.getDiasRestantes(),
+                    porcentaje: proyecto.getPorcentajeAvance(),
+                    estadoSubEtapas: proyecto.getEstadoSubEtapas()
+                },
+                etapaAnterior: 'instalacion',
+                etapaNueva: proyecto.etapa_actual
+            }
+        });
+    } catch (error) {
+        console.error('Error al reabrir manufactura:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error al reabrir manufactura'
+        });
+    }
+};
+
+/**
  * POST /api/produccion/:id/completar-subetapa
  * Completar una sub-etapa de producción (manufactura o herrería)
  */

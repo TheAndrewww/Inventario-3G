@@ -9,6 +9,7 @@ import {
     actualizarProyecto,
     togglePausa,
     regresarEtapa,
+    reabrirManufactura,
     eliminarProyecto,
     obtenerEstadisticas,
     sincronizarConSheets,
@@ -150,6 +151,13 @@ router.post('/:id/completar-subetapa', completarSubEtapa);
  * Acceso: Usuarios autenticados
  */
 router.post('/:id/regresar-etapa', regresarEtapa);
+
+/**
+ * POST /api/produccion/:id/reabrir-manufactura
+ * Reabrir solo la manufactura de una obra en «Preparado» (regresa a producción; herrería se queda)
+ * Acceso: Usuarios autenticados (el tablero no se lo muestra a almacén, como «Regresar»)
+ */
+router.post('/:id/reabrir-manufactura', reabrirManufactura);
 
 /**
  * POST /api/produccion

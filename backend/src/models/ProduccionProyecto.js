@@ -479,6 +479,45 @@ ProduccionProyecto.prototype.regresarEtapa = async function (usuarioId, opciones
 };
 
 /**
+ * Reabre SOLO la manufactura de una obra que ya estaba en «Preparado» (etapa interna 'instalacion') y la regresa a
+ * producción, p. ej. cuando en el día de instalación algo no quedó y suben el ajuste de producción. A diferencia de
+ * regresarEtapa, herrería se queda como estaba y no se borra ningún otro sello (diseño, compras, producción, fechas
+ * de entrada ni de límite). Lo que se quita (la manufactura terminada y el «Preparado») queda anotado con su fecha en
+ * observaciones_produccion. Una obra cerrada en el Índice (completado) no se toca. No avisa al grupo.
+ * @param {number|null} usuarioId - Quien la reabre (null desde la puerta entre sistemas)
+ * @param {object} [opciones] - { motivo, quien (texto para la nota), ahora, opcionesGuardar }
+ */
+ProduccionProyecto.prototype.reabrirManufactura = async function (usuarioId = null, opciones = {}) {
+    const { motivo = null, quien = null, ahora = new Date(), opcionesGuardar = {} } = opciones;
+    if (this.etapa_actual === 'completado') {
+        throw new Error('La obra ya está cerrada en el Índice; no se puede reabrir su manufactura');
+    }
+    if (this.etapa_actual !== 'instalacion') {
+        throw new Error('Solo se reabre la manufactura de una obra que está en «Preparado»');
+    }
+
+    const dia = (f) => (f ? new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(f)) : null);
+    const antes = [
+        this.manufactura_completado_en ? `manufactura terminada el ${dia(this.manufactura_completado_en)}` : null,
+        this.instalacion_completado_en ? `Preparado el ${dia(this.instalacion_completado_en)}` : null
+    ].filter(Boolean).join(', ');
+    const nota = `Manufactura reabierta el ${dia(ahora)}${quien ? ` por ${quien}` : ''}`
+        + `${antes ? ` (antes: ${antes})` : ''}${motivo ? `: ${motivo}` : ''}`;
+    this.observaciones_produccion = this.observaciones_produccion ? `${this.observaciones_produccion}\n${nota}` : nota;
+
+    this.manufactura_completado = false;
+    this.manufactura_completado_en = null;
+    this.manufactura_completado_por = null;
+    this.instalacion_completado_en = null;
+    this.instalacion_completado_por = null;
+    this.fecha_completado = null;
+    this.etapa_actual = 'produccion';
+
+    await this.save(opcionesGuardar);
+    return this;
+};
+
+/**
  * Completar una sub-etapa de Producción (Manufactura o Herrería)
  * @param {string} subEtapa - 'manufactura' o 'herreria'
  * @param {number} usuarioId - ID del usuario que completa

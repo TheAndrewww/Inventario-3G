@@ -46,7 +46,7 @@ function ResumenEtapas({ estadisticas, className }) {
 
 export default function VistaTablero({
   usuario, esAlmacen, proyectos, proyectosVisibles, proyectosFiltrados, estadisticas, loading, sincronizando, ultimaSync,
-  cargarDatos, sincronizarSheets, sincronizarDrive, completarEtapa, completarSubEtapa, regresarEtapa, crearProyecto, togglePausa, toggleEtapa,
+  cargarDatos, sincronizarSheets, sincronizarDrive, completarEtapa, completarSubEtapa, regresarEtapa, reabrirManufactura, crearProyecto, togglePausa, toggleEtapa,
   filtro, setFiltro, busqueda, setBusqueda, opciones, modalOpen, setModalOpen, proyectoCarpeta, setProyectoCarpeta,
   claveOrdenFiltros, ordenarOpciones,
 }) {
@@ -142,6 +142,7 @@ export default function VistaTablero({
                       onAbrirCarpeta={() => setProyectoCarpeta(p)}
                       onCompletar={esAlmacen ? undefined : completarEtapa}
                       onRegresar={esAlmacen ? undefined : regresarEtapa}
+                      onReabrirManufactura={esAlmacen ? undefined : reabrirManufactura}
                       onCompletarSubEtapa={completarSubEtapa}
                       onTogglePausa={esAlmacen ? undefined : togglePausa}
                       onToggleEtapa={toggleEtapa}

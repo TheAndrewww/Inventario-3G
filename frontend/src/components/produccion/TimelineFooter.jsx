@@ -1,5 +1,5 @@
 import React, { memo, useState } from 'react';
-import { CheckCircle2, RefreshCw, ChevronRight, ChevronLeft, Pause, Play, Snowflake } from 'lucide-react';
+import { CheckCircle2, RefreshCw, ChevronRight, ChevronLeft, Pause, Play, Snowflake, RotateCcw } from 'lucide-react';
 import { ETAPAS_CONFIG, ETAPAS_ORDEN, usaTimelineSimplificado } from './constants';
 import { confirmarG3, pedirTextoG3 } from '../../diseno-3g/dialogosG3';
 
@@ -7,9 +7,10 @@ import { confirmarG3, pedirTextoG3 } from '../../diseno-3g/dialogosG3';
  * Footer de la tarjeta de proyecto
  * Muestra: estado sub-etapas, mensaje completado, botón avanzar, botón pausar
  */
-const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, etapasPermitidas = null, isPaused }) => {
+const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onReabrirManufactura, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, etapasPermitidas = null, isPaused }) => {
     const [loading, setLoading] = useState(false);
     const [regresarLoading, setRegresarLoading] = useState(false);
+    const [reabrirLoading, setReabrirLoading] = useState(false);
     const [pauseLoading, setPauseLoading] = useState(false);
     const [subEtapaLoading, setSubEtapaLoading] = useState(null); // 'manufactura' | 'herreria' | null
     const timelineSimplificado = usaTimelineSimplificado(proyecto);
@@ -77,12 +78,34 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
         }
     };
 
+    // Reabrir solo manufactura de una obra en «Preparado» (p. ej. no quedó en la instalación y subieron el ajuste):
+    // regresa a producción; herrería y lo demás se quedan como estaban.
+    const handleReabrirManufactura = async () => {
+        if (reabrirLoading || !onReabrirManufactura) return;
+        const motivo = await pedirTextoG3({
+                titulo: `¿Reabrir la manufactura de «${proyecto.nombre}»?`,
+                etiqueta: 'La obra regresa a producción y vuelve a salir en Manufactura. Herrería se queda como está. ¿Por qué se reabre? (opcional)',
+                confirmar: 'Reabrir manufactura', cancelar: 'No reabrir',
+            });
+        if (motivo === null) return;
+
+        setReabrirLoading(true);
+        try {
+            await onReabrirManufactura(proyecto.id, motivo);
+        } finally {
+            setReabrirLoading(false);
+        }
+    };
+
     // Si no hay callbacks, no mostrar nada. Se cuenta onToggleEtapa: calidad
     // solo recibe ese, para marcar las sub-etapas de producción.
     if (!onCompletar && !onTogglePausa && !onRegresar && !onToggleEtapa) return null;
 
     // Puede regresar si no está en diseño o pendiente
     const puedeRegresar = onRegresar && !isPaused && !['pendiente', 'diseno'].includes(proyecto.etapa_actual);
+    // Reabrir manufactura: solo en «Preparado» y si la obra lleva manufactura
+    const puedeReabrirManufactura = onReabrirManufactura && !isPaused && !timelineSimplificado
+        && proyecto.etapa_actual === 'instalacion' && (proyecto.tiene_manufactura || proyecto.manufactura_completado);
 
     // Lógica para Controles de Producción (Sub-etapas)
     const esEtapaProduccion = proyecto.etapa_actual === 'produccion' && !timelineSimplificado;
@@ -209,6 +232,17 @@ const TimelineFooter = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa,
                             >
                                 <ChevronLeft size={16} />
                                 {regresarLoading ? 'Regresando...' : 'Regresar'}
+                            </button>
+                        )}
+                        {puedeReabrirManufactura && (
+                            <button
+                                onClick={handleReabrirManufactura}
+                                disabled={reabrirLoading}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-all"
+                                title="Regresa la obra a producción con la manufactura abierta"
+                            >
+                                <RotateCcw size={16} />
+                                {reabrirLoading ? 'Reabriendo...' : 'Reabrir manufactura'}
                             </button>
                         )}
                         {onTogglePausa && (
