@@ -223,6 +223,20 @@ export const useProduccionData = ({
         }
     }, [cargarDatos]);
 
+    // Regresar a producción la Manufactura de una obra cuya instalación falló
+    const reabrirManufactura = useCallback(async (proyectoId) => {
+        try {
+            const response = await produccionService.reabrirManufactura(proyectoId);
+            if (response.success) {
+                toast.success(response.message);
+                await cargarDatos();
+            }
+        } catch (error) {
+            console.error('Error al reabrir manufactura:', error);
+            toast.error(error.response?.data?.message || 'Error al regresar la manufactura a producción');
+        }
+    }, [cargarDatos]);
+
     // Crear nuevo proyecto
     const crearProyecto = useCallback(async (data) => {
         try {
@@ -357,6 +371,7 @@ export const useProduccionData = ({
         sincronizarDrive,
         completarEtapa,
         regresarEtapa,
+        reabrirManufactura,
         completarSubEtapa,
         crearProyecto,
         togglePausa,

@@ -37,6 +37,7 @@ const DashboardProduccionPage = () => {
         sincronizarDrive,
         completarEtapa,
         regresarEtapa,
+        reabrirManufactura,
         completarSubEtapa,
         crearProyecto,
         togglePausa,
@@ -69,6 +70,7 @@ const DashboardProduccionPage = () => {
             proyectosFiltrados={proyectosFiltrados} estadisticas={estadisticas} loading={loading}
             sincronizando={sincronizando} ultimaSync={ultimaSync} cargarDatos={cargarDatos}
             sincronizarSheets={sincronizarSheets} sincronizarDrive={sincronizarDrive} regresarEtapa={regresarEtapa}
+            reabrirManufactura={reabrirManufactura}
             completarEtapa={completarEtapa} completarSubEtapa={completarSubEtapa}
             crearProyecto={crearProyecto} togglePausa={togglePausa} toggleEtapa={toggleEtapa}
             filtro={filtro} setFiltro={setFiltro} busqueda={busqueda} setBusqueda={setBusqueda} opciones={opciones}

@@ -479,6 +479,43 @@ ProduccionProyecto.prototype.regresarEtapa = async function (usuarioId, opciones
 };
 
 /**
+ * Reabrir solo MANUFACTURA de una obra en «Preparado» (etapa 'instalacion') porque su instalación falló (11-nov-2026):
+ * la obra regresa a 'produccion' con Manufactura pendiente. Herrería (y soldadura y pintura) se queda como estaba;
+ * Diseño, Compras y Producción no se tocan. Se limpia el sello de «Preparado» para que el tablero (toggleEtapa) y la
+ * sincronización no la regresen solos a Preparado; los sellos que se quitan los guarda quien llama en el historial de
+ * reaperturas. Cuando Manufactura vuelva a terminar, la obra pasa a Preparado como siempre (completarSubEtapaProduccion).
+ * @param {object} [opcionesGuardar] - Opciones del save (la transacción de la reapertura)
+ */
+ProduccionProyecto.prototype.reabrirManufactura = async function (opcionesGuardar = {}) {
+    if (this.etapa_actual !== 'instalacion') {
+        throw new Error(`Solo se reabre Manufactura de una obra en Preparado (está en "${this.etapa_actual}")`);
+    }
+    this.manufactura_completado = false;
+    this.manufactura_completado_en = null;
+    this.manufactura_completado_por = null;
+    this.instalacion_completado_en = null;
+    this.instalacion_completado_por = null;
+    this.fecha_completado = null;
+    this.etapa_actual = 'produccion';
+    await this.save(opcionesGuardar);
+    return this;
+};
+
+/**
+ * Historial de reaperturas (11-nov-2026): produccion_proyectos.reaperturas (JSONB, una lista que solo crece). La columna
+ * se crea al arrancar con ADD COLUMN IF NOT EXISTS y vive fuera del modelo, como pronostico_whatsapp: el JSON de los
+ * proyectos no cambia. Nunca se borra una entrada.
+ */
+ProduccionProyecto.anotarReapertura = async function (id, entrada, { transaction = null } = {}) {
+    await sequelize.query(
+        `UPDATE produccion_proyectos
+            SET reaperturas = COALESCE(reaperturas, '[]'::jsonb) || jsonb_build_array(CAST(:e AS JSONB))
+          WHERE id = :id`,
+        { replacements: { id, e: JSON.stringify(entrada) }, transaction }
+    );
+};
+
+/**
  * Completar una sub-etapa de Producción (Manufactura o Herrería)
  * @param {string} subEtapa - 'manufactura' o 'herreria'
  * @param {number} usuarioId - ID del usuario que completa

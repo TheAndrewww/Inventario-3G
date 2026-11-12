@@ -22,6 +22,9 @@
  *   GET /api/sistemas/v1/pendientes-planta  alcance «produccion.leer» o «inicio.leer»  pedidos de encargados sin atender,
  *       tickets de salida sin llegar a Drive y celdas del calendario que Planta no entiende, para el resumen diario de
  *       Operación (6-nov-2026, revisión punto 9 e; services/seguimientoPlanta.service.js › pendientesDePlanta)
+ *   POST /api/sistemas/v1/produccion/reabrir-manufactura  alcance «produccion.reabrir»  { proyecto, motivo? } · regresa a
+ *       producción la Manufactura de una obra en Preparado, solo si su instalación es FALLA en el calendario (11-nov-2026;
+ *       la acción de Sofía, services/reaperturaManufactura.service.js)
  *   POST /api/sistemas/v1/calidad/sugerencias  alcance «calidad.sugerir»  lo que dijo la llamada de las 16:00 a Calidad
  *       (28-oct; origen «operacion»). Solo con PANEL_CALIDAD: apagada responde 404 como cualquier puerta que no existe.
  *
@@ -59,6 +62,7 @@ import { panelCalidad } from '../../utils/banderasCalidad.js';
 import { recibirSugerencias } from '../../services/calidad.service.js';
 
 export const ALCANCE_CALIDAD = 'calidad.sugerir';
+export const ALCANCE_REABRIR = 'produccion.reabrir';
 
 export const PREFIJO_INICIO = '/api/inicio3g/v1';
 export const PREFIJO_SISTEMAS = '/api/sistemas/v1';
@@ -545,6 +549,24 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
     router.get(`${PREFIJO_SISTEMAS}/produccion/documentos/archivo/:archivoId`, exigirAlcance(ALCANCE_PRODUCCION), async (req, res) => {
         const { mandarDocumento } = await import('./documentosProduccion.js');
         return mandarDocumento(req, res);
+    });
+    // 11-nov-2026 (pedido de Isa): Sofía puede ordenar que la Manufactura de una obra en Preparado regrese a producción,
+    // con la MISMA regla del botón del tablero (solo si su última instalación es FALLA en el calendario). Cuerpo
+    // { proyecto: <id de producción>, motivo?: texto }; sin motivo, el comentario de la falla. Leer el calendario tarda
+    // más que el tope de 2.8 s: 20 s, como los documentos.
+    router.post(`${PREFIJO_SISTEMAS}/produccion/reabrir-manufactura`, exigirAlcance(ALCANCE_REABRIR), async (req, res) => {
+        try {
+            const { reabrirManufacturaPorFalla, ErrorReapertura } = await import('../../services/reaperturaManufactura.service.js');
+            const r = await conTope(reabrirManufacturaPorFalla(req.body?.proyecto, {
+                origen: req.puerta.origen, quien: req.puerta.origen, motivo: req.body?.motivo
+            }).catch((e) => (e instanceof ErrorReapertura ? { fallo: e } : Promise.reject(e))), 20000);
+            if (r.fallo) return error(res, r.fallo.codigo, r.fallo.message);
+            const { usuarioId, ...reapertura } = r.reapertura;
+            res.json({ ok: true, proyecto: { id: r.proyecto.id, nombre: r.proyecto.nombre, etapa: r.proyecto.etapa_actual }, reapertura });
+        } catch (e) {
+            console.error('[puerta] /produccion/reabrir-manufactura:', e.message);
+            error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo reabrir la Manufactura; intenta de nuevo.');
+        }
     });
     // 6-nov-2026 (revisión, punto 9 e): pendientes de Planta para el resumen diario de Operación. Solo lee; sin bandera.
     router.get(`${PREFIJO_SISTEMAS}/pendientes-planta`, exigirAlgunAlcance([ALCANCE_PRODUCCION, 'inicio.leer']), async (req, res) => {

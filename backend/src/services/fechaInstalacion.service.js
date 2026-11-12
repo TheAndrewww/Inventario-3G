@@ -361,6 +361,29 @@ export const resolverFechasInstalacion = (proyectos, citas, hoy = hoyMexico(), {
 };
 
 /**
+ * ¿La última instalación de esta obra quedó como FALLA en el calendario (la hora pintada en rojo oscuro)? Con el mismo
+ * cruce de nombres de la agenda (resolverFechasInstalacion) y la misma regla del dashboard (frontend/src/utils/produccion.js
+ * · buscarFechaInstalacion): solo cuenta el último bloque de días seguidos; si una instalación vieja falló y ya se
+ * reprogramó, manda la cita nueva. Los retiros y las cimentaciones no son la instalación. `nota` = el comentario de la
+ * celda (el motivo de la falla), o null. Para reabrir Manufactura de una obra en Preparado (11-nov-2026).
+ * `proyectos` = las obras abiertas (incluida esta): los respaldos por número y por trozo del nombre las necesitan.
+ * @returns {{ falla: boolean, fecha: string|null, nota: string|null }}
+ */
+export const fallaDeInstalacion = (proyecto, proyectos, citas, { hoy = hoyMexico(), unico = vocabularioUnico() } = {}) => {
+    const sinFalla = { falla: false, fecha: null, nota: null };
+    const nombres = new Set(resolverFechasInstalacion(proyectos, citas, hoy, { unico }).get(proyecto?.id)?.nombres || []);
+    if (!nombres.size) return sinFalla;
+    const suyas = (citas || []).filter(c => c?.fecha && nombres.has(normalizarNombre(c.nombre)) && !esRetiro(c, unico) && !esCimentacion(c, unico));
+    const inicio = inicioUltimoBloque([...new Set(suyas.map(c => c.fecha))].sort());
+    if (!inicio) return sinFalla;
+    const bloque = suyas.filter(c => c.fecha >= inicio);
+    const conFalla = bloque.filter(c => c.equipoHora === 'FALLA').sort((a, b) => b.fecha.localeCompare(a.fecha));
+    if (!conFalla.length) return sinFalla;
+    const nota = conFalla.find(c => c.nota)?.nota || bloque.find(c => c.nota)?.nota || null;
+    return { falla: true, fecha: conFalla[0].fecha, nota: nota ? String(nota).trim() || null : null };
+};
+
+/**
  * ¿La obra de esta cita es EXTENSIVO en el Índice? Con el mismo cruce de nombres de la agenda (resolverFechasInstalacion):
  * la cita se liga a la obra que reclamó su nombre. Para el campo `es_extensivo` de GET /produccion/citas (6-nov-2026).
  * @returns {(cita) => boolean}

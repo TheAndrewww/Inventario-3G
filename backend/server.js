@@ -1414,6 +1414,15 @@ const startServer = async () => {
             console.error('⚠️ Error verificando pronostico_whatsapp:', pronosticoErr.message);
         }
 
+        // 11-nov-2026: historial de reaperturas de Manufactura por falla de instalación (lista que solo crece). Fuera del
+        // modelo, como pronostico_whatsapp: el JSON de los proyectos no cambia.
+        try {
+            await sequelize.query("ALTER TABLE produccion_proyectos ADD COLUMN IF NOT EXISTS reaperturas JSONB");
+            console.log('✅ Columna reaperturas verificada en produccion_proyectos');
+        } catch (reaperturasErr) {
+            console.error('⚠️ Error verificando reaperturas:', reaperturasErr.message);
+        }
+
         // C1 · PLA-19: el ID 3G de la obra (dato, nunca llave) en el proyecto y en sus tickets. Fuera de los modelos: el
         // JSON de proyectos y tickets no cambia. Sin EMPATE_POR_OBRA quedan vacías.
         try {
