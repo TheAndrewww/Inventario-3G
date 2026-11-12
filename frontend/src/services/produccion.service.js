@@ -80,6 +80,12 @@ export const regresarEtapa = async (proyectoId) => {
     return response.data;
 };
 
+// Reabrir solo la manufactura de una obra en «Preparado»: regresa a producción (herrería se queda)
+export const reabrirManufactura = async (proyectoId, motivo = '') => {
+    const response = await api.post(`/produccion/${proyectoId}/reabrir-manufactura`, { motivo });
+    return response.data;
+};
+
 // Sub-etapas de Producción (Manufactura y Herrería)
 export const completarSubEtapa = async (proyectoId, subEtapa) => {
     const response = await api.post(`/produccion/${proyectoId}/completar-subetapa`, { subEtapa });
@@ -176,6 +182,7 @@ export default {
     eliminarProyecto,
     completarEtapa,
     regresarEtapa,
+    reabrirManufactura,
     sincronizarConSheets,
     obtenerMesesDisponibles,
     previewProyectosSheets,

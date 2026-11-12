@@ -11,6 +11,8 @@
  *   GET /api/sistemas/v1/latidos      alcance «latidos.leer» (llave nueva de Ventas)  latido de la línea del contable (D1 · PLA-15)
  *   POST /api/sistemas/v1/ordenes/:folio/seguimiento  alcance «ordenes.seguimiento»  estados de la orden según Julia (C4 · PLA-16)
  *   POST /api/sistemas/v1/produccion/pronostico  alcance «produccion.pronostico»  el sí o el no de Producción (C7 · PLA-17)
+ *   POST /api/sistemas/v1/produccion/reabrir-manufactura  alcance «produccion.reabrir»  regresa a producción una obra en
+ *       «Preparado» con su manufactura abierta (11-nov; la ordena Sofía; reabrirManufactura.js)
  *   POST /api/sistemas/v1/proveedores/credito  alcance «proveedores.credito»  crédito y plazo de CTAS CRÉDITO (B3 · PLA-20)
  *   GET /api/sistemas/v1/proveedores  alcance «proveedores.credito»  la ficha maestra de proveedores para Julia (B3 · PLA-20)
  *   POST /api/sistemas/v1/almacen/solicitudes  alcance «almacen.solicitar»  pedidos de los encargados a Almacén (23-oct; origen «operacion»)
@@ -52,6 +54,7 @@ import { registrarBitacora } from './bitacora.js';
 import { leerLatidos } from './latidos.js';
 import { registrarSeguimiento } from './ordenes.js';
 import { registrarPronostico } from './pronostico.js';
+import { ALCANCE_REABRIR, reabrirManufacturaPuerta } from './reabrirManufactura.js';
 import { ALCANCE_PROVEEDORES, recibirCredito, leerProveedores } from './proveedores.js';
 import { ALCANCE_ALMACEN, registrarSolicitudAlmacen, listarSolicitudesAlmacen, TEXTO_TIPO } from './almacen.js';
 import { ALCANCE_PRODUCCION, leerCerradas, leerEstado, leerEnCurso } from './produccion.js';
@@ -520,6 +523,8 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
     router.post(`${PREFIJO_SISTEMAS}/ordenes/:folio/seguimiento`, ...escribirCon('ordenes.seguimiento', (req) => registrarSeguimiento(req.params.folio, req.body, req.puerta.origen)));
     // C7 · PLA-17: el sí o el no de Producción a «¿se completa hoy?» (FIN-11); solo se muestra, no cierra nada
     router.post(`${PREFIJO_SISTEMAS}/produccion/pronostico`, ...escribirCon('produccion.pronostico', (req) => registrarPronostico(req.body)));
+    // 11-nov: reabrir la manufactura de una obra en «Preparado» (regresa a producción; la ordena Sofía por WhatsApp)
+    router.post(`${PREFIJO_SISTEMAS}/produccion/reabrir-manufactura`, ...escribirCon(ALCANCE_REABRIR, (req) => reabrirManufacturaPuerta(req.body)));
     // B3 · PLA-20: crédito y plazo de CTAS CRÉDITO (los manda Julia) y la ficha maestra que lee Julia (FIN-23)
     router.post(`${PREFIJO_SISTEMAS}/proveedores/credito`, ...escribirCon(ALCANCE_PROVEEDORES, recibirCredito));
     router.get(`${PREFIJO_SISTEMAS}/proveedores`, ...leer(ALCANCE_PROVEEDORES, leerProveedores));
