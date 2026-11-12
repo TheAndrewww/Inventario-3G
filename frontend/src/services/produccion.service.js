@@ -80,6 +80,12 @@ export const regresarEtapa = async (proyectoId) => {
     return response.data;
 };
 
+// Obra en Preparado cuya instalación falló: su Manufactura regresa a producción (el motivo lo toma el servidor del calendario)
+export const reabrirManufactura = async (proyectoId) => {
+    const response = await api.post(`/produccion/${proyectoId}/reabrir-manufactura`);
+    return response.data;
+};
+
 // Sub-etapas de Producción (Manufactura y Herrería)
 export const completarSubEtapa = async (proyectoId, subEtapa) => {
     const response = await api.post(`/produccion/${proyectoId}/completar-subetapa`, { subEtapa });
@@ -176,6 +182,7 @@ export default {
     eliminarProyecto,
     completarEtapa,
     regresarEtapa,
+    reabrirManufactura,
     sincronizarConSheets,
     obtenerMesesDisponibles,
     previewProyectosSheets,

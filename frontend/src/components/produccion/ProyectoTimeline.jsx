@@ -1,5 +1,7 @@
-import React, { memo, useMemo } from 'react';
-import { px, s as escalar, calcularDiasPorEtapa, esProyectoMTO, esUrgenteMTO, getEstadoCierrePreparado } from '../../utils/produccion';
+import React, { memo, useMemo, useState } from 'react';
+import { RefreshCw, Undo2 } from 'lucide-react';
+import { px, s as escalar, calcularDiasPorEtapa, esProyectoMTO, esUrgenteMTO, getEstadoCierrePreparado, puedeReabrirManufactura } from '../../utils/produccion';
+import { confirmarG3 } from '../../diseno-3g/dialogosG3';
 import { ETAPAS_CONFIG, getColorPorTipo, usaTimelineSimplificado } from './constants';
 import TimelineHeader from './TimelineHeader';
 import TimelineStepper from './TimelineStepper';
@@ -21,13 +23,35 @@ export { ETAPAS_ORDEN } from './constants';
  * @param {boolean}  props.modoPreparados - Vista de Preparados: marca en rojo los
  *        proyectos cuya instalación ya terminó según el calendario (hay que
  *        cerrarlos) y avisa cuando la última cita quedó marcada como FALLA.
+ * @param {Function} props.onReabrirManufactura - Si se pasa, una obra en Preparado cuya instalación falló (hora en
+ *        rojo en el calendario) muestra el aviso de la falla con el botón para regresar su Manufactura a producción.
  */
-const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, etapasPermitidas = null, onAbrirCarpeta, modoPreparados = false }) => {
+const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePausa, onCompletarSubEtapa, onToggleEtapa, etapasPermitidas = null, onAbrirCarpeta, modoPreparados = false, onReabrirManufactura }) => {
     // Estado de cierre (solo aplica en la vista de Preparados)
     const estadoCierre = useMemo(
         () => (modoPreparados ? getEstadoCierrePreparado(proyecto) : { debeCerrar: false, falla: false, nota: null, diasDesde: 0 }),
         [modoPreparados, proyecto._fechaFinInstalacion, proyecto._fallaInstalacion, proyecto._notaFalla, proyecto.pausado]
     );
+
+    // 11-nov-2026: el botón solo aparece si la instalación falló; el motivo lo toma el servidor del calendario
+    const reabrible = !!onReabrirManufactura && puedeReabrirManufactura(proyecto);
+    const [reabriendo, setReabriendo] = useState(false);
+    const notaFalla = estadoCierre.nota || (reabrible ? proyecto._notaFalla : null);
+    const handleReabrir = async () => {
+        if (reabriendo) return;
+        const confirmado = await confirmarG3({
+            titulo: `¿Regresar la Manufactura de «${proyecto.nombre}» a producción?`,
+            datos: [['Motivo (del calendario)', proyecto._notaFalla || 'Falla en la instalación']],
+            confirmar: 'Regresar a producción', cancelar: 'No regresar',
+        });
+        if (!confirmado) return;
+        setReabriendo(true);
+        try {
+            await onReabrirManufactura(proyecto.id);
+        } finally {
+            setReabriendo(false);
+        }
+    };
 
     // Memoizar cálculos de estilo del contenedor
     const containerStyles = useMemo(() => {
@@ -93,14 +117,29 @@ const ProyectoTimeline = memo(({ proyecto, onCompletar, onRegresar, onTogglePaus
     return (
         <div className={containerStyles.className} style={containerStyles.style}>
             <TimelineHeader proyecto={proyecto} isPaused={containerStyles.isPaused} onAbrirCarpeta={onAbrirCarpeta} />
-            {estadoCierre.falla && (
+            {(estadoCierre.falla || reabrible) && (
                 <div
-                    className="bg-amber-100 border-y border-amber-300 text-amber-900 font-semibold"
-                    style={{ padding: `${px(4)} ${px(12)}`, fontSize: escalar(0.8) }}
+                    className="bg-amber-100 border-y border-amber-300 text-amber-900 font-semibold flex flex-wrap items-center justify-between"
+                    style={{ padding: `${px(4)} ${px(12)}`, fontSize: escalar(0.8), gap: px(8) }}
                 >
-                    {'Falla en la instalación · reprogramar'}
-                    {estadoCierre.nota && (
-                        <span className="font-normal"> — {estadoCierre.nota}</span>
+                    <span>
+                        {'Falla en la instalación · reprogramar'}
+                        {notaFalla && (
+                            <span className="font-normal"> — {notaFalla}</span>
+                        )}
+                    </span>
+                    {reabrible && (
+                        <button
+                            type="button"
+                            onClick={handleReabrir}
+                            disabled={reabriendo}
+                            className="flex items-center gap-1 rounded-lg bg-white border border-amber-400 hover:bg-amber-50 text-amber-900 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ padding: `${px(2)} ${px(8)}` }}
+                            title="Regresa solo la Manufactura de esta obra a producción. El motivo se toma de la falla en el calendario y queda en el historial."
+                        >
+                            {reabriendo ? <RefreshCw size={14} className="animate-spin" /> : <Undo2 size={14} />}
+                            Regresar Manufactura a producción
+                        </button>
                     )}
                 </div>
             )}

@@ -9,6 +9,7 @@ import {
     actualizarProyecto,
     togglePausa,
     regresarEtapa,
+    reabrirManufactura,
     eliminarProyecto,
     obtenerEstadisticas,
     sincronizarConSheets,
@@ -150,6 +151,13 @@ router.post('/:id/completar-subetapa', completarSubEtapa);
  * Acceso: Usuarios autenticados
  */
 router.post('/:id/regresar-etapa', regresarEtapa);
+
+/**
+ * POST /api/produccion/:id/reabrir-manufactura
+ * Regresar a Producción la Manufactura de una obra en Preparado cuya instalación falló (FALLA en el calendario)
+ * Acceso: Usuarios autenticados (almacén no)
+ */
+router.post('/:id/reabrir-manufactura', reabrirManufactura);
 
 /**
  * POST /api/produccion

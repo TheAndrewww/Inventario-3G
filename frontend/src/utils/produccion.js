@@ -653,6 +653,17 @@ export const getEstadoCierrePreparado = (proyecto) => {
 };
 
 /**
+ * ¿Se muestra el botón «Regresar Manufactura a producción»? (11-nov-2026, pedido de Isa). Solo para una obra en
+ * Preparado (etapa interna 'instalacion') cuya ÚLTIMA instalación quedó como FALLA en el calendario (hora en rojo). Sin
+ * falla, no hay botón. MTO y GTIA no extensivos (y PREMIUM) no pasan por producción. El servidor revisa lo mismo.
+ */
+export const puedeReabrirManufactura = (proyecto) => {
+    if (!proyecto || proyecto.etapa_actual !== 'instalacion' || proyecto.pausado || !proyecto._fallaInstalacion) return false;
+    const tipo = String(proyecto.tipo_proyecto || '').toUpperCase();
+    return !(((tipo === 'MTO' || tipo === 'GTIA') && !proyecto.es_extensivo) || proyecto.es_premium);
+};
+
+/**
  * Aplica fechas del calendario como fecha_limite a los proyectos de producción.
  * Para cada proyecto del calendario, busca un match de nombre (≥80%) en la lista de producción.
  * Si encuentra match, overridea fecha_limite con (fecha de instalación - 1 día hábil).

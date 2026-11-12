@@ -7,6 +7,7 @@ import { obraIdsDeProyectos } from '../services/obraId.service.js';
 import { clasificarCodigo, contarTerminal, revisarAreaDeEtapa } from '../middleware/codigoTerminal.middleware.js';
 import { calidadDetieneCierre, proyectoCerradoPorElAval, anotarPreparadoManual, correccionesParaArea } from '../services/calidad.service.js';
 import { panelCalidad } from '../utils/banderasCalidad.js';
+import { reabrirManufacturaPorFalla, ErrorReapertura } from '../services/reaperturaManufactura.service.js';
 import {
     avisarArchivosNuevos,
     avisarTicketSubido,
@@ -355,6 +356,44 @@ export const regresarEtapa = async (req, res) => {
             message: error.message || 'Error al regresar etapa',
             error: error.message
         });
+    }
+};
+
+/**
+ * POST /api/produccion/:id/reabrir-manufactura
+ * Regresa a Producción la Manufactura de una obra en Preparado cuya instalación falló (hora en rojo en el calendario).
+ * Sin cuerpo: el motivo es el comentario de la falla en el calendario y queda en el historial de reaperturas.
+ */
+export const reabrirManufactura = async (req, res) => {
+    try {
+        // Calidad (rol almacén) solo cierra producción: no mueve la obra entre etapas
+        if (req.usuario?.rol === 'almacen') {
+            return res.status(403).json({ success: false, message: 'Desde almacén no se reabren obras' });
+        }
+        const { proyecto, reapertura } = await reabrirManufacturaPorFalla(req.params.id, {
+            usuarioId: req.usuario?.id || null,
+            quien: req.usuario?.nombre || null,
+            origen: 'web'
+        });
+        res.json({
+            success: true,
+            message: 'Manufactura regresó a producción',
+            data: {
+                proyecto: {
+                    ...proyecto.toJSON(),
+                    diasRestantes: proyecto.getDiasRestantes(),
+                    porcentaje: proyecto.getPorcentajeAvance(),
+                    estadoSubEtapas: proyecto.getEstadoSubEtapas()
+                },
+                reapertura
+            }
+        });
+    } catch (error) {
+        if (error instanceof ErrorReapertura) {
+            return res.status(error.codigo).json({ success: false, message: error.message });
+        }
+        console.error('Error al reabrir manufactura:', error);
+        res.status(500).json({ success: false, message: 'Error al reabrir manufactura', error: error.message });
     }
 };
 
