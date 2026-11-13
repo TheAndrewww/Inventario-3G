@@ -443,6 +443,12 @@ router.post('/:id/decision', async (req, res) => {
 
         res.json({
             success: true,
+            // 13-nov-2026 (Compras sin ruido): al AUTORIZAR, Julia ya dice en Compras «🛒 Autorizada *PROVEEDOR*
+            // (OC-…)…» (requisiciones/pedidos.js, con el aviso 'orden_aprobada'); este «✅ Orden … autorizada por …»
+            // era el segundo mensaje por orden. Con avisarEnGrupo:false Julia no lo publica (inventario/aprobaciones.js,
+            // donde hoy hace sendText(`✅ ${data.message}`)); el texto se queda para su log. El rechazo sí se publica:
+            // es el único aviso de que el material vuelve a Solicitudes.
+            avisarEnGrupo: !aprobado,
             message: aprobado
                 ? `Orden ${orden.ticket_id} autorizada por ${autorizador.nombre}. Ya puede enviarse al proveedor.`
                 // Con el rechazo a secas nadie sabía qué seguía: la orden queda ahí y el

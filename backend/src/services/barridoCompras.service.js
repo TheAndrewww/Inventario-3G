@@ -9,7 +9,7 @@
  *      DIAS_PROYECCION días con el consumo promedio del histórico;
  *   2. crea o actualiza (nunca duplica) la solicitud de lo que va a quedar
  *      bajo el mínimo, saltándose lo que ya está en una orden activa;
- *   3. manda UN aviso al grupo de Compras con lo nuevo y la liga a
+ *   3. manda UN aviso AL DÍA al grupo de Compras con lo nuevo y la liga a
  *      Solicitudes, donde se editan cantidades y se crea la orden.
  *
  * Los SKUs con mínimo 0 no se reponen: solo entran si una salida ya les
@@ -22,6 +22,7 @@ import {
     DetalleMovimiento, Movimiento, Proveedor, Usuario, AvisoWhatsApp
 } from '../models/index.js';
 import { enviarWhatsApp } from './whatsapp.service.js';
+import { articuloCorto, unidadCorta, numeroCorto, nombrePropio, plural } from '../utils/textoCorto.js';
 
 export const DIAS_HISTORICO = 60;   // ventana para el consumo promedio
 export const DIAS_PROYECCION = 2;   // salidas que se anticipan
@@ -31,9 +32,6 @@ const ESTADOS_ORDEN_ACTIVA = ['pendiente_aprobacion', 'borrador', 'enviada', 'pa
 // Varias solicitudes nacen juntas (una salida con 5 faltantes): se espera un
 // poco para barrer una sola vez y mandar un solo aviso.
 const ESPERA_BARRIDO_MS = 3 * 60 * 1000;
-// Entre avisos al grupo; lo que salga en medio va en el siguiente.
-const MIN_ENTRE_AVISOS_MS = 30 * 60 * 1000;
-const MAX_LINEAS_AVISO = 25;
 
 const MARCA_BARRIDO = '[Barrido]';
 
@@ -238,36 +236,101 @@ export const ejecutarBarridoCompras = async ({ usuarioId = null } = {}) => {
 // Aviso al grupo de Compras
 // ---------------------------------------------------------------------------
 
-let ultimoAviso = 0;
 let timerAviso = null;
 // Solo si NUNCA se ha mandado un aviso (base recién estrenada).
 const MARGEN_SIN_HISTORIAL_MS = 12 * 60 * 60 * 1000;
+// En «lo más urgente» se nombran a lo más estos proveedores y artículos; el resto se cuenta.
+const MAX_PROVEEDORES_AVISO = 2;
+const MAX_ARTICULOS_AVISO = 4;
 
-// El encabezado sirve de marca para reconocer estos avisos en la cola.
-const ENCABEZADO_AVISO = '🧾 *Solicitudes de compra por revisar*';
+// Marcas para reconocer estos avisos en la cola: la de hoy y la de antes del 13-nov-2026.
+const PREFIJO_AVISO = '🧾 Hay ';
+const ENCABEZADO_ANTERIOR = '🧾 *Solicitudes de compra por revisar*';
+const esAvisoDeSolicitudes = {
+    [Op.or]: [
+        { mensaje: { [Op.like]: `${PREFIJO_AVISO}%solicitud%` } },
+        { mensaje: { [Op.like]: `${ENCABEZADO_ANTERIOR}%` } }
+    ]
+};
+
+const ORDEN_PRIORIDAD = { urgente: 0, alta: 1, media: 2, baja: 3 };
+const SIN_PROVEEDOR = 'Sin proveedor';
 
 /**
- * Cuándo salió el último aviso, leído de la COLA de avisos.
+ * Texto del aviso, en corto (13-nov-2026, pedido de Isa: «parece spam, nadie lo lee»).
+ * Dos renglones: cuántas hay, lo más urgente de lo nuevo (2 proveedores / 4 artículos) y la liga.
  *
- * Vivía solo en memoria, y Railway reinicia el backend en cada despliegue: al
- * arrancar se creía que no había avisado nunca, tomaba el margen de 12 horas y
- * el siguiente aviso salía con TODA la cola —26, 35 pendientes— en vez de con
- * lo que acababa de cambiar. Eso es lo que lo volvía redundante. Con la fecha
- * en la base, un reinicio ya no borra la memoria.
+ *   🧾 Hay 19 solicitudes de compra (8 proveedores). Lo más urgente: Formalasser — cerramiento
+ *   recto grande 189, soporte medio muro 43; Re.ba.ce / Baleros — balero grande 6.
+ *   Ver: https://inventario-3-g.vercel.app/solicitudes-compra
+ *
+ * `recientes`: [{ proveedor, articulo, cantidad, unidad, prioridad }]. Pura.
  */
-const ultimoAvisoEnLaCola = async () => {
-    try {
-        const fila = await AvisoWhatsApp.findOne({
-            where: { destino: 'compras', mensaje: { [Op.like]: `${ENCABEZADO_AVISO}%` } },
-            order: [['id', 'DESC']]
-        });
-        const f = fila && (fila.created_at || fila.createdAt);
-        return f ? new Date(f).getTime() : 0;
-    } catch (e) {
-        console.error('⚠️ [barridoCompras] No pude leer el último aviso:', e.message);
-        return 0;
+export const construirAvisoSolicitudes = ({ total, proveedores, recientes = [], url = urlSolicitudes() }) => {
+    // Lo que no tiene proveedor va al final (no es lo que se puede pedir hoy); luego por prioridad.
+    const ordenados = [...recientes].sort((x, y) =>
+        (x.proveedor ? 0 : 1) - (y.proveedor ? 0 : 1)
+        || (ORDEN_PRIORIDAD[x.prioridad] ?? 9) - (ORDEN_PRIORIDAD[y.prioridad] ?? 9));
+
+    const grupos = new Map();
+    let nombrados = 0;
+    for (const r of ordenados) {
+        if (nombrados >= MAX_ARTICULOS_AVISO) break;
+        const prov = r.proveedor || SIN_PROVEEDOR;
+        if (!grupos.has(prov)) {
+            if (grupos.size >= MAX_PROVEEDORES_AVISO) continue;
+            grupos.set(prov, []);
+        }
+        const unidad = unidadCorta(r.unidad);
+        grupos.get(prov).push(`${articuloCorto(r.articulo)} ${numeroCorto(r.cantidad)}${unidad ? ` ${unidad}` : ''}`);
+        nombrados++;
     }
+
+    let urgente = [...grupos].map(([prov, items]) =>
+        `${prov === SIN_PROVEEDOR ? 'sin proveedor' : nombrePropio(prov)} — ${items.join(', ')}`).join('; ');
+    const faltan = recientes.length - nombrados;
+    if (urgente && faltan > 0) urgente += `; y ${faltan} más`;
+
+    const cabeza = `${PREFIJO_AVISO}${plural(total, 'solicitud', 'solicitudes')} de compra` +
+        (proveedores > 0 ? ` (${plural(proveedores, 'proveedor', 'proveedores')}).` : '.');
+    return [
+        urgente ? `${cabeza} Lo más urgente: ${urgente}.` : cabeza,
+        `Ver: ${url}`
+    ].join('\n');
 };
+
+/** Fecha (AAAA-MM-DD) en la hora de México: «hoy» es el día de Planta, no el del servidor. */
+export const diaMexico = (fecha) => new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit'
+}).format(new Date(fecha));
+
+/**
+ * Regla del jefe: UN aviso al día en Compras. Con los avisos de la cola decide:
+ *  - 'esperar':    el de hoy ya salió → lo nuevo espera al aviso de mañana (si quedó otro en
+ *                  cola sin salir, se descarta: serían dos en el día, lo que pasó el 12-nov);
+ *  - 'actualizar': hay uno que aún no sale (espera el horario o a Julia) → se le cambia el
+ *                  texto, no se encola otro;
+ *  - 'nuevo':      hoy no ha salido ninguno.
+ * `ultimo` = el más reciente de la cola; `ultimoEnviado` = el más reciente que sí salió. Pura.
+ */
+export const decidirAvisoDelDia = (ultimo, ultimoEnviado, ahora = new Date()) => {
+    if (ultimoEnviado && diaMexico(fechaDeAviso(ultimoEnviado)) === diaMexico(ahora)) return 'esperar';
+    if (ultimo?.estado === 'pendiente') return 'actualizar';
+    return 'nuevo';
+};
+
+/**
+ * Los últimos avisos de solicitudes en la cola. La fecha vive en la base (no en memoria):
+ * Railway reinicia el backend en cada despliegue y, con la memoria en blanco, el siguiente
+ * aviso salía con TODA la cola.
+ */
+const avisosEnLaCola = async () => AvisoWhatsApp.findAll({
+    where: { destino: 'compras', estado: { [Op.in]: ['pendiente', 'enviado'] }, ...esAvisoDeSolicitudes },
+    order: [['id', 'DESC']],
+    limit: 5
+});
+
+const fechaDeAviso = (a) => new Date(a.enviado_at || a.created_at || a.createdAt || 0);
 
 const fechaCambio = (s) => new Date(s.updatedAt || s.updated_at || s.createdAt || s.created_at || 0);
 
@@ -279,9 +342,8 @@ const REVERTIDA = /^\s*\[Revertida automáticamente\]/;
 const esRebote = (s) => REVERTIDA.test(String(s.observaciones || ''));
 
 /**
- * Lista las solicitudes pendientes que nacieron o cambiaron desde el último
- * aviso —vengan del barrido, de una salida o capturadas a mano— agrupadas
- * por proveedor. null si no hay nada nuevo.
+ * Aviso con las solicitudes pendientes que nacieron o cambiaron desde `desde` —vengan del
+ * barrido, de una salida o capturadas a mano—. null si no hay nada nuevo.
  */
 const armarAviso = async (desde) => {
     const pendientes = await SolicitudCompra.findAll({
@@ -290,57 +352,50 @@ const armarAviso = async (desde) => {
             { model: Proveedor, as: 'proveedor', attributes: ['nombre'], required: false },
             { model: Articulo, as: 'articulo', attributes: ['nombre', 'unidad'], required: false }
         ],
-        order: [['prioridad', 'DESC'], ['id', 'ASC']]
+        order: [['id', 'ASC']]
     });
     const recientes = pendientes.filter(s => fechaCambio(s) >= desde && !esRebote(s));
     if (recientes.length === 0) return null;
 
-    const proveedores = new Set(pendientes.map(s => s.proveedor?.nombre || 'Sin proveedor'));
-    const agrupados = new Map();
-    for (const s of recientes) {
-        const k = s.proveedor?.nombre || 'Sin proveedor';
-        if (!agrupados.has(k)) agrupados.set(k, []);
-        const urgente = s.prioridad === 'urgente' ? ' ⚠️' : '';
-        agrupados.get(k).push(`${s.articulo?.nombre || 'Artículo'}: ${fmt(s.cantidad_solicitada)} ${s.articulo?.unidad || ''}`.trimEnd() + urgente);
-    }
-
-    const lineas = [
-        ENCABEZADO_AVISO,
-        `Stock mínimo + salidas previstas de los próximos ${DIAS_PROYECCION} días.`,
-        ''
-    ];
-    let usadas = 0;
-    for (const [prov, items] of agrupados) {
-        if (usadas >= MAX_LINEAS_AVISO) break;
-        lineas.push(`*${prov}*`);
-        for (const t of items) {
-            if (usadas >= MAX_LINEAS_AVISO) break;
-            lineas.push(`• ${t}`);
-            usadas++;
-        }
-    }
-    if (recientes.length > usadas) lineas.push(`…y ${recientes.length - usadas} más`);
-
-    lineas.push('');
-    lineas.push(`En total hay ${pendientes.length} pendiente(s) de ${proveedores.size} proveedor(es).`);
-    lineas.push('Revisa, ajusta cantidades y crea la orden aquí:');
-    lineas.push(urlSolicitudes());
-    return lineas.join('\n');
+    return construirAvisoSolicitudes({
+        total: pendientes.length,
+        proveedores: new Set(pendientes.map(s => s.proveedor?.nombre).filter(Boolean)).size,
+        recientes: recientes.map(s => ({
+            proveedor: s.proveedor?.nombre || null,
+            articulo: s.articulo?.nombre || 'Artículo',
+            cantidad: s.cantidad_solicitada,
+            unidad: s.articulo?.unidad,
+            prioridad: s.prioridad
+        }))
+    });
 };
 
 const enviarAvisoPendiente = async () => {
     timerAviso = null;
-    if (!ultimoAviso) ultimoAviso = await ultimoAvisoEnLaCola();
-    // Con la fecha recién recuperada puede que el aviso anterior sea de hace un rato:
-    // se respeta el espacio entre avisos en vez de mandar dos casi pegados.
-    const falta = ultimoAviso + MIN_ENTRE_AVISOS_MS - Date.now();
-    if (falta > 0) { timerAviso = setTimeout(enviarAvisoPendiente, falta); return; }
-    const desde = new Date(ultimoAviso || (Date.now() - MARGEN_SIN_HISTORIAL_MS));
-    const marca = Date.now();
     try {
+        const avisos = await avisosEnLaCola();
+        const ultimo = avisos[0] || null;
+        const ultimoEnviado = avisos.find(a => a.estado === 'enviado') || null;
+        const decision = decidirAvisoDelDia(ultimo, ultimoEnviado);
+        if (decision === 'esperar') {
+            // Ya salió el de hoy: lo nuevo se junta para el de mañana (lo recoge el barrido diario).
+            for (const a of avisos.filter(x => x.estado === 'pendiente')) {
+                await a.update({ estado: 'descartado', error: 'Ya salió el aviso de solicitudes de hoy (uno al día)' });
+            }
+            console.log('🧾 [barridoCompras] Ya salió el aviso de hoy; lo nuevo espera a mañana');
+            return;
+        }
+        // Lo que cambió desde el último aviso que SÍ salió (también al actualizar uno que aún
+        // no sale: así no pierde lo que ya llevaba).
+        const desde = ultimoEnviado ? fechaDeAviso(ultimoEnviado) : new Date(Date.now() - MARGEN_SIN_HISTORIAL_MS);
         const mensaje = await armarAviso(desde);
         if (!mensaje) return;
-        if (await enviarWhatsApp(mensaje, 'compras')) ultimoAviso = marca;
+        if (decision === 'actualizar') {
+            await ultimo.update({ mensaje });
+            console.log(`🧾 [barridoCompras] Aviso #${ultimo.id} aún en cola: se actualizó en vez de encolar otro`);
+            return;
+        }
+        await enviarWhatsApp(mensaje, 'compras');
     } catch (e) {
         console.error('⚠️ [barridoCompras] No se pudo armar el aviso:', e.message);
     }
@@ -348,8 +403,7 @@ const enviarAvisoPendiente = async () => {
 
 const agendarAviso = () => {
     if (timerAviso) return; // ya hay uno en camino; lo nuevo entra en él
-    const espera = Math.max(0, ultimoAviso + MIN_ENTRE_AVISOS_MS - Date.now());
-    timerAviso = setTimeout(enviarAvisoPendiente, espera);
+    timerAviso = setTimeout(enviarAvisoPendiente, 0);
 };
 
 // ---------------------------------------------------------------------------
@@ -381,11 +435,14 @@ export const programarBarridoCompras = ({ usuarioId = null } = {}) => {
     }, ESPERA_BARRIDO_MS);
 };
 
-/** Barrido programado (cron): solo avisa si encontró algo. */
+/**
+ * Barrido programado (cron). Siempre revisa el aviso: si ayer algo se quedó esperando porque
+ * ya había salido el aviso del día, hoy es cuando sale. Sin nada nuevo no se manda nada.
+ */
 export const barridoComprasProgramado = async () => {
     try {
-        const { nuevas, actualizadas } = await ejecutarBarridoCompras();
-        if (nuevas.length || actualizadas.length) agendarAviso();
+        await ejecutarBarridoCompras();
+        agendarAviso();
     } catch (e) {
         console.error('❌ [barridoCompras] Error en el barrido programado:', e.message);
     }
