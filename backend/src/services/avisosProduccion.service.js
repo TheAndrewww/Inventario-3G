@@ -140,14 +140,11 @@ export const avisarEtapaCompletada = async (datos) => {
 };
 
 /**
- * El proyecto terminó producción y se movió a Completados.
+ * El proyecto terminó producción y se movió a Completados. Un solo renglón (13-nov-2026, pedido del usuario: los tres
+ * renglones de antes parecían spam). El bot contable lo lee con proyectoCompletadoDe (resumenAvisos.js), mismo formato.
  */
 export const construirAvisoProyectoCompletado = ({ proyecto }) =>
-    [
-        '🏁 *Proyecto completado*',
-        '',
-        `Ya puede confirmarse en calendario de ${proyecto}.`
-    ].join('\n');
+    `🏁 *Proyecto completado* ${String(proyecto ?? '').trim().replace(/\.+$/, '')}. Listo para confirmar`;
 
 export const avisarProyectoCompletado = async (datos) =>
     enviarWhatsApp(construirAvisoProyectoCompletado(datos), DESTINO);
