@@ -25,6 +25,10 @@
  *   POST /api/sistemas/v1/produccion/reabrir-manufactura  alcance «produccion.reabrir»  { proyecto, motivo? } · regresa a
  *       producción la Manufactura de una obra en Preparado, solo si su instalación es FALLA en el calendario (11-nov-2026;
  *       la acción de Sofía, services/reaperturaManufactura.service.js)
+ *   GET /api/sistemas/v1/produccion/preparados  alcance «produccion.leer» o «produccion.reabrir»  ?q= · las obras en
+ *       Preparado, buscadas por el nombre que dicta Isa (tolera acentos, romanos y una letra de error), con su falla del
+ *       calendario y si se pueden reabrir con las reglas de arriba (12-nov-2026; Sofía la lee antes de proponer la orden;
+ *       forma de la respuesta en preparados.js)
  *   POST /api/sistemas/v1/calidad/sugerencias  alcance «calidad.sugerir»  lo que dijo la llamada de las 16:00 a Calidad
  *       (28-oct; origen «operacion»). Solo con PANEL_CALIDAD: apagada responde 404 como cualquier puerta que no existe.
  *
@@ -58,6 +62,7 @@ import { registrarPronostico } from './pronostico.js';
 import { ALCANCE_PROVEEDORES, recibirCredito, leerProveedores } from './proveedores.js';
 import { ALCANCE_ALMACEN, registrarSolicitudAlmacen, listarSolicitudesAlmacen, TEXTO_TIPO } from './almacen.js';
 import { ALCANCE_PRODUCCION, leerCerradas, leerEstado, leerEnCurso } from './produccion.js';
+import { leerPreparados } from './preparados.js';
 import { panelCalidad } from '../../utils/banderasCalidad.js';
 import { recibirSugerencias } from '../../services/calidad.service.js';
 
@@ -437,8 +442,10 @@ export const llavesPlanta = async (registro) => {
  * @param {object} [opciones]
  * @param {object} [opciones.env]     variables de entorno (process.env)
  * @param {Function} [opciones.anotar] (fila) => void, registro sin datos personales
+ * @param {Function} [opciones.leerFallas] (obras) => Map id → falla del calendario, para /produccion/preparados
+ *        (por omisión leerFallasDelCalendario; las pruebas pasan uno en memoria)
  */
-export const crearPuertas = ({ env = process.env, anotar } = {}) => {
+export const crearPuertas = ({ env = process.env, anotar, leerFallas } = {}) => {
     const router = express.Router();
     const registro = leerRegistro(env);
     const escribir = anotar || ((fila) => console.log('[puerta] ' + JSON.stringify(fila)));
@@ -566,6 +573,17 @@ export const crearPuertas = ({ env = process.env, anotar } = {}) => {
         } catch (e) {
             console.error('[puerta] /produccion/reabrir-manufactura:', e.message);
             error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo reabrir la Manufactura; intenta de nuevo.');
+        }
+    });
+    // 12-nov-2026 (pedido de Isa): Sofía busca aquí la obra que Isa dicta y sabe si se puede reabrir ANTES de proponer
+    // la orden de arriba. Solo lee. Leer el calendario tarda más que el tope de 2.8 s: 20 s, como reabrir-manufactura.
+    router.get(`${PREFIJO_SISTEMAS}/produccion/preparados`, exigirAlgunAlcance([ALCANCE_PRODUCCION, ALCANCE_REABRIR]), async (req, res) => {
+        try {
+            const { codigo, cuerpo } = await conTope(leerPreparados(req, leerFallas ? { leerFallas } : {}), 20000);
+            res.status(codigo).json(cuerpo);
+        } catch (e) {
+            console.error('[puerta] /produccion/preparados:', e.message);
+            error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo armar la lista de Preparados; intenta de nuevo.');
         }
     });
     // 6-nov-2026 (revisión, punto 9 e): pendientes de Planta para el resumen diario de Operación. Solo lee; sin bandera.
