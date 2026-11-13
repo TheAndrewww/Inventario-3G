@@ -12,6 +12,7 @@
 
 import { AvisoWhatsApp } from '../models/index.js';
 import { llegadaConDatos } from '../models/OrdenSeguimiento.js';
+import { articuloCorto, unidadCorta, numeroCorto, nombreDePila } from '../utils/textoCorto.js';
 
 // 'requisiciones' = grupo de ALMACÉN/CALIDAD. Ahí no puede salir ni un precio: está
 // separado de Compras justo para que quien recibe el material no vea cotizaciones ni
@@ -53,37 +54,54 @@ export const enviarWhatsApp = async (mensaje, destino = 'requisiciones') => {
     }
 };
 
+// Cuántos artículos se nombran en la orden por autorizar antes de decir «y N más».
+const MAX_ARTICULOS_AUTORIZAR = 8;
+
 /**
- * Publica una orden de compra en el grupo para que la autoricen ahí mismo.
- * Va sin importes: al grupo solo le interesa qué se está pidiendo y cuánto.
+ * Texto de la orden por autorizar, en corto (13-nov-2026): dos renglones como los escribiría
+ * una persona, en vez de 10 con «Folio: / Proveedor: / La pidió: / • …: 150 PIEZAS».
+ *
+ *   🛒 *EL TORNILLO* (pidió Susana): tuerca seguridad 3/8" ×150, tuerca 3/16" ×50.
+ *   Orden de compra por autorizar ✅ / ❌ · Folio: OC-111126-2219-01
+ *
+ * OJO, lo lee Julia (auxiliar-contable-3g): «Folio: OC-…» (server.js, regex /Folio:\s*([\w-]+)/,
+ * para ligar la ✅ por folio) y la frase «Orden de compra por autorizar» (inventario/aprobaciones.js,
+ * ENCABEZADO: reconoce el mensaje si el id no empata). No quitarlos sin cambiar allá primero.
+ * Va sin importes: al grupo solo le interesa qué se pide y cuánto. Pura.
+ */
+export const construirMensajeAutorizacion = (orden) => {
+    const detalles = orden?.detalles || [];
+    const partes = detalles.slice(0, MAX_ARTICULOS_AUTORIZAR).map(d => {
+        const unidad = unidadCorta(d.articulo?.unidad);
+        return `${articuloCorto(d.articulo?.nombre)} ×${numeroCorto(d.cantidad_solicitada)}${unidad ? ` ${unidad}` : ''}`;
+    });
+    const resto = detalles.length - partes.length;
+    if (resto > 0) partes.push(`y ${resto} más`);
+
+    const proveedor = orden?.proveedor?.nombre || 'Sin proveedor';
+    const quien = orden?.creador?.nombre ? ` (pidió ${nombreDePila(orden.creador.nombre)})` : '';
+    const lista = partes.length ? `: ${partes.join(', ')}.` : '.';
+    return [
+        `🛒 *${proveedor}*${quien}${lista}`,
+        `Orden de compra por autorizar ✅ / ❌ · Folio: ${orden?.ticket_id || 's/folio'}`
+    ].join('\n');
+};
+
+/**
+ * Publica una orden de compra en el grupo para que la autoricen ahí mismo. Cada orden es SU
+ * propio mensaje: la ✅/❌ se reacciona sobre él.
  */
 export const pedirAutorizacionOrden = async (orden) => {
     if (!isWhatsAppEnabled()) return false;
 
-    const articulos = (orden.detalles || []).map(d => {
-        const nombre = d.articulo?.nombre || 'Artículo';
-        const cantidad = parseFloat(d.cantidad_solicitada) || 0;
-        const unidad = d.articulo?.unidad || '';
-        return `• ${nombre}: ${cantidad} ${unidad}`.trimEnd();
-    });
-
-    const lineas = [
-        `🛒 *Orden de compra por autorizar*`,
-        `Folio: ${orden.ticket_id}`,
-        `Proveedor: ${orden.proveedor?.nombre || 'Sin proveedor'}`,
-        orden.creador?.nombre ? `La pidió: ${orden.creador.nombre}` : null,
-        '',
-        ...articulos,
-        '',
-        'Reacciona ✅ para autorizar o ❌ para rechazar.'
-    ].filter(l => l !== null);
+    const mensaje = construirMensajeAutorizacion(orden);
 
     try {
         await AvisoWhatsApp.create({
             destino: 'compras',
             tipo: 'aprobacion_orden',
             referencia_id: orden.id,
-            mensaje: lineas.join('\n').slice(0, 4000)
+            mensaje: mensaje.slice(0, 4000)
         });
         console.log(`📨 Orden ${orden.ticket_id} encolada para autorizar por WhatsApp`);
         return true;
