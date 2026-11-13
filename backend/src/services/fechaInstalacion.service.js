@@ -440,7 +440,10 @@ export const resumenProduccion = (p) => {
         pendientes,
         listas,
         sin_planos: sinPlanos,
-        produccion_cerrada: etapaPasoProduccion || (pendientes.length === 0 && !sinPlanos)
+        // 13-nov-2026: un área que sigue pendiente manda sobre la etapa. Una obra ya en «Preparado» a la que se le sube
+        // producción nueva (PODER JUDICIAL SALVATIERRA: manufactura subida el 13, etapa 'instalacion') salía en el grupo
+        // como «producción lista» y se quedaba fuera del aviso de entrega.
+        produccion_cerrada: pendientes.length === 0 && (etapaPasoProduccion || !sinPlanos)
     };
 };
 
