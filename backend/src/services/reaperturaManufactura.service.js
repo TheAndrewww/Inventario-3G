@@ -15,7 +15,9 @@
  *  · Herrería, Diseño, Compras y Producción se quedan como estaban.
  *
  * La usan el botón del tablero (POST /api/produccion/:id/reabrir-manufactura) y la puerta entre sistemas
- * (POST /api/sistemas/v1/produccion/reabrir-manufactura, alcance «produccion.reabrir»).
+ * (POST /api/sistemas/v1/produccion/reabrir-manufactura, alcance «produccion.reabrir»). La lista de Preparados que lee
+ * Sofía (GET /api/sistemas/v1/produccion/preparados, 12-nov-2026) dice con estas MISMAS reglas (impedimentoDeObra,
+ * SIN_FALLA y la falla del calendario) qué obra se puede reabrir, sin escribir nada.
  */
 import { sequelize } from '../config/database.js';
 import { ProduccionProyecto } from '../models/index.js';
@@ -40,16 +42,50 @@ export const idProyecto = (v) => {
 };
 
 /** MTO y GTIA no extensivos van directo a Preparado: no tienen producción que reabrir. */
-const usaTimelineSimplificado = (p) => {
+export const usaTimelineSimplificado = (p) => {
     const tipo = String(p?.tipo_proyecto || '').toUpperCase();
     return ((tipo === 'MTO' || tipo === 'GTIA') && !p.es_extensivo) || !!p?.es_premium;
+};
+
+export const SIN_FALLA = 'La última instalación de esta obra no está marcada como FALLA en el calendario: no se reabre Manufactura.';
+
+/**
+ * Por qué no se reabre esta obra ANTES de mirar el calendario: { codigo, mensaje }, o null si por la obra sí se puede
+ * (falta la falla del calendario). Puro: lo usan reabrirManufacturaPorFalla y la lista de Preparados que lee Sofía.
+ */
+export const impedimentoDeObra = (proyecto) => {
+    if (!proyecto || proyecto.activo === false) return { codigo: 404, mensaje: 'Proyecto no encontrado' };
+    if (proyecto.etapa_actual !== 'instalacion') {
+        return { codigo: 409, mensaje: 'Solo se reabre Manufactura de una obra que está en Preparado (instalación).' };
+    }
+    if (usaTimelineSimplificado(proyecto)) {
+        return { codigo: 409, mensaje: 'Esta obra no pasa por producción (MTO, garantía o premium): no hay Manufactura que reabrir.' };
+    }
+    return null;
+};
+
+/** La falla de una obra con las citas y las obras abiertas ya leídas (la obra se suma si no está entre las abiertas). */
+const fallaConAbiertas = (proyecto, abiertos, citas) => {
+    const proyectos = abiertos.some(p => p.id === proyecto.id) ? abiertos : [...abiertos, proyecto];
+    return fallaDeInstalacion(proyecto, proyectos, citas);
 };
 
 /** La falla de la obra según el calendario (mes anterior completo, el en curso y el siguiente). */
 export const leerFallaDelCalendario = async (proyecto) => {
     const [anteriores, cercanas, abiertos] = await Promise.all([leerCitasMesAnterior(), leerCitasCercanas(), proyectosAbiertos()]);
-    const proyectos = abiertos.some(p => p.id === proyecto.id) ? abiertos : [...abiertos, proyecto];
-    return fallaDeInstalacion(proyecto, proyectos, [...anteriores, ...cercanas]);
+    return fallaConAbiertas(proyecto, abiertos, [...anteriores, ...cercanas]);
+};
+
+/**
+ * Lo mismo que leerFallaDelCalendario para varias obras, con UNA lectura del calendario y de las obras abiertas (la lista
+ * de Preparados que lee Sofía, 12-nov-2026). Lanza si el calendario no se puede leer.
+ * @returns {Promise<Map<number, { falla: boolean, fecha: string|null, nota: string|null }>>}
+ */
+export const leerFallasDelCalendario = async (proyectos) => {
+    if (!proyectos?.length) return new Map();
+    const [anteriores, cercanas, abiertos] = await Promise.all([leerCitasMesAnterior(), leerCitasCercanas(), proyectosAbiertos()]);
+    const citas = [...anteriores, ...cercanas];
+    return new Map(proyectos.map(p => [p.id, fallaConAbiertas(p, abiertos, citas)]));
 };
 
 const texto = (v) => {
@@ -75,13 +111,8 @@ export const reabrirManufacturaPorFalla = async (id, ctx = {}) => {
 
     const n = idProyecto(id);
     const proyecto = n ? await buscar(n) : null;
-    if (!proyecto || proyecto.activo === false) falla(404, 'Proyecto no encontrado');
-    if (proyecto.etapa_actual !== 'instalacion') {
-        falla(409, 'Solo se reabre Manufactura de una obra que está en Preparado (instalación).');
-    }
-    if (usaTimelineSimplificado(proyecto)) {
-        falla(409, 'Esta obra no pasa por producción (MTO, garantía o premium): no hay Manufactura que reabrir.');
-    }
+    const impedimento = impedimentoDeObra(proyecto);
+    if (impedimento) falla(impedimento.codigo, impedimento.mensaje);
 
     let calendario;
     try {
@@ -90,9 +121,7 @@ export const reabrirManufacturaPorFalla = async (id, ctx = {}) => {
         console.error(`[reabrir manufactura] no se pudo leer el calendario para «${proyecto.nombre}»:`, e.message);
         falla(503, 'No se pudo leer el calendario para revisar la falla de instalación. Intenta de nuevo en un momento.');
     }
-    if (!calendario?.falla) {
-        falla(409, 'La última instalación de esta obra no está marcada como FALLA en el calendario: no se reabre Manufactura.');
-    }
+    if (!calendario?.falla) falla(409, SIN_FALLA);
 
     const motivoCalendario = texto(calendario.nota);
     const reapertura = {
