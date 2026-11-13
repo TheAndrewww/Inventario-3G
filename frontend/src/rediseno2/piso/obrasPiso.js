@@ -6,7 +6,7 @@
 //
 // Para la revisión final: el grupo produccion tiene su propia traducción para el tablero (rediseno2/produccion/obras.js,
 // pasosDe y fechaMaximaDe). Las dos siguen las mismas reglas; conviene juntarlas en una sola al final.
-import { calcularDiasPorEtapa, esProyectoMTO, getHoyStr } from '../../utils/produccion';
+import { calcularDiasPorEtapa, calcularDiasHabiles, citaVsFechaMaxima, esProyectoMTO, fechaMaximaIndice, getHoyStr } from '../../utils/produccion';
 import { usaTimelineSimplificado } from '../../components/produccion/constants';
 import { plural, fechaCorta, aFecha } from '../fundacion/formato';
 import { estadoDe, tipoTrabajo } from '../fundacion/vocabulario';
@@ -83,10 +83,22 @@ export const citaDe = (p) => (p?._fechaCalendario ? (p._fechaInstalacion || p.fe
 /** Fecha máxima (la del Índice) y su plazo, con los umbrales del recuadro «Fecha máxima» de hoy. */
 export function fechaMaximaDe(p, { sinColor = false } = {}) {
   if (!p?.fecha_limite) return null;
-  const fecha = p.fecha_limite_original || p.fecha_limite;
-  // Hoy el recuadro se pinta de ámbar con 3 días o menos (y de rojo con 2 o menos en instalación). En la TV, un solo
-  // lenguaje de plazo (DISENO-v2 §3.4): rojo si ya pasó; ámbar hoy y mañana; lo demás sin color.
-  const pz = plazoHabil(p.diasRestantes, fecha, { avisoHasta: 1 });
+  const fecha = fechaMaximaIndice(p);
+  const dia = diaConSemana(fecha) || corta(fecha);
+  // 12-nov-2026: con cita en el calendario manda la cita contra la fecha máxima del Índice: agendada DESPUÉS → rojo,
+  // el MISMO día → amarillo. Si la cita va antes, el plazo se cuenta hacia la fecha máxima (no hacia la cita).
+  const cmp = citaVsFechaMaxima(p);
+  let pz;
+  if (cmp?.tono === 'mal') {
+    pz = { texto: `Cita ${plural(Math.max(cmp.dias, 1), 'día', 'días')} después`, detalle: `máx. ${dia} · cita ${diaConSemana(cmp.cita)}`, tono: 'mal', dias: p.diasRestantes };
+  } else if (cmp?.tono === 'aviso') {
+    pz = { texto: 'Cita el día límite', detalle: dia, tono: 'aviso', dias: p.diasRestantes };
+  } else {
+    // Hoy el recuadro se pinta de ámbar con 3 días o menos (y de rojo con 2 o menos en instalación). En la TV, un solo
+    // lenguaje de plazo (DISENO-v2 §3.4): rojo si ya pasó; ámbar hoy y mañana; lo demás sin color.
+    const dias = cmp ? calcularDiasHabiles(getHoyStr(), String(fecha).slice(0, 10)) : p.diasRestantes;
+    pz = plazoHabil(dias, fecha, { avisoHasta: 1 });
+  }
   return { ...pz, tono: sinColor && pz.tono !== null ? 'neutro' : pz.tono, fecha };
 }
 

@@ -2,7 +2,7 @@
 // SOLO traduce a texto y tono lo que la tarjeta de hoy ya calcula (TimelineHeader, TimelineStepper, TimelineFooter):
 // mismas cuentas de atraso y urgencia (utils/produccion.js), mismas fechas por etapa (calcularDiasPorEtapa), mismas
 // reglas de qué etapa se puede marcar. No cambia ningún valor ni pide nada.
-import { calcularDiasPorEtapa, esProyectoMTO, esUrgenteMTO, formatDateShort } from '../../utils/produccion';
+import { calcularDiasHabiles, calcularDiasPorEtapa, citaVsFechaMaxima, esProyectoMTO, esUrgenteMTO, fechaMaximaIndice, formatDateShort, getHoyStr } from '../../utils/produccion';
 import { usaTimelineSimplificado, calcularPorcentaje } from '../../components/produccion/constants';
 import { plural } from '../fundacion/formato';
 import { estadoDe } from '../fundacion/vocabulario';
@@ -143,8 +143,12 @@ export function problemaDe(p, pasos, atraso) {
 /** Fecha máxima de la obra: la del Índice y su plazo, con los MISMOS colores que el recuadro «Fecha máxima» de hoy. */
 export function fechaMaximaDe(p) {
   if (!p.fecha_limite) return null;
-  const fecha = p.fecha_limite_original || p.fecha_limite;
-  const d = p.diasRestantes;
+  const fecha = fechaMaximaIndice(p);
+  // 12-nov-2026: con cita en el calendario, la cita contra la fecha máxima del Índice: después → rojo, mismo día → amarillo.
+  const cmp = citaVsFechaMaxima(p);
+  if (cmp?.tono === 'mal') return { fecha, texto: `Cita ${plural(Math.max(cmp.dias, 1), 'día', 'días')} después de la fecha máxima`, tono: 'mal' };
+  if (cmp?.tono === 'aviso') return { fecha, texto: 'Cita el día límite', tono: 'aviso' };
+  const d = cmp ? calcularDiasHabiles(getHoyStr(), String(fecha).slice(0, 10)) : p.diasRestantes;
   const inst = p.etapa_actual === 'instalacion';
   if (d === null || d === undefined) return { fecha, texto: '', tono: null };
   let tono = null;

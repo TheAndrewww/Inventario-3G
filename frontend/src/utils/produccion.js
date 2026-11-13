@@ -630,6 +630,29 @@ const fechaLimiteDesdeInstalacion = (fechaInstalacionStr) => {
  *
  * @returns {{debeCerrar: boolean, falla: boolean, nota: string|null, diasDesde: number}}
  */
+/**
+ * Cita del calendario contra la fecha máxima del Índice (12-nov-2026, regla del jefe para el recuadro «Fecha máxima»
+ * del tablero y de las pantallas):
+ *   cita DESPUÉS de la fecha máxima → { tono: 'mal' }  (rojo: se agendó tarde)
+ *   cita el MISMO día               → { tono: 'aviso' } (amarillo: al límite)
+ *   cita antes                      → { tono: null }
+ * null cuando no hay cita o el Índice no trae fecha máxima (los MTO sin fecha, por ejemplo).
+ */
+export const citaVsFechaMaxima = (proyecto) => {
+    if (!proyecto?._fechaCalendario || !proyecto._fechaInstalacion || !proyecto._fechaIndice) return null;
+    const cita = String(proyecto._fechaInstalacion).slice(0, 10);
+    const maxima = String(proyecto._fechaIndice).slice(0, 10);
+    if (cita > maxima) {
+        return { tono: 'mal', cita, maxima, dias: calcularDiasHabiles(maxima, cita), texto: 'Cita después de la fecha máxima' };
+    }
+    if (cita === maxima) return { tono: 'aviso', cita, maxima, dias: 0, texto: 'Cita el día límite' };
+    return { tono: null, cita, maxima, dias: calcularDiasHabiles(maxima, cita), texto: '' };
+};
+
+/** La fecha máxima que se enseña: la del Índice aunque la cita del calendario haya movido fecha_limite. */
+export const fechaMaximaIndice = (proyecto) =>
+    proyecto?._fechaIndice || proyecto?.fecha_limite_original || proyecto?.fecha_limite || null;
+
 export const getEstadoCierrePreparado = (proyecto) => {
     const vacio = { debeCerrar: false, falla: false, nota: null, diasDesde: 0 };
     if (!proyecto || proyecto.pausado) return vacio;
@@ -752,7 +775,7 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
             const { fechaInstalacionStr, nombreCal } = match;
             const nuevaFechaLimite = fechaLimiteDesdeInstalacion(fechaInstalacionStr);
             console.log(`   ✅ CALENDARIO MANDA: prod="${nombreProd}" ↔ cal="${nombreCal}" → instalación=${fechaInstalacionStr} (índice=${fechaIndice || 'N/A'}) → fecha_limite=${nuevaFechaLimite}`);
-            return { ...p, ...metaCierre, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
+            return { ...p, ...metaCierre, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr, _fechaIndice: fechaIndice || null };
         }
 
         // 2) Citas de meses futuros: cuando el Índice NO trae fecha máxima, o
@@ -765,7 +788,7 @@ export const aplicarFechasCalendario = (proyectos, calendarioProyectos, anio, me
                 const { fechaInstalacionStr, nombreCal } = matchFut;
                 const nuevaFechaLimite = fechaLimiteDesdeInstalacion(fechaInstalacionStr);
                 console.log(`   ✅ CALENDARIO FUTURO MANDA (índice sin fecha): prod="${nombreProd}" ↔ cal="${nombreCal}" → instalación=${fechaInstalacionStr} → fecha_limite=${nuevaFechaLimite}`);
-                return { ...p, ...metaCierre, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr };
+                return { ...p, ...metaCierre, fecha_limite: nuevaFechaLimite, _fechaCalendario: true, _fechaInstalacion: fechaInstalacionStr, _fechaIndice: fechaIndice || null };
             }
         }
 

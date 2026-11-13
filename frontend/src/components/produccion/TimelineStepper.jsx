@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { s, px, addBusinessDays, formatDateShort, calcularDiasHabiles, getHoyStr, calcularDiasPorEtapa, restarDiasHabiles } from '../../utils/produccion';
+import { s, px, addBusinessDays, formatDateShort, calcularDiasHabiles, getHoyStr, calcularDiasPorEtapa, restarDiasHabiles, citaVsFechaMaxima, fechaMaximaIndice } from '../../utils/produccion';
 import {
     Factory,
     Scissors,
@@ -400,45 +400,46 @@ const TimelineStepper = memo(({ proyecto }) => {
 
     return (
         <div className="bg-gray-50 relative overflow-visible" style={{ height: px(altoStepper), padding: px(12) }}>
-            {proyecto.fecha_limite && (
+            {proyecto.fecha_limite && (() => {
+                // 12-nov-2026: con cita en el calendario, el recuadro compara la cita contra la fecha máxima del Índice:
+                // agendada DESPUÉS → rojo; el MISMO día → amarillo (como en las pantallas). Sin cita, el plazo de siempre.
+                const cmp = citaVsFechaMaxima(proyecto);
+                const fechaMax = fechaMaximaIndice(proyecto);
+                const dMax = cmp ? calcularDiasHabiles(getHoyStr(), String(fechaMax).slice(0, 10)) : diasRestantes;
+                const inst = proyecto.etapa_actual === 'instalacion';
+                let tono = 'normal';
+                if (cmp?.tono === 'mal') tono = 'rojo';
+                else if (cmp?.tono === 'aviso') tono = 'ambar';
+                else if (dMax !== null && dMax !== undefined) {
+                    if ((dMax < 0 && !inst) || (inst && dMax <= 2)) tono = 'rojo';
+                    else if (dMax <= 3) tono = 'ambar';
+                }
+                const caja = { rojo: 'bg-red-100 text-red-700 border border-red-200', ambar: 'bg-amber-100 text-amber-700 border border-amber-200', normal: 'bg-white text-gray-700 border border-gray-200' }[tono];
+                const letra = { rojo: 'text-red-600', ambar: 'text-amber-600', normal: 'text-gray-500' }[tono];
+                let leyenda;
+                if (cmp?.tono === 'mal') leyenda = `Cita +${Math.max(cmp.dias, 1)}d`;
+                else if (cmp?.tono === 'aviso') leyenda = 'Al límite';
+                else if (dMax === null || dMax === undefined) leyenda = '';
+                else if (dMax < 0) leyenda = 'Venc';
+                else if (inst && dMax <= 2) leyenda = 'Urgente';
+                else if (dMax === 0) leyenda = 'Hoy';
+                else leyenda = `${dMax}d`;
+                return (
                 <div
-                    className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center origin-right rounded-xl shadow-md ${diasRestantes !== null && (diasRestantes < 0 && proyecto.etapa_actual !== 'instalacion')
-                        ? 'bg-red-100 text-red-700 border border-red-200'
-                        : diasRestantes !== null && (diasRestantes <= 2 && proyecto.etapa_actual === 'instalacion') // Rojo si <= 2 días (incluye negativos)
-                            ? 'bg-red-100 text-red-700 border border-red-200'
-                            : diasRestantes !== null && diasRestantes <= 3
-                                ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                                : 'bg-white text-gray-700 border border-gray-200'
-                        }`}
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center origin-right rounded-xl shadow-md ${caja}`}
                     style={{ padding: `${px(12)} ${px(16)}`, gap: px(2) }}
+                    title={cmp?.tono ? `${cmp.texto}: cita ${cmp.cita}, fecha máxima ${cmp.maxima}` : undefined}
                 >
                     <span className="font-bold text-gray-700 text-center uppercase tracking-wide leading-tight" style={{ fontSize: s(1.5), marginBottom: px(2) }}>FECHA<br/>MÁXIMA</span>
                     <span className="font-bold" style={{ fontSize: s(1.5) }}>
-                        {new Date((proyecto.fecha_limite_original || proyecto.fecha_limite) + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                        {new Date(String(fechaMax).slice(0, 10) + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
                     </span>
-                    <span
-                        className={`font-semibold ${diasRestantes !== null && (diasRestantes < 0 && proyecto.etapa_actual !== 'instalacion')
-                            ? 'text-red-600'
-                            : diasRestantes !== null && (diasRestantes <= 2 && proyecto.etapa_actual === 'instalacion')
-                                ? 'text-red-600'
-                                : diasRestantes !== null && diasRestantes <= 3
-                                    ? 'text-amber-600'
-                                    : 'text-gray-500'
-                            }`}
-                        style={{ fontSize: s(1.125) }}
-                    >
-                        {
-                            diasRestantes !== null && diasRestantes < 0
-                                ? 'Venc'
-                                : diasRestantes !== null && (diasRestantes <= 2 && proyecto.etapa_actual === 'instalacion')
-                                    ? 'Urgente'
-                                    : diasRestantes === 0
-                                        ? 'Hoy'
-                                        : `${diasRestantes}d`
-                        }
-                    </span>
+                    {leyenda && (
+                        <span className={`font-semibold ${letra}`} style={{ fontSize: s(1.125) }}>{leyenda}</span>
+                    )}
                 </div>
-            )}
+                );
+            })()}
 
             {/* Líneas SVG */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" viewBox="0 0 100 100" preserveAspectRatio="none">
