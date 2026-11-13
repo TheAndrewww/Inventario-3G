@@ -385,3 +385,30 @@
   :root[data-diseno="3g"] .r2-tk-franja--resumen .r2-segmentado { flex: 1 1 100%; }
   :root[data-diseno="3g"] .r2-tk-destino-elegido { flex: 1; min-width: 0; }
 }
+
+/* Orden de salida · acomodo de siempre con el diseño nuevo (12-nov-2026): dos columnas en computadora y tableta,
+   buscar + artículos a la izquierda, «Resumen de la orden» fijo a la derecha. */
+:root[data-diseno="3g"] .r2-tk-salida-columnas { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); gap: 24px; align-items: start; padding: 8px 0 32px; }
+:root[data-diseno="3g"] .r2-tk-salida-principal { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+:root[data-diseno="3g"] .r2-tk-tarjeta { background: var(--g3-superficie); border: 1px solid var(--g3-linea); border-radius: 14px; box-shadow: var(--g3-sombra-1, none); padding: 20px; min-width: 0; }
+:root[data-diseno="3g"] .r2-tk-tarjeta-titulo { margin: 0 0 16px; font: var(--r2-t-titulo-seccion, 600 1.125rem/1.5rem var(--g3-f-texto)); color: var(--g3-tinta); display: flex; align-items: baseline; gap: 8px; }
+:root[data-diseno="3g"] .r2-tk-tarjeta .r2-tk-buscador-fila { position: relative; }
+:root[data-diseno="3g"] .r2-tk-tarjeta .r2-tk-buscador-ayuda { justify-content: center; text-align: center; }
+:root[data-diseno="3g"] .r2-tk-salida-resumen { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 16px; }
+:root[data-diseno="3g"] .r2-tk-salida-resumen .r2-tk-tarjeta-titulo { margin-bottom: 0; }
+:root[data-diseno="3g"] .r2-tk-salida-campos { padding-bottom: 16px; border-bottom: 1px solid var(--g3-linea); }
+:root[data-diseno="3g"] .r2-tk-salida-campos .r2-tk-franja-campos--pila { gap: 16px; }
+:root[data-diseno="3g"] .r2-tk-salida-totales { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+:root[data-diseno="3g"] .r2-tk-salida-totales > div { display: flex; justify-content: space-between; gap: 12px; font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+:root[data-diseno="3g"] .r2-tk-salida-totales dt, :root[data-diseno="3g"] .r2-tk-salida-totales dd { margin: 0; }
+:root[data-diseno="3g"] .r2-tk-salida-totales dd { font-weight: 500; color: var(--g3-tinta); font-variant-numeric: tabular-nums; }
+:root[data-diseno="3g"] .r2-tk-salida-totales > .r2-tk-salida-total { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--g3-linea); align-items: baseline; }
+:root[data-diseno="3g"] .r2-tk-salida-total dt { font-weight: 600; color: var(--g3-tinta); }
+:root[data-diseno="3g"] .r2-tk-salida-total dd { font-size: 1.25rem; font-weight: 700; color: var(--g3-primario); }
+:root[data-diseno="3g"] .r2-tk-salida-resumen .r2-tk-barra-aviso { margin: 0; }
+:root[data-diseno="3g"] .r2-tk-salida-botones { display: flex; flex-direction: column; gap: 8px; }
+:root[data-diseno="3g"] .r2-tk-salida-info { margin: 0; padding-top: 16px; border-top: 1px solid var(--g3-linea); font: var(--r2-t-secundario); color: var(--g3-tinta-2); }
+@media (max-width: 1200px) {
+  :root[data-diseno="3g"] .r2-tk-salida-columnas { grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
+  :root[data-diseno="3g"] .r2-tk-tarjeta { padding: 16px; }
+}

@@ -4,12 +4,14 @@
 // Plano (DISENO-v2 §5.2): pestañas de la sección + «⋯ Vaciar orden» → franja «Para quién» (obra o equipo, encargado,
 // observaciones) → buscador/escáner grande con resultados debajo → la orden como tabla → barra fija con el total y
 // «Finalizar orden de salida». En celular la franja es un renglón que abre un cajón.
+// 12-nov-2026: en computadora y tableta vuelve el acomodo de antes (dos columnas con «Resumen de la orden» a la derecha)
+// con las piezas y colores del diseño nuevo; el plano apilado de arriba queda solo para celular.
 import { useState } from 'react';
 import { Camera, ChevronRight, Package, Plus, StickyNote, Trash2 } from 'lucide-react';
 import {
   Pagina, EncabezadoPagina, BarraAccion, Boton, Tabla, Lista, FilaLista, MenuAcciones, Miniatura, Vacio,
   Cajon, CajonCabecera, CajonCuerpo, CajonPie, Campo, Selector, SelectorBuscable, Area,
-  useEsCelular, dinero, cantidad, plural, numero, fechaCorta, clases,
+  useEsCelular, useAnchoR2, dinero, cantidad, plural, numero, fechaCorta, clases,
 } from '../fundacion';
 import { CantidadTicket, CampoEscaner, ListaResultados, EstadoPistola } from './comunes';
 import { getImageUrl } from '../../utils/imageUtils';
@@ -92,6 +94,10 @@ function Observaciones({ e, abiertas, abrir, compacta }) {
 
 export default function VistaOrdenSalida({ e }) {
   const celular = useEsCelular();
+  const ancho = useAnchoR2();
+  // Acomodo de siempre (antes del rediseño) en computadora y tableta: buscar + artículos a la izquierda y el resumen
+  // de la orden (para quién, totales, Finalizar/Vaciar) fijo a la derecha. En celular se queda el acomodo apilado.
+  const dosColumnas = ancho === 'escritorio' || ancho === 'tableta';
   const [paraQuien, setParaQuien] = useState(false);
   const almacen = e.user?.rol === 'almacen';
   const items = e.items;
@@ -177,6 +183,98 @@ export default function VistaOrdenSalida({ e }) {
 
   const resumen = `${plural(items.length, 'artículo', 'artículos')} · ${cantidad(totalPiezas, 'piezas')} · ${dinero(costoTotal)}`;
   const aviso = vacia ? null : !elegido ? (almacen ? 'Elige el equipo para finalizar' : 'Elige la obra para finalizar') : null;
+
+  const fechaHoy = fechaCorta(new Date());
+
+  if (dosColumnas) {
+    return (
+      <Pagina titulo="Orden de salida" densidad="comoda" className="r2-tk-salida">
+        <EncabezadoPagina pestanas="seccion" titulo="Orden de salida"
+          extra={<EstadoPistola leyendo={e.isScanning} />} masAcciones={vaciarOrden} />
+
+        <div className="r2-tk-salida-columnas">
+          <div className="r2-tk-salida-principal">
+            {/* Buscar y agregar artículos */}
+            <section className="r2-tk-tarjeta" aria-label="Agregar artículos">
+              <h2 className="r2-tk-tarjeta-titulo">Buscar y agregar artículos</h2>
+              <div className="r2-tk-buscador-fila">
+                <div className="r2-tk-buscador-campo">
+                  <CampoEscaner valor={e.busqueda} alCambiar={e.cambiarBusqueda} alLimpiar={() => e.cambiarBusqueda('')}
+                    texto="Busca por nombre o código, o lee el código con la pistola"
+                    etiqueta="Buscar artículo por nombre o código" controla={idResultados} expandido={verResultados} />
+                  {verResultados && (
+                    <ListaResultados id={idResultados} items={resultados} buscando={e.buscando} alElegir={e.handleAgregarArticulo}
+                      etiqueta="Artículos encontrados"
+                      vacio={(
+                        <div className="r2-tk-resultados-vacio">
+                          <p className="r2-tk-resultados-vacio-titulo">Ningún artículo coincide con «{e.busqueda}»</p>
+                          <p className="r2-tk-resultados-vacio-texto">Revisa cómo se escribe o créalo para agregarlo a la orden.</p>
+                          <Boton nivel="tonal" icono={Plus} alHacer={e.abrirNuevoArticulo}>Crear artículo nuevo</Boton>
+                        </div>
+                      )} />
+                  )}
+                </div>
+                <Boton nivel="contorno" tamano="grande" icono={Camera} alHacer={() => e.setShowScanner(!e.showScanner)}
+                  aria-pressed={e.showScanner} title="Escanear código de barras con la cámara">
+                  Escanear con cámara
+                </Boton>
+              </div>
+              {!e.busqueda && (
+                <p className="r2-tk-buscador-ayuda">Escribe el nombre o código del artículo, o lee su código con la pistola sin tocar el campo.</p>
+              )}
+            </section>
+
+            {/* Artículos en la orden */}
+            <section className="r2-tk-tarjeta" aria-label="Artículos de la orden">
+              <h2 className="r2-tk-tarjeta-titulo">
+                Artículos en la orden {!vacia && <span className="r2-tk-subtitulo-dato">{numero(items.length)}</span>}
+              </h2>
+              {vacia ? (
+                <Vacio icono={Package} titulo="Tu orden está vacía" texto="Busca o escanea un artículo para empezar."
+                  accion={{ texto: 'Ver inventario', alHacer: e.irAInventario, nivel: 'contorno' }} />
+              ) : (
+                <Tabla etiqueta="Artículos en la orden" columnas={columnas} filas={items} clave="id" densidad="comoda"
+                  masAcciones={quitarDe} />
+              )}
+            </section>
+          </div>
+
+          {/* Resumen de la orden */}
+          <aside className="r2-tk-tarjeta r2-tk-salida-resumen" aria-label="Resumen de la orden">
+            <h2 className="r2-tk-tarjeta-titulo">Resumen de la orden</h2>
+            <div className="r2-tk-salida-campos">
+              <FranjaParaQuien e={e} compacta />
+            </div>
+            <dl className="r2-tk-salida-totales">
+              <div><dt>Artículos</dt><dd className="r2-num">{numero(items.length)}</dd></div>
+              <div><dt>Piezas</dt><dd className="r2-num">{numero(totalPiezas)}</dd></div>
+              <div className="r2-tk-salida-total"><dt>Costo total</dt><dd className="r2-num">{dinero(costoTotal)}</dd></div>
+            </dl>
+            {aviso && <p className="r2-tk-barra-aviso" role="status">{aviso}</p>}
+            <div className="r2-tk-salida-botones">
+              <Boton nivel="principal" tamano="grande" anchoCompleto alHacer={finalizar}
+                deshabilitado={vacia} motivo="La orden está vacía">Finalizar orden de salida</Boton>
+              <Boton nivel="contorno" anchoCompleto icono={Trash2} alHacer={e.handleVaciarCarrito}
+                deshabilitado={vacia} motivo="La orden está vacía">Vaciar orden</Boton>
+            </div>
+            <p className="r2-tk-salida-info">La arma {e.user?.nombre || 'N/A'} · hoy {fechaHoy}</p>
+          </aside>
+        </div>
+
+        {/* Escáner de cámara */}
+        <Cajon abierto={e.showScanner} alCerrar={() => e.setShowScanner(false)} ancho="ancho" etiqueta="Escanear con la cámara">
+          <CajonCabecera titulo="Escanear con la cámara" dato="Los artículos leídos se juntan abajo y se agregan a la orden de una vez."
+            alCerrar={() => e.setShowScanner(false)} />
+          <CajonCuerpo className="r2-tk-cajon-escaner">
+            {e.escaner}
+          </CajonCuerpo>
+        </Cajon>
+
+        {e.avisoLectura}
+        {e.modales}
+      </Pagina>
+    );
+  }
 
   return (
     <Pagina titulo="Orden de salida" densidad="comoda" espacioInferior={!vacia} className="r2-tk-pagina-barra">
