@@ -14,6 +14,7 @@
  *   POST /api/sistemas/v1/proveedores/credito  alcance «proveedores.credito»  crédito y plazo de CTAS CRÉDITO (B3 · PLA-20)
  *   GET /api/sistemas/v1/proveedores  alcance «proveedores.credito»  la ficha maestra de proveedores para Julia (B3 · PLA-20)
  *   POST /api/sistemas/v1/almacen/solicitudes  alcance «almacen.solicitar»  pedidos de los encargados a Almacén (23-oct; origen «operacion»)
+ *   POST /api/sistemas/v1/almacen/tickets/:folio/cerrar  alcance «almacen.tickets» o «almacen.solicitar»  Carla cierra el ticket que Charly ya surtió (13-nov; tickets.js)
  *   GET /api/sistemas/v1/almacen/solicitudes   alcance «almacen.solicitar»  ?encargado= · el estado de esos pedidos para la tableta
  *   GET /api/sistemas/v1/produccion/cerradas   alcance «produccion.leer»  ?desde=&despuesDe= · obras que cerraron producción (Carla 3G, flujo C)
  *   GET /api/sistemas/v1/produccion/estado     alcance «produccion.leer»  ?obras=3G-AA-NNNN,… · ¿sigue cerrada? justo antes de llamar
@@ -61,6 +62,7 @@ import { registrarSeguimiento } from './ordenes.js';
 import { registrarPronostico } from './pronostico.js';
 import { ALCANCE_PROVEEDORES, recibirCredito, leerProveedores } from './proveedores.js';
 import { ALCANCE_ALMACEN, registrarSolicitudAlmacen, listarSolicitudesAlmacen, TEXTO_TIPO } from './almacen.js';
+import { ALCANCE_TICKETS, cerrarTicket } from './tickets.js';
 import { ALCANCE_PRODUCCION, leerCerradas, leerEstado, leerEnCurso } from './produccion.js';
 import { leerPreparados } from './preparados.js';
 import { panelCalidad } from '../../utils/banderasCalidad.js';
@@ -537,6 +539,16 @@ export const crearPuertas = ({ env = process.env, anotar, leerFallas } = {}) => 
     // 23-oct: los encargados le piden a Almacén desde su tableta (Operación los reenvía) y ven si ya se surtió
     router.post(`${PREFIJO_SISTEMAS}/almacen/solicitudes`, ...escribirCon(ALCANCE_ALMACEN, (req) => registrarSolicitudAlmacen(req.body)));
     router.get(`${PREFIJO_SISTEMAS}/almacen/solicitudes`, ...leer(ALCANCE_ALMACEN, (req) => listarSolicitudesAlmacen(req)));
+    // 13-nov: Carla cierra el ticket que Charly le dijo en la junta que ya surtió (lo mismo que «Terminar» del almacén)
+    router.post(`${PREFIJO_SISTEMAS}/almacen/tickets/:folio/cerrar`, exigirAlgunAlcance([ALCANCE_TICKETS, ALCANCE_ALMACEN]), async (req, res) => {
+        try {
+            const { codigo, cuerpo } = await conTope(cerrarTicket(req.params.folio, req.body), 2800);
+            res.status(codigo).json(cuerpo);
+        } catch (e) {
+            console.error('[puerta] /almacen/tickets/cerrar:', e.message);
+            error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo cerrar el ticket; intenta de nuevo.');
+        }
+    });
     // Carla 3G (v2 · pareja #20): Operación lee producción sin escribir nada; nunca Sheets, teléfonos ni importes
     router.get(`${PREFIJO_SISTEMAS}/produccion/cerradas`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerCerradas(req)));
     router.get(`${PREFIJO_SISTEMAS}/produccion/estado`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerEstado(req)));
