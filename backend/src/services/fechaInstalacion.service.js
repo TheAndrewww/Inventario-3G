@@ -754,14 +754,19 @@ const revisarCambiosUnaVez = async () => {
         if (r.sin_planos || r.produccion_cerrada) continue;
         if (!isWhatsAppEnabled()) continue;
 
-        const cambio = clasificarCambio({ anterior, nueva, hoy });
+        let cambio = clasificarCambio({ anterior, nueva, hoy });
         if (!cambio) continue;
+        // (17-nov-2026) Sin cita en el calendario la fecha es la col D del Índice (fecha máxima), no una instalación.
+        // RAUL GONZALEZ ARAUJO - TERRAZA perdió su cita del 24 y cayó a la col D (hoy): salió «se instala HOY». Eso no
+        // es un adelanto: es una obra que se quedó sin cita.
+        const sinCita = fechas.get(p.id)?.fuente === 'indice';
+        if (cambio === 'adelanto' && sinCita) cambio = 'sin-cita';
         const seAdelanta = cambio === 'adelanto';
 
         // Dos pasadas (la de cada 5 min y la que pide el bot antes de avisar) pueden ver el
         // mismo cambio: se avisa una vez por proyecto y fecha.
         const tipo = seAdelanta ? 'adelanto_instalacion' : 'cambio_instalacion';
-        const marca = `Nueva fecha: ${nueva || 'sin fecha'}`;
+        const marca = `Nueva fecha: ${cambio === 'sin-cita' ? 'sin fecha' : nueva || 'sin fecha'}`;
         const yaAvisado = await AvisoWhatsApp.findOne({
             where: { tipo, referencia_id: p.id, mensaje: { [Op.like]: `%${marca}%` } }
         });
@@ -787,7 +792,7 @@ const revisarCambiosUnaVez = async () => {
                 `*${p.nombre}* ahora se instala ${cuando} (${fechaEnPalabras(nueva)}); ` +
                 `antes estaba para el ${fechaEnPalabras(anterior)}.\n\n` +
                 `Producción: ${falta}.\n\n_${marca}_`;
-        } else if (nueva) {
+        } else if (nueva && cambio !== 'sin-cita') {
             mensaje =
                 `📅 *Cambió una instalación*\n\n` +
                 `*${p.nombre}* ya no se instala el ${fechaEnPalabras(anterior)}: ahora es el ` +

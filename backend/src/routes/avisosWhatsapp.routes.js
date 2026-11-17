@@ -622,6 +622,10 @@ router.get('/produccion/agenda', async (req, res) => {
                 proyecto: p.nombre,
                 fecha_instalacion: fecha,
                 fecha_indice: p.fecha_limite,
+                // (17-nov-2026) De dónde salió la fecha: 'calendario' = hay cita; 'indice' = no hay cita y quedó la col D
+                // (fecha máxima, NO una instalación). null = no se pudo leer el calendario. RAUL GONZALEZ ARAUJO - TERRAZA
+                // perdió su cita (el calendario dice ESTACIONAMIENTO) y cayó a la col D = hoy: Carla le preguntó a Charly.
+                fuente_fecha: fechas ? (fechas.get(p.id)?.fuente || null) : null,
                 etapa_actual: p.etapa_actual,
                 // MTO: a Charly solo se le pregunta si ya hubo un retiro antes (ver huboRetiro).
                 es_mto: String(p.tipo_proyecto || '').toUpperCase() === 'MTO' || /\bMTO\b/i.test(p.nombre || ''),
