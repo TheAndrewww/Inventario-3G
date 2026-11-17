@@ -760,7 +760,8 @@ const revisarCambiosUnaVez = async () => {
         // RAUL GONZALEZ ARAUJO - TERRAZA perdió su cita del 24 y cayó a la col D (hoy): salió «se instala HOY». Eso no
         // es un adelanto: es una obra que se quedó sin cita.
         const sinCita = fechas.get(p.id)?.fuente === 'indice';
-        if (cambio === 'adelanto' && sinCita) cambio = 'sin-cita';
+        // EL CALENDARIO MANDA: la col D nunca se anuncia como fecha de instalación, ni adelantada ni cambiada.
+        if (sinCita) cambio = 'sin-cita';
         const seAdelanta = cambio === 'adelanto';
 
         // Dos pasadas (la de cada 5 min y la que pide el bot antes de avisar) pueden ver el
