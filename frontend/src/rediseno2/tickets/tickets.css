@@ -336,6 +336,7 @@
 :root[data-diseno="3g"] .r2-tk-filtro-fecha-campo:focus { outline: none; box-shadow: 0 0 0 3px var(--g3-foco-anillo); }
 :root[data-diseno="3g"] .r2-tk-pdf { color: var(--g3-tinta-2); }
 :root[data-diseno="3g"] .r2-tk-pdf:hover, :root[data-diseno="3g"] .r2-renglon:hover .r2-tk-pdf { color: var(--g3-primario); }
+:root[data-diseno="3g"] .r2-tk-acciones-fila { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 :root[data-diseno="3g"] .r2-tk-tabla-lineas .r2-fila-debajo .r2-estado-linea { white-space: normal; text-align: right; align-items: baseline; }
 :root[data-diseno="3g"] .r2-tk-tabla-lineas .r2-fila-debajo .r2-estado-punto { align-self: flex-start; margin-top: 5px; }
 :root[data-diseno="3g"] .r2-tk-conteo { font: var(--r2-t-secundario); color: var(--g3-tinta-2); font-variant-numeric: tabular-nums; white-space: nowrap; }

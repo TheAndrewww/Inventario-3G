@@ -12,6 +12,21 @@ const HistorialPage = () => {
   const [showModal, setShowModal] = useState(false);
   // Rediseño 2: la vista nueva enseña el error de carga con «Reintentar» (el aviso flotante de siempre no cambia)
   const [errorCargaR2, setErrorCargaR2] = useState(null);
+  // id del ticket que se está mandando a la impresora (para el estado «cargando» del botón)
+  const [reimprimiendoId, setReimprimiendoId] = useState(null);
+
+  const reimprimir = async (movimiento) => {
+    if (!movimiento?.id || reimprimiendoId) return;
+    try {
+      setReimprimiendoId(movimiento.id);
+      const r = await movimientosService.reimprimirTicket(movimiento.id);
+      toast.success(r?.message || `Ticket ${movimiento.ticket_id} enviado a la impresora`);
+    } catch (error) {
+      toast.error(error?.message || 'No se pudo mandar el ticket a la impresora');
+    } finally {
+      setReimprimiendoId(null);
+    }
+  };
 
   useEffect(() => {
     fetchHistorial();
@@ -55,6 +70,7 @@ const HistorialPage = () => {
     <VistaHistorial h={{
       movimientos, filteredMovimientos, loading, searchTerm, setSearchTerm, fetchHistorial, errorCarga: errorCargaR2,
       selectedMovimiento, showModal, handleVerDetalles, handleCloseModal, descargarPDF: generateTicketPDF,
+      reimprimir, reimprimiendoId,
     }} />
   );
 };

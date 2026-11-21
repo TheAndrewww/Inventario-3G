@@ -34,6 +34,16 @@ const movimientosService = {
     }
   },
 
+  // Volver a mandar un ticket del historial a la impresora de tickets
+  async reimprimirTicket(id) {
+    try {
+      const response = await api.post(`/pedidos/${id}/reimprimir`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'No se pudo mandar el ticket a la impresora' };
+    }
+  },
+
   // Obtener detalle de un movimiento
   async getById(id) {
     try {

@@ -609,25 +609,11 @@ export const crearPedido = async (req, res) => {
         const db = admin.firestore();
 
         // Preparar datos del pedido para el agente de impresión
-        const datosPedido = {
-          ticket_id: ticket_id,
-          tipo: 'pedido',
-          fecha: new Date().toISOString(),
+        const datosPedido = datosTicketImpresion(pedidoCompleto, {
           proyecto: proyecto || (equipo ? equipo.nombre : 'Sin proyecto'),
           creador: req.usuario.nombre,
-          ubicacion_destino: pedidoCompleto.ubicacionDestino?.codigo || 'N/A',
-          observaciones: observaciones || '',
-          articulos: pedidoCompleto.detalles.map(d => ({
-            nombre: d.articulo?.nombre || 'Artículo',
-            cantidad: d.cantidad,
-            unidad: d.articulo?.unidad || 'pz',
-            categoria: d.articulo?.categoria?.nombre || 'Sin categoría',
-            ubicacion: d.articulo?.ubicacion?.codigo || 'N/A',
-            imagen: d.articulo?.imagen_url || null,
-            descripcion: d.articulo?.descripcion || null
-          })),
-          total_piezas: articulos.reduce((sum, art) => sum + art.cantidad, 0)
-        };
+          fecha: new Date().toISOString(),
+        });
 
         await db.collection('cola_impresion').add({
           tipo: 'pedido',
@@ -878,6 +864,84 @@ export const obtenerPedido = async (req, res) => {
       message: 'Error al obtener el pedido',
       error: error.message
     });
+  }
+};
+
+// Datos que el agente de impresión (Mac Mini, colección 'cola_impresion') necesita para un ticket tipo 'pedido'.
+// Lo usan crearPedido (impresión automática) y reimprimirTicket (botón del Historial).
+function datosTicketImpresion(mov, { proyecto, creador, fecha } = {}) {
+  const detalles = mov.detalles || [];
+  return {
+    ticket_id: mov.ticket_id,
+    tipo: 'pedido',
+    fecha: fecha || new Date(mov.created_at || mov.createdAt || Date.now()).toISOString(),
+    proyecto: proyecto || mov.proyecto || mov.equipo?.nombre || 'Sin proyecto',
+    creador: creador || mov.usuario?.nombre || 'N/A',
+    ubicacion_destino: mov.ubicacionDestino?.codigo || 'N/A',
+    observaciones: mov.observaciones || '',
+    articulos: detalles.map(d => ({
+      nombre: d.articulo?.nombre || 'Artículo',
+      cantidad: d.cantidad,
+      unidad: d.articulo?.unidad || 'pz',
+      categoria: d.articulo?.categoria?.nombre || 'Sin categoría',
+      ubicacion: d.articulo?.ubicacion?.codigo || 'N/A',
+      imagen: d.articulo?.imagen_url || null,
+      descripcion: d.articulo?.descripcion || null
+    })),
+    total_piezas: detalles.reduce((sum, d) => sum + (parseFloat(d.cantidad) || 0), 0)
+  };
+}
+
+/**
+ * Volver a mandar un ticket del historial a la impresora de tickets.
+ * Encola el mismo trabajo que se manda al crear el pedido (tipo 'pedido' en 'cola_impresion').
+ */
+export const reimprimirTicket = async (req, res) => {
+  try {
+    if (!admin.apps.length) {
+      return res.status(503).json({ success: false, message: 'La impresora de tickets no está conectada (Firebase sin configurar)' });
+    }
+    const mov = await Movimiento.findByPk(req.params.id, {
+      include: [
+        { model: Usuario, as: 'usuario', attributes: ['id', 'nombre'] },
+        { model: Equipo, as: 'equipo', attributes: ['id', 'nombre'] },
+        { model: Ubicacion, as: 'ubicacionDestino', attributes: ['id', 'codigo', 'almacen'] },
+        {
+          model: DetalleMovimiento,
+          as: 'detalles',
+          include: [{
+            model: Articulo,
+            as: 'articulo',
+            include: [{ model: Categoria, as: 'categoria' }, { model: Ubicacion, as: 'ubicacion' }]
+          }]
+        }
+      ]
+    });
+    if (!mov) {
+      return res.status(404).json({ success: false, message: 'Ticket no encontrado' });
+    }
+    if (!mov.detalles?.length) {
+      return res.status(400).json({ success: false, message: 'Este ticket no tiene artículos para imprimir' });
+    }
+
+    const datos = datosTicketImpresion(mov);
+    await admin.firestore().collection('cola_impresion').add({
+      tipo: 'pedido',
+      datos,
+      pedido_id: mov.id,
+      ticket_id: mov.ticket_id,
+      estado: 'pendiente',
+      created_at: new Date(),
+      printer: 'TicketPrinter',
+      reimpresion: true,
+      reimpreso_por: req.usuario?.nombre || null
+    });
+    console.log(`🖨️ Reimpresión enviada a Firebase para ticket ${mov.ticket_id} (por ${req.usuario?.nombre})`);
+
+    res.status(200).json({ success: true, message: `Ticket ${mov.ticket_id} enviado a la impresora` });
+  } catch (error) {
+    console.error('Error al reimprimir ticket:', error);
+    res.status(500).json({ success: false, message: 'No se pudo mandar el ticket a la impresora', error: error.message });
   }
 };
 

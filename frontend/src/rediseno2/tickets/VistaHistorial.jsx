@@ -1,7 +1,7 @@
 // Rediseño 2 · Historial (/historial), vista encendida. La página guarda el estado, la carga y el filtro de búsqueda;
 // aquí solo se pinta. Plano (DISENO-v2 §5.2): pestañas de la sección → fila de filtros (búsqueda con foco y fecha) →
 // tabla compacta que cabe, agrupada por día → detalle en cajón con «Descargar PDF» arriba.
-import { Download, History } from 'lucide-react';
+import { Download, History, Printer } from 'lucide-react';
 import {
   Pagina, EncabezadoPagina, BarraFiltros, Tabla, Boton, Fecha, Estado, Datos,
   Cajon, CajonCabecera, CajonDecision, CajonCuerpo, SeccionCajon,
@@ -27,6 +27,12 @@ function DetalleMovimiento({ h }) {
           <CajonCabecera titulo={m.ticket_id} dato={m.proyecto || tipoMovimiento(m)} estado={<EstadoMov m={m} />} alCerrar={h.handleCloseModal} />
           <CajonDecision>
             <Boton nivel="principal" icono={Download} alHacer={() => h.descargarPDF(m)}>Descargar PDF</Boton>
+            {m.detalles?.length > 0 && (
+              <Boton nivel="contorno" icono={Printer} cargando={h.reimprimiendoId === m.id}
+                deshabilitado={Boolean(h.reimprimiendoId)} alHacer={() => h.reimprimir(m)}>
+                Reimprimir ticket
+              </Boton>
+            )}
           </CajonDecision>
           <CajonCuerpo>
             <SeccionCajon titulo="Datos">
@@ -123,10 +129,19 @@ export default function VistaHistorial({ h }) {
         grupos={grupos} alAbrir={h.handleVerDetalles} seleccionada={abiertoId}
         etiquetaAbrir={(m) => `Ver el detalle de ${m.ticket_id}`}
         accion={celular ? undefined : (m) => (
-          <Boton nivel="fantasma" tamano="chico" icono={Download} alHacer={() => h.descargarPDF(m)} title="Descargar PDF"
-            aria-label={`Descargar PDF de ${m.ticket_id}`} className="r2-tk-pdf">
-            PDF
-          </Boton>
+          <span className="r2-tk-acciones-fila">
+            <Boton nivel="fantasma" tamano="chico" icono={Download} alHacer={() => h.descargarPDF(m)} title="Descargar PDF"
+              aria-label={`Descargar PDF de ${m.ticket_id}`} className="r2-tk-pdf">
+              PDF
+            </Boton>
+            {m.detalles?.length > 0 && (
+              <Boton nivel="fantasma" tamano="chico" icono={Printer} alHacer={() => h.reimprimir(m)}
+                cargando={h.reimprimiendoId === m.id} deshabilitado={Boolean(h.reimprimiendoId)}
+                title="Volver a mandar a la impresora de tickets" aria-label={`Reimprimir ticket ${m.ticket_id}`}>
+                Imprimir
+              </Boton>
+            )}
+          </span>
         )}
         filaCelular={filaCelular} className="r2-tk-tabla-lineas"
         cargando={h.loading} error={error}

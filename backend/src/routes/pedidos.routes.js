@@ -24,7 +24,8 @@ import {
   previewAnulacionMasiva,
   ejecutarAnulacionMasiva,
   previewReabrirAnulacionMasiva,
-  reabrirAnulacionMasiva
+  reabrirAnulacionMasiva,
+  reimprimirTicket
 } from '../controllers/pedidos.controller.js';
 import {
   verificarToken,
@@ -137,6 +138,18 @@ router.get(
   verificarToken,
   accesoInventario,
   listarSupervisores
+);
+
+/**
+ * @route   POST /api/pedidos/:id/reimprimir
+ * @desc    Volver a mandar el ticket a la impresora de tickets (desde el Historial)
+ * @access  Diseñador, Almacén, Supervisor, Administrador
+ */
+router.post(
+  '/:id/reimprimir',
+  verificarToken,
+  verificarRol('diseñador', 'almacen', 'encargado', 'administrador'),
+  reimprimirTicket
 );
 
 /**
