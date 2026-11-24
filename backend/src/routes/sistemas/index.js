@@ -552,7 +552,7 @@ export const crearPuertas = ({ env = process.env, anotar, leerFallas } = {}) => 
     });
     // 23-nov (jefe: «si Carla queda en cerrar, debe cerrar»): lo que Carla dijo en la junta que cerraba (una etapa de
     // producción) y las fallas de un área que marca ✗ en el control de campaña. Ver juntaCierres.js.
-    const juntaEscribe = (alcance, ruta, fn) => router.post(`${PREFIJO_SISTEMAS}${ruta}`, exigirAlgunAlcance([alcance, ALCANCE_TICKETS]), async (req, res) => {
+    const juntaEscribe = (alcance, ruta, fn) => router.post(`${PREFIJO_SISTEMAS}${ruta}`, exigirAlgunAlcance([alcance, ALCANCE_TICKETS, ALCANCE_ALMACEN]), async (req, res) => {
         try {
             const { codigo, cuerpo } = await conTope(fn(req.body), 8000);
             res.status(codigo).json(cuerpo);
