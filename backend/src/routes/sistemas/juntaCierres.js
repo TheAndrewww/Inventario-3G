@@ -120,8 +120,14 @@ export async function marcarCampana(cuerpo, m = { CampanaControl }) {
     const donde = { year: c.year, quarter: c.quarter, area: d.area, week: c.week };
     const previa = await m.CampanaControl.findOne({ where: donde });
     const notaPrevia = String(previa?.note ?? '').trim();
-    const ya = previa?.status === 'bad' && notaPrevia.includes(d.nota);
-    const nota = ya ? notaPrevia : (notaPrevia ? `${notaPrevia}\n• ${d.nota}` : d.nota).slice(0, 4000);
+    // 24-nov (jefe): en el control de campaña se escribe en MAYÚSCULAS. Si la misma nota ya estaba en minúsculas, se
+    // reescribe en mayúsculas en su lugar (no se repite).
+    const nueva = d.nota.toLocaleUpperCase('es-MX');
+    const i = notaPrevia.toLocaleUpperCase('es-MX').indexOf(nueva);
+    const ya = previa?.status === 'bad' && i >= 0 && notaPrevia.slice(i, i + nueva.length) === nueva;
+    const nota = ya ? notaPrevia
+        : i >= 0 ? `${notaPrevia.slice(0, i)}${nueva}${notaPrevia.slice(i + nueva.length)}`
+            : (notaPrevia ? `${notaPrevia}\n• ${nueva}` : nueva).slice(0, 4000);
     if (!ya) await m.CampanaControl.upsert({ ...donde, status: 'bad', note: nota });
     console.log(`[puerta] ${d.quien} marcó ✗ ${d.area} semana ${c.week}${ya ? ' (ya estaba)' : ''}`);
     return { codigo: 200, cuerpo: { ok: true, ...c, area: d.area, status: 'bad', nota, ya } };

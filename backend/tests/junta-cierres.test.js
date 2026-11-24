@@ -84,8 +84,12 @@ test('marcar ✗: crea la celda, suma notas y no repite la misma', async () => {
     assert.equal(a.cuerpo.week, 47);
     assert.equal(a.cuerpo.ya, false);
     const b = await marcarCampana({ area: 'manufactura', nota: 'Pantallas más grandes', fecha: '2026-11-21', quien: 'Carla' }, m);
-    assert.match(b.cuerpo.nota, /quemadura\n• Pantallas/);
+    assert.match(b.cuerpo.nota, /QUEMADURA\n• PANTALLAS MÁS GRANDES/);
     const c = await marcarCampana({ area: 'manufactura', nota: 'Pantallas más grandes', fecha: '2026-11-21', quien: 'Carla' }, m);
     assert.equal(c.cuerpo.ya, true);
+    // La que ya estaba en minúsculas se reescribe en mayúsculas en su lugar.
+    celdas.set('2026|4|herreria|47', { status: 'bad', note: 'Jorge Gastón: orejas volteadas' });
+    const d = await marcarCampana({ area: 'herreria', nota: 'Jorge Gastón: orejas volteadas', fecha: '2026-11-17', quien: 'Carla' }, m);
+    assert.equal(d.cuerpo.nota, 'JORGE GASTÓN: OREJAS VOLTEADAS');
     assert.equal((await marcarCampana({ area: 'ventas2', nota: 'x', fecha: '2026-11-21', quien: 'Carla' }, m)).codigo, 400);
 });
