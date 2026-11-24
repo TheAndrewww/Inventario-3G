@@ -63,6 +63,7 @@ import { registrarPronostico } from './pronostico.js';
 import { ALCANCE_PROVEEDORES, recibirCredito, leerProveedores } from './proveedores.js';
 import { ALCANCE_ALMACEN, registrarSolicitudAlmacen, listarSolicitudesAlmacen, TEXTO_TIPO } from './almacen.js';
 import { ALCANCE_TICKETS, cerrarTicket } from './tickets.js';
+import { ALCANCE_CIERRE, ALCANCE_CAMPANA, cerrarEtapa, marcarCampana } from './juntaCierres.js';
 import { ALCANCE_PRODUCCION, leerCerradas, leerEstado, leerEnCurso } from './produccion.js';
 import { leerPreparados } from './preparados.js';
 import { panelCalidad } from '../../utils/banderasCalidad.js';
@@ -549,6 +550,19 @@ export const crearPuertas = ({ env = process.env, anotar, leerFallas } = {}) => 
             error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo cerrar el ticket; intenta de nuevo.');
         }
     });
+    // 23-nov (jefe: «si Carla queda en cerrar, debe cerrar»): lo que Carla dijo en la junta que cerraba (una etapa de
+    // producción) y las fallas de un área que marca ✗ en el control de campaña. Ver juntaCierres.js.
+    const juntaEscribe = (alcance, ruta, fn) => router.post(`${PREFIJO_SISTEMAS}${ruta}`, exigirAlgunAlcance([alcance, ALCANCE_TICKETS]), async (req, res) => {
+        try {
+            const { codigo, cuerpo } = await conTope(fn(req.body), 8000);
+            res.status(codigo).json(cuerpo);
+        } catch (e) {
+            console.error(`[puerta] ${ruta}:`, e.message);
+            error(res, e?.message === 'tiempo' ? 504 : 500, 'Planta no pudo guardar el cambio; intenta de nuevo.');
+        }
+    });
+    juntaEscribe(ALCANCE_CIERRE, '/produccion/cerrar-etapa', cerrarEtapa);
+    juntaEscribe(ALCANCE_CAMPANA, '/campana/marcar', marcarCampana);
     // Carla 3G (v2 · pareja #20): Operación lee producción sin escribir nada; nunca Sheets, teléfonos ni importes
     router.get(`${PREFIJO_SISTEMAS}/produccion/cerradas`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerCerradas(req)));
     router.get(`${PREFIJO_SISTEMAS}/produccion/estado`, ...leerConCodigo(ALCANCE_PRODUCCION, (req) => leerEstado(req)));

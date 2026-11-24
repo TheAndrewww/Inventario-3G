@@ -37,7 +37,7 @@ const COLORES_AREAS = {
  *
  * Nunca lanza: un aviso que no salió no debe tumbar el avance del proyecto.
  */
-const avisarCambioDeEtapa = async ({ proyecto, etapa, etapaNueva, etapaPrevia, usuario }) => {
+export const avisarCambioDeEtapa = async ({ proyecto, etapa, etapaNueva, etapaPrevia, usuario }) => {
     try {
         if (etapa) {
             await avisarEtapaCompletada({ proyecto: proyecto.nombre, etapa, usuario });
