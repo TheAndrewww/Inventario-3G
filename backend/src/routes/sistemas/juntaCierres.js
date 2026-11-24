@@ -15,7 +15,7 @@ import { ProduccionProyecto, CampanaControl } from '../../models/index.js';
  *       → { ok, year, quarter, week, area, status: 'bad', nota, ya }
  *     Una «✗» en la semana ISO de esa fecha, con la nota (si la celda ya tenía nota, se suma). La misma nota dos veces: `ya`.
  *
- * Alcances: produccion.cerrar / campana.marcar, o la llave de los tickets de la junta (almacen.tickets), que es la que
+ * Alcances: produccion.cerrar / campana.marcar, o las de los tickets de la junta (almacen.tickets o almacen.solicitar), las que
  * Operación ya tiene para cerrar lo que Charly confirma en la llamada.
  */
 
